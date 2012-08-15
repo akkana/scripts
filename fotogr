@@ -1,0 +1,81 @@
+#!/usr/bin/env python
+
+# Photo Search:
+# Search under the current dir, or the first argument given,
+# for grep matches within files named "Keywords".
+# Then translate that to a list of full pathnames
+# Copyright 2007,2009 by Akkana Peck: share and enjoy under the GPLv2 or later.
+
+import sys, os, string
+
+def system_out (cmdstr) :
+    retlist = []
+    fp = os.popen(cmdstr)
+    while 1:
+        s = fp.readline()
+        if not s : break
+        retlist.append(s)
+    fp.close()
+    return retlist
+
+def SearchForKeywords(opts, pat, grepdirs) :
+    for grepdir in grepdirs :
+        matches = system_out("find " + grepdir + \
+                             " -name 'Keywords' -print0 | xargs -0 grep -i '" \
+                             + pat + "' /dev/null")
+        # matches is an array of lines that are either empty, or look like this:
+        # ./missionpeak/Keywords:dave: pict1166.jpg pict1167.jpg pict1168.jpg
+    
+        for line in (matches) :
+            if opts.separate :
+                if line[0:2] == "./" :
+                    print line[2:]
+                else :
+                    print line
+                continue
+
+            #print "Have a match: -", line, "-"
+            pieces = line.split(':')
+            #print "dir is", pieces[0], "middle", pieces[1], "rest", pieces[2]
+    
+            matchsplit = pieces[2].split()
+            #print "matchsplit", matchsplit
+    
+            subdir = os.path.normpath(os.path.dirname(pieces[0]))
+    
+            # Don't add "./" if . is the current path
+            if subdir == "." :
+                subdir = None
+            #print "subdir is", subdir
+    
+            for fil in matchsplit :
+                if subdir :
+                    fnam = os.path.join(subdir, fil)
+                else :
+                    fnam = fil
+    
+                # Only print files that actually exist and are readable:
+                if os.access(fnam, os.R_OK) :
+                    print fnam,
+        print
+
+if __name__ == "__main__" :
+    from optparse import OptionParser
+    usage = "Usage: %prog [options] gpx_file(s)"
+    version = "%prog 0.2: search for photos with keywords.\n\
+Copyright 2009 by Akkana Peck; share and enjoy under the GPL v2 or later."
+    parser = OptionParser(usage=usage, version=version)
+    parser.add_option("-s", "--separate",
+                      action="store_true", dest="separate",
+                      help="print separate lines from different Keywords files")
+    (options, args) = parser.parse_args()
+
+    if len(args) == 0 :
+        parser.print_help()
+    elif len(args) == 1 :
+        SearchForKeywords(options, args[0], [ "." ])
+    else :
+        SearchForKeywords(options, args[0], args[1:])
+
+
+
