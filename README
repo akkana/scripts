@@ -1,4 +1,7 @@
-A collection of useful scripts that don't fit anywhere else
+A collection of useful scripts and snippets that don't fit anywhere else
+
+falls_between.py: given a day of the week ("tue") or a day of the
+month (15), did it occur between two given dates?
 
 fotogr: Search for strings in files named Keyword beneath the current directory.
 
