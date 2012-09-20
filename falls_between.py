@@ -13,7 +13,8 @@ def falls_between(when, time1, time2) :
        If when == none, return True.
        If when matches time2, return True.
     """
-    if not when or type(len) is str and len(when) <= 0 :
+
+    if not when or type(when) is str and len(when) <= 0 :
         return True
 
     # We need both times both in seconds since epoch and in struct_time:
