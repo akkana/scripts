@@ -1,0 +1,67 @@
+#! /usr/bin/env python
+
+# Pick a new random background
+# usage: newbg [directory]
+# Default directory is ~/Images/Backgrounds/$dpy_width
+
+import sys, os, subprocess
+import random
+
+def set_random_bg(bgdir, arg) :
+    images = os.listdir(bgdir)
+    while len(images) > 0 :
+        img = random.choice(images)
+        if img.find('.') :
+            print "Setting background to", os.path.join(bgdir, img)
+            subprocess.call(['hsetroot', arg, os.path.join(bgdir, img)])
+            sys.exit(0)
+    print "No images in", bgdir
+    sys.exit(1)
+
+# If the dir is specified explicitly, go ahead and do it.
+if len(sys.argv) > 1 :
+    set_random_bg(sys.argv[1], '-fill')
+
+# Find the current resolution:
+fp = os.popen("xdpyinfo")
+while True :
+    line = fp.readline().strip()
+    if line[0:11] == 'dimensions:' :
+        parts = line[12:].split()[0].split('x')
+        width = int(parts[0])
+        height = int(parts[1])
+        break
+fp.close()
+if not width or not height :
+    print "Couldn't find screen dimensions!"
+    sys.exit(1)
+
+basedir = os.path.expanduser("~/Images/Backgrounds")
+bgdir = os.path.join(basedir, '%dx%d' % (width, height))
+
+# If the exact right directory exists, use it.
+if os.path.exists(bgdir) :
+    print bgdir, "exists: using it"
+    set_random_bg(bgdir, '-fill')
+
+# We don't have images at exactly the right resolution.
+# Try to find the closest match:
+print "Looking for the closest match"
+mindiff = 99999
+bgdir = None
+for d in os.listdir(basedir) :
+    try :
+        parts = d.split('x')
+        if len(parts) == 2 :
+            w = int(parts[0])
+            h = int(parts[1])
+            diff = abs(w - width) + abs(h - height)
+            if diff < mindiff :
+                mindiff = diff
+                bgdir = os.path.join(basedir, d)
+    except :
+        continue
+
+print "Will use", bgdir
+set_random_bg(bgdir, '-fill')
+
