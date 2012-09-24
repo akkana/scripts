@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Nutty amixer won't take - and + arguments on Master (sometimes it
+# works, mostly it doesn't) but it mostly seems to work on PCM.
+if [ `basename $0` == "mute" ]; then
+  #aumix -v 0
+  echo mute >/tmp/notes
+  amixer -c 0 set Master mute
+elif [ `basename $0` == "quieter" ]; then
+  #aumix -v -4
+  echo quieter >/tmp/notes
+  amixer -c 0 set Master 5-
+else  # louder
+  #aumix -v +4
+  echo louder >/tmp/notes
+  amixer -c 0 set Master 5+
+fi
+
+#aumix -v q
