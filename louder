@@ -1,19 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env python
+# Set the volume louder or softer, depending on program name.
 
-# Nutty amixer won't take - and + arguments on Master (sometimes it
-# works, mostly it doesn't) but it mostly seems to work on PCM.
-if [ `basename $0` == "mute" ]; then
-  #aumix -v 0
-  echo mute >/tmp/notes
-  amixer -c 0 set Master mute
-elif [ `basename $0` == "quieter" ]; then
-  #aumix -v -4
-  echo quieter >/tmp/notes
-  amixer -c 0 set Master 5-
-else  # louder
-  #aumix -v +4
-  echo louder >/tmp/notes
-  amixer -c 0 set Master 5+
-fi
+import alsaaudio, sys, os
 
-#aumix -v q
+increment = 4
+
+# First find a mixer. Use the first one.
+try :
+    mixer = alsaaudio.Mixer('Master', 0)
+except alsaaudio.ALSAAudioError :
+    sys.stderr.write("No such mixer\n")
+    sys.exit(1)
+
+cur = mixer.getvolume()[0]
+if os.path.basename(sys.argv[0]).startswith("louder") :
+    mixer.setvolume(cur + increment, alsaaudio.MIXER_CHANNEL_ALL)
+else :
+    mixer.setvolume(cur - increment, alsaaudio.MIXER_CHANNEL_ALL)
+
+# print "Volume from", cur, "to", mixer.getvolume()[0]
