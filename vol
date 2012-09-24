@@ -1,0 +1,93 @@
+#!/usr/bin/env python
+
+# Simple volume control.
+# Because I'm tired of gnome-volume-control changing names or
+# removing features every time I turn around, and no one else
+# seems to be interested in writing a basic volume control app
+# that isn't a windowmanager panel applet.
+
+# Copyright 2005 by Akkana Peck.
+# You may use, distribute, or modify this program under the terms of the GPL.
+
+import string, re, os, sys
+import gtk
+import alsaaudio
+
+def Usage() :
+    print "Usage:", os.path.basename(sys.argv[0]), "[-v|-h]"
+    sys.exit(0)
+
+# Python alas doesn't have a simple way to do this.
+def system_readline (cmdstr) :
+    fp = os.popen(cmdstr)
+    s = fp.readline()
+    fp.close()
+    return s
+
+# Python is unbelievably bad at parsing integers!
+# There's apparently no built-in way to pull 70 out of the string "70,".
+def str2int(s) :
+    pos = 0
+    if s[0] in '-+' :
+        pos = 1
+    while pos < len(s):
+        if s[pos] not in '1234567890':
+            return int(s[0:pos])
+        pos = pos + 1       
+
+# Get the current system volume.
+def get_volume() :
+    volstr = string.split(system_readline("aumix -vq"), " ")
+    return (str2int(volstr[1]), str2int(volstr[2]))
+
+# Change the system volume (both channels at once).
+def change_volume(scale) :
+    newval = scale.get_adjustment().value
+    # Force PCM to something semi-sane so that the volume won't clip.
+    # This used to add a -W 100 but on some kernels that fails.
+    os.system("aumix -w 78 -v " + str(int(newval)))
+
+def key_press(w, event) :
+    if event.string == "q" :
+        sys.exit(0)
+    return False
+
+def create_window(vol, verticalP) :
+    win = gtk.Window()
+    win.set_name("PyVolume")
+    win.set_border_width(5)
+    win.connect("destroy", gtk.main_quit)
+
+    vbox = gtk.VBox()
+    win.add(vbox)
+
+    adj = gtk.Adjustment(value=vol, lower=0, upper=100,
+                         step_incr=-1, page_incr=6)
+    if (vertical) :
+        scale = gtk.VScale(adjustment=adj)
+        scale.set_size_request(50, 250)
+    else :
+        scale = gtk.HScale(adjustment=adj)
+        scale.set_size_request(250, 50)
+    scale.set_digits(0)
+    vbox.pack_start(scale)
+    scale.show()
+    vbox.show()
+
+    scale.connect("value_changed", change_volume)
+    scale.connect("key-press-event", key_press)
+
+    win.show()
+    gtk.main()
+
+# main
+vertical = 0
+if len(sys.argv) > 1 :
+    if sys.argv[1] == "-v" or sys.argv[1] == "-V" :
+        vertical = 1
+    elif sys.argv[1] != "-h" :
+        Usage()
+
+(vLeft, vRight) = get_volume()
+create_window((vLeft + vRight)/2, vertical)
+
