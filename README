@@ -1,7 +1,31 @@
-A collection of useful scripts and snippets that don't fit anywhere else
+A collection of useful scripts and snippets
 
-falls_between.py: given a day of the week ("tue") or a day of the
-month (15), did it occur between two given dates?
+epubtag:
+    Display or modify the tags in an ebook .epub file.
 
-fotogr: Search for strings in files named Keyword beneath the current directory.
+falls_between.py:
+    given a day of the week ("tue") or a day of the month (15),
+    did it occur between two given dates?
+
+fotogr:
+    Search for strings in files named Keyword beneath the current directory.
+
+randombg:
+    Choose a random background (wallpaper) from a directory named based on
+    current X resolution. So you can have different sets of backgrounds
+    sized for laptop screen, external monitor etc.
+
+randomline:
+    Print a random line from a file. Useful for things like choosing
+    a random wallpaper or random system beep tone.
+
+vol:
+    A simple python-gtk volume slider. Much simpler and smaller than
+    alsamixergui.
+
+louder:
+    Increase alsa system volume by a small increment. Symlink it to
+    "quieter" and that will decrease it. Bind those to volume increase/
+    decrease keys on your laptop.
+
 
