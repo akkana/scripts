@@ -110,9 +110,11 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False) :
 
     # Now we have the new file in new_epub_file, old in filename.
     # Rename appropriately:
-    os.rename(filename, filename + ".bak")
+    bakfile = filename + ".bak"
+    os.rename(filename, bakfile)
     os.rename(new_epub_file, filename)
     print "Wrote", filename
+    os.remove(bakfile)
 
 def Usage() :
     print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
