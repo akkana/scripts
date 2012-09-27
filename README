@@ -28,4 +28,6 @@ louder:
     "quieter" and that will decrease it. Bind those to volume increase/
     decrease keys on your laptop.
 
-
+chatsounds.py:
+    An xchat Python script to handle nick (and other special-case) sounds.
+    Also a rare example of an xchat Python script.
