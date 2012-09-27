@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 
 # xchat script to play different sounds in different circumstances.
+# Copyright 2012 by Akkana Peck, http://shallowsky.com.
+# Share and enjoy under the GPLv2 or (at your option) any later version.
 
 __module_name__ = "chatsounds" 
 __module_version__ = "0.1" 
