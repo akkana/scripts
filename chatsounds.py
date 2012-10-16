@@ -10,7 +10,7 @@ __module_description__ = "Plays sounds when it sees keywords"
 __module_author__ = "Akkana Peck <akkana@shallowsky.com>"
 
 import xchat
-import sys, os
+import sys, os, subprocess
 import time
 
 # Globals that you may want to customize:
@@ -21,12 +21,7 @@ START_TIME = time.time()
 STARTUP_DELAY = 15     # No sounds will be played in the first few seconds
 
 def play_alert(alertfile) :
-    if not os.fork() :
-        os.execl(APLAY, APLAY, "-q", alertfile)
-    # No point in waiting: if there are a bunch of messages all coming
-    # at once (e.g. a bitlbee twitter channel), best to play them all quickly.
-    #else :
-    #    os.wait()
+    subprocess.call([APLAY, '-q', alertfile])
 
 def handle_message(word, word_eol, userdata):
     '''
@@ -58,14 +53,18 @@ def handle_message(word, word_eol, userdata):
     mynick = ctxt.get_info("nick")
     line = word[1]
 
-    # People directly addressing me:
-    if line.startswith(mynick) :
-        # print ">>>>> Starts with my nick!"
+    # Now, customize the rest as desired. Here are some examples:
+
+    # Anyone addressing or mentioning my nick:
+    if line.find(mynick) > 0 and word[0] != 'NickServ' or \
+           userdata == "Channel Msg Hilight" or \
+           userdata == "Channel Action Hilight" :
+        # print ">>>>> Contains my nick!", userdata, ">>", line
         play_alert(os.path.join(SOUND_DIR, "akk.wav"))
 
-    # Anyone mentioning me:
-    elif line.find(mynick) > 0 and word[0] != 'NickServ' :
-        # print ">>>>> Contains my nick!"
+    # Private message:
+    elif userdata.startswith("Private Message") :
+        # print ">>>>> Private message!"
         play_alert(os.path.join(SOUND_DIR, "akk.wav"))
 
     # More subtle sound for bitlbee/twitter, since they're so numerous:
@@ -74,9 +73,10 @@ def handle_message(word, word_eol, userdata):
         play_alert(os.path.join(SOUND_DIR, "SingleClick.wav"))
 
     # if you want to be fairly noisy or don't have many active channels,
-    # you might want an alert for every message:
-    # else :
-    #     play_alert("/home/akkana/.xchat2/sounds/pop.wav")
+    # you might want an alert for every channel message:
+    elif userdata.startswith("Channel M") or \
+            userdata.startswith("Channel Action") :
+        play_alert(os.path.join(SOUND_DIR, "pop.wav"))
 
     return xchat.EAT_NONE
 
