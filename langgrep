@@ -1,0 +1,76 @@
+#! /usr/bin/env python
+
+# langgrep: grep for a pattern but only in files written in the
+# specified language (as specified by the shebang line).
+#
+# Copyright 2009 by Akkana Peck.
+# Please share, modify and enjoy under the terms of the GPL v2
+# or, at your option, any later GPL version.
+#
+# Bugs: it isn't smart about parsing the grep flags.
+# Anything beginning with a - will be considered a flag
+# and passed on to grep; the first argument not starting with -
+# is taken to be the search pattern, and everything after that
+# is the file list.
+#
+
+import string, os, sys
+import subprocess
+import shlex
+
+def Usage():
+    print "langgrep lang [grepflags] pattern files"
+    print " e.g. langgrep python -w find *"
+    sys.exit(0)
+
+def check_file_lang(filename, lang) :
+    if os.path.isdir(filename) or not os.path.exists(filename) :
+        return False
+    try :
+        f = open(filename)
+        firstline = f.readline(80)
+        f.close()
+    except IOError, e :
+        print "IOError", e
+        #print "exc_info is", sys.exc_info()
+        sys.exit(1)
+        return False
+
+    if firstline[0:2] == "#!" and string.find(firstline, lang) >= 0 :
+        return True
+    return False
+
+# main()
+if len(sys.argv) < 3 :
+    Usage()
+lang = sys.argv[1]
+
+args = ""
+for i in range(2, len(sys.argv)) :
+    if sys.argv[i][0] == '-' :
+        args = args + " " + sys.argv[i]
+    else :
+        args = args + " " + sys.argv[i]
+        break
+
+# Now sys.argv[i:] is the file list, if any.
+# If none, substitute ~/bin/*
+if i >= len(sys.argv) - 1 :
+    os.chdir(os.path.join(os.getenv("HOME"), "bin"))
+    files = os.listdir(".")
+else :
+    files = sys.argv[i:]
+
+try :
+    for fil in files :
+        if check_file_lang(fil, lang) :
+            #os.system("grep -H" + args + " " + fil)
+            arglist = ['grep', '-H']
+            arglist.extend(shlex.split(args))
+            arglist.append(fil)
+            subprocess.call(arglist)
+# Try to catch ctrl-C and print a nicer message. This doesn't work, though:
+# subprocess.call just terminates the whole process.
+except KeyboardInterrupt, e :
+    print "Interrupt!"
+    sys.exit(1)
