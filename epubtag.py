@@ -4,9 +4,12 @@ import os, sys
 import zipfile
 import xml.dom.minidom
 
-def tag_epub_file(filename, new_tag_list=None, delete_tags=False) :
+def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
     subjectTag = 'dc:subject'
-    print filename
+    if brief :
+        print filename, '|',
+    else :
+        print filename
     if not zipfile.is_zipfile(filename) :
         print filename, "isn't an epub file (not zipped)"
         return
@@ -28,21 +31,64 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False) :
 
     # Tags are inside <metadata> and look like this:
     # <metadata>
-    # <dc:subject>Presidents -- United States -- Biography</dc:subject>
-    parent = None
-    tag = None
-    tags = dom.getElementsByTagName(subjectTag)
-    for tag in tags :
-        # Obviously there should be more error checking here
-        if not parent :
-            parent = tag.parentNode
+    #   <dc:subject>Presidents -- United States -- Biography</dc:subject>
+    # Author (dc:creator) and Title (dc:title) are stored similarly.
+
+    def get_matches(elname, delete_tags=False) :
+        elements = dom.getElementsByTagName(elname)
+        parent = None
+        matches = []
+        for el in elements :
+            # Obviously there should be more error checking here
+            if not parent :
+                parent = el.parentNode
+            else :
+                assert parent == el.parentNode
+            if delete_tags :
+                print "Deleting:", el.childNodes[0].wholeText
+                el.parentNode.removeChild(tag)
+            else :
+                # el.childNodes[0].wholeText is the unicode.
+                # Turn it into UTF-8 before returning.
+                # Uncomment the next line and run on micromegas.epub
+                # to test a weird thing: it happens if you run
+                # epubtag.py micromegas.epub | cat
+                # but not if you just run
+                # epubtag.py micromegas.epub
+                # See http://stackoverflow.com/questions/492483/setting-the-correct-encoding-when-piping-stdout-in-python
+                # matches.append(el.childNodes[0].wholeText)
+                matches.append(el.childNodes[0].wholeText.encode('utf-8',
+                                                        'backslashreplace'))
+
+        return matches
+
+    # But first, grab the title and author
+    titles = get_matches('dc:title')
+    if titles :
+        if brief :
+            print ', '.join(titles), '|',
         else :
-            assert parent == tag.parentNode
-        if delete_tags :
-            print "Deleting:", tag.childNodes[0].wholeText
-            tag.parentNode.removeChild(tag)
+            for t in titles :
+                print "Title:", t
+    authors = get_matches('dc:creator')
+    if brief :
+        print ', '.join(authors), '|',
+    else :
+        if len(authors) > 1 :
+            print 'Authors:',
         else :
-            print "  ", tag.childNodes[0].wholeText
+            print 'Author:',
+        print ', '.join(authors)
+
+    # Now get the subject tags.
+    tags = get_matches(subjectTag, delete_tags)
+    if brief :
+        print ', '.join(tags)
+    else :
+        if tags :
+            print "Tags:"
+            for tag in tags :
+                print '  ', tag
 
     # Now add new tags, if any
     content.close()
@@ -119,8 +165,12 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False) :
 def Usage() :
     print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
         % os.path.basename(sys.argv[0])
+    print "Display, add or remove tags in epub ebooks."
+    print "Copyright 2012 by Akkana Peck -- share and enjoy under the GPL."
+    print "Options:"
     print "    -t: add tags (otherwise, just print existing tags)"
     print "    -d: delete existing tags before adding new ones"
+    print "    -b: print only one line for each book (useful with grep)"
     sys.exit(1)
 
 # main
@@ -137,12 +187,16 @@ if __name__ == "__main__" :
     tags = []
     add_tags = False
     delete_tags = False
+    brief = False
     for arg in sys.argv[1:] :
         if arg == '-d' :
             delete_tags = True
             continue
         if arg == '-t' :
             add_tags = True
+            continue
+        if arg == '-b' :
+            brief = True
             continue
         if arg[0] == '-' :
             Usage()
@@ -158,5 +212,6 @@ if __name__ == "__main__" :
         Usage()
 
     for f in epubfiles :
-        print "======="
-        tag_epub_file(f, tags, delete_tags)
+        if not brief :
+            print "======="
+        tag_epub_file(f, tags, delete_tags, brief)
