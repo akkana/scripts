@@ -31,9 +31,9 @@ def print_sheet(sheetname, sh) :
             if not val :
                 continue
 
-            print "type:", type(val), val
+            #print "type:", type(val), val
             slen = len(unicode(val))
-            if slen > maxlen : slen = maxlen
+            #if slen > maxlen : slen = maxlen
             if slen > maxstr[colnum] :
                 maxstr[colnum] = slen
 
