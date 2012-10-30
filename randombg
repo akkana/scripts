@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # Pick a new random background
-# usage: newbg [directory]
+# usage: randombg [directory]
 # Default directory is ~/Images/Backgrounds/$dpy_width
 
 import sys, os, subprocess
