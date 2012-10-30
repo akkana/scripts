@@ -57,7 +57,7 @@ class XchatSoundHandler :
     ''' Play alert sound depending on the channel and circumstances.
     '''
 
-    STARTUP_DELAY = 15     # No sounds will be played in the first few seconds
+    STARTUP_DELAY = 25     # No sounds will be played in the first few seconds
 
     # Xchat events. Comment out any events for which you don't want alerts:
     EVENTS = [
