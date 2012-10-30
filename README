@@ -25,9 +25,27 @@ vol:
 
 louder:
     Increase alsa system volume by a small increment. Symlink it to
-    "quieter" and that will decrease it. Bind those to volume increase/
-    decrease keys on your laptop.
+    another name like "quieter" and it will decrease instead.
+    Bind those to volume increase/decrease keys on your laptop.
+    and set it as the system wallpaper.
 
 chatsounds.py:
     An xchat Python script to handle nick (and other special-case) sounds.
     Also a rare example of an xchat Python script.
+
+pyplay.py:
+    A class to play sounds asynchronously by calling aplay (or an app
+    of your choice). Don't repeat a sound that's already playing.
+    Used in the xchat script chatsounds.py.
+
+xlsrd:
+    Display an .xls spreadsheet as a formatted ASCII table, using
+    the xlrd package to parse the spreadsheet.
+
+epubtag.py:
+    Display author, title and tag information for ebooks in epub format;
+    or add or modify an ebook's topic tags.
+
+analemma.py:
+    Plot the analemma from the selected location, using PyEphem and PyGTK.
+
