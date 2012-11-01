@@ -179,11 +179,10 @@ class AnalemmaWindow :
         gtk.main()
 
 if __name__ == "__main__" :
-    observer = ephem.Observer()
-
     if len(sys.argv) == 2 :
         observer = ephem.city(sys.argv[1])
     elif len(sys.argv) == 3 :
+        observer = ephem.Observer()
         observer.name = "custom"
         observer.lon = sys.argv[1]
         observer.lat = sys.argv[2]
@@ -191,6 +190,7 @@ if __name__ == "__main__" :
         # default to San Jose
         # pyephem doesn't know ephem.city('San Jose')
         # Houge Park is -121^56.53' 37^15.38'
+        observer = ephem.Observer()
         observer.name = "San Jose"
         observer.lon = '-121:56.8'
         observer.lat = '37:15.55'
