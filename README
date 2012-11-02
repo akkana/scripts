@@ -49,3 +49,6 @@ epubtag.py:
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
+masq:
+    Set up IP masquerading to talk to another computer, such as a
+    Raspberry Pi, over eth0 while using wlan0 for the internet.
