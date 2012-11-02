@@ -12,6 +12,7 @@ pi_net=192.168.0
 myaddr=$(ifconfig wlan0 | grep 'inet addr:' | sed -e 's/.*addr://' -e 's/ *Bcast:.*//')
 echo My wlan0 address is $myaddr
 
+# Set up IP masquerading:
 modprobe ipt_MASQUERADE
 iptables -F
 iptables -t nat -F
@@ -19,8 +20,11 @@ iptables -t mangle -F
 iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to $myaddr
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
+# A little security: set it up so that the pi can send us anything,
+# but outside hosts can't:
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -m state --state NEW ! -i wlan0 -j ACCEPT
 iptables -P INPUT DROP
 
+# Bring up eth0 so we can actually talk:
 ifconfig eth0 ${pi_net}.1 up
