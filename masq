@@ -5,26 +5,28 @@
 # http://www.ibiblio.org/pub/linux/docs/howto/other-formats/html_single/Masquerading-Simple-HOWTO.html
 
 pi_net=192.168.0
+ext_iface=wlan0   # Would be nice to figure this out
+pi_iface=eth0
 
 # Don't actually need to know the Pi's intended address, just the network.
 #pi_addr=97
 
-myaddr=$(ifconfig wlan0 | grep 'inet addr:' | sed -e 's/.*addr://' -e 's/ *Bcast:.*//')
-echo My wlan0 address is $myaddr
+myaddr=$(ifconfig ${ext_iface} | grep 'inet addr:' | sed -e 's/.*addr://' -e 's/ *Bcast:.*//')
+echo My ${ext_iface} address is $myaddr
 
 # Set up IP masquerading:
 modprobe ipt_MASQUERADE
 iptables -F
 iptables -t nat -F
 iptables -t mangle -F
-iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to $myaddr
+iptables -t nat -A POSTROUTING -o ${ext_iface} -j SNAT --to $myaddr
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
 # A little security: set it up so that the pi can send us anything,
 # but outside hosts can't:
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-iptables -A INPUT -m state --state NEW ! -i wlan0 -j ACCEPT
+iptables -A INPUT -m state --state NEW ! -i ${ext_iface} -j ACCEPT
 iptables -P INPUT DROP
 
 # Bring up eth0 so we can actually talk:
-ifconfig eth0 ${pi_net}.1 up
+ifconfig ${pi_iface} ${pi_net}.1 up
