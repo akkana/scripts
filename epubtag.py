@@ -60,17 +60,17 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
                 matches.append(el.childNodes[0].wholeText.encode('utf-8',
                                                         'backslashreplace'))
 
-        return matches
+        return matches, elements, parent
 
     # But first, grab the title and author
-    titles = get_matches('dc:title')
+    titles, elements, parent = get_matches('dc:title')
     if titles :
         if brief :
             print ', '.join(titles), '|',
         else :
             for t in titles :
                 print "Title:", t
-    authors = get_matches('dc:creator')
+    authors, elements, parent = get_matches('dc:creator')
     if brief :
         print ', '.join(authors), '|',
     else :
@@ -80,8 +80,8 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
             print 'Author:',
         print ', '.join(authors)
 
-    # Now get the subject tags.
-    tags = get_matches(subjectTag, delete_tags)
+    # Now get the subject tags, deleting them if appropriate.
+    tags, elements, parent = get_matches(subjectTag, delete_tags)
     if brief :
         print ', '.join(tags)
     else :
@@ -96,14 +96,25 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
         zf.close()
         return
 
+    # There are new tags to add.
+
     # If we didn't see a dc:subject, we still need a parent, the <metadata> tag.
     if not parent :
+        print "Warning: didn't see any subject tags previously"
         parent = dom.getElementsByTagName("metadata")[0]
-    # If there's no metadata tag, maybe we should add one,
-    # but it might be better to throw an error.
 
-    # There are new tags to add.
-    # First, add them to the DOM by cloning the last node:
+        # If there's no metadata tag, maybe we should add one,
+        # but it might be better to throw an error.
+        if not parent :
+            print "No metadata tag! Bailing."
+            return
+
+    # We'll want to add the new subject tags after the last one.
+    if elements :
+        last_tag_el = elements[-1]
+    else :
+        last_tag_el = None
+
     for new_tag in new_tag_list :
         # Make the new node:
         #newnode = tag.cloneNode(False)
@@ -117,8 +128,8 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
         textnode = dom.createTextNode('\n')
 
         # Append nodenode after the last tag node we saw:
-        if tag and tag.nextSibling :
-            parent.insertBefore(textnode, tag.nextSibling)
+        if last_tag_el and last_tag_el.nextSibling :
+            parent.insertBefore(textnode, last_tag_el.nextSibling)
             parent.insertBefore(newnode, textnode)
         # If we didn't see a tag, or the tag was the last child
         # of its parent, we have to do it this way:
