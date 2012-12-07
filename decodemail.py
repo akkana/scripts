@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Decode From and Subject lines spammers encode in other charsets
-# to try to hide them from spam filters.
+# to try to hide them from spam filters. (RFC 2047 encoding.)
 # Use in conjunction with programs like procmail or spamassassin,
 # instead of something like formail
 
