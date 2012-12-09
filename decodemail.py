@@ -8,6 +8,13 @@
 import sys
 import email
 
+Usage = """Usage: decodemail [-a] headername [filename]
+Find a line matching the given header name (Subject:, From:, etc.)
+and decode it according to RFC 2047.
+Without a filemame, will read standard input.
+Adding -a will print all matches within the given file, not just the first.
+"""
+
 # Usage: decodemail headername [inputfile]
 # Decode the first line seen that starts with headername (e.g. From:).
 # If inputfile is omitted, will use stdin.
