@@ -10,6 +10,9 @@ falls_between.py:
 fotogr:
     Search for strings in files named Keyword beneath the current directory.
 
+preso:
+    A lightweight presentation program for displaying HTML slides.
+
 randombg:
     Choose a random background (wallpaper) from a directory named based on
     current X resolution. So you can have different sets of backgrounds

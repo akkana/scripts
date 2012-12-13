@@ -27,8 +27,12 @@ class PresoViewer(gtk.Window):
 
         # set the size to the size of my laptop:
         self.set_default_size(self.fullwidth, self.fullheight)
-        # Optionally, run fullscreen (comment out if not desired):
-        self.fullscreen()
+
+        # If the physical display is bigger than displaywidth,
+        # then it's better not to run fullscreen.
+        if gtk.gdk.screen_width() <= self.displaywidth and \
+                gtk.gdk.screen_height() <= self.displayheight :
+            self.fullscreen()
 
         self._browser = webkit.WebView()
         self.add(self._browser)
@@ -88,7 +92,7 @@ class PresoViewer(gtk.Window):
     def key_press_event(self, widget, event) :
         if event.keyval == gtk.keysyms.q and \
                  event.state == gtk.gdk.CONTROL_MASK :
-            print "ctrl-Q"
+            print "Bye!"
             gtk.main_quit()
 
         elif event.string == ' ' :
