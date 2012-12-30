@@ -1,0 +1,224 @@
+#!/usr/bin/env python
+
+# pisooth: play soothing noise files (rain, water etc.) in a loop,
+# while scanning for user input to control skipping to the next
+# file, shutting down or other options.
+#
+# Copyright 2012 by Akkana Peck, http://shallowsky.com.
+# Share and enjoy under the GPLv2 or (at your option) any later version.
+#
+# It's called pisoothe because it's intended as a script that will
+# turn a Raspberry Pi into a sleep soother machine you can take with
+# you on trips.
+# To use this on as the sole program on a Raspberry Pi (q will shut down),
+# add the following to the end of /etc/rc.local:
+# 
+# /path/to/pisoothe file1.wav file2.wav ...
+# /sbin/poweroff
+#
+# Eventually I'll also monitor the state of some pushbuttons
+# to control Next and Shutdown so no keyboard is needed;
+# I just need to assemble the hardware in one place.
+
+import sys, os
+import subprocess
+import time             # for sleep()
+import termios, fcntl   # For non-blocking key reads
+import alsaaudio
+
+class SoundPlayer :
+    """
+       Asynchronously play sounds that don't overlap in time.
+       Allow for querying whether a sound is still playing,
+       or killing it to start a new sound.
+    """
+
+    PLAYER = "/usr/bin/aplay"
+
+    def __init__(self) :
+        self.curpath = None
+        self.current = None
+        self.retcode = -1
+        self.debug = False
+
+    def __del__(self) :
+        self.kill()
+
+    def kill(self) :
+        if self.current :
+            if self.debug :
+                print "Killing"
+            self.current.kill()   # or try terminate()
+        elif self.debug : print "Already dead, no need to kill"
+
+    def play(self, path, interrupt=False) :
+        if self.current :
+            if self.current.poll() == None :
+                # Current process hasn't finished yet. Is this the same sound?
+                if path == self.curpath :
+                    # A repeat of the currently playing sound.
+                    # Don't play it more than once.
+                    if self.debug :
+                        print path, "is still playing. Not playing again"
+                    return
+                elif interrupt :
+                    # Stop the currently playing process,
+                    # so we can play a new one.
+                    self.kill()
+                    if self.debug :
+                        print "Waiting for process to die:",
+                    while self.current.poll() == None :
+                        time.sleep(.2)
+                        if self.debug :
+                            print ".",
+                    if self.debug :
+                        print "Gone."
+                else :
+                    # Trying to play a different sound.
+                    # Wait on the current sound then play the new one.
+                    if self.debug :
+                        print "Different sound; first waiting for", self.curpath
+                    self.wait()
+            self.current = None
+            self.curpath = None
+
+        if self.debug :
+            print "Playing", path
+
+        self.curpath = path
+        self.current = subprocess.Popen([ SoundPlayer.PLAYER, '-q', path ] )
+
+    def poll(self) :
+        '''Returns None if currently playing, else last exit code.'''
+        if not self.current :
+            return self.retcode
+        poll = self.current.poll()
+        if poll != None :
+            self.retcode = self.current.returncode
+            self.current = None
+            self.curpath = None
+        return poll
+
+    def is_done(self) :
+        '''Simpler version of retcode: returns True if the process is
+           finished, False otherwise.
+        '''
+        if not self.current :
+            return True
+        if self.poll() != None :
+            return True
+        return False
+
+    def wait(self) :
+        if self.current and self.current.poll() == None :
+            self.current.wait()
+
+class KeyReader :
+    '''
+    Read keypresses one at a time, without waiting for a newline.
+    Uses the technique from
+    http://docs.python.org/2/faq/library.html#how-do-i-get-a-single-keypress-at-a-time
+    '''
+    def __init__(self, echo=False) :
+        '''Put the terminal into cbreak and noecho mode.'''
+        self.fd = sys.stdin.fileno()
+
+        self.oldterm = termios.tcgetattr(self.fd)
+        newattr = termios.tcgetattr(self.fd)
+        newattr[3] = newattr[3] & ~termios.ICANON
+        if not echo :
+            newattr[3] = newattr[3] & ~termios.ECHO
+        termios.tcsetattr(self.fd, termios.TCSANOW, newattr)
+
+        self.oldflags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags | os.O_NONBLOCK)
+
+        # Sad hack: when the destructor __del__ is called,
+        # the fcntl module may already be unloaded, so we can no longer
+        # call fcntl.fcntl() to set the terminal back to normal.
+        # So just in case, store a reference to the fcntl module,
+        # and also to termios (though I haven't yet seen a case
+        # where termios was gone -- for some reason it's just fnctl).
+        # The idea of keeping references to the modules comes from
+        # http://bugs.python.org/issue5099
+        # though I don't know if it'll solve the problem completely.
+        self.fcntl = fcntl
+        self.termios = termios
+
+    def __del__(self) :
+        '''Reset the terminal before exiting the program.'''
+        self.termios.tcsetattr(self.fd, self.termios.TCSAFLUSH, self.oldterm)
+        self.fcntl.fcntl(self.fd, self.fcntl.F_SETFL, self.oldflags)
+
+    def getch(self) :
+        '''Read keyboard input, returning a string.
+           Note that one key may result in a string of more than one character,
+           e.g. arrow keys that send escape sequences.
+           There may also be multiple keystrokes queued up since the last read.
+
+           This function, sadly, cannot read special characters like VolumeUp.
+           They don't show up in ordinary CLI reads -- you have to be in
+           a window system like X to get those special keycodes.
+        '''
+        try:
+            return sys.stdin.read()
+        except IOError:
+            return None
+
+# main
+# For instance,
+# pisooth pop.wav pop.wav pop.wav meow.wav meow.wav pop.wav pop.wav
+if __name__ == "__main__" :
+    if len(sys.argv) < 1 :
+        print "Usage: %s soundfile soundfile soundfile ..." % sys.argv[0]
+        sys.exit(1)
+
+    try :
+        mixer = alsaaudio.Mixer('Master', 0)
+    except alsaaudio.ALSAAudioError :
+        sys.stderr.write("No such mixer\n")
+        mixer = None
+    vol_increment = 4
+
+    readkey = KeyReader()
+    player = SoundPlayer()
+    samplenum = 1
+    player.play(sys.argv[samplenum])
+    while True :
+        time.sleep(.5)
+        c = readkey.getch()
+        if not c :   # Didn't read anything. Is the current sound still playing?
+            if player.is_done() :
+                player.play(sys.argv[samplenum])
+            continue
+
+        # Else we did read a character. Act on it:
+        if c == 'q' :
+            # print "Bye!"
+            sys.exit(0)
+        if c == 'n' :
+            print "Next sound"
+            samplenum += 1
+            player.play(sys.argv[samplenum], True)
+            continue
+        if c == '\x1b[A' :   # Up arrow
+            if mixer :
+                print "Louder"
+                cur = mixer.getvolume()[0]
+                mixer.setvolume(cur + vol_increment,
+                                alsaaudio.MIXER_CHANNEL_ALL)
+            continue
+        if c == '\x1b[B' :   # Down arrow
+            if mixer :
+                print "Quieter"
+                cur = mixer.getvolume()[0]
+                mixer.setvolume(cur - vol_increment,
+                                alsaaudio.MIXER_CHANNEL_ALL)
+            continue
+        # If we get here, it was an unrecognized character.
+        print "Don't know key",
+        for cc in c :
+            o = ord(cc)
+            if o < 32 : cc = ' '    # Don't try to print nonprintables
+            print '%c (%d)' % (cc, o),
+        print
