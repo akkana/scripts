@@ -1,0 +1,130 @@
+#! /usr/bin/env python
+
+# Wrapper for rsync that adds several features:
+# 1. preserves atime on the source,
+#    so e.g. you can back up your mutt folder directory without
+#    messing up mutt's idea of which folders have new mail).
+#    TODO: preserve it on the dest end too.
+# 2. Print the list of what will be copied, give the user a chance
+#    to confirm, then do it.
+# 3. Preserve password for remote copies, so you only have to type
+#    it once, not several times.
+#    Rsync has two ways to do that, os.environ["RSYNC_PASSWORD"] and
+#    --password-file=FILE, but they only work with rsyncd, not with ssh.
+#    So use pexpect instead.
+
+# Copyright 2011 by Akkana Peck. Share and enjoy under the GPL v.2 or later.
+
+import sys, os, getpass, pexpect
+
+check_cmd = "rsync -avn --delete %s %s"
+sync_cmd = "rsync -av --delete %s %s"
+
+def Usage() :
+    print "Usage: %s source dest" % sys.argv
+    sys.exit(1)
+
+# atime and mtime for every file under src:
+utimes = {}
+
+def find_all_atimes(src) :
+    print "Saving all atimes"
+    for root, dirs, files in os.walk(src) :
+        for file in files :
+            path = os.path.join(root, file)
+            #atimes[file] = os.path.getatime(path)
+            filestat = os.stat(path)
+            utimes[path] = ( filestat.st_atime, filestat.st_mtime )
+
+def find_atimes(files) :
+    print "Saving all atimes"
+    for file in files :
+        #atimes[file] = os.path.getatime(os.path.join(root, file))
+        filestat = os.stat(file)
+        utimes[file] = ( filestat.st_atime, filestat.st_mtime )
+
+def restore_all_atimes(src) :
+    print "Restoring all atimes and mtimes: ",
+    for file in utimes.keys() :
+        print "\rRestoring", file,    #'\tto', utimes[file],
+        os.utime(file, utimes[file])
+    print "\nRestored all atimes and mtimes"
+
+def sync(src, dst, confirm=True) :
+    # Find all atimes BEFORE calling rsync, since rsync will destroy them:
+    find_all_atimes(src)
+
+    passwd = None
+    if confirm :
+        # use rsync to get the list of files needing sync
+        print "Getting list of files that need to be transfered"
+        deletefiles = []
+        copyfiles = []
+
+        child = pexpect.spawn(check_cmd % (src, dst))
+
+        # rsync will send as its first line either a password: prompt,
+        # or , if it needs no passwd, "sending incremental file list".
+        # If we expect either one we can detect whether a password
+        # is needed.
+        got = child.expect(['password:', 'sending incremental file list'])
+        if got == 0 :    # a password prompt
+            passwd = getpass.getpass("Password for %s: " % dst)
+            child.sendline (passwd)
+            print "Sent password"
+        else :           # sent file list without needing password
+            print "No password needed"
+
+        while True :
+            line = child.readline()
+            if not line : break
+            line = line.strip()
+            if not line or line.startswith("building file list") \
+               or line.startswith("sending ") or line.startswith("created ") \
+               or line.startswith("sent ") or line.startswith("total ") \
+               or line == './' :
+                continue
+            elif line.startswith("deleting ") :
+                deletefiles.append(line[9:])
+            else :
+                copyfiles.append(line)
+        child.close()
+
+        print "Files to delete:"
+        for f in deletefiles :
+            print "-", f
+        print "\nFiles to copy:"
+        for f in copyfiles :
+            print "+", f
+
+        # We could probably replace utimes list with the list
+        # of files actually copied -- does rsync change atime
+        # on any non-copied files? Test this.
+
+        # Verify that the user wants to proceed:
+        ans = raw_input("Proceed? (y/n) ")
+        if ans and ans[0].lower() != 'y' :
+            print "\nNot syncing"
+            sys.exit(0)
+
+    print "Syncing ..."
+    child = pexpect.spawn(sync_cmd % (src, dst))
+    if passwd :
+        child.expect('password:')
+        child.sendline (passwd)
+        print "Sent password again"
+    #child.interact()
+    while child.isalive() :
+        print child.readline(),
+    child.close()
+
+    restore_all_atimes(src)
+
+if __name__ == "__main__" :
+    if len(sys.argv) != 3 :
+        Usage()
+
+    src = sys.argv[1]
+    dst = sys.argv[2]
+
+    sync(src, dst, True)

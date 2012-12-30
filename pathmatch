@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+# pathmatch: Search for a string in $PATH
+# usage pathmatch pattern [pattern ...]
+# e.g. if you're looking for volume control, pathmatch mix vol
+# will show you all programs in your path that incorporate "mix" or "vol"
+# anywhere in their names.
+#
+# Copyright 2003,2011 by Akkana Peck.
+# Share and enjoy under the terms of the GPL v2 or later.
+
+import sys, string, os, types
+
+def getMatchingFiles(pat, files) :
+    matches = []
+    lc = string.lower(pat)
+    for fil in range(0, len(files)) :
+        #print "Looking for", lc, "in", files[fil]
+        callfile = string.lower(files[fil])
+        if (string.find(callfile, lc) >= 0) :
+            matches.append(files[fil])
+    return matches
+
+def findPatInPath(pat, pathdirs) :
+    """Return a set of files in the path matching the pattern"""
+    matchprogs = set([])
+    for dir in pathdirs :
+        try :
+            progs = os.listdir(dir)
+        except OSError, e:
+            continue
+        matches = getMatchingFiles(pat, progs)
+        for prog in matches :
+            # Only add it if it's an executable file:
+            fullpath = os.path.join(dir, prog)
+            if not os.access(fullpath, os.X_OK) :
+                continue
+            if os.path.isdir(fullpath) :
+                continue
+            matchprogs.add(prog)
+
+    return matchprogs
+
+# main()
+
+pathdirs = string.split(os.environ["PATH"], ":")
+
+for argp in range(1, len(sys.argv)) :
+    progs = list(findPatInPath(sys.argv[argp], pathdirs))
+    progs.sort()
+    for p in progs :
+        print p
+

@@ -3,6 +3,9 @@ A collection of useful scripts and snippets
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
+bdump:
+    Ascii/hex/decimal dumps of any file. Like od but much more readable.
+
 chatsounds.py:
     An xchat Python script to handle nick (and other special-case) sounds.
     Also a rare example of an xchat Python script.
@@ -10,6 +13,9 @@ chatsounds.py:
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
+
+eggtimer:
+    Pop up a reminder window in a specified number of minutes.
 
 epubtag.py:
     Display author, title and tag information for ebooks in epub format;
@@ -19,8 +25,15 @@ falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
     did it occur between two given dates?
 
+fontasia:
+    A Linux font chooser and categorizer.
+
 fotogr:
     Search for strings in files named Keyword beneath the current directory.
+
+langgrep:
+    Search (grep) for patterns only within scripts written in a
+    specified language (e.g. in all python scripts).
 
 louder:
     Increase alsa system volume by a small increment. Symlink it to
@@ -32,6 +45,11 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+pathmatch:
+    Search your executable path to find programs matching a string.
+    Like str<tab> except you can match patterns anywhere in the
+    string, not just at the beginning.
+
 pisoothe:
     Play sound samples (e.g. soothing white or pink noise samples)
     in a loop, reacting to key events for volume control or to skip
@@ -40,10 +58,24 @@ pisoothe:
 preso:
     A lightweight presentation program for displaying HTML slides.
 
+pyclip:
+    Read the X clipboard.
+
+pykey:
+    Simulate keypresses under X. A simpler, Python version of
+    Crikey http://shallowsky.com/software/crikey/
+
 pyplay.py:
     A class to play sounds asynchronously by calling aplay (or an app
     of your choice). Don't repeat a sound that's already playing.
     Used in the xchat script chatsounds.py.
+
+pyruler:
+    An X pixel ruler. Useful for measuring things like icon sizes.
+
+pysync:
+    Call rsync, but check first what would be changed, and save the
+    password between the two calls.
 
 randombg:
     Choose a random background (wallpaper) from a directory named based on
@@ -57,6 +89,9 @@ randomline:
 readkey.py:
     Read a key press from the keyboard without waiting for a newline.
     For CLI programs: doesn't need X, tkintr, pygame or similar libs.
+
+termcolors:
+    Display ANSI colors for the current terminal.
 
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than
