@@ -1,7 +1,19 @@
 A collection of useful scripts and snippets
 
-epubtag:
-    Display or modify the tags in an ebook .epub file.
+analemma.py:
+    Plot the analemma from the selected location, using PyEphem and PyGTK.
+
+chatsounds.py:
+    An xchat Python script to handle nick (and other special-case) sounds.
+    Also a rare example of an xchat Python script.
+
+decodemail.py:
+    Decode email lines encoded in RFC 2047 format, printing only lines
+    that match a specific header (Subject:, From:, etc.).
+
+epubtag.py:
+    Display author, title and tag information for ebooks in epub format;
+    or add or modify an ebook's topic tags.
 
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
@@ -10,8 +22,28 @@ falls_between.py:
 fotogr:
     Search for strings in files named Keyword beneath the current directory.
 
+louder:
+    Increase alsa system volume by a small increment. Symlink it to
+    another name like "quieter" and it will decrease instead.
+    Bind those to volume increase/decrease keys on your laptop.
+    and set it as the system wallpaper.
+
+masq:
+    Set up IP masquerading to talk to another computer, such as a
+    Raspberry Pi, over eth0 while using wlan0 for the internet.
+
+pisoothe:
+    Play sound samples (e.g. soothing white or pink noise samples)
+    in a loop, reacting to key events for volume control or to skip
+    to the next sample.
+
 preso:
     A lightweight presentation program for displaying HTML slides.
+
+pyplay.py:
+    A class to play sounds asynchronously by calling aplay (or an app
+    of your choice). Don't repeat a sound that's already playing.
+    Used in the xchat script chatsounds.py.
 
 randombg:
     Choose a random background (wallpaper) from a directory named based on
@@ -22,41 +54,15 @@ randomline:
     Print a random line from a file. Useful for things like choosing
     a random wallpaper or random system beep tone.
 
+readkey.py:
+    Read a key press from the keyboard without waiting for a newline.
+    For CLI programs: doesn't need X, tkintr, pygame or similar libs.
+
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than
     alsamixergui.
 
-louder:
-    Increase alsa system volume by a small increment. Symlink it to
-    another name like "quieter" and it will decrease instead.
-    Bind those to volume increase/decrease keys on your laptop.
-    and set it as the system wallpaper.
-
-chatsounds.py:
-    An xchat Python script to handle nick (and other special-case) sounds.
-    Also a rare example of an xchat Python script.
-
-pyplay.py:
-    A class to play sounds asynchronously by calling aplay (or an app
-    of your choice). Don't repeat a sound that's already playing.
-    Used in the xchat script chatsounds.py.
-
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
     the xlrd package to parse the spreadsheet.
-
-epubtag.py:
-    Display author, title and tag information for ebooks in epub format;
-    or add or modify an ebook's topic tags.
-
-analemma.py:
-    Plot the analemma from the selected location, using PyEphem and PyGTK.
-
-masq:
-    Set up IP masquerading to talk to another computer, such as a
-    Raspberry Pi, over eth0 while using wlan0 for the internet.
-
-decodemail.py:
-    Decode email lines encoded in RFC 2047 format, printing only lines
-    that match a specific header (Subject:, From:, etc.).
 
