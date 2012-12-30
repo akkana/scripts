@@ -5,9 +5,6 @@
 # Copyright 2012 by Akkana Peck, http://shallowsky.com.
 # Share and enjoy under the GPLv2 or (at your option) any later version.
 
-# Rules:
-#
-
 import sys
 import subprocess
 
