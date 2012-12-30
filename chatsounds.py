@@ -124,10 +124,6 @@ class XchatSoundHandler :
         mynick = ctxt.get_info("nick")
         line = word[1]
 
-        # Are we silenced?
-        if channel in self.silenced_channels :
-            return xchat.EAT_NONE
-
         # Now, customize the rest as desired. Here are some examples:
 
         # Anyone addressing or mentioning my nick:
@@ -136,14 +132,22 @@ class XchatSoundHandler :
                userdata == "Channel Action Hilight" :
             # print ">>>>> Contains my nick!", userdata, ">>", line
             self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            return xchat.EAT_NONE
 
         # Private message:
         elif userdata.startswith("Private Message") :
             # print ">>>>> Private message!"
             self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            return xchat.EAT_NONE
+
+        # Now check whether we're silenced.
+        # Note that nick references and private messages are exempt
+        # from this check -- you'll hear them even on silenced channels.
+        if channel in self.silenced_channels :
+            return xchat.EAT_NONE
 
         # More subtle sound for bitlbee/twitter, since they're so numerous:
-        elif channel == "#twitter_" + mynick :
+        if channel == "#twitter_" + mynick :
             # print ">>>>> Twitter channel!"
             self.player.play(os.path.join(self.sound_dir, "SingleClick.wav"))
 
