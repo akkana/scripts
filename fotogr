@@ -6,12 +6,8 @@
 # Then translate that to a list of full pathnames.
 # Copyright 2007,2009 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
-# Boolean logic usage example: works kinda like google search, e.g.
-# fotogr dead tree OR frog
-# will find photos that match keywords (dead AND tree) OR (frog)
-# Also take directory name into account, e.g. the previous query
-# would match anything inside Images/2011/sanborn-bullfrogs
-# and anything keyworded "dead" inside Images/2010/big-trees.
+# Wish list: Boolean logic. Currently this can search only for one
+# term/phrase at a time.
 
 import sys, os, string
 
