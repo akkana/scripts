@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+
+# tweet: play a bird call matching the argument string.
+# Copyright 2003 by Akkana Peck.
+# You may use, distribute or modify this program under the terms of the GPL.
+
+# This program assumes that you have bird calls installed in files
+# named after each bird, where spaces may be replaced by underscores:
+# e.g. Broad-Billed_Hummingbird.wav or Song_Sparrow.ogg.
+# Edit calldir to point to the place where these are stored.
+# It also assumes that you have a program called "play" which
+# can play whatever format you're using.  If you use a different
+# program, edit the os.system line in the play function appropriately.
+
+# This program does NOT come with any bird calls included.
+# I recommend the Stokes Field Guide to Bird Songs, available
+# from booksellers.  Use your favorite CD ripper to rip the CDs
+# in and store in whatever format you like (I use ogg).
+
+import sys, string, os, types
+
+calldir = os.environ["HOME"] + "/Sounds/Birds"
+os.chdir(calldir)
+
+callfiles = os.listdir(calldir)
+
+def prettify(filnam) :
+    return string.replace(filnam, "_", " ")
+
+def getMatchingFiles(pat, files) :
+    matches = []
+    bird = string.lower(pat)
+    for fil in range(0, len(files)) :
+        #print "Looking for", bird, "in", files[fil]
+        callfile = string.lower(files[fil])
+        if (string.find(callfile, bird) >= 0) :
+            matches.append(files[fil])
+            #print "Appended: matches is now", matches
+    return matches
+
+def play(fil) :
+    if type(fil) != types.StringType :
+        return
+    os.system("play " + fil)
+
+def playList(lis) :
+    if type(lis) != types.ListType :
+        return
+    for b in lis :
+        #print "(", b, ")"
+        play(b)
+    
+def doBird(b) :
+    matches = getMatchingFiles(b, callfiles)
+
+    # If we have more than one, prompt the user:
+    while len(matches) > 1 :
+        for m in range(0, len(matches)) :
+            dot = string.rfind(matches[m], ".")
+            if dot < 0 :
+                continue
+            print "%d. %s" % (m+1, prettify(matches[m][0:dot]))
+        print "%d. %s" % (len(matches)+1, "all")
+        try :
+            ans = raw_input("Which one? ")
+        except KeyboardInterrupt, e :
+            print
+            return
+        if (ans == "q") :
+            return
+        if (ans == "all") :
+            playList(matches)
+            return
+        try :
+            answer = eval(ans)
+            if type(answer) == types.IntType :
+                if answer == len(matches)+1 :
+                    playList(matches)
+                    return
+                if answer <= 0 or answer > len(matches) :
+                    return
+                play(matches[answer-1])
+                return
+        except NameError, e:
+            if type(ans) == types.StringType :
+                newmatches = getMatchingFiles(ans, matches)
+                matches = newmatches
+
+    if len(matches) <= 0 :
+        return
+
+    play(matches[0])
+    return
+
+# main()
+for argp in range(1, len(sys.argv)) :
+    doBird(sys.argv[argp])
+
