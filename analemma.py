@@ -109,8 +109,9 @@ class AnalemmaWindow :
 
     def expose_handler(self, widget, event) :
         # print "Expose"
-        self.xgc = widget.window.new_gc()
-        self.bgc = widget.window.new_gc()
+        if not self.xgc :
+            self.xgc = widget.window.new_gc()
+            self.bgc = widget.window.new_gc()
         self.width, self.height = self.drawing_area.window.get_size()
 
         # Draw a blue background. But if we're using a sinusoidal
