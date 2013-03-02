@@ -1,0 +1,307 @@
+<html>
+<head>
+<title>Javascript Jupiter</title>
+
+<style type="text/css">
+div#jupframe {
+  background: black;
+  color: white;
+  position: relative;
+  width: 99%;
+  height: 100px;
+}
+
+/* All images and labels inside the jupframe are absolutely positioned */
+#jupframe img, #jupframe span { position: absolute; visibility: hidden; }
+
+#jupframe span.moonlabel { color: white; top: .3em; }
+
+#jupframe span.shadowlabel { color: yellow; top: 1.1em; }
+
+#jupframe span#grslabel { color: #aaa; font-size: .9em; bottom: .1em; }
+
+</style>
+
+<!-- The code for calculating Jovian moon and GRS positions: -->
+<script type="text/javascript" src="jupiter.js"></script>
+
+<!-- Code specific to displaying on this page: -->
+<script type="text/javascript">
+function screenWidth() {
+  if (window.innerWidth != null)
+    return window.innerWidth;
+  if (document.documentElement.clientWidth)
+    return document.documentElement.clientWidth;
+  return 800;
+}
+
+function placeImage(im, left, top, width, height) {
+  im.style.left = left;
+  if (top) {
+    im.style.top = top;
+  }
+  if (width) {
+    im.width = width;
+    if (height) {
+      im.height = height;
+    } else {
+      im.height = width;   // assume square if width but not height specified
+    }
+  }
+  im.style.visibility = "visible";
+}
+
+// Change to a new date:
+function setDate() {
+  drawJupiter(jup, new Date(document.getElementById("thedate").value));
+
+}
+
+function addHours(hrs) {
+  var d = jup.getDate();
+  d.setTime(d.getTime() + 60 * 60 * hrs * 1000)
+  drawJupiter(jup, d);
+}
+
+/*
+function setNewDateIfEnterKey(ev) {
+  var e = ev || event;
+  if (e.keyCode == 13) {  // Was it the return/enter key?
+    setDate();
+    }
+    return false; //prevents form from being submitted.
+  }
+}
+ */
+
+// Animate:
+var animating = false;
+var animateTime = 250;
+
+function animateStep() {
+  if (! animating)
+    return;
+  var d = jup.getDate();
+  d.setTime(d.getTime() + 60 * 60 * 1000)
+  drawJupiter(jup, d);
+  setTimeout("animateStep();", animateTime);
+}
+
+function animateFaster(amt) {
+  if (animateTime == 1 && amt < 0) animateTime = 0;
+  animateTime = animateTime - amt;
+  if (animateTime < 1) animateTime = 1;
+  var animspan = document.getElementById("animDelay");
+  animspan.innerHTML = "Delay: " + animateTime + " milliseconds";
+}
+
+function toggleAnimation() {
+  animating = !animating;
+  if (animating) {
+    animateStep();
+  }
+}
+
+function drawJupiter(jup, date) {
+  jup.setDate(date);
+
+  var thedate = document.getElementById("thedate");
+  if (thedate)
+      thedate.value = date;
+
+  var datefield = document.getElementById("datefield");
+  if (datefield)
+      datefield.value = date;
+
+  var width = parseInt(screenWidth() * .99);
+  var halfwidth = width/2;
+  var height = 100;
+  var halfheight = height/2;
+  var jupRadius = 19;
+  var spotWidth = 27 * jupRadius / 30;
+  var spotHeight = 13 * jupRadius / 30;
+  
+  // Make sure Jupiter is properly centered:
+  var img = document.getElementById("jupiter");
+  if (img) {
+    placeImage(img, halfwidth - jupRadius, halfheight - jupRadius, jupRadius*2);
+  }
+  
+  // The GRS:
+  var coord = jup.getRedSpotXY(80);
+  var img = document.getElementById("grs");
+  var label = document.getElementById("grslabel");
+  
+  if (img && !isNaN(coord.x) && !isNaN(coord.y)) {
+    // XXX Need some extra code here to make width smaller if the GRS
+    // XXX is near the limb and foreshortened.
+    var sx = halfwidth + coord.x * jupRadius - spotWidth/2;
+    var sw = spotWidth;
+    var jr = jupRadius * .8;   // approx radius at spot's latitude
+    if (sx < halfwidth - jr) {
+      sw = sw - halfwidth - jr - sx;
+      sx = halfwidth - jr
+    } else if (sx + sw > halfwidth + jr) {
+      sw = halfwidth + jr - sx;
+    }
+    placeImage(img, sx, coord.y * jupRadius + halfheight - spotHeight/2,
+               sw, spotHeight);
+    if (label) {
+      placeImage(label, sx);
+    }
+  }
+  else if (img) {
+    img.style.visibility = "hidden";
+    if (label) {
+      label.style.visibility = "hidden";
+    }
+  }
+  else { alert("no grs image"); }
+  
+  for (var whichmoon = 0; whichmoon < 4; ++whichmoon) {
+    // First handle the shadow
+    coord = jup.getMoonShadowXY(whichmoon);
+    img = document.getElementById("shadow" + whichmoon);
+    label = document.getElementById("slabel" + whichmoon);
+    if (img && !isNaN(coord.x) && !isNaN(coord.y)) {
+      img.setAttribute("src", "moonshadow.png");
+      var x = coord.x * jupRadius + halfwidth;
+      placeImage(img, x, coord.y * jupRadius + halfheight);
+  
+      // Place the label too:
+      if (label) {
+        placeImage(label, x);
+      }
+    }
+    else if (img) {
+      img.style.visibility = "hidden";
+      if (label) {
+        label.style.visibility = "hidden";
+      }
+    }
+  
+    // Now, with the shadow done, handle the moon itself:
+    img = document.getElementById("moon" + whichmoon);
+    label = document.getElementById("label" + whichmoon);
+    coord = jup.getMoonXY(whichmoon);
+    if (img && !isNaN(coord.x) && !isNaN(coord.y)) {
+      img.setAttribute("src", "borderedmoon.png");
+      var x = coord.x * jupRadius + halfwidth;
+      placeImage(img, x, coord.y * jupRadius + halfheight);
+  
+      // Place the label too:
+      if (label) {
+        placeImage(label, x);
+      }
+    }
+    else if (img) {
+      img.style.visibility = "hidden";
+      if (label) {
+        label.style.visibility = "hidden";
+      }
+    }
+  }
+}
+
+</script>
+</head>
+
+<body>
+<h1>Javascript Jupiter</h1>
+
+<p>
+Here are the four bright "Galilean" moons of Jupiter --
+Io, Europa, Ganymede and Callisto -- and their shadows.
+It also shows the approximate position of Jupiter's "great red spot" (GRS).
+
+<p>
+This is an experiment on doing graphics in HTML/CSS/Javascript,
+re-implementing my <a href="/jupiter.html">Java Jupiter</a> page without Java.
+
+<p>
+North is up.
+
+<p>
+It apparently doesn't work in IE. I don't know what the problem is yet.
+
+<noscript>
+<p>
+<b>
+The moon positions are set using Javascript, which is disabled
+in your browser. You'll need to turn it back on if you want to see
+the current position of Jupiter's moons.
+</b>
+</noscript>
+
+<div id="jupframe">
+<img id="jupiter" src="smalljup.png">
+<img id="grs" src="grs.png">
+<img id="shadow0" src="moonshadow.png">
+<img id="shadow1" src="moonshadow.png">
+<img id="shadow2" src="moonshadow.png">
+<img id="shadow3" src="moonshadow.png">
+<img id="moon0" src="borderedmoon.png">
+<img id="moon1" src="borderedmoon.png">
+<img id="moon2" src="borderedmoon.png">
+<img id="moon3" src="borderedmoon.png">
+<span id="label0" class="moonlabel">I</span>
+<span id="label1" class="moonlabel">E</span>
+<span id="label2" class="moonlabel">G</span>
+<span id="label3" class="moonlabel">C</span>
+<span id="slabel0" class="shadowlabel">I</span>
+<span id="slabel1" class="shadowlabel">E</span>
+<span id="slabel2" class="shadowlabel">G</span>
+<span id="slabel3" class="shadowlabel">C</span>
+<span id="grslabel">GRS</span>
+</div>
+
+<p>
+<!-- Don't wrap these in a form -- it keeps the dates from working
+     when you hit enter. -->
+Or you can set a date explicitly:
+<!--
+  Would make more sense to use a datetime input, but hitting return in it
+  briefly changes the date, then reverts back to the current date.
+<input id="thedate" type="text" onKeyPress="setNewDateIfEnterKey(event);" 
+ size=40>
+<br>
+ -->
+<input id="datefield" type="datetime"
+ onChange="drawJupiter(jup, new Date(document.getElementById('datefield').value)); return false;"
+ size=40>
+<input type="button" name="changeDate" value="Recalculate" onClick="setDate();">
+<p>
+<input type="button" name="nextDay" value="-1 day" onClick="addHours(-24);">
+<input type="button" name="nextHour" value="-1 hour" onClick="addHours(-1);">
+<input type="button" name="nextHour" value="-5 min" onClick="addHours(-1/12);">
+<input type="button" name="nextHour" value="+5 min" onClick="addHours(1/12);">
+<input type="button" name="nextHour" value="+1 hour" onClick="addHours(1);">
+<input type="button" name="nextDay" value="+1 day" onClick="addHours(24);">
+<input type="button" name="now" value="Now"
+        onClick="drawJupiter(jup, new Date());">
+<p>
+<input type="button" name="animate" value="Animate"
+       onClick="toggleAnimation();">
+<input type="button" name="faster" value="faster" onClick="animateFaster(50);">
+<input type="button" name="slower" value="slower" onClick="animateFaster(-50);">
+<span id="animDelay">Delay: 250 milliseconds</span>
+
+<script type="text/javascript">
+/* Call the code that calculates the positions, defined in jupiter.js. */
+var jup = new Jupiter();
+var date = new Date();
+drawJupiter(jup, date);
+</script>
+
+<hr>
+Miguel Moreto has adapted this code for a neat mobile phone app called
+<a href="http://code.google.com/p/mobilejupiter/">Mobile Jupiter</a>.
+<p>
+<a href="/software/">Akkana's other software</a> |
+<a href="/astro.html">Akkana's Astronomy Page</a> |
+<a href="/">Shallow Sky home</a>
+
+
+</body>
+</html>
+
