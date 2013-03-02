@@ -191,21 +191,27 @@ function Jupiter()
 	moondata.moonx = r * Math.sin(moonAngles[whichmoon]);
 	moondata.moony = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
 
-	// See whether the moon is hidden behind the planet:
-	if (moondata.moonx < 1. && moondata.moonx > -1.
-	    && moonAngles[whichmoon] > Math.PI * .5
+	// See whether the moon is on the far side of the planet:
+        if (moonAngles[whichmoon] > Math.PI * .5
 	    && moonAngles[whichmoon] < Math.PI * 1.5)
-	{
-	    moondata.moonx = moondata.moony = NaN;
-	}
-
-        // Now, shadows.
-        // Calculate the moon-planet-sun angle:
-	var moonSunAngle = moonAngles[whichmoon] - psi;
-
-        // Is the moon on this side of the planet?
-        if (moonSunAngle < Math.PI * .5 || moonSunAngle > Math.PI * 1.5)
         {
+            // Is the moon blocked by the planet, so it's invisible?
+	    if (moondata.moonx < 1. && moondata.moonx > -1.)
+	    {
+	        moondata.moonx = moondata.moony = NaN;
+	    }
+
+            // if not, then figure out whether the planet's shadow
+            // might be eclipsing the moon.
+        }
+
+        // Calculate shadows.
+        // Moon shadows on the planet can only happen if the moon
+        // is on the near side of the planet.
+        else {
+            // Calculate the moon-planet-sun angle:
+	    var moonSunAngle = moonAngles[whichmoon] - psi;
+
             moondata.shadowx = r * Math.sin(moonSunAngle);
             // This Y coord isn't right ... need to derive the right eqn:
             moondata.shadowy = r * Math.cos(moonSunAngle) * Math.sin(De);
@@ -214,12 +220,6 @@ function Jupiter()
             // Some day, ought to check for moons eclipsing other moons
             if (moondata.shadowx < -1. || moondata.shadowx > 1.)
                 moondata.shadowx = moondata.shadowy = NaN;
-        }
-        // Otherwise, the moon is on the far side of the planet.
-        // We can't see the moon's shadow; but Jupiter's shadow
-        // might be eclipsing the moon.
-        else {
-            moondata.shadowx = moondata.shadowy = NaN;
         }
 
     	return moondata;
