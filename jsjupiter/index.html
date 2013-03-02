@@ -160,13 +160,14 @@ function drawJupiter(jup, date) {
   
   for (var whichmoon = 0; whichmoon < 4; ++whichmoon) {
     // First handle the shadow
-    coord = jup.getMoonShadowXY(whichmoon);
+    moondata = jup.getMoonXYData(whichmoon);
+ 
     img = document.getElementById("shadow" + whichmoon);
     label = document.getElementById("slabel" + whichmoon);
-    if (img && !isNaN(coord.x) && !isNaN(coord.y)) {
+    if (img && !isNaN(moondata.shadowx) && !isNaN(moondata.shadowy)) {
       img.setAttribute("src", "moonshadow.png");
-      var x = coord.x * jupRadius + halfwidth;
-      placeImage(img, x, coord.y * jupRadius + halfheight);
+      var x = moondata.shadowx * jupRadius + halfwidth;
+      placeImage(img, x, moondata.shadowy * jupRadius + halfheight);
   
       // Place the label too:
       if (label) {
@@ -183,11 +184,10 @@ function drawJupiter(jup, date) {
     // Now, with the shadow done, handle the moon itself:
     img = document.getElementById("moon" + whichmoon);
     label = document.getElementById("label" + whichmoon);
-    coord = jup.getMoonXY(whichmoon);
-    if (img && !isNaN(coord.x) && !isNaN(coord.y)) {
+    if (img && !isNaN(moondata.moonx) && !isNaN(moondata.moony)) {
       img.setAttribute("src", "borderedmoon.png");
-      var x = coord.x * jupRadius + halfwidth;
-      placeImage(img, x, coord.y * jupRadius + halfheight);
+      var x = moondata.moonx * jupRadius + halfwidth;
+      placeImage(img, x, moondata.moony * jupRadius + halfheight);
   
       // Place the label too:
       if (label) {
@@ -220,9 +220,6 @@ re-implementing my <a href="/jupiter.html">Java Jupiter</a> page without Java.
 
 <p>
 North is up.
-
-<p>
-It apparently doesn't work in IE. I don't know what the problem is yet.
 
 <noscript>
 <p>

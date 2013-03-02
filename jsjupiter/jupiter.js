@@ -61,7 +61,12 @@ function Jupiter()
     
     function setDate(initDate)
     {
-        // Calculate the position of Jupiter's central meridian:
+        // Calculate the position of Jupiter's central meridian,
+        // and the corresponding moonAngle and moonDist arrays;
+        // and system I and system II longitudes;
+        // psi, the Jupiter's phase angle (always btw. -12 and 12 degrees):
+        // and De, the planetocentric angular distance of the earth
+        // from the equator of Jupiter.
 
         // First, get the number of days since 1899 Dec 31 12h ET.
         curdate = initDate;
@@ -174,57 +179,52 @@ function Jupiter()
     
     //
     // Returns the moon position in units of Jupiter radii.
+    // Also calculate the shadows, and whether the moon is eclipsed by Jupiter.
     //
-    function getMoonXY(whichmoon)
+    function getMoonXYData(whichmoon)
     {
 	var r = moonDist[whichmoon];
 	
-    	var coord = new XYCoord();
+    	//var mooncoord = new XYCoord();
+        var moondata = new Object();
+
+	moondata.moonx = r * Math.sin(moonAngles[whichmoon]);
+	moondata.moony = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
 
 	// See whether the moon is hidden behind the planet:
-	coord.x = r * Math.sin(moonAngles[whichmoon]);
-	coord.y = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
-
-        //alert("Moon " + whichmoon + ": angle " + moonAngles[whichmoon] + ", (" + coord.x + ", " + coord.y + ")");
-	if (coord.x < 1. && coord.x > -1.
+	if (moondata.moonx < 1. && moondata.moonx > -1.
 	    && moonAngles[whichmoon] > Math.PI * .5
 	    && moonAngles[whichmoon] < Math.PI * 1.5)
 	{
-	    coord.x = coord.y = NaN;
+	    moondata.moonx = moondata.moony = NaN;
 	}
-    	return coord;
-    }
-    this.getMoonXY = getMoonXY
 
-    //
-    // Moon shadows, also in units of Jupiter radii.
-    //
-    function getMoonShadowXY(whichmoon)
-    {
-	var r = moonDist[whichmoon];
+        // Now, shadows.
+        // Calculate the moon-planet-sun angle:
 	var moonSunAngle = moonAngles[whichmoon] - psi;
-	
-    	var coord = new XYCoord();
-        coord.x = r * Math.sin(moonSunAngle);
-        // This Y coord isn't right ... need to derive the right eqn:
-        coord.y = r * Math.cos(moonSunAngle) * Math.sin(De);
 
-	// See whether the shadow is on the far side of the planet:
-	if (coord.x > -1. && coord.x < 1.
-	    && moonSunAngle > Math.PI * .5 && moonSunAngle < Math.PI * 1.5)
-	{
-	    coord.x = coord.y = NaN;
-	}
-        else if (coord.x < -1. || coord.x > 1.)
+        // Is the moon on this side of the planet?
+        if (moonSunAngle < Math.PI * .5 || moonSunAngle > Math.PI * 1.5)
         {
-            // shadow isn't hitting the planet right now
+            moondata.shadowx = r * Math.sin(moonSunAngle);
+            // This Y coord isn't right ... need to derive the right eqn:
+            moondata.shadowy = r * Math.cos(moonSunAngle) * Math.sin(De);
+
+            // Is it hitting the planet? If not, set coords to NaN.
             // Some day, ought to check for moons eclipsing other moons
-	    coord.x = coord.y = NaN;
+            if (moondata.shadowx < -1. || moondata.shadowx > 1.)
+                moondata.shadowx = moondata.shadowy = NaN;
         }
-	
-    	return coord;
+        // Otherwise, the moon is on the far side of the planet.
+        // We can't see the moon's shadow; but Jupiter's shadow
+        // might be eclipsing the moon.
+        else {
+            moondata.shadowx = moondata.shadowy = NaN;
+        }
+
+    	return moondata;
     }
-    this.getMoonShadowXY = getMoonShadowXY
+    this.getMoonXYData = getMoonXYData
     
     //
     // The Great Red Spot, currently at longitude 61 in system II
