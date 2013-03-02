@@ -12,7 +12,9 @@ div#jupframe {
 }
 
 /* All images and labels inside the jupframe are absolutely positioned */
-#jupframe img, #jupframe span { position: absolute; visibility: hidden; }
+#jupframe img, #jupframe span {
+   position: absolute; visibility: hidden; z-index: 50
+}
 
 #jupframe span.moonlabel { color: white; top: .3em; }
 
@@ -188,6 +190,10 @@ function drawJupiter(jup, date) {
       img.setAttribute("src", "borderedmoon.png");
       var x = moondata.moonx * jupRadius + halfwidth;
       placeImage(img, x, moondata.moony * jupRadius + halfheight);
+      if (moondata.farside)
+        img.style.zIndex = 1;
+      else
+        img.style.zIndex = 100;
   
       // Place the label too:
       if (label) {
@@ -215,8 +221,9 @@ Io, Europa, Ganymede and Callisto -- and their shadows.
 It also shows the approximate position of Jupiter's "great red spot" (GRS).
 
 <p>
-This is an experiment on doing graphics in HTML/CSS/Javascript,
-re-implementing my <a href="/jupiter.html">Java Jupiter</a> page without Java.
+This is a re-implementation of my older
+<a href="/jupiter.html">Java Jupiter</a> page
+using HTML, CSS and Javascript (and nicer graphics).
 
 <p>
 North is up.
@@ -286,11 +293,20 @@ Or you can set a date explicitly:
 <script type="text/javascript">
 /* Call the code that calculates the positions, defined in jupiter.js. */
 var jup = new Jupiter();
-var date = new Date();
+//var date = new Date();
+// Europa should be visible at 19:51 but gone at 19:59; back at 20:06.
+//var date = new Date('Mon Mar 10 2013 19:53:00 GMT-0700 (PDT)');
+//var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
+var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
 drawJupiter(jup, date);
 </script>
 
 <hr>
+I use this app on Android with the help of my
+<a href="http://shallowsky.com/software/android/WebClient/">WebClient</a>
+wrapper app.
+<br>
+For older Java phones,
 Miguel Moreto has adapted this code for a neat mobile phone app called
 <a href="http://code.google.com/p/mobilejupiter/">Mobile Jupiter</a>.
 <p>

@@ -191,24 +191,42 @@ function Jupiter()
 	moondata.moonx = r * Math.sin(moonAngles[whichmoon]);
 	moondata.moony = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
 
+        s = "moon " + whichmoon;
+        s += "\nDist = " + r;
+        s += "\nmoonAngle = " + moonAngles[whichmoon];
+
 	// See whether the moon is on the far side of the planet:
         if (moonAngles[whichmoon] > Math.PI * .5
 	    && moonAngles[whichmoon] < Math.PI * 1.5)
         {
+            s += "\nFar side of the planet";
+            moondata.farside = true;
+
             // Is the moon blocked by the planet, so it's invisible?
 	    if (moondata.moonx < 1. && moondata.moonx > -1.)
 	    {
 	        moondata.moonx = moondata.moony = NaN;
+                s += "\nBlocked by the planet";
 	    }
-
-            // if not, then figure out whether the planet's shadow
-            // might be eclipsing the moon.
+            else {
+                // if not, then figure out whether the planet's shadow
+                // might be eclipsing the moon.
+                // Calculate the moon-planet-sun angle:
+	        var moonSunAngle = moonAngles[whichmoon] - psi;
+                s += "\nMSA = " + moonSunAngle;
+                moondata.eclipse = (1. < r * Math.sin(moonSunAngle))
+                if (moondata.eclipse) {
+                    s += "Eclipse of moon " + whichmoon + "!";
+                }
+            }
         }
 
-        // Calculate shadows.
-        // Moon shadows on the planet can only happen if the moon
-        // is on the near side of the planet.
+        // Since the moon is on the near side, check for shadows
+        // cast by the moon on the planet.
         else {
+            s += "\nNear side of the planet";
+            moondata.farside = false;
+
             // Calculate the moon-planet-sun angle:
 	    var moonSunAngle = moonAngles[whichmoon] - psi;
 
@@ -222,6 +240,7 @@ function Jupiter()
                 moondata.shadowx = moondata.shadowy = NaN;
         }
 
+        //if (whichmoon == 1) alert(s);
     	return moondata;
     }
     this.getMoonXYData = getMoonXYData
