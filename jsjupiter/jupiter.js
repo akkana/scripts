@@ -305,7 +305,29 @@ function Jupiter()
     }
 }
 
-function upcomingEvents(date)
+function prettytime(tothrs)
+{
+    if (tothrs < 24)
+        prettytime = tothrs + " hours";
+    else {
+        hrs = tothrs % 24;
+        days = (tothrs-hrs) / 24;
+        prettytime = days + " day";
+        if (days != 1)
+            prettytime += "s";
+
+        if (hrs == 1)
+            prettytime += ", 1 hour";
+        else if (hrs != 1)
+            prettytime += ", " + hrs + " hours";
+    }
+    return prettytime;
+}
+
+//
+// Build a table of upcoming moon events for a given interval.
+//
+function upcomingEvents(date, tothrs)
 {
     var saveDate = jup.curdate;
     if (!saveDate) {
@@ -313,9 +335,8 @@ function upcomingEvents(date)
         saveDate = date;
     }
 
-    tothrs = 8;
     interval = 1;   // minutes
-    upcoming = "Moon events in the next " + tothrs + " hours:\n";
+    upcoming = "<b>Moon events in the next " + prettytime(tothrs) + "</b>\n\n";
 
     moonnames = [ "Io", "Europa", "Ganymede", "Callisto" ];
 
