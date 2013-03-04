@@ -25,6 +25,8 @@ div#jupframe {
 
 #jupframe span.shadowlabel { color: yellow; top: 1.1em; }
 
+#jupframe span.eclipselabel { color: blue; top: .3em; }
+
 #jupframe span#grslabel { color: #aaa; font-size: .9em; bottom: .1em; }
 
 </style>
@@ -83,21 +85,29 @@ function setNewDateIfEnterKey(ev) {
 
 // Animate:
 var animating = false;
-var animateTime = 250;
+var animateTime = 100;  // default msec delay between steps
+var stepMinutes = 10;   // default time to advance in each step
 
 function animateStep() {
   if (! animating)
     return;
   var d = jup.getDate();
-  d.setTime(d.getTime() + 60 * 60 * 1000);
+  d.setTime(d.getTime() + stepMinutes * 60 * 1000);
   drawJupiter(jup, d);
   setTimeout("animateStep();", animateTime);
 }
 
 function animateFaster(amt) {
-  if (animateTime == 1 && amt < 0) animateTime = 0;
-  animateTime = animateTime - amt;
-  if (animateTime < 1) animateTime = 1;
+  if (stepMinutes > 10 && amt < 0) {
+    stepMinutes -= 10;
+  }
+  else {
+    animateTime = animateTime - amt;
+    if (animateTime < 1) {
+      animateTime = 1;
+      stepMinutes += 10;
+    }
+  }
   var animspan = document.getElementById("animDelay");
   animspan.innerHTML = "Delay: " + animateTime + " milliseconds";
 }
@@ -191,7 +201,16 @@ function drawJupiter(jup, date) {
     // Now, with the shadow done, handle the moon itself:
     img = document.getElementById("moon" + whichmoon);
     label = document.getElementById("label" + whichmoon);
-    if (img && !isNaN(moondata.moonx) && !isNaN(moondata.moony)) {
+    eclipselabel = document.getElementById("elabel" + whichmoon);
+    if (moondata.eclipse) {
+      var x = moondata.moonx * jupRadius + halfwidth;
+      placeImage(eclipselabel, x);
+      if (img)
+        img.style.visibility = "hidden";
+      if (label)
+        label.style.visibility = "hidden";
+    }
+    else if (img && !isNaN(moondata.moonx) && !isNaN(moondata.moony)) {
       img.setAttribute("src", "borderedmoon.png");
       var x = moondata.moonx * jupRadius + halfwidth;
       placeImage(img, x, moondata.moony * jupRadius + halfheight);
@@ -199,17 +218,21 @@ function drawJupiter(jup, date) {
         img.style.zIndex = 1;
       else
         img.style.zIndex = 100;
-  
+
       // Place the label too:
-      if (label) {
+      if (label)
         placeImage(label, x);
-      }
+
+      if (eclipselabel)
+        eclipselabel.style.visibility = "hidden";
     }
-    else if (img) {
-      img.style.visibility = "hidden";
-      if (label) {
+    else {
+      if (img)
+        img.style.visibility = "hidden";
+      if (label)
         label.style.visibility = "hidden";
-      }
+      if (eclipselabel)
+        eclipselabel.style.visibility = "hidden";
     }
   }
 
@@ -269,6 +292,10 @@ the current position of Jupiter's moons.
 <span id="slabel1" class="shadowlabel">E</span>
 <span id="slabel2" class="shadowlabel">G</span>
 <span id="slabel3" class="shadowlabel">C</span>
+<span id="elabel0" class="eclipselabel">I</span>
+<span id="elabel1" class="eclipselabel">E</span>
+<span id="elabel2" class="eclipselabel">G</span>
+<span id="elabel3" class="eclipselabel">C</span>
 <span id="grslabel">GRS</span>
 </div>
 
@@ -304,16 +331,17 @@ Or you can set a date explicitly:
 <span id="animDelay">Delay: 250 milliseconds</span>
 
 <p>
-<textarea id="upcoming" readonly cols=280 rows=30></textarea>
+<!-- <textarea id="upcoming" readonly cols=80 rows=30></textarea> -->
+<pre id="upcoming"></pre>
 
 <script type="text/javascript">
 /* Call the code that calculates the positions, defined in jupiter.js. */
 var jup = new Jupiter();
-//var date = new Date();
+var date = new Date();
 // Europa should be visible at 19:51 but gone at 19:59; back at 20:06.
 //var date = new Date('Mon Mar 10 2013 19:53:00 GMT-0700 (PDT)');
 //var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
-var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
+//var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
 //var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
 drawJupiter(jup, date);
 </script>

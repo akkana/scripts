@@ -259,13 +259,6 @@ function Jupiter()
             s += "\nDist from center = " + Math.sqrt(xy.x*xy.x + xy.y*xy.y);
             if (moondata.eclipse)
                 s += "\nEclipse of moon " + whichmoon + "!";
-
-            /* This was just for testing.
-            if (moondata.eclipse) {
-                moondata.shadowx = xy.x;
-                moondata.shadowy = xy.y;
-            }
-            */
         }
 
         //if (moondata.eclipse) alert(s);
@@ -366,7 +359,7 @@ function upcomingEvents(date)
                                 + "'s shadow disappears\n";
                 else if (moondata.shadowx && !lastmoondata[whichmoon].shadowx)
                     upcoming += d + ": " + moonnames[whichmoon]
-                                + "'s shadow reappears\n";
+                                + "'s shadow appears\n";
 
                 if (verbose)
                     upcoming += JSON.stringify(lastmoondata[whichmoon]) + "\n"
