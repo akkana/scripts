@@ -70,6 +70,7 @@ function addHours(hrs) {
   var d = jup.getDate();
   d.setTime(d.getTime() + 60 * 60 * hrs * 1000);
   drawJupiter(jup, d);
+  predictUpcoming();
 }
 
 /*
@@ -116,6 +117,9 @@ function toggleAnimation() {
   animating = !animating;
   if (animating) {
     animateStep();
+  }
+  else {
+    predictUpcoming();
   }
 }
 
@@ -238,11 +242,18 @@ function drawJupiter(jup, date) {
 
   var upcoming = document.getElementById("upcoming");
   if (!upcoming) {
-    alert("No place to note upcoming events");
+    //alert("No place to note upcoming events");
     return;
   }
+}
 
-  upcoming.innerHTML = upcomingEvents(date, 8);
+function predictUpcoming()
+{
+  var upcoming = document.getElementById("upcoming");
+  if (!upcoming) return;
+  upcoming.innerHTML =
+    upcomingEvents(date,
+                   parseInt(document.getElementById("upcoming-hrs").value));
 }
 
 </script>
@@ -311,7 +322,7 @@ Or you can set a date explicitly:
 <br>
  -->
 <input id="datefield" type="datetime"
- onChange="drawJupiter(jup, new Date(document.getElementById('datefield').value)); return false;"
+ onChange="drawJupiter(jup, new Date(document.getElementById('datefield').value)); predictUpcoming(); return false;"
  size=40>
 <input type="button" name="changeDate" value="Recalculate" onClick="setDate();">
 <p>
@@ -322,7 +333,7 @@ Or you can set a date explicitly:
 <input type="button" name="nextHour" value="+1 hour" onClick="addHours(1);">
 <input type="button" name="nextDay" value="+1 day" onClick="addHours(24);">
 <input type="button" name="now" value="Now"
-        onClick="drawJupiter(jup, new Date());">
+        onClick="drawJupiter(jup, new Date()); predictUpcoming(); return true">
 <p>
 <input type="button" name="animate" value="Animate"
        onClick="toggleAnimation();">
@@ -331,7 +342,13 @@ Or you can set a date explicitly:
 <span id="animDelay">Delay: 250 milliseconds</span>
 
 <p>
-<!-- <textarea id="upcoming" readonly cols=80 rows=30></textarea> -->
+Show events for
+<input id="upcoming-hrs" type="text" value="8" size=4 
+ onChange="predictUpcoming();">
+hours.
+<input type="button" name="predict" value="Predict"
+       onClick="predictUpcoming();">
+<p>
 <pre id="upcoming"></pre>
 
 <script type="text/javascript">
@@ -344,6 +361,7 @@ var date = new Date();
 //var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
 //var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
 drawJupiter(jup, date);
+predictUpcoming();
 </script>
 
 <hr>

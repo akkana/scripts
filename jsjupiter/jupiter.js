@@ -9,6 +9,7 @@
 // Code below is from Jupiter.java and is in the process of being
 // translated to javascript.
 
+
 function Jupiter()
 {
     const NUM_MOONS = 4;
@@ -181,7 +182,8 @@ function Jupiter()
     
     //
     // Returns the moon position in units of Jupiter radii.
-    // Also calculate the shadows, and whether the moon is eclipsed by Jupiter.
+    // Also calculate the shadows, and whether the moon is eclipsed
+    // by Jupiter's shadow or transiting in front of Jupiter.
     //
     function getMoonXYData(whichmoon)
     {
@@ -198,13 +200,12 @@ function Jupiter()
             return xy;
         }
 
-        function dist(x, y)
-        {
-            return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
-        }
-
 	moondata.moonx = r * Math.sin(moonAngles[whichmoon]);
 	moondata.moony = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
+
+        // Is the moon directly in front of or behind Jupiter's disk?
+        // Then this distance will be <= 1.
+        diskdist = dist(moondata.moonx, moondata.moony);
 
         s = "moon " + whichmoon;
         s += "\nDist = " + r;
@@ -217,6 +218,11 @@ function Jupiter()
         if (moonAngles[whichmoon] < Math.PI * .5
 	    || moonAngles[whichmoon] > Math.PI * 1.5)
         {
+            // Is it transiting? Leave a little slop, consider a moon
+            // transiting when it's just starting its transit.
+            if (diskdist < .9)
+                moondata.transit = true;
+
             // Since the moon is on the near side, check for shadows
             // cast by the moon on the planet.
             s += "\nNear side of the planet";
@@ -234,7 +240,7 @@ function Jupiter()
 
         // Is the moon blocked by the planet, so it's invisible?
         //else if (moondata.moonx < 1. && moondata.moonx > -1.)
-        else if (dist(moondata.moonx, moondata.moony) < 1.)
+        else if (diskdist < 1.0)
 	{
             moondata.farside = true;
 	    moondata.moonx = moondata.moony = NaN;
@@ -305,23 +311,28 @@ function Jupiter()
     }
 }
 
+function dist(x, y)
+{
+    return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+}
+
 function prettytime(tothrs)
 {
     if (tothrs < 24)
-        prettytime = tothrs + " hours";
+        pt = tothrs + " hours";
     else {
         hrs = tothrs % 24;
         days = (tothrs-hrs) / 24;
-        prettytime = days + " day";
+        pt = days + " day";
         if (days != 1)
-            prettytime += "s";
+            pt += "s";
 
         if (hrs == 1)
-            prettytime += ", 1 hour";
-        else if (hrs != 1)
-            prettytime += ", " + hrs + " hours";
+            pt += ", 1 hour";
+        else if (hrs > 0)
+            pt += ", " + hrs + " hours";
     }
-    return prettytime;
+    return pt;
 }
 
 //
@@ -351,39 +362,64 @@ function upcomingEvents(date, tothrs)
         jup.setDate(d);
         if (verbose)
             upcoming += "\n" + d + "\n";
+
+        // Keep track of how many moons are involved in events
+        nshadows = 0;
+        ntransits = 0;
+
         for (var whichmoon = 0; whichmoon < 4; ++whichmoon) {
             moondata = jup.getMoonXYData(whichmoon);
             if (verbose) {
                 upcoming += " (" + whichmoon + "):\n";
                 upcoming += JSON.stringify(moondata) + "\n";
             }
+
             if (lastmoondata[whichmoon]) {
+                // Count total events
+                if (moondata.shadowx)
+                    ++nshadows;
+                if (moondata.transit)
+                    ++ntransits;
+                thisevent = "";
 
                 if (!moondata.moonx && lastmoondata[whichmoon].moonx)
-                    upcoming += d + ": "
+                    thisevent += d + ": "
                                 + moonnames[whichmoon] + " disappears\n";
                 else if (moondata.moonx && ! lastmoondata[whichmoon].moonx) {
                     if (! moondata.eclipse)
-                        upcoming += d + ": "
+                        thisevent += d + ": "
                                     + moonnames[whichmoon] + " reappears\n";
                 }
 
+                else if (moondata.transit && ! lastmoondata[whichmoon].transit)
+                    thisevent += d + ": " + moonnames[whichmoon]
+                                + " begins transit\n";
+                else if (! moondata.transit && lastmoondata[whichmoon].transit)
+                    thisevent += d + ": " + moonnames[whichmoon]
+                                + " ends transit\n";
+
                 else if (moondata.eclipse && ! lastmoondata[whichmoon].eclipse)
-                    upcoming += d + ": " + moonnames[whichmoon]
+                    thisevent += d + ": " + moonnames[whichmoon]
                                 + " enters eclipse\n";
                 else if (! moondata.eclipse && lastmoondata[whichmoon].eclipse)
-                    upcoming += d + ": " + moonnames[whichmoon]
+                    thisevent += d + ": " + moonnames[whichmoon]
                                 + " leaves eclipse\n";
 
                 if (!moondata.shadowx && lastmoondata[whichmoon].shadowx)
-                    upcoming += d + ": " + moonnames[whichmoon]
+                    thisevent += d + ": " + moonnames[whichmoon]
                                 + "'s shadow disappears\n";
                 else if (moondata.shadowx && !lastmoondata[whichmoon].shadowx)
-                    upcoming += d + ": " + moonnames[whichmoon]
+                    thisevent += d + ": " + moonnames[whichmoon]
                                 + "'s shadow appears\n";
 
-                if (verbose)
-                    upcoming += JSON.stringify(lastmoondata[whichmoon]) + "\n"
+                if (nshadows + ntransits > 1)
+                    upcoming += "<b>";
+                upcoming += thisevent;
+                if (nshadows + ntransits > 1)
+                    upcoming += "</b>";
+
+                //if (verbose)
+                //    upcoming += JSON.stringify(lastmoondata[whichmoon]) + "\n"
             }
 
             // Ick! This is supposedly the most efficient way to clone
