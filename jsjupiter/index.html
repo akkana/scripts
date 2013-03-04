@@ -29,6 +29,11 @@ div#jupframe {
 
 #jupframe span#grslabel { color: #aaa; font-size: .9em; bottom: .1em; }
 
+/* I can't find any way to style an input button by name --
+ * it has to have an id as well as a name.
+ */
+input[type=button]#now { margin-left: 3em; }
+
 </style>
 
 <!-- The code for calculating Jovian moon and GRS positions: -->
@@ -60,29 +65,31 @@ function placeImage(im, left, top, width, height) {
   im.style.visibility = "visible";
 }
 
-// Change to a new date:
-function setDate() {
-  drawJupiter(jup, new Date(document.getElementById("thedate").value));
+// Update Jupiter and predict upcoming events based on whatever
+// date is in the date field of the page.
+function setDate() 
+{
+  drawJupiter(jup, new Date(document.getElementById("datefield").value));
 
+  predictUpcoming();
+}
+
+// Update the date field to the given date, then call setDate().
+function updateDate(newdate)
+{
+  var datefield = document.getElementById("datefield");
+  if (!datefield) {
+    return;
+  }
+  datefield.value = newdate;
+  setDate();
 }
 
 function addHours(hrs) {
   var d = jup.getDate();
   d.setTime(d.getTime() + 60 * 60 * hrs * 1000);
-  drawJupiter(jup, d);
-  predictUpcoming();
+  updateDate(d);
 }
-
-/*
-function setNewDateIfEnterKey(ev) {
-  var e = ev || event;
-  if (e.keyCode == 13) {  // Was it the return/enter key?
-    setDate();
-    }
-    return false; //prevents form from being submitted.
-  }
-}
- */
 
 // Animate:
 var animating = false;
@@ -102,12 +109,14 @@ function animateFaster(amt) {
   if (stepMinutes > 10 && amt < 0) {
     stepMinutes -= 10;
   }
+  else if (animateTime == 1) {
+    animateTime = 1;
+    stepMinutes += 10;
+  }
   else {
-    animateTime = animateTime - amt;
-    if (animateTime < 1) {
+    animateTime -= amt;
+    if (animateTime < 1)
       animateTime = 1;
-      stepMinutes += 10;
-    }
   }
   var animspan = document.getElementById("animDelay");
   animspan.innerHTML = "Delay: " + animateTime + " milliseconds";
@@ -124,15 +133,10 @@ function toggleAnimation() {
 }
 
 function drawJupiter(jup, date) {
+  busy = document.getElementById("recalculating")
+  busy.style.visibility = "visible";
+
   jup.setDate(date);
-
-  var thedate = document.getElementById("thedate");
-  if (thedate)
-      thedate.value = date;
-
-  var datefield = document.getElementById("datefield");
-  if (datefield)
-      datefield.value = date;
 
   var width = parseInt(screenWidth() * .99);
   var halfwidth = width/2;
@@ -240,20 +244,19 @@ function drawJupiter(jup, date) {
     }
   }
 
-  var upcoming = document.getElementById("upcoming");
-  if (!upcoming) {
-    //alert("No place to note upcoming events");
-    return;
-  }
+  busy.style.visibility = "hidden";
+  document.getElementById("datefield").value = jup.getDate();
 }
 
 function predictUpcoming()
 {
+  busy.style.visibility = "visible";
   var upcoming = document.getElementById("upcoming");
   if (!upcoming) return;
   upcoming.innerHTML =
-    upcomingEvents(date,
+    upcomingEvents(jup.getDate(),
                    parseInt(document.getElementById("upcoming-hrs").value));
+  busy.style.visibility = "hidden";
 }
 
 </script>
@@ -314,17 +317,10 @@ the current position of Jupiter's moons.
 <!-- Don't wrap these in a form -- it keeps the dates from working
      when you hit enter. -->
 Or you can set a date explicitly:
-<!--
-  Would make more sense to use a datetime input, but hitting return in it
-  briefly changes the date, then reverts back to the current date.
-<input id="thedate" type="text" onKeyPress="setNewDateIfEnterKey(event);" 
- size=40>
-<br>
- -->
-<input id="datefield" type="datetime"
- onChange="drawJupiter(jup, new Date(document.getElementById('datefield').value)); predictUpcoming(); return false;"
+<input id="datefield" type="datetime" onChange="setDate(); return false;"
  size=40>
 <input type="button" name="changeDate" value="Recalculate" onClick="setDate();">
+<span id="recalculating"><i>Recalculating ...</i></span>
 <p>
 <input type="button" name="nextDay" value="-1 day" onClick="addHours(-24);">
 <input type="button" name="nextHour" value="-1 hour" onClick="addHours(-1);">
@@ -332,14 +328,14 @@ Or you can set a date explicitly:
 <input type="button" name="nextHour" value="+5 min" onClick="addHours(1/12);">
 <input type="button" name="nextHour" value="+1 hour" onClick="addHours(1);">
 <input type="button" name="nextDay" value="+1 day" onClick="addHours(24);">
-<input type="button" name="now" value="Now"
+<input type="button" name="now" id="now" value="* Now *"
         onClick="drawJupiter(jup, new Date()); predictUpcoming(); return true">
 <p>
 <input type="button" name="animate" value="Animate"
        onClick="toggleAnimation();">
-<input type="button" name="faster" value="faster" onClick="animateFaster(50);">
-<input type="button" name="slower" value="slower" onClick="animateFaster(-50);">
-<span id="animDelay">Delay: 250 milliseconds</span>
+<input type="button" name="faster" value="faster" onClick="animateFaster(20);">
+<input type="button" name="slower" value="slower" onClick="animateFaster(-20);">
+<span id="animDelay">Delay: 100 milliseconds</span>
 
 <p>
 Show events for
@@ -360,8 +356,9 @@ var date = new Date();
 //var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
 //var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
 //var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
-drawJupiter(jup, date);
-predictUpcoming();
+var date = new Date('Wed Mar 10 2010 06:35:17 GMT-0800 (PST)'); // 2 xits 2 shad
+
+updateDate(date);
 </script>
 
 <hr>

@@ -342,7 +342,6 @@ function upcomingEvents(date, tothrs)
 {
     var saveDate = jup.curdate;
     if (!saveDate) {
-        //alert("upcoming events, but curdate is " + jup.curdate);
         saveDate = date;
     }
 
@@ -367,6 +366,7 @@ function upcomingEvents(date, tothrs)
         nshadows = 0;
         ntransits = 0;
 
+        thisevent = "";
         for (var whichmoon = 0; whichmoon < 4; ++whichmoon) {
             moondata = jup.getMoonXYData(whichmoon);
             if (verbose) {
@@ -380,7 +380,6 @@ function upcomingEvents(date, tothrs)
                     ++nshadows;
                 if (moondata.transit)
                     ++ntransits;
-                thisevent = "";
 
                 if (!moondata.moonx && lastmoondata[whichmoon].moonx)
                     thisevent += d + ": "
@@ -412,12 +411,6 @@ function upcomingEvents(date, tothrs)
                     thisevent += d + ": " + moonnames[whichmoon]
                                 + "'s shadow appears\n";
 
-                if (nshadows + ntransits > 1)
-                    upcoming += "<b>";
-                upcoming += thisevent;
-                if (nshadows + ntransits > 1)
-                    upcoming += "</b>";
-
                 //if (verbose)
                 //    upcoming += JSON.stringify(lastmoondata[whichmoon]) + "\n"
             }
@@ -425,10 +418,28 @@ function upcomingEvents(date, tothrs)
             // Ick! This is supposedly the most efficient way to clone
             // an object in javascript. Can you believe it?
             lastmoondata[whichmoon] = JSON.parse(JSON.stringify(moondata));
-        }
+        } // end loop over whichmoon
+
+        if (thisevent && (nshadows + ntransits > 1))
+            upcoming += "<b>" + pluralize(ntransits, "transit")
+                       + ", " + pluralize(nshadows, "shadow") + ":</b>\n";
+        upcoming += thisevent;
     }
 
     if (saveDate != undefined)
         jup.setDate(saveDate);
     return upcoming;
+}
+
+function endsWith(str, suffix) {
+    return str.indexOf(suffix, str.length - suffix.length) !== -1;
+}
+
+function pluralize(num, word)
+{
+    if (num == 1)
+        return "1 " + word;
+    else if (endsWith(word, 's'))
+        return num + " " + word + "es";
+    return num + " " + word + "s";
 }
