@@ -1,5 +1,10 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
 <html>
 <head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
 <title>Javascript Jupiter</title>
 
 <style type="text/css">
@@ -61,7 +66,7 @@ function setDate() {
 
 function addHours(hrs) {
   var d = jup.getDate();
-  d.setTime(d.getTime() + 60 * 60 * hrs * 1000)
+  d.setTime(d.getTime() + 60 * 60 * hrs * 1000);
   drawJupiter(jup, d);
 }
 
@@ -84,7 +89,7 @@ function animateStep() {
   if (! animating)
     return;
   var d = jup.getDate();
-  d.setTime(d.getTime() + 60 * 60 * 1000)
+  d.setTime(d.getTime() + 60 * 60 * 1000);
   drawJupiter(jup, d);
   setTimeout("animateStep();", animateTime);
 }
@@ -207,6 +212,14 @@ function drawJupiter(jup, date) {
       }
     }
   }
+
+  var upcoming = document.getElementById("upcoming");
+  if (!upcoming) {
+    alert("No place to note upcoming events");
+    return;
+  }
+
+  upcoming.innerHTML = upcomingEvents(date);
 }
 
 </script>
@@ -290,6 +303,9 @@ Or you can set a date explicitly:
 <input type="button" name="slower" value="slower" onClick="animateFaster(-50);">
 <span id="animDelay">Delay: 250 milliseconds</span>
 
+<p>
+<textarea id="upcoming" readonly cols=280 rows=30></textarea>
+
 <script type="text/javascript">
 /* Call the code that calculates the positions, defined in jupiter.js. */
 var jup = new Jupiter();
@@ -298,6 +314,7 @@ var jup = new Jupiter();
 //var date = new Date('Mon Mar 10 2013 19:53:00 GMT-0700 (PDT)');
 //var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
 var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
+//var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
 drawJupiter(jup, date);
 </script>
 

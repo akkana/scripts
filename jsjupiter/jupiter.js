@@ -1,3 +1,5 @@
+/* -*- Mode: Javascript; js-indent-level: 4; indent-tabs-mode: nil; -*- */
+
 // Javascript code to calculate the position of Jupiter's moons and shadows.
 // Copyright 2009 by Akkana Peck --
 // please share and enjoy under the terms of the GPL v2 or later.
@@ -129,6 +131,7 @@ function Jupiter()
         // from the equator of Jupiter:
         var lambda = angle((238.05 + .083091 * d + .33 * Math.sin(V))
                               * Math.PI / 180 + B);
+
         De = ((3.07 * Math.sin(lambda + 44.5 * Math.PI / 180)
 	       - 2.15 * Math.sin(psi) * Math.cos(lambda - 24.*Math.PI/180)
 	       - 1.31 * (r - delta) / delta
@@ -161,13 +164,12 @@ function Jupiter()
     /* Make the function public: */
     this.setDate = setDate;
 
-    function daysBetween(d1, d2)
-    {
+    function daysBetween(d1, d2) {
         return ((d2.getTime() - d1.getTime())) / (24.*60.*60.*1000.);
     }
 
     function getJulianDate(d) {
-        return ( daysBetween(new Date("Jan 1 0:00 PST 1970"), d)
+        return (daysBetween(new Date("Jan 1 0:00 PST 1970"), d)
 		+ 2440587.83333333333);
     }
 
@@ -185,8 +187,21 @@ function Jupiter()
     {
 	var r = moonDist[whichmoon];
 	
-    	//var mooncoord = new XYCoord();
         var moondata = new Object();
+
+        function getShadowXY(angle)
+        {
+            var moonSunAngle = angle - psi;
+    	    var xy = new XYCoord();
+            xy.x = r * Math.sin(moonSunAngle);
+            xy.y = r * Math.cos(moonSunAngle) * Math.sin(De);
+            return xy;
+        }
+
+        function dist(x, y)
+        {
+            return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+        }
 
 	moondata.moonx = r * Math.sin(moonAngles[whichmoon]);
 	moondata.moony = r * Math.cos(moonAngles[whichmoon]) * Math.sin(De);
@@ -194,45 +209,22 @@ function Jupiter()
         s = "moon " + whichmoon;
         s += "\nDist = " + r;
         s += "\nmoonAngle = " + moonAngles[whichmoon];
+        s += " = " + moonAngles[whichmoon] * 180. / Math.PI;
+        s += "\nJup phase angle = " + psi;
+        s += " = " + psi * 180. / Math.PI;
 
-	// See whether the moon is on the far side of the planet:
-        if (moonAngles[whichmoon] > Math.PI * .5
-	    && moonAngles[whichmoon] < Math.PI * 1.5)
+	// See whether the moon is on the near side of the planet:
+        if (moonAngles[whichmoon] < Math.PI * .5
+	    || moonAngles[whichmoon] > Math.PI * 1.5)
         {
-            s += "\nFar side of the planet";
-            moondata.farside = true;
-
-            // Is the moon blocked by the planet, so it's invisible?
-	    if (moondata.moonx < 1. && moondata.moonx > -1.)
-	    {
-	        moondata.moonx = moondata.moony = NaN;
-                s += "\nBlocked by the planet";
-	    }
-            else {
-                // if not, then figure out whether the planet's shadow
-                // might be eclipsing the moon.
-                // Calculate the moon-planet-sun angle:
-	        var moonSunAngle = moonAngles[whichmoon] - psi;
-                s += "\nMSA = " + moonSunAngle;
-                moondata.eclipse = (1. < r * Math.sin(moonSunAngle))
-                if (moondata.eclipse) {
-                    s += "Eclipse of moon " + whichmoon + "!";
-                }
-            }
-        }
-
-        // Since the moon is on the near side, check for shadows
-        // cast by the moon on the planet.
-        else {
+            // Since the moon is on the near side, check for shadows
+            // cast by the moon on the planet.
             s += "\nNear side of the planet";
             moondata.farside = false;
 
-            // Calculate the moon-planet-sun angle:
-	    var moonSunAngle = moonAngles[whichmoon] - psi;
-
-            moondata.shadowx = r * Math.sin(moonSunAngle);
-            // This Y coord isn't right ... need to derive the right eqn:
-            moondata.shadowy = r * Math.cos(moonSunAngle) * Math.sin(De);
+            xy = getShadowXY(moonAngles[whichmoon]);
+            moondata.shadowx = xy.x;
+            moondata.shadowy = xy.y;
 
             // Is it hitting the planet? If not, set coords to NaN.
             // Some day, ought to check for moons eclipsing other moons
@@ -240,7 +232,43 @@ function Jupiter()
                 moondata.shadowx = moondata.shadowy = NaN;
         }
 
-        //if (whichmoon == 1) alert(s);
+        // Is the moon blocked by the planet, so it's invisible?
+        //else if (moondata.moonx < 1. && moondata.moonx > -1.)
+        else if (dist(moondata.moonx, moondata.moony) < 1.)
+	{
+            moondata.farside = true;
+	    moondata.moonx = moondata.moony = NaN;
+            s += "\nBlocked by the planet";
+	}
+
+        // Otherwise, it's on the far side.
+        // See if it's eclipsed by the planet's shadow.
+        else {
+            moondata.farside = true;
+            s += "\nFar side of the planet";
+
+            // See if a moon 180 degrees away from this moon's position,
+            // at the same distance, would cast a shadow on the planet.
+            // If so, the actual moon is eclipsed.
+            //atmoslop = 1.0;   // .83 might be worth pursuing
+            atmoslop = .9;
+            xy = getShadowXY(angle(moonAngles[whichmoon] + Math.PI));
+            moondata.eclipse = (dist(xy.x, xy.y) < atmoslop);
+            s += "\nActual moon at (" + moondata.moonx + ", " + moondata.moony + ")";
+            s += "\nFake shadow at (" + xy.x + ", " + xy.y + ")";
+            s += "\nDist from center = " + Math.sqrt(xy.x*xy.x + xy.y*xy.y);
+            if (moondata.eclipse)
+                s += "\nEclipse of moon " + whichmoon + "!";
+
+            /* This was just for testing.
+            if (moondata.eclipse) {
+                moondata.shadowx = xy.x;
+                moondata.shadowy = xy.y;
+            }
+            */
+        }
+
+        //if (moondata.eclipse) alert(s);
     	return moondata;
     }
     this.getMoonXYData = getMoonXYData
@@ -284,3 +312,73 @@ function Jupiter()
     }
 }
 
+function upcomingEvents(date)
+{
+    var saveDate = jup.curdate;
+    if (!saveDate) {
+        //alert("upcoming events, but curdate is " + jup.curdate);
+        saveDate = date;
+    }
+
+    tothrs = 8;
+    interval = 1;   // minutes
+    upcoming = "Moon events in the next " + tothrs + " hours:\n";
+
+    moonnames = [ "Io", "Europa", "Ganymede", "Callisto" ];
+
+    d = new Date(date);
+    lastmoondata  = [ null, null, null, null ];
+    // Moon data includes moonx, moony, shadowx, shadowy, farside, and eclipsed.
+
+    var verbose = false;
+
+    for (mins = -30; mins < tothrs * 60; mins += interval) {
+        d.setTime(date.getTime() + mins * 60 * 1000);
+        jup.setDate(d);
+        if (verbose)
+            upcoming += "\n" + d + "\n";
+        for (var whichmoon = 0; whichmoon < 4; ++whichmoon) {
+            moondata = jup.getMoonXYData(whichmoon);
+            if (verbose) {
+                upcoming += " (" + whichmoon + "):\n";
+                upcoming += JSON.stringify(moondata) + "\n";
+            }
+            if (lastmoondata[whichmoon]) {
+
+                if (!moondata.moonx && lastmoondata[whichmoon].moonx)
+                    upcoming += d + ": "
+                                + moonnames[whichmoon] + " disappears\n";
+                else if (moondata.moonx && ! lastmoondata[whichmoon].moonx) {
+                    if (! moondata.eclipse)
+                        upcoming += d + ": "
+                                    + moonnames[whichmoon] + " reappears\n";
+                }
+
+                else if (moondata.eclipse && ! lastmoondata[whichmoon].eclipse)
+                    upcoming += d + ": " + moonnames[whichmoon]
+                                + " enters eclipse\n";
+                else if (! moondata.eclipse && lastmoondata[whichmoon].eclipse)
+                    upcoming += d + ": " + moonnames[whichmoon]
+                                + " leaves eclipse\n";
+
+                if (!moondata.shadowx && lastmoondata[whichmoon].shadowx)
+                    upcoming += d + ": " + moonnames[whichmoon]
+                                + "'s shadow disappears\n";
+                else if (moondata.shadowx && !lastmoondata[whichmoon].shadowx)
+                    upcoming += d + ": " + moonnames[whichmoon]
+                                + "'s shadow reappears\n";
+
+                if (verbose)
+                    upcoming += JSON.stringify(lastmoondata[whichmoon]) + "\n"
+            }
+
+            // Ick! This is supposedly the most efficient way to clone
+            // an object in javascript. Can you believe it?
+            lastmoondata[whichmoon] = JSON.parse(JSON.stringify(moondata));
+        }
+    }
+
+    if (saveDate != undefined)
+        jup.setDate(saveDate);
+    return upcoming;
+}
