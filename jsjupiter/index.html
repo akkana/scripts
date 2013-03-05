@@ -345,16 +345,37 @@ hours.
 <pre id="upcoming"></pre>
 
 <script type="text/javascript">
-/* Call the code that calculates the positions, defined in jupiter.js. */
-var jup = new Jupiter();
-var date = new Date();
-// Europa should be visible at 19:51 but gone at 19:59; back at 20:06.
-//var date = new Date('Mon Mar 10 2013 19:53:00 GMT-0700 (PDT)');
-//var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
-//var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
-//var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
-//var date = new Date('Wed Mar 10 2010 06:35:17 GMT-0800 (PST)'); // 2 xits 2 shad
 
+var date = null;
+
+// Did the user specify a date in the URL?
+var url = new String(document.location);
+var idx = url.indexOf("?");
+if (idx > 0) {
+  idx = url.indexOf("date=", idx);
+  if (idx > 0) {
+    date = new Date(decodeURIComponent(url.substr(idx + 5)));
+// Discussion of the three decoding options in javascript:
+// http://unixpapa.com/js/querystring.html
+// http://stackoverflow.com/questions/747641/what-is-the-difference-between-decodeuricomponent-and-decodeuri
+  }
+}
+
+if (!date)
+  date = new Date();
+
+// Some useful times for testing:
+// Ganymede just about to reappear from eclipse before disappearing again:
+//date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
+// Europa should be visible at 19:51 but gone at 19:59; back at 20:06 re xephem:
+//date = new Date('Mon Mar 10 2013 19:53:00 GMT-0700 (PDT)');
+//date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
+//date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
+// 2 transits, 2 shadows:
+//date = new Date('Wed Mar 10 2010 06:35:17 GMT-0800 (PST)');
+
+// Call the code that calculates the positions, defined in jupiter.js.
+var jup = new Jupiter();
 updateDate(date);
 </script>
 
