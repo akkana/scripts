@@ -29,6 +29,8 @@ div#jupframe {
 
 #jupframe span#grslabel { color: #aaa; font-size: .9em; bottom: .1em; }
 
+#upcoming { background: #fffcf5; border: 1px inset; padding: 5px;  }
+
 /* I can't find any way to style an input button by name --
  * it has to have an id as well as a name.
  */
@@ -268,15 +270,10 @@ function predictUpcoming()
 <p>
 Here are the four bright "Galilean" moons of Jupiter --
 Io, Europa, Ganymede and Callisto -- and their shadows.
-It also shows the approximate position of Jupiter's "great red spot" (GRS).
+It also shows the position of Jupiter's "great red spot" (GRS).
 
 <p>
-This is a re-implementation of my older
-<a href="/jupiter.html">Java Jupiter</a> page
-using HTML, CSS and Javascript (and nicer graphics).
-
-<p>
-North is up.
+North is up; west is right (binocular/Newtonian view, not refractor).
 
 <noscript>
 <p>
@@ -356,12 +353,36 @@ var date = new Date();
 //var date = new Date('Mon Mar 10 2013 19:57:00 GMT-0700 (PDT)');
 //var date = new Date('Mon Mar 10 2013 20:02:00 GMT-0700 (PDT)');
 //var date = new Date('Sat Nov 10 2012 16:10:00 GMT-0800 (PDT)');
-var date = new Date('Wed Mar 10 2010 06:35:17 GMT-0800 (PST)'); // 2 xits 2 shad
+//var date = new Date('Wed Mar 10 2010 06:35:17 GMT-0800 (PST)'); // 2 xits 2 shad
 
 updateDate(date);
 </script>
 
 <hr>
+
+<h3>About Javascript Jupiter</h3>
+
+<p>
+<b>New for 2013!</b> Now you can predict future events, see eclipses,
+and I improved the graphics so it's more obvious when moons are emerging
+from behind Jupiter. Please report any bugs you find.
+
+<p>
+Times are approximate. There are lots of different models for Jupiter's
+moons, and they all seem to give slightly different results, especially
+for shadow events and eclipses. Start observing ten or fifteen 
+minutes early if you want to be sure of catching something.
+
+<p>
+This is a re-implementation of my older
+<a href="/jupiter.html">Java Jupiter</a> page
+using HTML, CSS and Javascript (and nicer graphics).
+It is Copyright &copy; 2000 - 2013 by Akkana Peck,
+licensed under the GNU Public License v.2.
+Feel free to share it or modify it! If you do, I'd appreciate hearing
+about it, and a link back to my site.
+
+<p>
 I use this app on Android with the help of my
 <a href="http://shallowsky.com/software/android/WebClient/">WebClient</a>
 wrapper app.
@@ -369,7 +390,10 @@ wrapper app.
 For older Java phones,
 Miguel Moreto has adapted this code for a neat mobile phone app called
 <a href="http://code.google.com/p/mobilejupiter/">Mobile Jupiter</a>.
-<p>
+
+<hr>
+<a href="https://github.com/akkana/scripts/tree/master/jsjupiter">Javascript
+Jupiter on GitHub</a> |
 <a href="/software/">Akkana's other software</a> |
 <a href="/astro.html">Akkana's Astronomy Page</a> |
 <a href="/">Shallow Sky home</a>
