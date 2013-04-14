@@ -24,7 +24,7 @@ def system_out (cmdstr) :
 def SearchForKeywords(opts, pat, grepdirs) :
     for grepdir in grepdirs :
         matches = system_out("find " + grepdir + \
-                             " -name 'Keywords' -print0 | xargs -0 grep -i '" \
+                             " -name 'Keywords' -or -name 'Tags' -print0 | xargs -0 grep -i '" \
                              + pat + "' /dev/null")
         # matches is an array of lines that are either empty, or look like this:
         # ./missionpeak/Keywords:dave: pict1166.jpg pict1167.jpg pict1168.jpg
