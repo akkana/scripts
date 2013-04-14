@@ -21,13 +21,21 @@
 #
 # See also Eldan Goldenberg's raw_noaa_historical_weather_data_csv_converter
 # http://eldan.co.uk/
+#
+# Other places for weather data:
+#
+# ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v3/
+#
+# You could scrape some of these HTML pages:
+# http://www.wrcc.dri.edu/climatedata/comparative/
+# http://www.wrcc.dri.edu/summary/lcdus08.html
+#
+# There's http://acis.dri.edu/ but it's not open to the public.
 
-import datetime
+from meantemps import *
 import urllib
-import os
+import sys, os
 import gzip
-import time
-import sys
 import matplotlib.pyplot as plt
 
 verbose = True
@@ -59,21 +67,15 @@ NOAA_fields = {
                              # Tornado or Funnel Cloud ('T' - 6th digit).
 }
 
-class WeatherMean :
+class NOAAWeatherMean(WeatherMean) :
     '''Weather means for one location, over an extended period,
        encompassing means for several different fields keyed by
        name (e.g. MAX for high temp, MIN for low temp), averaged
        by month.
     '''
-    def __init__(self, fields) :
-        self.tots = {}
-        self.num_obs = {}
-        self.normalized = False
-        for field in fields :
-            self.tots[field] = [0.0] * 12
-            self.num_obs[field] = [0] * 12
+    # __init__ is inherited from the base class
 
-    def add_NOAA_obs(self, line) :
+    def add_obs(self, line) :
         '''Add observations for every field we're tracking
            by parsing a line from an NOAA data file.
            Increment nobs if the field isn't undefined.
@@ -99,19 +101,6 @@ class WeatherMean :
                 if val < 999 :
                     self.tots[field][month] += val
                     self.num_obs[field][month] += 1
-
-    def normalize(self) :
-        for field in self.tots.keys() :
-            for month in range(12) :
-                if self.num_obs[field][month] > 0 :
-                    self.tots[field][month] /= self.num_obs[field][month]
-        self.normalized = True
-
-    def get_data(self, field) :
-        '''Return the 12-month means for the indicated field name.'''
-        if not self.normalized :
-            self.normalize()
-        return self.tots[field]
 
 def findstations(stationnames) :
     '''Search through ish-history.txt for given station names.
@@ -163,7 +152,6 @@ if __name__ == '__main__' :
     else :
         stations = sys.argv[1:]
     years = range(1991, 2012)
-    #years = [ 2012 ]
     urls = noaa_files(stations, years)
     fields = ['TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP']
     download_dir = "."
@@ -174,7 +162,7 @@ if __name__ == '__main__' :
 
     means = {}
     for station in stations :
-        means[station] = WeatherMean(fields)
+        means[station] = NOAAWeatherMean(fields)
 
     # Get all the stationcodes. Best to do this all at once since it
     # requires parsing a large file.
@@ -211,7 +199,7 @@ if __name__ == '__main__' :
             # Now the file should be there.
             fp = gzip.open(filename)
             for line in fp :
-                means[station].add_NOAA_obs(line)
+                means[station].add_obs(line)
             fp.close()
 
         print "===============", station, y, stationcodes[station][2]
