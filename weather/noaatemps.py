@@ -36,7 +36,6 @@ from meantemps import *
 import urllib
 import sys, os
 import gzip
-import matplotlib.pyplot as plt
 
 verbose = True
 
@@ -155,10 +154,6 @@ if __name__ == '__main__' :
     urls = noaa_files(stations, years)
     fields = ['TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP']
     download_dir = "."
-    monthnames = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
-    colors  = 'brgcmky'
-    markers = 'o+sv*p<>^hH.'
 
     means = {}
     for station in stations :
@@ -167,11 +162,6 @@ if __name__ == '__main__' :
     # Get all the stationcodes. Best to do this all at once since it
     # requires parsing a large file.
     stationcodes = findstations(stations)
-
-    print '     ',
-    for mn in monthnames :
-        print '  ' + mn,
-    print
 
     for i, station in enumerate(stations) :
         for y in years :
@@ -202,21 +192,6 @@ if __name__ == '__main__' :
                 means[station].add_obs(line)
             fp.close()
 
-        print "===============", station, y, stationcodes[station][2]
-
-        for field in ('TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP') :
-            data = means[station].get_data(field)
-            print '%6s' % field,
-            for m in range(12) :
-                print '%5.2f' % data[m],
-            print
-
-        color = colors[i%len(colors)] + markers[i%len(markers)] + '-'
-        plt.plot(means[station].get_data('MAX'), color,
-                 label=stationcodes[station][2])
-        plt.plot(means[station].get_data('MIN'), color, markerfacecolor='none')
-
-    plt.legend()
-    plt.show()
+    display_results(means)
 
 

@@ -18,6 +18,7 @@
 #
 
 import sys, os
+import matplotlib.pyplot as plt
 
 class WeatherMean :
     '''Weather means for one location, over an extended period,
@@ -32,6 +33,9 @@ class WeatherMean :
         for field in fields :
             self.tots[field] = [0.0] * 12
             self.num_obs[field] = [0] * 12
+
+    def fields(self) :
+        return self.tots.keys()
 
     def add_obs(self, line) :
         '''Add observations for every field we're tracking
@@ -54,4 +58,37 @@ class WeatherMean :
         if not self.normalized :
             self.normalize()
         return self.tots[field]
+
+def display_results(means) :
+    '''Print a table and display a plot of the results in means,
+       which is a dictionary of { stationname, WeatherMean }
+       where each WeatherMean has 12-month mean data for each
+       of a list of fields.
+    '''
+
+    monthnames = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+    colors  = 'brgcmky'
+    markers = 'o+sv*p<>^hH.'
+
+    print '     ',
+    for mn in monthnames :
+        print '  ' + mn,
+    print
+
+    for i, station in enumerate(means.keys()) :
+        print "===============", station
+        for field in means[station].fields() :
+            data = means[station].get_data(field)
+            print '%6s' % field,
+            for m in range(12) :
+                print '%5.2f' % data[m],
+            print
+
+        color = colors[i%len(colors)] + markers[i%len(markers)] + '-'
+        plt.plot(means[station].get_data('MAX'), color, label=station)
+        plt.plot(means[station].get_data('MIN'), color, markerfacecolor='none')
+
+    plt.legend()
+    plt.show()
 
