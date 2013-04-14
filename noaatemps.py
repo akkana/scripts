@@ -1,14 +1,10 @@
 #! /usr/bin/env python
 
-# Print a table of mean temperatures per month for several locations.
-# Work in progress.
+# Print a table of mean temperatures (and other weather data) per month
+# for several locations.
 #
-# Description of the format:
-# ftp://ftp.ncdc.noaa.gov/pub/data/gsod/GSOD_DESC.txt
-# 
-# See also Eldan Goldenberg's raw_noaa_historical_weather_data_csv_converter
-# http://eldan.co.uk/
-
+# Copyright 2013 by Akkana Peck.
+#
 # This program is free software; you can redistribute it and/or
 #        modify it under the terms of the GNU General Public License
 #        as published by the Free Software Foundation; either version 2
@@ -19,6 +15,12 @@
 #        GNU General Public License for more details.
 # The licence text is available online at:
 #        http://www.gnu.org/licenses/gpl-2.0.html
+#
+# Description of the format:
+# ftp://ftp.ncdc.noaa.gov/pub/data/gsod/GSOD_DESC.txt
+#
+# See also Eldan Goldenberg's raw_noaa_historical_weather_data_csv_converter
+# http://eldan.co.uk/
 
 import datetime
 import urllib
@@ -155,68 +157,6 @@ def noaa_files(stationnames, years) :
             urldict[station].append(url)
     return urldict
 
-def find_NOAA_means(filename, fields) :
-    '''Parse an NOAA file for a given station and year,
-       and take means of the given fields.
-       Return a dictionary of means.
-       For example, given fields = ['MAX', 'MIN', 'PRCP', 'SNDP']
-       should return something like
-       { 'MAX': 72.3, 'MIN': 45.6, 'PRCP': 0.3, 'SNDP':999.9 }
-       except instead of scalers each of these should be a list of 12 month vals
-       All fields are presumed to be numbers! Don't use this routine
-       for non-numeric values like FRSHTT.
-    '''
-    fp = gzip.open(filename)
-
-    tots = {}
-    counts = {}
-    for field in fields :
-        tots[field] = [0.0] * 12
-        counts[field] = [0] * 12
-
-    for line in fp :
-        # Throw out the first line, with the keys.
-        # XXX eventually might want to check that all the keys match
-        # their value in this line.
-        if line.startswith('STN---') :
-            continue
-
-        # Get the month: we need that first.
-        month = int(line[NOAA_fields['MODA'][0]:NOAA_fields['MODA'][0]+2]) - 1
-
-        # Break into fields according to the NOAA spec.
-        for field in NOAA_fields.keys() :
-            if field in fields :
-                val = float(line[NOAA_fields[field][0]:NOAA_fields[field][1]])
-                # NOAA uses 999.9 or 9999.9 to denote missing data.
-                # So anything over 999 is likely missing; don't count it.
-                if val < 999 :
-                    tots[field][month] += val
-                    counts[field][month] += 1
-
-    fp.close()
-
-    # Divide totals by counts:
-    for field in fields :
-        for m in range(0, 12) :
-            if counts[field][m] > 0 :
-                tots[field][m] /= counts[field][m]
-            #else :
-            #    print "No observations for", field
-
-    return tots
-
-def add_to_means(overall, newmeans) :
-    '''Add a new set of means into the overall set we're accumulating.
-       Means are a dictionary of fields like
-       { 'MAX': [], 'MIN': [], 'PRCP': [], 'SNDP':[] }
-       where each list is a list of 12 floating point numbers
-       and we will add the ones in newmeans into the ones already in overall.
-    '''
-    for field in newmeans.keys() :
-        for i in range(len(newmeans[field])) :
-            overall[field][i] += newmeans[field][i]
-
 if __name__ == '__main__' :
     if len(sys.argv) <= 1 :
         stations = [ 'KSJC', 'KFLG' ]
@@ -245,12 +185,6 @@ if __name__ == '__main__' :
         print '  ' + mn,
     print
 
-    # overall = {}
-    # for station in stations :
-    #     overall[station] = {}
-    #     for field in fields :
-    #         overall[station][field] = [0] * 12
-
     for i, station in enumerate(stations) :
         for y in years :
             basename = '%s-%s-%d.op.gz' % (stationcodes[station][0],
@@ -266,6 +200,8 @@ if __name__ == '__main__' :
                 except IOError as e:
                     print(e)
                     print "Skipping", filename, "for station", station
+                    # NOAA has a lot of missing files -- many stations
+                    # don't have anything before 1995.
                     # Since it will probably get this error every time,
                     # create a zero-length file there:
                     emptyfile = open(filename, 'w')
@@ -278,36 +214,7 @@ if __name__ == '__main__' :
                 means[station].add_NOAA_obs(line)
             fp.close()
 
-            # Now the file should be there.
-            #means = find_NOAA_means(filename, fields)
-            #
-            #add_to_means(overall[station], means)
-            #num_obs += 1
-            #
-            # if False :
-            #     print "===============", station, y, stationcodes[station][2]
-            #     for field in ('TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP') :
-            #         print '%6s' % field,
-            #         for m in range(0, 12) :
-            #             print '%5.2f' % means[field][m],
-            #         print
-            #
-            #     color = colors[i%len(colors)] + markers[i%len(markers)] + '-'
-            #     fig = plt.plot(means['MAX'], color)
-            #     fig = plt.plot(means['MIN'], color)
-
-        # overall is cumulative and needs to be divided
-        # print num_obs, "observations for", station
-        # for field in overall[station].keys() :
-        #     for m in range(12) :
-        #         overall[station][field][m] /= num_obs
-
         print "===============", station, y, stationcodes[station][2]
-        # for field in ('TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP') :
-        #     print '%6s' % field,
-        #     for m in range(0, 12) :
-        #         print '%5.2f' % overall[station][field][m],
-        #     print
 
         for field in ('TEMP', 'MAX', 'MIN', 'PRCP', 'SNDP') :
             data = means[station].get_data(field)
