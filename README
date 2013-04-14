@@ -54,6 +54,10 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+noaatemps.py:
+    Display and plot weather means for a set of stations,
+    by downloading NOAA data files.
+
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
