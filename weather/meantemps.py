@@ -37,15 +37,6 @@ class WeatherMean :
     def fields(self) :
         return self.tots.keys()
 
-    def add_obs(self, line) :
-        '''Add observations for every field we're tracking
-           by parsing a line from a data file.
-           Increment nobs if the field isn't undefined.
-           This method is undefined in the base class;
-           derived classes should override it.
-        '''
-        raise NotImplementedError
-
     def normalize(self) :
         for field in self.tots.keys() :
             for month in range(12) :
@@ -84,6 +75,11 @@ def display_results(means) :
             for m in range(12) :
                 print '%5.2f' % data[m],
             print
+        # Also print number of observations:
+        print '   OBS',
+        for m in range(12) :
+            print '%5d' % means[station].num_obs[field][m],
+        print
 
         color = colors[i%len(colors)] + markers[i%len(markers)] + '-'
         plt.plot(means[station].get_data('MAX'), color, label=station)
