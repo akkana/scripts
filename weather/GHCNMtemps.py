@@ -167,8 +167,8 @@ class GHCNMWeatherMean(WeatherMean) :
 
 if __name__ == '__main__' :
 
-    # SJ, Moab, Flagstaff
-    stations = [ '30285247000', '42500425733', '42572376004' ]
+    # Moffet Field, Moab, Flagstaff
+    stations = [ '42574509003', '42500425733', '42572376004' ]
     fields = [ 'MIN', 'MAX' ]
     means = {}
     for station in stations :
