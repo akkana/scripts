@@ -1,6 +1,29 @@
 #!/usr/bin/env python
 
-import sys
+# Graph a bunch of financial assets (stocks or mutual funds)
+# specified on the commandline by ticker symbols.
+# (Downloads data from Yahoo finance.)
+# Usage: fincompare.py LDLAX SRCMX VFIAX FUSVX VSCGX IRCAX SCALX
+
+# You can also specify modules that do custom loading,
+# in case you need to parse CSV or Excel files or any other local files.
+# Just add those on the commandline, e.g. fincompare mybank.py IRCAX SCALX
+# The name of the module must end in .py, e.g. mycsv.py
+# It may include a full path to the file, e.g. ~/mydata/parse_my_data.py
+
+# Your module must provide a function with this signature:
+# plot_fund(color='b', marker='o')
+# (of course you can choose your own defaults for color and marker).
+# The function should return a triplet initial, start, end
+# where initial is the initial value of the investment in dollars,
+# and start and end are datetimes.
+
+# You can't currently specify the date range unless you use a custom module.
+
+# Copyright 2013 by Akkana Peck.
+# Share and enjoy under the terms of the GPL v2 or later.
+
+import sys, os
 import datetime
 
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
@@ -14,17 +37,25 @@ from matplotlib.finance import quotes_historical_yahoo
 # we'll try to load the module, which should include this function:
 # plot_fund(color='b', marker='o')
 #
+imported_modules = {}
+
 if len(sys.argv) < 2 :
     funds = ['VFIAX', 'FUSVX', 'LDLAX', 'VSCGX', 'IRCAX', 'SCALX', 'SRCMX']
 else :
     funds = []
-    imported_modules = {}
     for f in sys.argv[1:] :
         if f.endswith('.py') :
+            # First split off any pathname included,
+            # since python isn't smart about importing from a pathname.
+            fpath, ffile = os.path.split(f)
+            if fpath :
+                sys.path.append(fpath)
+
             try :
-                imported_modules[f] = __import__(f[:-3])
-            except :
+                imported_modules[f] = __import__(ffile[:-3])
+            except Exception, e :
                 print "Couldn't import", f
+                print e
         else :
             funds.append(f)
 
@@ -40,13 +71,15 @@ ax1 = plt.subplot(111)
 # http://matplotlib.org/api/colors_api.html
 colors = [ 'b', 'r', 'g', 'c', 'y', 'k' ]
 styles = [ '-', '--', ':', '-.' ]
-markers = [ 'o', '*', 's', '^', 'h', '+', 'D', 'x', '|' ]
+markers = [ 'o', '*', 's', '^', 'p', '+', 'D', 'x', '|', 'h' ]
 
 def pick_color(i) :
     '''Pick a color that tries to be reasonably different
        from other colors so far picked.
     '''
-    return colors[i % len(colors)] + styles[int(i / len(colors))]
+    return colors[i % len(colors)] \
+        + styles[int(i / len(colors))]
+#        + markers[i%len(markers)]
 
 def plot_funds(tickerlist, initial, start, end) :
     '''Plot a fund by its ticker symbol,
@@ -57,8 +90,7 @@ def plot_funds(tickerlist, initial, start, end) :
     #                                 datetime.datetime(2013, 4, 1),
     #                                 asobject=True)
     for i, ticker in enumerate(tickerlist) :
-        fund_data = quotes_historical_yahoo(ticker, start, end,
-                                            asobject=True)
+        fund_data = quotes_historical_yahoo(ticker, start, end, asobject=True)
 
         # Normalize to the initial investment:
         fund_data['aclose'] *= initial / fund_data['aclose'][0]
@@ -72,8 +104,9 @@ for i, f in enumerate(imported_modules.keys()) :
     try :
         initial, start, end = imported_modules[f].plot_fund(color='k',
                                                 marker=markers[i%len(markers)])
-    except :
+    except Exception, e:
         print "Couldn't plot", f
+        print e
 
 if not initial :
     initial = 100000
@@ -82,6 +115,10 @@ if not initial :
 
 # Baseline at the initial investment:
 plt.axhline(y=initial, color='k')
+
+# This used to happen automatically, but then matplotlib started
+# starting at 2000 rather than following the data. So better be sure:
+ax1.set_xlim(start, end)
 
 plot_funds(funds, initial, start, end)
 
