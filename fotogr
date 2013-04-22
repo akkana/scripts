@@ -21,7 +21,7 @@ def system_out (cmdstr) :
     fp.close()
     return retlist
 
-def SearchForKeywords(opts, pat, grepdirs) :
+def search_for_keywords(opts, pat, grepdirs) :
     for grepdir in grepdirs :
         matches = system_out("find " + grepdir + \
                              " -name 'Keywords' -print0 | xargs -0 grep -i '" \
@@ -76,9 +76,9 @@ Copyright 2009 by Akkana Peck; share and enjoy under the GPL v2 or later."
     if len(args) == 0 :
         parser.print_help()
     elif len(args) == 1 :
-        SearchForKeywords(options, args[0], [ "." ])
+        search_for_keywords(options, args[0], [ "." ])
     else :
-        SearchForKeywords(options, args[0], args[1:])
+        search_for_keywords(options, args[0], args[1:])
 
 
 
