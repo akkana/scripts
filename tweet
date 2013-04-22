@@ -39,7 +39,9 @@ def getMatchingFiles(pat, files) :
     return matches
 
 def play(fil) :
-    if type(fil) != types.StringType :
+    try :
+        fil = str(fil)
+    except :
         return
     os.system("play " + fil)
 
