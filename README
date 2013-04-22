@@ -1,4 +1,4 @@
-A collection of useful scripts and snippets
+A collection of useful scripts and snippets, in various languges.
 
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
@@ -13,6 +13,10 @@ chatsounds.py:
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
+
+diffiles.py:
+    Find files that differ between two directories -- even if 
+    they've been moved to different places in the directory structure.
 
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
@@ -29,7 +33,12 @@ fontasia:
     A Linux font chooser and categorizer.
 
 fotogr:
-    Search for strings in files named Keyword beneath the current directory.
+    Find tagged photos: search for strings in files named Keyword or Tags
+    beneath the current directory.
+
+jsjupiter:
+    My Jupiter's Moons Javascript web app: show the Galilean moons and
+    their shadows, and predict transits, shadow transits and eclipses.
 
 langgrep:
     Search (grep) for patterns only within scripts written in a
@@ -44,6 +53,10 @@ louder:
 masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
+
+noaatemps.py:
+    Display and plot weather means for a set of stations,
+    by downloading NOAA data files.
 
 pathmatch:
     Search your executable path to find programs matching a string.
@@ -92,6 +105,10 @@ readkey.py:
 
 termcolors:
     Display ANSI colors for the current terminal.
+
+tweet:
+    Play birdsong from a specific bird. Requires ripped tracks from a
+    bird song CD: for example, the Stokes, Cornell or Peterson collections.
 
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than

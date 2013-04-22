@@ -1,7 +1,7 @@
 /* -*- Mode: Javascript; js-indent-level: 4; indent-tabs-mode: nil; -*- */
 
 // Javascript code to calculate the position of Jupiter's moons and shadows.
-// Copyright 2009 by Akkana Peck --
+// Copyright 2009, 2013 by Akkana Peck --
 // please share and enjoy under the terms of the GPL v2 or later.
 //
 // Equations come from Jean Meeus, Astronomical Formulae for Calculators.
