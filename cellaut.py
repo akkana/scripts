@@ -112,23 +112,6 @@ class CAWindow:
                                                         c * w, r * h,
                                                         w, h)
 
-    def expose_handler(self, widget, event):
-        # print "Expose"
-        if not self.fgc:
-            self.fgc = widget.window.new_gc()
-            self.bgc = widget.window.new_gc()
-            self.bgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 0))
-
-            self.width, self.height = self.drawing_area.window.get_size()
-
-            self.running = True
-
-            # set a timeout
-            gobject.timeout_add(self.timeout, self.idle_handler,
-                                self.drawing_area)
-
-        self.draw()
-
     def idle_handler(self, widget):
         self.cellgrid.update(self.rule)
         self.draw()
@@ -157,6 +140,23 @@ class CAWindow:
             return True
 
         return False
+
+    def expose_handler(self, widget, event):
+        # print "Expose"
+        if not self.fgc:
+            self.fgc = widget.window.new_gc()
+            self.bgc = widget.window.new_gc()
+            self.bgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 0))
+
+            self.width, self.height = self.drawing_area.window.get_size()
+
+            #self.running = True
+
+            # set a timeout
+            gobject.timeout_add(self.timeout, self.idle_handler,
+                                self.drawing_area)
+
+        self.draw()
 
     def start(self):
         win = gtk.Window()
@@ -203,18 +203,38 @@ def life(cellgrid, cawin):
 
     cawin.rule = liferule
 
+def neighbor(cellgrid, cawin):
+    '''Initialize the grid to simulate Thomas Schelling's
+       segregated neighborhood study.
+    '''
+    def neighbor_rule(cellgrid, coords):
+        x, y = coords
+        tot = cellgrid.item((x-1, y)) + cellgrid.item((x+1, y)) \
+            + cellgrid.item((x, y-1)) + cellgrid.item((x, y+1))
+
+        # Total of 4 neightbors. If less than 2 are the same color as x, y
+        # then the resident is unhappy, and sells out to someone of the
+        # other color.
+        cur = cellgrid.item(coords)
+        if tot >= 2:
+            return cur
+        else:
+            return int(not cur)
+
+    # Initialize with 50% probability:
+    cellgrid.randomize((.5, .5))
+    cawin.rule = neighbor_rule
+
 if __name__ == "__main__":
     # Some sample rules:
-
-    def addone(cellgrid, coords):
-        return cellgrid.item(coords) + 1
 
     # Set up the grid:
     cellgrid = Cellgrid(50, 50)
 
     cawin = CAWindow(cellgrid)
 
-    life(cellgrid, cawin)
+    #life(cellgrid, cawin)
+    neighbor(cellgrid, cawin)
 
     cawin.start()
 
