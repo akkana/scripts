@@ -7,6 +7,7 @@
 
 import time
 import random
+import gtk, gobject
 
 class Cellgrid:
     def __init__(self, nrows, ncols):
@@ -40,6 +41,11 @@ class Cellgrid:
 
         self.grid = self.newgrid
 
+    def run_plot(self, stepsecs=.1):
+        '''Iterate over the rule, plotting the evolving grid
+        '''
+        
+
     def __repr__(self):
         out = ''
         for row in self.grid:
@@ -51,7 +57,78 @@ class Cellgrid:
             out += '\n'
         return out
 
-if __name__ == "__main__" :
+class CAWindow:
+    def __init__(self, cellgrid, rule, timeout = 1):
+        '''Timeout in milliseconds
+        '''
+        self.cellgrid = cellgrid
+        self.rule = rule
+        self.drawing_area = None
+        self.fgc = None
+        self.bgc = None
+        self.width = 0
+        self.height = 0
+        self.timeout = timeout
+
+    def draw(self):
+        '''Draw the current state of the cell grid
+        '''
+        # Clear the background:
+        self.drawing_area.window.draw_rectangle(self.bgc, True, 0, 0,
+                                                self.width, self.height)
+
+        # What's the size of each cell?
+        w = self.width / self.cellgrid.ncols
+        h = self.height / self.cellgrid.nrows
+
+        # Draw the cells
+        for r in xrange(self.cellgrid.ncols):
+            for c in xrange(self.cellgrid.nrows):
+                if cellgrid.item((r, c)):
+                    self.fgc.set_rgb_fg_color(gtk.gdk.Color(65535, 0, 65535))
+                else:
+                    self.fgc.set_rgb_fg_color(gtk.gdk.Color(512, 512, 512))
+                self.drawing_area.window.draw_rectangle(self.fgc, True,
+                                                        c * w, r * h,
+                                                        w, h)
+
+    def expose_handler(self, widget, event):
+        # print "Expose"
+        if not self.fgc:
+            self.fgc = widget.window.new_gc()
+            self.bgc = widget.window.new_gc()
+            self.bgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 0))
+
+            self.width, self.height = self.drawing_area.window.get_size()
+
+            # set a timeout
+            gobject.timeout_add(self.timeout, self.idle_handler,
+                                self.drawing_area)
+
+        self.draw()
+
+    def idle_handler(self, widget):
+        self.cellgrid.update(self.rule)
+        self.draw()
+
+        # Return True so we'll be called again:
+        return True
+
+    def run(self):
+        win = gtk.Window()
+        self.drawing_area = gtk.DrawingArea()
+        self.drawing_area.connect("expose-event", self.expose_handler)
+        win.add(self.drawing_area)
+        self.drawing_area.show()
+        win.connect("destroy", gtk.main_quit)
+        win.set_default_size(512, 512)
+
+        win.show()
+        gtk.main()
+
+if __name__ == "__main__":
+    # Some sample rules:
+
     def addone(cellgrid, coords):
         return cellgrid.item(coords) + 1
 
@@ -72,7 +149,8 @@ if __name__ == "__main__" :
         # Otherwise it dies, of lonliness or overcrowding:
         return 0
 
-    cellgrid = Cellgrid(10, 10)
+    # Set up the grid:
+    cellgrid = Cellgrid(50, 50)
 
     # Initialize with a glider:
     cellgrid.setitem((0, 2), 1)
@@ -85,9 +163,13 @@ if __name__ == "__main__" :
     #cellgrid.characters = '.*'
     cellgrid.characters = [' .', ' *' ]
 
-    while True:
-        print ""
-        print "====================="
-        print cellgrid
-        cellgrid.update(life)
-        time.sleep(.1)
+    cawin = CAWindow(cellgrid, life)
+    cawin.run()
+
+    # print "Shouldn't ever get here"
+    # while True:
+    #     print ""
+    #     print "====================="
+    #     print cellgrid
+    #     cellgrid.update(life)
+    #     time.sleep(.1)
