@@ -5,6 +5,7 @@
 # Copyright 2013 by Akkana Peck.
 # Share and enjoy under the terms of the GPL v2 or later.
 
+import sys
 import time
 import random
 import gtk, gobject
@@ -14,7 +15,25 @@ class Cellgrid:
         self.nrows = nrows
         self.ncols = ncols
         self.grid = [[0] * ncols for i in xrange(nrows)]
+        self.iterations = 0
+
+        # characters is used in __repr__ for printing the grid
         self.characters = None
+
+    def randomize(self, probabilities):
+        '''Initialize the grid to random values specified by the probailities
+           argument. probabilities should be a tuple or list of floating
+           point values adding to 1. The number of entries in probabilities
+           controls what integer values the grid can take.
+        '''
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                tot = 0
+                for i, prob in enumerate(probabilities):
+                    tot += prob
+                    if random.random() <= tot:
+                        self.grid[r][c] = i
+                        break   # break out of the inner loop over probabilities
 
     def item(self, coords):
         '''Return the item at the given coordinates,
@@ -40,11 +59,11 @@ class Cellgrid:
                 self.newgrid[r].append(rule(self, (r, c)))
 
         self.grid = self.newgrid
+        self.iterations += 1
 
-    def run_plot(self, stepsecs=.1):
-        '''Iterate over the rule, plotting the evolving grid
-        '''
-        
+    def quit(self):
+        print self.iterations, "iterations"
+        sys.exit(0)
 
     def __repr__(self):
         out = ''
@@ -58,7 +77,7 @@ class Cellgrid:
         return out
 
 class CAWindow:
-    def __init__(self, cellgrid, rule, timeout = 1):
+    def __init__(self, cellgrid, rule=None, timeout = 1):
         '''Timeout in milliseconds
         '''
         self.cellgrid = cellgrid
@@ -68,6 +87,7 @@ class CAWindow:
         self.bgc = None
         self.width = 0
         self.height = 0
+        self.running = False
         self.timeout = timeout
 
     def draw(self):
@@ -101,6 +121,8 @@ class CAWindow:
 
             self.width, self.height = self.drawing_area.window.get_size()
 
+            self.running = True
+
             # set a timeout
             gobject.timeout_add(self.timeout, self.idle_handler,
                                 self.drawing_area)
@@ -112,10 +134,34 @@ class CAWindow:
         self.draw()
 
         # Return True so we'll be called again:
-        return True
+        if self.running:
+            return True
 
-    def run(self):
+    def key_press_event(self, widget, event) :
+        if event.string == "q" :
+            self.cellgrid.quit()
+            return True
+
+        if event.string == " " :
+            self.cellgrid.update(self.rule)
+            self.draw()
+            self.running = False
+            return True
+
+        if event.string == "c" :
+            if self.running:
+                return True
+            self.running = True
+            gobject.timeout_add(self.timeout, self.idle_handler,
+                                self.drawing_area)
+            return True
+
+        return False
+
+    def start(self):
         win = gtk.Window()
+        win.connect("key-press-event", self.key_press_event)
+
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.connect("expose-event", self.expose_handler)
         win.add(self.drawing_area)
@@ -126,13 +172,10 @@ class CAWindow:
         win.show()
         gtk.main()
 
-if __name__ == "__main__":
-    # Some sample rules:
-
-    def addone(cellgrid, coords):
-        return cellgrid.item(coords) + 1
-
-    def life(cellgrid, coords):
+def life(cellgrid, cawin):
+    '''Initialize the grids to play Conway's Game of Life.
+    '''
+    def liferule(cellgrid, coords):
         # Count the total number of neighbors, not including the cell itself:
         tot = 0
         for i in (-1, 0, 1):
@@ -149,9 +192,6 @@ if __name__ == "__main__":
         # Otherwise it dies, of lonliness or overcrowding:
         return 0
 
-    # Set up the grid:
-    cellgrid = Cellgrid(50, 50)
-
     # Initialize with a glider:
     cellgrid.setitem((0, 2), 1)
     cellgrid.setitem((1, 2), 1)
@@ -159,13 +199,29 @@ if __name__ == "__main__":
     cellgrid.setitem((2, 1), 1)
     cellgrid.setitem((1, 0), 1)
 
+    cellgrid.randomize((.5, .5))
+
+    cawin.rule = liferule
+
+if __name__ == "__main__":
+    # Some sample rules:
+
+    def addone(cellgrid, coords):
+        return cellgrid.item(coords) + 1
+
+    # Set up the grid:
+    cellgrid = Cellgrid(50, 50)
+
+    cawin = CAWindow(cellgrid)
+
+    life(cellgrid, cawin)
+
+    cawin.start()
+
     # Show characters, not numbers:
     #cellgrid.characters = '.*'
-    cellgrid.characters = [' .', ' *' ]
-
-    cawin = CAWindow(cellgrid, life)
-    cawin.run()
-
+    #cellgrid.characters = [' .', ' *' ]
+    #
     # print "Shouldn't ever get here"
     # while True:
     #     print ""
