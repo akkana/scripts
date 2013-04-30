@@ -1,20 +1,20 @@
 /* -*- Mode: Javascript; js-indent-level: 4; indent-tabs-mode: nil; -*- */
 
-// Javascript code to calculate the position of Jupiter's moons and shadows.
+// JavaScript code to calculate the position of Jupiter's moons and shadows.
 // Copyright 2009, 2013 by Akkana Peck --
 // please share and enjoy under the terms of the GPL v2 or later.
 //
 // Equations come from Jean Meeus, Astronomical Formulae for Calculators.
 
 // Code below is from Jupiter.java and is in the process of being
-// translated to javascript.
+// translated to JavaScript.
 
 
 function Jupiter()
 {
     const NUM_MOONS = 4;
 
-    var curdate;        // javascript Date object
+    var curdate;        // JavaScript Date object
     var d;		// days since epoch, 1899 Dec 31 12h ET
     
     // Angles of each of the Galilean satellites, in radians,
@@ -416,7 +416,7 @@ function upcomingEvents(date, tothrs)
             }
 
             // Ick! This is supposedly the most efficient way to clone
-            // an object in javascript. Can you believe it?
+            // an object in JavaScript. Can you believe it?
             lastmoondata[whichmoon] = JSON.parse(JSON.stringify(moondata));
         } // end loop over whichmoon
 
