@@ -65,6 +65,11 @@ class Cellgrid:
         print self.iterations, "iterations"
         sys.exit(0)
 
+    def run_plot(self, stepsecs=.1):
+        '''Iterate over the rule, plotting the evolving grid
+        '''
+        
+
     def __repr__(self):
         out = ''
         for row in self.grid:
@@ -149,14 +154,8 @@ class CAWindow:
             self.bgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 0))
 
             self.width, self.height = self.drawing_area.window.get_size()
-
-            #self.running = True
-
-            # set a timeout
-            gobject.timeout_add(self.timeout, self.idle_handler,
-                                self.drawing_area)
-
         self.draw()
+        return True
 
     def start(self):
         win = gtk.Window()
@@ -233,8 +232,8 @@ if __name__ == "__main__":
 
     cawin = CAWindow(cellgrid)
 
-    #life(cellgrid, cawin)
-    neighbor(cellgrid, cawin)
+    life(cellgrid, cawin)
+    #neighbor(cellgrid, cawin)
 
     cawin.start()
 
