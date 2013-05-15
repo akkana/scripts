@@ -5,14 +5,12 @@
 # e.g. aptver libgtk2 tells you the versions of all the libgtk2
 # packages you have installed, without your needing to remember
 # package names like libgtk2.0-0.
+# Also useful as a search tool that doesn't limit the descriptions to
+# the width of the terminal, so you can use it with grep.
 # Copyright 2013 by Akkana Peck -- share and enjoy under the GPL v2 or later.
 
 import sys
 import apt
-
-cache = apt.cache.Cache()
-
-pat = sys.argv[1]
 
 class Colprinter():
     '''Format rows (lists) in columns,
@@ -40,14 +38,34 @@ class Colprinter():
                                    for c, col in enumerate(row))
                          for row in self.thelist)
 
-colpr = Colprinter()
-for pkgname in cache.keys():
-    if pat in pkgname:
-        pkg = cache[pkgname]
-        instver = pkg.installed
-        if not instver:
-            continue    # Package isn't installed, skip it
-        colpr.add((pkg.name, instver.version, instver.summary))
+def show_apt_matches(pat, cache, uninstalled=False):
+    colpr = Colprinter()
+    for pkgname in cache.keys():
+        if pat in pkgname:
+            pkg = cache[pkgname]
+            instver = pkg.installed
+            if instver:
+                colpr.add((pkg.name, instver.version, instver.summary))
+            elif uninstalled:
+                candidate = pkg.candidate
+                colpr.add((pkg.name, '(' + candidate.version + ')',
+                           candidate.summary))
 
-print colpr
+    print colpr
+
+if __name__ == '__main__':
+    from optparse import OptionParser
+    usage = '''Usage: %prog pattern
+'''
+    LongVersion = '''%prog 0.1: search for packages and show versions.'''
+
+    optparser = OptionParser(usage=usage, version=LongVersion)
+    optparser.add_option("-u", "--uninstalled",
+                         action="store_true", dest="show_uninstalled",
+                    help="Show uninstalled packages as well as installed ones")
+    (options, args) = optparser.parse_args()
+
+    cache = apt.cache.Cache()
+
+    show_apt_matches(args[0], cache, uninstalled=options.show_uninstalled)
 
