@@ -9,19 +9,23 @@
 
 import sys
 import apt
+import itertools
 
 cache = apt.cache.Cache()
 
 pat = sys.argv[1]
 
 class Colprinter():
+    '''Format rows (lists) in columns,
+       sized to the widest element in each column.
+    '''
     def __init__(self):
         self.thelist = []
         self.lengths = []
 
     def add(self, lis):
-        #self.thelist.append(map(str, lis))
-        self.thelist.append(lis)
+        '''Add a row (a list of items)'''
+        self.thelist.append(map(str, lis))
 
         for i, item in enumerate(lis):
             itemlen = len(item)
@@ -33,15 +37,9 @@ class Colprinter():
                 self.lengths[i] = itemlen
 
     def __repr__(self):
-        fmtstr = ''
-        for l in self.lengths:
-            fmtstr += '%%%ds  ' % l
-        fmtstr += '\n'
-
-        retstr = ''
-        for lis in self.thelist:
-            retstr += fmtstr % lis
-        return retstr
+        return '\n'.join('  '.join(str(col).rjust(self.lengths[c])
+                                   for c, col in enumerate(row))
+                         for row in self.thelist)
 
 colpr = Colprinter()
 for pkgname in cache.keys():
