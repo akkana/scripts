@@ -9,7 +9,6 @@
 
 import sys
 import apt
-import itertools
 
 cache = apt.cache.Cache()
 
@@ -37,7 +36,7 @@ class Colprinter():
                 self.lengths[i] = itemlen
 
     def __repr__(self):
-        return '\n'.join('  '.join(str(col).rjust(self.lengths[c])
+        return '\n'.join(' '.join(str(col).ljust(self.lengths[c])
                                    for c, col in enumerate(row))
                          for row in self.thelist)
 
@@ -48,7 +47,7 @@ for pkgname in cache.keys():
         instver = pkg.installed
         if not instver:
             continue    # Package isn't installed, skip it
-        colpr.add((pkg.name, instver.version))
+        colpr.add((pkg.name, instver.version, instver.summary))
 
 print colpr
 
