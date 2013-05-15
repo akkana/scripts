@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+# A simple program to show you the installed versions of
+# all installed packages matching the given pattern.
+# e.g. aptver libgtk2 tells you the versions of all the libgtk2
+# packages you have installed, without your needing to remember
+# package names like libgtk2.0-0.
+# Copyright 2013 by Akkana Peck -- share and enjoy under the GPL v2 or later.
+
+import sys
+import apt
+
+cache = apt.cache.Cache()
+
+pat = sys.argv[1]
+
+class Colprinter():
+    def __init__(self):
+        self.thelist = []
+        self.lengths = []
+
+    def add(self, lis):
+        #self.thelist.append(map(str, lis))
+        self.thelist.append(lis)
+
+        for i, item in enumerate(lis):
+            itemlen = len(item)
+
+            # See if it's longer than anything else in this position so far:
+            if i >= len(self.lengths):
+                self.lengths.append(itemlen)
+            elif itemlen > self.lengths[i]:
+                self.lengths[i] = itemlen
+
+    def __repr__(self):
+        fmtstr = ''
+        for l in self.lengths:
+            fmtstr += '%%%ds  ' % l
+        fmtstr += '\n'
+
+        retstr = ''
+        for lis in self.thelist:
+            retstr += fmtstr % lis
+        return retstr
+
+colpr = Colprinter()
+for pkgname in cache.keys():
+    if pat in pkgname:
+        pkg = cache[pkgname]
+        instver = pkg.installed
+        if not instver:
+            continue    # Package isn't installed, skip it
+        colpr.add((pkg.name, instver.version))
+
+print colpr
+
