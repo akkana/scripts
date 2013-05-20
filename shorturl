@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+# URL shortener. Saves needing to copy a link, go to a bookmarked web page,
+# paste the link, read the result page, copy that link, go paste it in
+# twitter, close the tab.
+
+#import urllib, urllib2, urlparse, httplib
+import sys
+import urllib, urllib2
+import gtk
+
+# We have three different shortening services:
+
+# isgd API reference: http://is.gd/apishorteningreference.php
+def isgd(url, keyword=None):
+    isgdurl = 'http://is.gd/create.php?format=simple&url=' + \
+        urllib.quote(url)
+
+    # Allow for an optional keyword, instead of getting a random
+    # string of characters:
+    if keyword:
+        isgdurl += '&shorturl=' + keyword
+
+    page = urllib2.urlopen(isgdurl)
+    shorturl = page.read()
+    page.close()
+
+    # Now check to make sure it worked:
+    isgdurl = 'http://is.gd/forward.php?format=simple&shorturl=' + shorturl
+    page = urllib2.urlopen(isgdurl)
+    longurl = page.read()
+    page.close()
+
+    return shorturl, longurl
+
+def shorturl(url):
+    apiurl = "http://shorturl.com/make_url.php?longurl=%s" %(url)
+    page = urllib2.urlopen(apiurl)
+    contents = page.read()
+    page.close()
+    shorturl = re.findall("<a href=(http://alturl.com/\w+) target=\"_blank\">", page)[0]
+    longurl = re.findall('<INPUT NAME="longurl".* VALUE="(.*?)"', page)[0]
+    return shorturl, longurl
+
+def tinyurl(url):
+    tiny = "http://tinyurl.com/api-create.php?url=%s" %(url)
+    page = urllib2.urlopen(tiny)
+    contents = page.read()
+    page.close()
+    tiny = re.findall("(http://tinyurl.com/\w+)", page)[0]
+    # Just return the original long URL and hope that's really
+    # where the short link goes -- I can't find any way of verifying.
+    return tiny, url
+
+def SimpleURLWindow(shorturl, longurl):
+    window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+    window.set_title('Shortened URL')
+    window.connect("delete_event", gtk.main_quit)
+    vbox = gtk.VBox(True, 2)
+    window.add(vbox)
+    vbox.pack_start(gtk.Label(shorturl))
+    vbox.pack_start(gtk.Label(longurl))
+
+    def key_press(widget, event) :
+        if event.string == "q" :
+            sys.exit(0)
+            return True
+        return False
+
+    window.connect("key-press-event", key_press)
+
+    # And select the short URL:
+    clipboard = gtk.Clipboard(selection=gtk.gdk.SELECTION_PRIMARY)
+    clipboard.set_text(shorturl)
+
+    # Aguably, we might want to set a timer and make the window
+    # auto-disappear after a minute or so.
+
+    window.show_all()
+    gtk.main()
+
+if __name__ == "__main__":
+    # Should we take the URL as an argument, or get it from the clipboard?
+    if len(sys.argv) < 2 or sys.argv[1].startswith('-'):
+        # Get it from the clipboard
+        primary = gtk.clipboard_get(gtk.gdk.SELECTION_PRIMARY)
+        if not primary.wait_is_text_available() :
+            print "Nothing on the primary selection!"
+            sys.exit(0)
+        url = primary.wait_for_text()
+    else:
+        url = sys.argv[1]
+
+    # For now, always use isgd:
+    shorturl, longurl = isgd(url)
+    print shorturl
+    print longurl
+
+    SimpleURLWindow(shorturl, longurl)
