@@ -90,9 +90,19 @@ def plot_funds(tickerlist, initial, start, end) :
     #                                 datetime.datetime(2013, 4, 1),
     #                                 asobject=True)
     for i, ticker in enumerate(tickerlist) :
+        # This gives a runtime warning for SCAL, and all the aclose vals
+        # come out zero. Catching a RuntimeWarning isn't as simple as try;
+        # http://stackoverflow.com/questions/10519237/python-how-to-avoid-runtimewarning-in-function-definition
+        # http://stackoverflow.com/questions/9349434/how-do-i-check-for-numeric-overflow-without-getting-a-warning-in-python
         fund_data = quotes_historical_yahoo(ticker, start, end, asobject=True)
 
         # Normalize to the initial investment:
+        if fund_data['aclose'][0] == 0 :
+            # Guard against failures of quotes_historical_yahoo;
+            # without this check you'll see more uncatchable RuntimeWarnings.
+            print ticker, ": First adjusted close is 0!"
+            continue
+
         fund_data['aclose'] *= initial / fund_data['aclose'][0]
 
         # and plot
