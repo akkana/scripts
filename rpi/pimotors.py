@@ -100,7 +100,9 @@ if __name__ == '__main__':
     #    top row: 18, 23, 24, 25, 8, 7
     # bottom row: 4, 17, 22
     #motors = [ PiMotor(22, 9, 10), PiMotor(24, 7, 8) ]
-    motors = [ PiMotor(22, 23, 25), PiMotor(24, 7, 8) ]
+    #motors = [ PiMotor(22, 23, 25), PiMotor(24, 7, 8) ]
+    # Better for Pi plate, since it doesn't expose 7 and 8:
+    motors = [ PiMotor(25, 23, 24), PiMotor(17, 21, 22) ]
 
     print "Cleaning up GPIO"
     GPIO.cleanup()
