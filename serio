@@ -1,0 +1,90 @@
+#! /usr/bin/env python
+
+# serio:
+# A simple terminal communications program to talk over a serial line.
+
+# This grew out of my ardmonitor script for talking to Arduinos.
+
+# It's *just a proof of concept*; it doesn't work very well.
+# Sometimes it randomly seems to skip characters or add delays.
+
+# Copyright 2013 by Akkana Peck; share and enjoy under the GPLv2 or later.
+
+import sys
+import serial, select
+import tty, termios
+import signal
+
+class SerIO() :
+    def __init__(self) :
+        self.old_settings = termios.tcgetattr(sys.stdin.fileno())
+
+    def run(self, baud=115200) :
+        # Port may vary, so look for it:
+        baseports = ['/dev/ttyUSB']
+        self.ser = None
+        for baseport in baseports :
+            if self.ser : break
+            for i in xrange(0, 8) :
+                try :
+                    port = baseport + str(i)
+                    self.ser = serial.Serial(port, baud, timeout=1)
+                    print "Opened", port
+                    break
+                except :
+                    self.ser = None
+                    pass
+
+        if not self.ser :
+            print "Couldn't open a serial port"
+            sys.exit(1)
+
+        signal.signal(signal.SIGINT, self.signal_handler)
+
+        tty.setraw(sys.stdin.fileno())
+
+        self.ser.flushInput()
+        while True :
+            # Check whether the user has typed anything:
+            inp, outp, err = select.select([sys.stdin, self.ser], [], [], .2)
+
+            # Check for user input:
+            if sys.stdin in inp :
+                line = sys.stdin.read(1)
+                self.ser.write(line)
+
+            # check for output from the other end:
+            if self.ser in inp :
+                line = self.ser.read(1)
+                sys.stdout.write(line)
+
+            sys.stdout.flush()
+
+    def signal_handler(self, signal, frame):
+        print 'You pressed Ctrl+C! Cleaning up.'
+        self.cleanup()
+        sys.exit(0)
+
+    def cleanup(self) :
+        print "Calling cleanup"
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                          self.old_settings)
+
+serio = SerIO()
+try :
+    if len(sys.argv) > 1 :
+        print "Using", sys.argv[1], "baud"
+        serio.run(baud=sys.argv[1])
+    else :
+        serio.run()
+except serial.SerialException :
+    print "Disconnected (Serial exception)"
+except IOError :
+    print "Disconnected (I/O Error)"
+except KeyboardInterrupt :
+    print "Interrupt"
+
+finally :
+    print "finally: Cleaning up"
+    serio.cleanup()
+
