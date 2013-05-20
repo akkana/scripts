@@ -13,6 +13,10 @@ import xchat
 import sys, os, subprocess
 import time
 
+# The debugging log file.
+# If it's set, we might get debug messages written to it.
+Debug = None
+
 class SoundPlayer :
     """
        Play sounds that don't overlap in time.
@@ -124,19 +128,50 @@ class XchatSoundHandler :
         mynick = ctxt.get_info("nick")
         line = word[1]
 
+        # For debugging. But this goes to the channel and makes things
+        # hard to follow. Would be better to debug to a log file.
+        if Debug :
+            print >>Debug, "Channel", channel, ", network", network, ":", line
+
         # Now, customize the rest as desired. Here are some examples:
 
         # Anyone addressing or mentioning my nick:
-        if line.find(mynick) > 0 and word[0] != 'NickServ' or \
-               userdata == "Channel Msg Hilight" or \
-               userdata == "Channel Action Hilight" :
-            # print ">>>>> Contains my nick!", userdata, ">>", line
+        if line.find(mynick) > 0 and word[0] != 'NickServ' :
+            if Debug :
+                print >>Debug, ">>> chatsounds", userdata, \
+                    "network =", network, \
+                    "channel =", channel,
+                print >>Debug, ">>>>> Contains my nick! akking", userdata, \
+                    ">>", line
             self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            return xchat.EAT_NONE
+
+        if userdata == "Channel Msg Hilight" or \
+                userdata == "Channel Action Hilight" :
+            #if channel == 'root' || channel == '&bitlbee'
+            # Don't play sounds for bitlbee channel actions,
+            # because it's constantly losing connection and restarting.
+            # In fact, if we could just delete those tabs it would be great.
+            if network != 'Bitlbee' :
+                if Debug :
+                    print >>Debug, ">>> chatsounds akking", userdata, \
+                        "network =", network, \
+                        "channel =", channel
+                self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            else:
+                if Debug :
+                    print >>Debug, ">>> chatsounds skipping bitlbee", \
+                        userdata, "network =", network, \
+                        "channel =", channel
             return xchat.EAT_NONE
 
         # Private message:
         elif userdata.startswith("Private Message") :
-            # print ">>>>> Private message!"
+            if Debug :
+                print >>Debug, ">>> chatsounds private message! akking", \
+                    userdata, \
+                    "network =", network, \
+                    "channel =", channel,
             self.player.play(os.path.join(self.sound_dir, "akk.wav"))
             return xchat.EAT_NONE
 
@@ -176,5 +211,8 @@ class XchatSoundHandler :
         return xchat.EAT_ALL
 
 if __name__ == "__main__" :
+    # Debug log, line buffered:
+    Debug = open("/tmp/chatsounds.log", "w", buffering=1)
+
     chathandler = XchatSoundHandler()
 
