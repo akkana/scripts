@@ -106,9 +106,6 @@ if __name__ == "__main__":
 
     for (name, func) in shorteners:
         try:
-            if name == 'isgd':
-                print "Skipping isgd"
-                continue
             shorturl, longurl = func(url)
             if shorturl and longurl:
                 print "Shortened with", name
