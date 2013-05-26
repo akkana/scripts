@@ -18,7 +18,6 @@ tty = open('/dev/tty', 'r+')
 tty.write('\033[7\033[r\033[999;999H\033[6n')
 tty.flush()
 
-
 fd = sys.stdin.fileno()
 
 oldterm = termios.tcgetattr(fd)
@@ -30,7 +29,7 @@ oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
 fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
 
 try:
-    while 1:
+    while True:
         r, w, e = select.select([fd], [], [])
         if r:
             output = sys.stdin.read()
@@ -44,8 +43,6 @@ rows, cols = map(int, re.findall(r'\d+', output))
 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH",
                                                 rows, cols, 0, 0))
 
-fd = posix.open( '/dev/tty', 2, 0 )
-posix.close(fd)
 print "\nReset the terminal to", rows, "rows", cols, "cols"
 
 
