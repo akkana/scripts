@@ -38,7 +38,7 @@ class Colprinter():
                                    for c, col in enumerate(row))
                          for row in self.thelist)
 
-def show_apt_matches(pat, cache, uninstalled=False):
+def show_apt_matches(pat, cache, only_installed=False):
     colpr = Colprinter()
     for pkgname in cache.keys():
         if pat in pkgname:
@@ -46,7 +46,7 @@ def show_apt_matches(pat, cache, uninstalled=False):
             instver = pkg.installed
             if instver:
                 colpr.add((pkg.name, instver.version, instver.summary))
-            elif uninstalled:
+            elif not only_installed:
                 candidate = pkg.candidate
                 colpr.add((pkg.name, '(' + candidate.version + ')',
                            candidate.summary))
@@ -60,12 +60,12 @@ if __name__ == '__main__':
     LongVersion = '''%prog 0.1: search for packages and show versions.'''
 
     optparser = OptionParser(usage=usage, version=LongVersion)
-    optparser.add_option("-u", "--uninstalled",
-                         action="store_true", dest="show_uninstalled",
-                    help="Show uninstalled packages as well as installed ones")
+    optparser.add_option("-i", "--installed",
+                         action="store_true", dest="only_installed",
+                         help="Show only pages that are already installed")
     (options, args) = optparser.parse_args()
 
     cache = apt.cache.Cache()
 
-    show_apt_matches(args[0], cache, uninstalled=options.show_uninstalled)
+    show_apt_matches(args[0], cache, only_installed=options.only_installed)
 
