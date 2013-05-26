@@ -8,6 +8,7 @@
 import sys
 import urllib, urllib2
 import gtk
+import re
 
 # We have three different shortening services:
 
@@ -34,31 +35,43 @@ def isgd(url, keyword=None):
     return shorturl, longurl
 
 def shorturl(url):
-    apiurl = "http://shorturl.com/make_url.php?longurl=%s" %(url)
+    apiurl = "http://shorturl.com/make_url.php?longurl=" + urllib.quote(url)
+
     page = urllib2.urlopen(apiurl)
     contents = page.read()
     page.close()
-    shorturl = re.findall("<a href=(http://alturl.com/\w+) target=\"_blank\">", page)[0]
-    longurl = re.findall('<INPUT NAME="longurl".* VALUE="(.*?)"', page)[0]
+
+    shorturl = re.findall("<a href=(http://alturl.com/\w+) target=\"_blank\">", contents)[0]
+    longurl = re.findall('<INPUT NAME="longurl".* VALUE="(.*?)"', contents)[0]
+
     return shorturl, longurl
 
 def tinyurl(url):
     tiny = "http://tinyurl.com/api-create.php?url=%s" %(url)
     page = urllib2.urlopen(tiny)
-    contents = page.read()
+    tiny = page.read()
     page.close()
-    tiny = re.findall("(http://tinyurl.com/\w+)", page)[0]
+
     # Just return the original long URL and hope that's really
     # where the short link goes -- I can't find any way of verifying.
     return tiny, url
 
-def SimpleURLWindow(shorturl, longurl):
+# The list of shorteners, in the order we want to try them:
+shorteners = [ ('isgd', isgd), ('shorturl', shorturl), ('tinyurl', tinyurl) ]
+
+def SimpleURLWindow(shorturl, longurl, servicename=None):
     window = gtk.Window(gtk.WINDOW_TOPLEVEL)
     window.set_title('Shortened URL')
     window.connect("delete_event", gtk.main_quit)
     vbox = gtk.VBox(True, 2)
     window.add(vbox)
-    vbox.pack_start(gtk.Label(shorturl))
+    if servicename:
+        vbox.pack_start(gtk.Label('Shortened with ' + servicename))
+    entry = gtk.Entry()
+    entry.set_text(shorturl)
+    entry.select_region(0, -1)
+    vbox.pack_start(entry)
+    #vbox.pack_start(gtk.Label(shorturl))
     vbox.pack_start(gtk.Label(longurl))
 
     def key_press(widget, event) :
@@ -91,9 +104,18 @@ if __name__ == "__main__":
     else:
         url = sys.argv[1]
 
-    # For now, always use isgd:
-    shorturl, longurl = isgd(url)
-    print shorturl
-    print longurl
+    for (name, func) in shorteners:
+        try:
+            if name == 'isgd':
+                print "Skipping isgd"
+                continue
+            shorturl, longurl = func(url)
+            if shorturl and longurl:
+                print "Shortened with", name
+                print '%s (from %s)' % (shorturl, longurl)
+                break
+        except Exception, e:
+            print "Failed on", name
+            print e
 
-    SimpleURLWindow(shorturl, longurl)
+    SimpleURLWindow(shorturl, longurl, name)
