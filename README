@@ -3,12 +3,19 @@ A collection of useful scripts and snippets, in various languges.
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
+aptver:
+    Search for Debian packages, installed or uninstalled, matching
+    a pattern, and print out versions and descriptions.
+
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
 
 chatsounds.py:
     An xchat Python script to handle nick (and other special-case) sounds.
     Also a rare example of an xchat Python script.
+
+cellaut.py:
+    Simple cellular automata simulation in Python. Slow.
 
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
@@ -28,6 +35,11 @@ epubtag.py:
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
     did it occur between two given dates?
+
+fincompare.py:
+    Download financial data from Yahoo finance and plot lots of
+    different funds on the same scale.
+    Can also take data from a local spreadsheet or other source.
 
 fontasia:
     A Linux font chooser and categorizer.
@@ -103,8 +115,21 @@ readkey.py:
     Read a key press from the keyboard without waiting for a newline.
     For CLI programs: doesn't need X, tkintr, pygame or similar libs.
 
+serio:
+    A proof-of-concept serial terminal app in Python.
+    Don't take this seriously; it's not meant as a real app (yet?)
+
+shorturl:
+    Use a URL shortening service to get a shorter URL.
+    Can take input from the current X selection, and automatically
+    select its output for pasting into a browser or Twitter window.
+
 termcolors:
     Display ANSI colors for the current terminal.
+
+termsize:
+    Set stty size to the size of the current terminal window
+    (e.g. when logged in to an embedded Posix device over a serial line).
 
 tweet:
     Play birdsong from a specific bird. Requires ripped tracks from a
