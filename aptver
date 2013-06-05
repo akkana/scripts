@@ -55,8 +55,7 @@ def show_apt_matches(pat, cache, only_installed=False):
 
 if __name__ == '__main__':
     from optparse import OptionParser
-    usage = '''Usage: %prog pattern
-'''
+    usage = '''Usage: %prog pattern'''
     LongVersion = '''%prog 0.1: search for packages and show versions.'''
 
     optparser = OptionParser(usage=usage, version=LongVersion)
@@ -67,5 +66,8 @@ if __name__ == '__main__':
 
     cache = apt.cache.Cache()
 
+    if not args:
+        optparser.print_usage()
+        sys.exit(1)
     show_apt_matches(args[0], cache, only_installed=options.only_installed)
 
