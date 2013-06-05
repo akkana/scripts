@@ -57,7 +57,11 @@ def tinyurl(url):
     return tiny, url
 
 # The list of shorteners, in the order we want to try them:
-shorteners = [ ('isgd', isgd), ('shorturl', shorturl), ('tinyurl', tinyurl) ]
+shorteners = [ 
+               ('shorturl', shorturl),
+               ('isgd', isgd),
+               ('tinyurl', tinyurl)
+               ]
 
 def SimpleURLWindow(shorturl, longurl, servicename=None):
     window = gtk.Window(gtk.WINDOW_TOPLEVEL)
