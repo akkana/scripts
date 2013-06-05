@@ -46,7 +46,7 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
                 assert parent == el.parentNode
             if delete_tags :
                 print "Deleting:", el.childNodes[0].wholeText
-                el.parentNode.removeChild(tag)
+                el.parentNode.removeChild(el)
             else :
                 # el.childNodes[0].wholeText is the unicode.
                 # Turn it into UTF-8 before returning.
