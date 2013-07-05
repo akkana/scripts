@@ -25,6 +25,8 @@
 
 import sys, os
 import datetime
+import math
+import numpy
 
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
 import matplotlib.pyplot as plt
@@ -85,6 +87,11 @@ def plot_funds(tickerlist, initial, start, end) :
     '''Plot a fund by its ticker symbol,
        normalized to a given initial value.
     '''
+
+    numdays = (end - start).days
+    daysinyear = 365.0
+    print '%9s %9s %9s %9s' % ('Ticker', 'daily', 'CC', 'abs')
+
     # For testing, use something like
     # FUSVX = quotes_historical_yahoo('FUSVX', datetime.datetime(2012, 10, 1),
     #                                 datetime.datetime(2013, 4, 1),
@@ -96,13 +103,30 @@ def plot_funds(tickerlist, initial, start, end) :
         # http://stackoverflow.com/questions/9349434/how-do-i-check-for-numeric-overflow-without-getting-a-warning-in-python
         fund_data = quotes_historical_yahoo(ticker, start, end, asobject=True)
 
-        # Normalize to the initial investment:
+        # Guard against failures of quotes_historical_yahoo;
+        # without this check you'll see more uncatchable RuntimeWarnings.
         if fund_data['aclose'][0] == 0 :
-            # Guard against failures of quotes_historical_yahoo;
-            # without this check you'll see more uncatchable RuntimeWarnings.
             print ticker, ": First adjusted close is 0!"
             continue
 
+        # Calculate effective daily-compounded interest rate
+        fixed_pct = fund_data['aclose'][-1]/fund_data['aclose'][0] - 1.
+
+        Rcc = daysinyear / numdays * \
+            numpy.log(fund_data['aclose'][-1] / fund_data['aclose'][0])
+
+        # Convert CC return to daily-compounded return:
+        Rdaily = daysinyear * (math.exp(Rcc / daysinyear) - 1.)
+
+        # Another attempt to compute the daily rate, but it's wrong.
+        # Reff = daysinyear * (math.exp(math.log(fund_data['aclose'][-1]
+        #                                        - fund_data['aclose'][0])
+        #                               /numdays) - 1)
+
+        print "%9s %9.2f %9.2f %9.2f" % (ticker,
+                                         Rdaily*100, Rcc*100, fixed_pct*100)
+
+        # Normalize to the initial investment:
         fund_data['aclose'] *= initial / fund_data['aclose'][0]
 
         # and plot
