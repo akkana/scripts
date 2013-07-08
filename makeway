@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+
+# Take a file and of descriptions, multi-line and separated by blank lines,
+# and turn it into a collection of GPX waypoints
+# suitable for import into Osmand, PyTopo or other mapping programs.
+# Copyright 2013 by Akkana Peck <akkana@shallowsky.com>.
+# Please share and enjoy under the GPL v2 or later.
+
+import sys
+import re
+import datetime
+
+def write_gpx_file(entries, filename):
+    '''Write the list of entries -- each entry is [lat, long, desc] --
+       to a GPX file as separate waypoints.
+    '''
+    fp = open(filename, 'w')
+    fp.write('''<?xml version="1.0" encoding="UTF-8"?>
+<gpx
+ version="1.0"
+creator="makeway v. 0.1"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns="http://www.topografix.com/GPX/1/0"
+xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd">
+''')
+    fp.write('<time>%s</time>\n' % datetime.datetime.now().isoformat())
+
+    # Calculate our bounds:
+    minlat = 91
+    maxlat = 0
+    minlon = 1000
+    maxlon = -1000
+    for ent in entries:
+        if ent[0] < minlat:
+            minlat = ent[0]
+        elif ent[0] > maxlat:
+            maxlat = ent[0]
+        if ent[1] < minlon:
+            minlon = ent[1]
+        elif ent[1] > maxlon:
+            maxlon = ent[1]
+
+    fp.write('<bounds minlat="%f" minlon="%f" maxlat="%f" maxlon="%f"/>\n')
+
+    for ent in entries:
+        print >>fp, '<wpt lat="%f" lon="%f">' % (ent[0], ent[1])
+        print >>fp, '<name>%s</name>' % ent[2]
+        print >>fp, '<sym>Flag, Blue</sym>'
+        print >>fp, '</wpt>'
+
+    fp.write('</gpx>\n')
+
+def read_description_file(filename):
+    '''Read a file filled with multi-line descriptions, blank line separated.
+       The first line of each description is a latitude and longitude,
+       separated by whitespace.
+       The rest is free-form description.
+       Returns a list of entries, where each entry is a list:
+       [ latitude, longitude, text ]
+    '''
+
+    entries = []
+    cur_ent = []
+
+    fp = open(filename)
+    for line in fp:
+        line = line.strip()
+        if not line:    # end of a record. Save the current entry and move on
+            if cur_ent:
+                entries.append(cur_ent)
+                cur_ent = []
+                continue
+
+        if not cur_ent:
+            numeric = '[\+\-\d\.]'
+            # re.search doesn't work if you put the % expression in the
+            # search call, but it does work if you store the
+            # intermediate string first:
+            twonums = '(%s+)\s+(%s+)' % (numeric, numeric)
+            match = re.search(twonums, line)
+            if not match:
+                print "Illegal first line:", line
+                continue
+            cur_ent.append(float(match.group(1)))
+            cur_ent.append(float(match.group(2)))
+            # Start cur_ent[2] with a null string:
+            cur_ent.append('')
+            continue
+
+        # Else we have a non-null line, we have a current entry,
+        # so we're just appending to cur_ent[2].
+        # But skip lines that have any long words that are likely
+        # too long to wrap on a phone display (they're probably URLs).
+        if re.search('\S{27,}', line):
+            print "Skipping long line:", line
+            continue
+        if cur_ent[2]:
+            cur_ent[2] += '\n' + line
+        else:
+            cur_ent[2] += line
+
+    if cur_ent:
+        entries.append(cur_ent)
+
+    fp.close()
+
+    return entries
+
+if __name__ == "__main__" :
+    entries = read_description_file(sys.argv[1])
+    write_gpx_file(entries, sys.argv[2])
+
+
+
+
