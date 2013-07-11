@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+# Make a feedme-style directory of .txt files from one week of
+# a Coursera class.
+
+# Usage: courseratext in_dir out_dir
+# It will create the out_dir if it doesn't already exist.
+
+import sys, os
+
+def courseratext(in_dir, out_dir):
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    header = '''<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" type="text/css" title="Feeds" href="../../feeds.css"/>
+<title>%s</title>
+</head>
+
+<body>
+'''
+    indexstr = header % 'Coursera class index for ' + in_dir
+
+    for fil in sorted(os.listdir(in_dir)):
+        if not fil.endswith('.txt'):
+            print "Skipping", fil
+            continue
+
+        # Now we know the filename is something.txt.
+        # We need the base for it, so we can also make .html.
+        basefil = fil[:-4]
+        htmlfil = basefil + '.html'
+
+        # Take some of the spaces out of the filename.
+        # XXX add this later
+
+        # Put an HTML-ified version of the text file into the new directory.
+        newfile = open(os.path.join(out_dir, htmlfil), 'w')
+        newfile.write(header % fil)
+        fp = open(os.path.join(in_dir, fil))
+        for line in fp:
+            # Coursera caption files have no paragraph breaks,
+            # making them hard to read. Add some, even though
+            # this will probably mean too many paragraph breaks
+            # rather than too few.
+            if line[0].isupper():
+                newfile.write('\n<p>\n')
+            newfile.write(line)
+        fp.close()
+        newfile.close()
+
+        indexstr += '<p><a href="%s">%s</a>' % (htmlfil, fil)
+        
+        print "Wrote", basefil
+
+    indexfile = open(os.path.join(out_dir, 'index.html'), 'w')
+    indexfile.write(indexstr)
+    indexfile.close
+
+if __name__ == "__main__":
+    courseratext(sys.argv[1], sys.argv[2])
+
