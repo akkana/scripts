@@ -62,11 +62,6 @@ louder:
     Bind those to volume increase/decrease keys on your laptop.
     and set it as the system wallpaper.
 
-makeway:
-    Take a file and of descriptions, multi-line and separated by blank lines,
-    and turn it into a collection of GPX waypoints suitable for import into
-    any mapping program (e.g. Osmand or PyTopo).
-
 masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
@@ -143,6 +138,11 @@ tweet:
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than
     alsamixergui.
+
+waymaker:
+    Take a file and of descriptions, multi-line and separated by blank lines,
+    and turn it into a collection of GPX waypoints suitable for import into
+    any mapping program (e.g. Osmand or PyTopo).
 
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
