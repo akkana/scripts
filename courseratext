@@ -30,11 +30,12 @@ def courseratext(in_dir, out_dir):
 
         # Now we know the filename is something.txt.
         # We need the base for it, so we can also make .html.
-        basefil = fil[:-4]
+        # Take some of the spaces out of the filename while we're at it.
+        basefil = fil[:-4].replace(' - ', '-')
+
         htmlfil = basefil + '.html'
 
-        # Take some of the spaces out of the filename.
-        # XXX add this later
+        sentencebreak = False
 
         # Put an HTML-ified version of the text file into the new directory.
         newfile = open(os.path.join(out_dir, htmlfil), 'w')
@@ -45,9 +46,11 @@ def courseratext(in_dir, out_dir):
             # making them hard to read. Add some, even though
             # this will probably mean too many paragraph breaks
             # rather than too few.
-            if line[0].isupper():
+            if sentencebreak and line[0].isupper():
                 newfile.write('\n<p>\n')
-            newfile.write(line)
+            line = line.strip()
+            sentencebreak = line.endswith('.')
+            print >>newfile, line
         fp.close()
         newfile.close()
 
