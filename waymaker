@@ -64,7 +64,7 @@ def read_description_file(filename):
     cur_ent = []
 
     # In case we need to look up an address, we'll need to initialize
-    # Google Maps with our API key:
+    # Google Maps, but we only want to do that once.
     gmaps = None
 
     fp = open(filename)
@@ -142,9 +142,9 @@ def read_description_file(filename):
             # the Python GoogleMaps package (pip install googlemaps).
             # http://py-googlemaps.sourceforge.net/
             if not gmaps:
-                # We only want to initialize this once
+                # We only want to initialize Gmaps with the API key once.
                 print "Initializing Google Maps API"
-                gmaps = GoogleMaps('ABQIAAAAv9_d2WszxVN7VRdUB3o6BBTiBXU-rcqwtvtCpXQfdd06hg6lFRS0K2aG8lielRGij24iAbKxJhtJnw')
+                gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HEREw')
 
             lat, lon = gmaps.address_to_latlng(addr)
 
