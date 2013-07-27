@@ -9,6 +9,7 @@
 import sys, os
 import re
 import datetime
+import googlemaps   # need this for exceptions
 from googlemaps import GoogleMaps
 
 def write_gpx_file(entries, filename):
@@ -111,15 +112,23 @@ def read_description_file(filename):
                 # Try guards against StopIteration, i.e. end of file
                 try:
                     line2 = next(fp).strip()
+                    if not line2:
+                        # a blank line here means the previous line
+                        # wasn't meant to be the start of an entry anyway --
+                        # probably just a stray URL or something.
+                        continue
                     match = re.search(statezip, line2)
                     if not match:
                         print "Couldn't find coordinates OR address in '" + \
                             line + "' or in '" + line2 + "'"
                         print "Skipping this entry"
                         while True:
-                            line = next(fp)
+                            line = next(fp).strip()
                             if not line:
                                 break
+                        # Now continue the outer loop --
+                        # don't try to process this blank line as an address.
+                        continue
                 except StopIteration:
                     # StopIteration means the end of the file.
                     # Since this clause is only to start a new entry,
@@ -127,6 +136,7 @@ def read_description_file(filename):
                     # except closing the file.
                     # (montrose.txt is a good test case --
                     # or anything that ends with a blank line.)
+                    print "StopIteration"
                     fp.close()
                     return entries
 
@@ -146,7 +156,11 @@ def read_description_file(filename):
                 print "Initializing Google Maps API"
                 gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HEREw')
 
-            lat, lon = gmaps.address_to_latlng(addr)
+            try:
+                lat, lon = gmaps.address_to_latlng(addr)
+            except googlemaps.GoogleMapsError, e:
+                print "Oh, no! Couldn't geocode", addr
+                print e
 
             cur_ent.append(lat)
             cur_ent.append(lon)
