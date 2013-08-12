@@ -66,10 +66,6 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
-noaatemps.py:
-    Display and plot weather means for a set of stations,
-    by downloading NOAA data files.
-
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
@@ -143,6 +139,14 @@ waymaker:
     Take a file and of descriptions, multi-line and separated by blank lines,
     and turn it into a collection of GPX waypoints suitable for import into
     any mapping program (e.g. Osmand or PyTopo).
+
+weather/noaatemps.py:
+    Display and plot weather means for a set of stations,
+    by downloading NOAA data files.
+
+weather/weatherwin:
+    Display a window showing temperature and today's forecast
+    for several cities at once.
 
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using

@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+
+# Print weather for several locations,
+# given as city names or zip codes.
+# Copyright 2013 by Akkana Peck: share and enjoy under the GPL v2 or later.
+
+# Sample usage:
+# pywapitemp.py 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
+
+import sys
+import pywapi
+import gtk, gobject
+import pango
+# from pprint import pprint
+
+class WeatherWin(gtk.Window) :
+    def __init__(self):
+        super(WeatherWin, self).__init__()
+
+        self.mainbox = gtk.VBox(spacing = 10)
+        self.add(self.mainbox)
+
+        self.cityboxes = []
+
+        self.bigfont = 'Sans 16'
+
+    def run(self):
+        self.connect("delete_event", gtk.main_quit)
+        self.connect("destroy", gtk.main_quit)
+        self.connect("configure_event", self.configure_event)
+
+        self.show_all()
+
+        # set a timeout
+        gobject.timeout_add(300000, self.timer_func)
+
+        gtk.main()
+
+    def add_city(self, cityname):
+        code, name = WeatherWin.get_code(city)
+        if not code:
+            print "No data for", city
+            return
+
+        thisbox = {}
+        thisbox['code'] = code
+        thisbox['name'] = name
+
+        frame = gtk.Frame(name)
+
+        vbox = gtk.VBox()
+
+        label = gtk.Label(name)
+        label.modify_font(pango.FontDescription(self.bigfont))
+        vbox.pack_start(label)
+
+        hbox = gtk.HBox()
+
+        thisbox['curtemp'] = gtk.Label()
+        thisbox['curtemp'].modify_font(pango.FontDescription(self.bigfont))
+        hbox.pack_start(thisbox['curtemp'])
+
+        vbox.pack_start(hbox)
+        thisbox['curcond'] = gtk.Label()
+        hbox.pack_start(thisbox['curcond'])
+
+        hbox = gtk.HBox()
+        vbox.pack_start(hbox)
+        label = gtk.Label('Expecting: ')
+        hbox.pack_start(label)
+        thisbox['expecting'] = gtk.Label()
+        hbox.pack_start(thisbox['expecting'])
+
+        self.cityboxes.append(thisbox)
+
+        vbox.show_all()
+        frame.add(vbox)
+        self.mainbox.pack_start(frame)
+
+    def update_weather(self):
+        for box in self.cityboxes:
+            weather = pywapi.get_weather_from_yahoo(box['code'])
+            box['curtemp'].set_text(\
+                str(WeatherWin.c2f(weather['condition']['temp'])))
+            box['curcond'].set_text(weather['condition']['text'] + \
+                            ', humidity ' +  weather['atmosphere']['humidity'])
+            box['expecting'].set_text('%d, %s' % \
+                            (WeatherWin.c2f(weather['forecasts'][0]['high']),
+                             weather['forecasts'][0]['text']))
+
+    # Some generic weather utilities:
+
+    @staticmethod
+    def c2f(c):
+        return int(float(c) * 1.8 + 32)
+
+    @staticmethod
+    def get_code(city):
+
+        loclist = pywapi.get_location_ids(city)
+        if not loclist:
+            return None, None
+
+        loc = None
+        if len(loclist.keys()) == 1:
+            loc = loclist.keys()[0]
+        else:
+            # First see if any of the sites matches exactly
+            for key in loclist.keys():
+                if loclist[key] == city:
+                    loc = key
+
+            if not loc:
+                print "Sites matching", city, ':'
+                pprint(loclist)
+                return None, None
+
+        return loc, loclist[loc]
+
+    def configure_event(self, widget, event) :
+        print "Configure event"
+        self.update_weather()
+
+    def timer_func(self) :
+        self.update_weather()
+        return True
+
+win = WeatherWin()
+
+for city in sys.argv[1:]:
+    win.add_city(city)
+
+win.run()
+
