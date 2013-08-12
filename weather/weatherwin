@@ -5,7 +5,7 @@
 # Copyright 2013 by Akkana Peck: share and enjoy under the GPL v2 or later.
 
 # Sample usage:
-# pywapitemp.py 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
+# weatherwin 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
 
 import sys
 import pywapi
@@ -118,7 +118,6 @@ class WeatherWin(gtk.Window) :
         return loc, loclist[loc]
 
     def configure_event(self, widget, event) :
-        print "Configure event"
         self.update_weather()
 
     def timer_func(self) :
