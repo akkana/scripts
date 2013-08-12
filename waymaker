@@ -42,7 +42,8 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
         elif ent[1] > maxlon:
             maxlon = ent[1]
 
-    fp.write('<bounds minlat="%f" minlon="%f" maxlat="%f" maxlon="%f"/>\n')
+    fp.write('<bounds minlat="%f" minlon="%f" maxlat="%f" maxlon="%f"/>\n' \
+                 % (minlat, minlon, maxlat, maxlon))
 
     for ent in entries:
         print >>fp, '<wpt lat="%f" lon="%f">' % (ent[0], ent[1])
@@ -144,7 +145,7 @@ def read_description_file(filename):
             # Either way, look it up and add it to the desc.
             addr = line
             if line2:
-                addr += ' ' + line2.strip()
+                addr += ' ' + line2
             print "Found an address!", addr
 
             # Look up an address using map search.
