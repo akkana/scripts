@@ -7,13 +7,13 @@
 # Sample usage:
 # weatherwin 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
 
-import sys
+import sys, os
 import pywapi
 import gtk, gobject
 import pango
 from pprint import pprint
 
-sources = [ 'yahoo', 'weather.com' ]
+sources = [ 'Yahoo', 'Weather.com' ]
 
 # NOAA stations are kinda useless because there are so few of them
 # and there's no way to map from a location to a station name.
@@ -24,27 +24,16 @@ sources = [ 'yahoo', 'weather.com' ]
 # }
 
 class WeatherWin(gtk.Window) :
-    def __init__(self):
+    def __init__(self, cities):
         super(WeatherWin, self).__init__()
 
-        self.mainbox = gtk.VBox(spacing = 10)
+        self.mainbox = gtk.Table(rows=len(cities), columns=len(sources))
         self.add(self.mainbox)
 
         self.cityboxes = []
+        self.nextrow = 0
 
         self.bigfont = 'Sans 16'
-
-    def run(self):
-        self.connect("delete_event", gtk.main_quit)
-        self.connect("destroy", gtk.main_quit)
-        self.connect("configure_event", self.configure_event)
-
-        self.show_all()
-
-        # set a timeout
-        gobject.timeout_add(300000, self.timer_func)
-
-        gtk.main()
 
     def add_city(self, cityname):
         code, name = WeatherWin.get_code(city)
@@ -56,15 +45,18 @@ class WeatherWin(gtk.Window) :
         thisbox['code'] = code
         thisbox['name'] = name
 
-        vbox = gtk.VBox()
-        self.mainbox.pack_start(vbox)
-
         label = gtk.Label(name)
         label.modify_font(pango.FontDescription(self.bigfont))
-        vbox.pack_start(label)
+        self.mainbox.attach(label,
+                            0, len(sources)+1,
+                            self.nextrow, self.nextrow+1,
+                            xpadding=5, ypadding=5)
+        self.nextrow += 1
 
-        def add_group_widgets(name, letter):
+        def add_group_widgets(name):
             '''Add widgets for one weather source'''
+            letter = name[0]
+
             iframe = gtk.Frame(name)
             iframe.set_label_align(1.0, .5)
             ivbox = gtk.VBox()
@@ -91,29 +83,29 @@ class WeatherWin(gtk.Window) :
             thisbox['expecting' + letter] = gtk.Label()
             hbox.pack_start(thisbox['expecting' + letter])
 
-            iframe.show_all()
             return iframe
 
-        city_hbox = gtk.HBox()
-        vbox.pack_start(city_hbox)
+        for i, source in enumerate(sources):
+            iframe = add_group_widgets(source)
+            self.mainbox.attach(iframe, i, i+1, self.nextrow, self.nextrow+1)
+            iframe.show_all()
 
-        # Temperature and conditions from Yahoo
-        if 'yahoo' in sources:
-            iframe = add_group_widgets('Yahoo', 'Y')
-            city_hbox.pack_start(iframe)
-
-        # Temp and conditions from weather.com
-        if 'weather.com' in sources:
-            iframe = add_group_widgets('Weather.com', 'W')
-            city_hbox.pack_start(iframe)
-
-        # Temp and conditions from NOAA
-        # if 'noaa' in sources:
-        #     add_group_widgets('NOAA', 'N')
+        self.nextrow += 1
 
         self.cityboxes.append(thisbox)
 
-        vbox.show_all()
+    def run(self):
+        self.connect("delete_event", gtk.main_quit)
+        self.connect("destroy", gtk.main_quit)
+        self.connect("configure_event", self.configure_event)
+
+        self.mainbox.show_all()
+        self.show_all()
+
+        # set a timeout
+        gobject.timeout_add(300000, self.timer_func)
+
+        gtk.main()
 
     def update_weather(self):
         def update_boxes(l, temp, condition, forecast):
@@ -122,7 +114,7 @@ class WeatherWin(gtk.Window) :
             box['expecting' + l].set_text(forecast)
 
         for box in self.cityboxes:
-            if 'yahoo' in sources:
+            if 'Yahoo' in sources:
                 weatherY = pywapi.get_weather_from_yahoo(box['code'],
                                                          'imperial')
                 update_boxes('Y', weatherY['condition']['temp'],
@@ -132,7 +124,7 @@ class WeatherWin(gtk.Window) :
                                  (weatherY['forecasts'][0]['high'],
                                   weatherY['forecasts'][0]['text']))
 
-            if 'weather.com' in sources:
+            if 'Weather.com' in sources:
                 weatherW = pywapi.get_weather_from_weather_com(box['code'],
                                                                'imperial')
                 update_boxes('W',
@@ -179,10 +171,14 @@ class WeatherWin(gtk.Window) :
         self.update_weather()
         return True
 
-win = WeatherWin()
+win = WeatherWin(sys.argv[1:])
 
 for city in sys.argv[1:]:
     win.add_city(city)
 
-win.run()
+rc = os.fork()
+if not rc:
+    win.run()
+else:
+    sys.exit(0)
 
