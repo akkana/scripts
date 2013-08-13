@@ -11,7 +11,17 @@ import sys
 import pywapi
 import gtk, gobject
 import pango
-# from pprint import pprint
+from pprint import pprint
+
+sources = [ 'yahoo', 'weather.com' ]
+
+# NOAA stations are kinda useless because there are so few of them
+# and there's no way to map from a location to a station name.
+# NOAA_stations = {
+#     'San Jose, CA' : 'KSJC',
+#     'Fallbrook, CA' : 'SDFBK',
+#     'White Rock, NM' : 'KLAM', 
+# }
 
 class WeatherWin(gtk.Window) :
     def __init__(self):
@@ -46,47 +56,92 @@ class WeatherWin(gtk.Window) :
         thisbox['code'] = code
         thisbox['name'] = name
 
-        frame = gtk.Frame(name)
-
         vbox = gtk.VBox()
+        self.mainbox.pack_start(vbox)
 
         label = gtk.Label(name)
         label.modify_font(pango.FontDescription(self.bigfont))
         vbox.pack_start(label)
 
-        hbox = gtk.HBox()
+        def add_group_widgets(name, letter):
+            '''Add widgets for one weather source'''
+            iframe = gtk.Frame(name)
+            iframe.set_label_align(1.0, .5)
+            ivbox = gtk.VBox()
+            iframe.add(ivbox)
+            hbox = gtk.HBox()
+            ivbox.pack_start(hbox)
 
-        thisbox['curtemp'] = gtk.Label()
-        thisbox['curtemp'].modify_font(pango.FontDescription(self.bigfont))
-        hbox.pack_start(thisbox['curtemp'])
+            idx = 'curtemp' + letter
+            thisbox[idx] = gtk.Label()
+            thisbox[idx].set_alignment(0., .5)
+            thisbox[idx].set_padding(5, 0)
+            #thisbox[idx].modify_bg(gtk.STATE_NORMAL,
+            #                             gtk.gdk.Color(65535, 65535, 0))
+            thisbox[idx].modify_font(pango.FontDescription(self.bigfont))
+            hbox.pack_start(thisbox[idx])
 
-        vbox.pack_start(hbox)
-        thisbox['curcond'] = gtk.Label()
-        hbox.pack_start(thisbox['curcond'])
+            idx = 'curcond' + letter
+            thisbox[idx] = gtk.Label()
+            thisbox[idx].set_alignment(0., .5)
+            hbox.pack_start(thisbox[idx])
 
-        hbox = gtk.HBox()
-        vbox.pack_start(hbox)
-        label = gtk.Label('Expecting: ')
-        hbox.pack_start(label)
-        thisbox['expecting'] = gtk.Label()
-        hbox.pack_start(thisbox['expecting'])
+            hbox = gtk.HBox()
+            ivbox.pack_start(hbox)
+            thisbox['expecting' + letter] = gtk.Label()
+            hbox.pack_start(thisbox['expecting' + letter])
+
+            iframe.show_all()
+            return iframe
+
+        city_hbox = gtk.HBox()
+        vbox.pack_start(city_hbox)
+
+        # Temperature and conditions from Yahoo
+        if 'yahoo' in sources:
+            iframe = add_group_widgets('Yahoo', 'Y')
+            city_hbox.pack_start(iframe)
+
+        # Temp and conditions from weather.com
+        if 'weather.com' in sources:
+            iframe = add_group_widgets('Weather.com', 'W')
+            city_hbox.pack_start(iframe)
+
+        # Temp and conditions from NOAA
+        # if 'noaa' in sources:
+        #     add_group_widgets('NOAA', 'N')
 
         self.cityboxes.append(thisbox)
 
         vbox.show_all()
-        frame.add(vbox)
-        self.mainbox.pack_start(frame)
 
     def update_weather(self):
+        def update_boxes(l, temp, condition, forecast):
+            box['curtemp' + l].set_text(temp)
+            box['curcond' + l].set_text(condition)
+            box['expecting' + l].set_text(forecast)
+
         for box in self.cityboxes:
-            weather = pywapi.get_weather_from_yahoo(box['code'])
-            box['curtemp'].set_text(\
-                str(WeatherWin.c2f(weather['condition']['temp'])))
-            box['curcond'].set_text(weather['condition']['text'] + \
-                            ', humidity ' +  weather['atmosphere']['humidity'])
-            box['expecting'].set_text('%d, %s' % \
-                            (WeatherWin.c2f(weather['forecasts'][0]['high']),
-                             weather['forecasts'][0]['text']))
+            if 'yahoo' in sources:
+                weatherY = pywapi.get_weather_from_yahoo(box['code'],
+                                                         'imperial')
+                update_boxes('Y', weatherY['condition']['temp'],
+                             weatherY['condition']['text'] + \
+                            ', humidity ' +  weatherY['atmosphere']['humidity'],
+                             'Expecting %s, %s' % \
+                                 (weatherY['forecasts'][0]['high'],
+                                  weatherY['forecasts'][0]['text']))
+
+            if 'weather.com' in sources:
+                weatherW = pywapi.get_weather_from_weather_com(box['code'],
+                                                               'imperial')
+                update_boxes('W',
+                             weatherW['current_conditions']['temperature'],
+                             weatherW['current_conditions']['text'] + \
+                                 ', humidity ' + \
+                                 weatherW['current_conditions']['humidity'],
+                             'Dewpoint: ' + \
+                                    weatherW['current_conditions']['dewpoint'])
 
     # Some generic weather utilities:
 
