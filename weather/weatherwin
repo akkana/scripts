@@ -13,15 +13,9 @@ import gtk, gobject
 import pango
 from pprint import pprint
 
+# What sources should we use? pywapi claims to support Yahoo, Weather.com
+# and NOAA, but its NOAA support doesn't work.
 sources = [ 'Yahoo', 'Weather.com' ]
-
-# NOAA stations are kinda useless because there are so few of them
-# and there's no way to map from a location to a station name.
-# NOAA_stations = {
-#     'San Jose, CA' : 'KSJC',
-#     'Fallbrook, CA' : 'SDFBK',
-#     'White Rock, NM' : 'KLAM', 
-# }
 
 class WeatherWin(gtk.Window) :
     def __init__(self, cities):
