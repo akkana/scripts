@@ -24,7 +24,7 @@ sources = [ 'Yahoo', 'Weather.com' ]
 # }
 
 class WeatherWin(gtk.Window) :
-    def __init__(self, cities):
+    def __init__(self, cities, debug=False):
         super(WeatherWin, self).__init__()
 
         self.mainbox = gtk.Table(rows=len(cities), columns=len(sources))
@@ -34,6 +34,10 @@ class WeatherWin(gtk.Window) :
         self.nextrow = 0
 
         self.bigfont = 'Sans 16'
+
+        self.updating = False
+
+        self.debug = debug
 
     def add_city(self, cityname):
         code, name = WeatherWin.get_code(city)
@@ -97,7 +101,7 @@ class WeatherWin(gtk.Window) :
     def run(self):
         self.connect("delete_event", gtk.main_quit)
         self.connect("destroy", gtk.main_quit)
-        self.connect("configure_event", self.configure_event)
+        self.winsig = self.connect("configure_event", self.configure_event)
 
         self.mainbox.show_all()
         self.show_all()
@@ -108,6 +112,16 @@ class WeatherWin(gtk.Window) :
         gtk.main()
 
     def update_weather(self):
+        # Since gtk is too lame to prevent recursive expose or configure events,
+        # and it has no way (that works) to block or temporarily disable them
+        # during an event handler, set this flag to indicate we're inside
+        # an event handler and prevent infinite loops:
+        if self.updating:
+            return
+        self.updating = True
+
+        if self.debug:
+            print "Updating"
         def update_boxes(l, temp, condition, forecast):
             box['curtemp' + l].set_text(temp)
             box['curcond' + l].set_text(condition)
@@ -115,36 +129,61 @@ class WeatherWin(gtk.Window) :
 
         for box in self.cityboxes:
             if 'Yahoo' in sources:
+                if self.debug:
+                    print "Getting from Yahoo ..."
                 weatherY = pywapi.get_weather_from_yahoo(box['code'],
                                                          'imperial')
-                update_boxes('Y', weatherY['condition']['temp'],
-                             weatherY['condition']['text'] + \
-                            ', humidity ' +  weatherY['atmosphere']['humidity'],
-                             'Expecting %s, %s' % \
-                                 (weatherY['forecasts'][0]['high'],
-                                  weatherY['forecasts'][0]['text']))
+                if self.debug:
+                    pprint(weatherY)
+                try:
+                    update_boxes('Y', weatherY['condition']['temp'],
+                                 weatherY['condition']['text'] + \
+                                ', humidity ' +  \
+                                     weatherY['atmosphere']['humidity'],
+                                 'Expecting %s, %s' % \
+                                     (weatherY['forecasts'][0]['high'],
+                                      weatherY['forecasts'][0]['text']))
+                except KeyError, e:
+                    if 'error' in weatherY:
+                        print weatherY[error]
+                    else:
+                        print e
+                        print "KeyError with Yahoo update: Yahoo returned"
+                        pprint(weatherY)
 
             if 'Weather.com' in sources:
+                if self.debug:
+                    print "Getting from Weather.com ..."
                 weatherW = pywapi.get_weather_from_weather_com(box['code'],
                                                                'imperial')
-                update_boxes('W',
-                             weatherW['current_conditions']['temperature'],
-                             weatherW['current_conditions']['text'] + \
-                                 ', humidity ' + \
-                                 weatherW['current_conditions']['humidity'],
-                             'Dewpoint: ' + \
-                                    weatherW['current_conditions']['dewpoint'])
+                if self.debug:
+                    pprint(weatherW)
+                try:
+                    update_boxes('W',
+                                 weatherW['current_conditions']['temperature'],
+                                 weatherW['current_conditions']['text'] + \
+                                     ', humidity ' + \
+                                     weatherW['current_conditions']['humidity'],
+                                 'Dewpoint: ' + \
+                                     weatherW['current_conditions']['dewpoint'])
+                except KeyError, e:
+                    if 'error' in weatherW:
+                        print weatherW[error]
+                    else:
+                        print e
+                        print "KeyError with Weather.com update: read"
+                        pprint(weatherW)
+
+        self.updating = False
 
     # Some generic weather utilities:
 
     @staticmethod
-    def c2f(c):
-        return int(float(c) * 1.8 + 32)
-
-    @staticmethod
     def get_code(city):
 
+        print "Getting location code for", city
         loclist = pywapi.get_location_ids(city)
+        print loclist
         if not loclist:
             return None, None
 
@@ -165,20 +204,35 @@ class WeatherWin(gtk.Window) :
         return loc, loclist[loc]
 
     def configure_event(self, widget, event) :
+        #self.window.freeze_updates()
+        #self.signal_handler_block(self.winsig)
+        if self.debug:
+            print "Configure event"
         self.update_weather()
+        #self.window.thaw_updates()
+        #self.signal_handler_unblock(self.winsig)
+
 
     def timer_func(self) :
+        if self.debug:
+            print "Timer"
         self.update_weather()
         return True
 
-win = WeatherWin(sys.argv[1:])
+if __name__ == '__main__':
+    debug = False
+    win = WeatherWin(sys.argv[1:], debug=debug)
 
-for city in sys.argv[1:]:
-    win.add_city(city)
+    for city in sys.argv[1:]:
+        win.add_city(city)
 
-rc = os.fork()
-if not rc:
-    win.run()
-else:
-    sys.exit(0)
+    if debug:
+        print "Debug mode: not forking"
+        win.run()
+    else:
+        rc = os.fork()
+        if not rc:
+            win.run()
+        else:
+            sys.exit(0)
 
