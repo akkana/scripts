@@ -140,6 +140,10 @@ waymaker:
     and turn it into a collection of GPX waypoints suitable for import into
     any mapping program (e.g. Osmand or PyTopo).
 
+weather/cwop.py:
+    Download and parse readings from Citizen Weather Observation Program
+    stations.
+
 weather/noaatemps.py:
     Display and plot weather means for a set of stations,
     by downloading NOAA data files.
