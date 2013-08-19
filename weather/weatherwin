@@ -139,7 +139,7 @@ class WeatherWin(gtk.Window) :
                                       weatherY['forecasts'][0]['text']))
                 except KeyError, e:
                     if 'error' in weatherY:
-                        print weatherY[error]
+                        print weatherY['error']
                     else:
                         print e
                         print "KeyError with Yahoo update: Yahoo returned"
@@ -155,14 +155,14 @@ class WeatherWin(gtk.Window) :
                 try:
                     update_boxes('W',
                                  weatherW['current_conditions']['temperature'],
-                                 weatherW['current_conditions']['text'] + \
-                                     ', humidity ' + \
-                                     weatherW['current_conditions']['humidity'],
-                                 'Dewpoint: ' + \
-                                     weatherW['current_conditions']['dewpoint'])
+                                 weatherW['current_conditions']['text'],
+                                 'Humidity ' + \
+                                   weatherW['current_conditions']['humidity'] \
+                                   + ', Dewpoint: ' + \
+                                   weatherW['current_conditions']['dewpoint'])
                 except KeyError, e:
                     if 'error' in weatherW:
-                        print weatherW[error]
+                        print weatherW['error']
                     else:
                         print e
                         print "KeyError with Weather.com update: read"
@@ -213,8 +213,15 @@ class WeatherWin(gtk.Window) :
         self.update_weather()
         return True
 
+def Usage():
+    print "Usage: %s city [city2 city3 ...]" % os.path.basename(sys.argv[0])
+    sys.exit(1)
+
 if __name__ == '__main__':
     debug = False
+    if len(sys.argv) <= 1:
+        Usage()
+
     win = WeatherWin(sys.argv[1:], debug=debug)
 
     for city in sys.argv[1:]:
