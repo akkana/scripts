@@ -187,7 +187,7 @@ class WeatherWin(gtk.Window) :
         else:
             # First see if any of the sites matches exactly
             for key in loclist.keys():
-                if loclist[key] == city:
+                if loclist[key].lower() == city.lower():
                     loc = key
 
             if not loc:
