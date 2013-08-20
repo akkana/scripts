@@ -155,7 +155,7 @@ def read_description_file(filename):
             if not gmaps:
                 # We only want to initialize Gmaps with the API key once.
                 print "Initializing Google Maps API"
-                gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HEREw')
+                gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HERE')
 
             try:
                 lat, lon = gmaps.address_to_latlng(addr)
