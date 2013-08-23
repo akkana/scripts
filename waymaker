@@ -29,17 +29,17 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
 
     # Calculate our bounds:
     minlat = 91
-    maxlat = 0
+    maxlat = -90
     minlon = 1000
     maxlon = -1000
     for ent in entries:
         if ent[0] < minlat:
             minlat = ent[0]
-        elif ent[0] > maxlat:
+        if ent[0] > maxlat:
             maxlat = ent[0]
         if ent[1] < minlon:
             minlon = ent[1]
-        elif ent[1] > maxlon:
+        if ent[1] > maxlon:
             maxlon = ent[1]
 
     fp.write('<bounds minlat="%f" minlon="%f" maxlat="%f" maxlon="%f"/>\n' \
