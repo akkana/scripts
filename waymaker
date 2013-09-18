@@ -8,6 +8,7 @@
 
 import sys, os
 import re
+import cgi
 import datetime
 import googlemaps   # need this for exceptions
 from googlemaps import GoogleMaps
@@ -165,11 +166,15 @@ def read_description_file(filename):
 
             cur_ent.append(lat)
             cur_ent.append(lon)
+
+            # XXX Need to remove special characters XML can't handle:
+            # ? & ( ) ' "
+
             # and append the address as the first part of the description:
             if line2:
-                cur_ent.append(line + '\n' + line2)
+                cur_ent.append(cgi.escape(line) + '\n' + cgi.escape(line2))
             else:
-                cur_ent.append(line)
+                cur_ent.append(cgi.escape(line))
 
             continue
 
@@ -181,9 +186,9 @@ def read_description_file(filename):
             print "Skipping long line:", line
             continue
         if cur_ent[2]:
-            cur_ent[2] += '\n' + line
+            cur_ent[2] += '\n' + cgi.escape(line)
         else:
-            cur_ent[2] += line
+            cur_ent[2] += cgi.escape(line)
 
     if cur_ent:
         entries.append(cur_ent)
