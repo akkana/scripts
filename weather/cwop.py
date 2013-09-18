@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Parse data from Citizen Weather Observation Program stations.
-# http://www.wxqa.com/states/AZ.html list, citizen weather obs program stations
+# More details on the program: http://wxqa.com/
 
 # To get data, find the "CWOP QC" from the table, then, e.g. for the QC=AS857,
 # get a CSV for the last 7 days at
