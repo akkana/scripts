@@ -10,8 +10,11 @@ import sys, os
 import re
 import cgi
 import datetime
-import googlemaps   # need this for exceptions
-from googlemaps import GoogleMaps
+import time
+
+# import googlemaps   # need this for exceptions
+# from googlemaps import GoogleMaps
+import urllib, json, csv
 
 def write_gpx_file(entries, filename):
     '''Write the list of entries -- each entry is [lat, long, desc] --
@@ -53,6 +56,55 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
         print >>fp, '</wpt>'
 
     fp.write('</gpx>\n')
+
+#
+# Replacement for googlemaps API:
+# http://stackoverflow.com/questions/18807114/http-error-403-with-api-id-in-accessing-google-maps
+#
+over_query_limit = False
+# Explanation of google's query limit:
+# https://developers.google.com/maps/documentation/business/articles/usage_limits
+
+def geocode(addr):
+    '''Use Google's geocoding URL to convert a string address
+       to latitude and longitude.
+       Returns a (lat, lon) pair, or None, None.
+    '''
+    global over_query_limit
+    if over_query_limit:
+        time.sleep(2)
+    else:
+        time.sleep(.1)
+        # Currently google's limit is 10 queries/second, so if we sleep
+        # for 1/10 second we should hopefully stay under the rate limit.
+        # https://developers.google.com/maps/documentation/business/faq#usage_limits
+
+    url = "http://maps.googleapis.com/maps/api/geocode/json?address=%s&sensor=false" %   (urllib.quote(addr.replace(' ', '+')))
+    try:
+        data = urllib.urlopen(url).read()
+        loaded = json.loads(data)
+        if loaded['status'] == u'OVER_QUERY_LIMIT':
+            print "Hit the Google Maps query limit; sleeping for 2 seconds between queries"
+            over_query_limit = True
+            time.sleep(2.5)
+            data = urllib.urlopen(url).read()
+            loaded = json.loads(data)
+
+        # If we've already waited the 2 seconds and Google still says
+        # we're over limit, then we've hit the (unspecified) daily limit
+        # and need to give up.
+        if over_query_limit and loaded['status'] == u'OVER_QUERY_LIMIT':
+            print "Hit Google's daily quota; giving up"
+            sys.exit(1)
+
+        location = loaded["results"][0]["geometry"]["location"]
+
+    except IndexError, e:
+        print "Error reading JSON for", addr
+        print loaded
+        return None, None
+
+    return location['lat'], location['lng']
 
 def read_description_file(filename):
     '''Read a file filled with multi-line descriptions, blank line separated.
@@ -149,20 +201,29 @@ def read_description_file(filename):
                 addr += ' ' + line2
             print "Found an address!", addr
 
+            # Google Maps has shut off access to this API,
+            # perhaps only temporarily:
+
             # Look up an address using map search.
             # This requires a Google Maps API key and
             # the Python GoogleMaps package (pip install googlemaps).
             # http://py-googlemaps.sourceforge.net/
-            if not gmaps:
-                # We only want to initialize Gmaps with the API key once.
-                print "Initializing Google Maps API"
-                gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HERE')
+            #if not gmaps:
+            #    # We only want to initialize Gmaps with the API key once.
+            #    print "Initializing Google Maps API"
+            #    gmaps = GoogleMaps('YOUR GOOGLE MAPS API KEY HERE')
+            #
+            # try:
+            #     lat, lon = gmaps.address_to_latlng(addr)
+            # except googlemaps.GoogleMapsError, e:
+            #     print "Oh, no! Couldn't geocode", addr
+            #     print e
 
-            try:
-                lat, lon = gmaps.address_to_latlng(addr)
-            except googlemaps.GoogleMapsError, e:
-                print "Oh, no! Couldn't geocode", addr
-                print e
+            # So instead, use a local version:
+            lat, lon = geocode(addr)
+            if not lat:
+                cur_ent = []
+                continue
 
             cur_ent.append(lat)
             cur_ent.append(lon)
