@@ -1,0 +1,125 @@
+#! /usr/bin/env python
+
+# Take an mbox HTML message (e.g. from mutt), split it using munpack
+# (a separate program), and rewrite it so it can be viewed in an
+# external browser.
+# Can be run from within a mailer like mutt, or independently
+# on a single message file.
+#
+# Usage: viewhtmlmail.py [mbox [tmpdir]]
+#    Defaults: /tmp/mutttmpbox, /tmp/viewhtmltmp
+#
+# Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
+# which sadly no longer works, at least with mail from current Apple Mail.
+#
+# Copyright 2013 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+
+# To use it from mutt, put the following lines in your .muttrc:
+# macro  index  <F10>  "<copy-message>/tmp/mutttmpbox\n<enter><shell-escape>~/bin/viewhtmlmail.py\n" "View HTML in browser"
+# macro  pager  <F10>  "<copy-message>/tmp/mutttmpbox\n<enter><shell-escape>~/bin/viewhtmlmail.py\n" "View HTML in browser"
+
+import os, sys
+import re
+import time
+import shutil
+
+def view_html_message(mbox, tmpdir):
+
+    if not os.path.exists(tmpdir):
+        os.makedirs(tmpdir)
+
+    fp = os.popen("munpack -q -t -C %s %s" % (tmpdir, mbox))
+    unpacked = fp.readlines()
+    fp.close()
+
+    # Lines will look like: filename (mimetype).
+    # Split it into a list of (filename, mimetype) for each file.
+    pat = re.compile('(.*) \'?\((.*)\)\'?')
+    files = [ m.groups() for l in unpacked for m in [pat.search(l)] if m ]
+
+    # Find the first HTML part:
+    html_part = None
+    for f in files:
+        if f[1] == 'text/html':
+            html_part = f[0]
+            files.remove(f)
+
+    # Now get a list of all the content-disposition embedded files
+    # from the original mailbox, since munpack doesn't do that for us.
+    mimefiles = []
+    curfile = {}
+    fp = open(mbox)
+
+    # The values we need for each MIME-attached file,
+    # and the pattern with which it's announced in the MIME message:
+    patterns = {
+        'content_id': re.compile('content-id: ?<(.*)>;?'),
+        'filename':   re.compile('filename ?= ?\'?"?(.*)\'?"?;?'),
+        'name_pat':   re.compile('name ?= ?\'?"?([^\'"]*)\'?"?;?')
+        }
+
+    for line in fp:
+        line = line.strip().lower()
+
+        if line.startswith('content-disposition:'):
+            if curfile:
+                mimefiles.append(curfile)
+            curfile = {}
+            continue
+
+        for pat in patterns.keys():
+            m = patterns[pat].match(line)
+            if m:
+                curfile[pat] = m.group(1)
+                continue
+
+    fp.close()
+    if curfile:
+        mimefiles.append(curfile)
+
+    # I'm not sure what the difference between filename and name is.
+    # Do a quick sanity check to see if they're ever different:
+    for f in mimefiles:
+        if 'name' in f and 'filename' in f and f['name'] != f['filename']:
+            print "Yikes! name = %s but filename = %s" % (f['name'],
+                                                          f['filename'])
+
+    # Some, maybe most, of the URLs use CIDs instead of filenames, e.g.
+    # src="cid:0635428E-AE25-4FA0-93AC-6B8379300161" 
+    # Need to rewrite the HTML to point to the file with the content_id
+    # that matches the CID in the HTML (case insensitive).
+    # 'content_id': '0635428e-ae25-4fa0-93ac-6b8379300161'
+    htmlfp = open(os.path.join(tmpdir, html_part))
+    htmlsrc = htmlfp.read()
+    htmlfp.close()
+
+    for mf in mimefiles:
+        htmlsrc = re.sub('cid: ?' + mf['content_id'], mf['filename'],
+                         htmlsrc, flags=re.IGNORECASE)
+
+    # Now theoretically all the <img> links have been substituted.
+    # Write it to an html file.
+    htmlfile = os.path.join(tmpdir, html_part + '.html')
+    outhtml = open(htmlfile, 'w')
+    outhtml.write(htmlsrc)
+    outhtml.close()
+
+    # Now call firefox on it
+    print "Running: firefox -new-window " + htmlfile
+    os.system("firefox -new-window " + htmlfile)
+
+    # Wait a while to make sure firefox has loads the imgaes, then clean up.
+    time.sleep(6)
+    shutil.rmtree(tmpdir)
+    os.unlink(mbox)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        mbox = sys.argv[1]
+    else:
+        mbox = '/tmp/mutttmpbox'
+    if len(sys.argv) > 2:
+        tmpdir = sys.argv[2]
+    else:
+        tmpdir = '/tmp/viewhtmltmp'
+    view_html_message(mbox, tmpdir)
