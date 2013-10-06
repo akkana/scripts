@@ -22,91 +22,104 @@ import os, sys
 import re
 import time
 import shutil
+import email, mimetypes
 
 def view_html_message(mbox, tmpdir):
 
     if not os.path.exists(tmpdir):
         os.makedirs(tmpdir)
 
-    fp = os.popen("munpack -q -t -C %s %s" % (tmpdir, mbox))
-    unpacked = fp.readlines()
+    fp = open(mbox)
+    msg = email.message_from_file(fp)
     fp.close()
 
-    # Lines will look like: filename (mimetype).
-    # Split it into a list of (filename, mimetype) for each file.
-    pat = re.compile('(.*) \'?\((.*)\)\'?')
-    files = [ m.groups() for l in unpacked for m in [pat.search(l)] if m ]
-
-    # Find the first HTML part:
     html_part = None
-    for f in files:
-        if f[1] == 'text/html':
-            html_part = f[0]
-            files.remove(f)
+    counter = 1
+    subfiles = []
+    for part in msg.walk():
 
-    # Now get a list of all the content-disposition embedded files
-    # from the original mailbox, since munpack doesn't do that for us.
-    mimefiles = []
-    curfile = {}
-    fp = open(mbox)
+        # print ""
 
-    # The values we need for each MIME-attached file,
-    # and the pattern with which it's announced in the MIME message:
-    patterns = {
-        'content_id': re.compile('content-id: ?<(.*)>;?'),
-        'filename':   re.compile('filename ?= ?\'?"?(.*)\'?"?;?'),
-        'name_pat':   re.compile('name ?= ?\'?"?([^\'"]*)\'?"?;?')
-        }
+        # part has, for example:
+        # items: [('Content-Type', 'image/jpeg'), ('Content-Transfer-Encoding', 'base64'), ('Content-ID', '<14.3631871432@web82503.mail.mud.yahoo.com>'), ('Content-Disposition', 'attachment; filename="ATT0001414.jpg"')]
+        # keys: ['Content-Type', 'Content-Transfer-Encoding', 'Content-ID', 'Content-Disposition']
+        # values: ['image/jpeg', 'base64', '<14.3631871432@web82503.mail.mud.yahoo.com>', 'attachment; filename="ATT0001414.jpg"']
 
-    for line in fp:
-        line = line.strip().lower()
-
-        if line.startswith('content-disposition:'):
-            if curfile:
-                mimefiles.append(curfile)
-            curfile = {}
+        # multipart/* are just containers
+        #if part.get_content_maintype() == 'multipart':
+        if part.is_multipart() or part.get_content_type == 'message/rfc822':
             continue
 
-        for pat in patterns.keys():
-            m = patterns[pat].match(line)
-            if m:
-                curfile[pat] = m.group(1)
-                continue
+        if part.get_content_subtype() == 'html':
+            if html_part:
+                print "Eek, more than one html part!"
+            html_part = part
 
-    fp.close()
-    if curfile:
-        mimefiles.append(curfile)
+        # Save it to a file in the temp dir.
+        filename = part.get_filename()
+        if not filename:
+            ext = mimetypes.guess_extension(part.get_content_type())
+            if not ext:
+                # Use a generic bag-of-bits extension
+                ext = '.bin'
+            filename = 'part-%03d%s' % (counter, ext)
 
-    # I'm not sure what the difference between filename and name is.
-    # Do a quick sanity check to see if they're ever different:
-    for f in mimefiles:
-        if 'name' in f and 'filename' in f and f['name'] != f['filename']:
-            print "Yikes! name = %s but filename = %s" % (f['name'],
-                                                          f['filename'])
+        # Applications should really sanitize the given filename so that an
+        # email message can't be used to overwrite important files.
+        # As a first step, guard against ../
+        if '../' in filename:
+            print "Eek! Possible security problem in filename", filename
+            continue
 
-    # Some, maybe most, of the URLs use CIDs instead of filenames, e.g.
-    # src="cid:0635428E-AE25-4FA0-93AC-6B8379300161" 
-    # Need to rewrite the HTML to point to the file with the content_id
-    # that matches the CID in the HTML (case insensitive).
-    # 'content_id': '0635428e-ae25-4fa0-93ac-6b8379300161'
-    htmlfp = open(os.path.join(tmpdir, html_part))
-    htmlsrc = htmlfp.read()
-    htmlfp.close()
+        filename = os.path.join(tmpdir, filename)
 
-    for mf in mimefiles:
-        htmlsrc = re.sub('cid: ?' + mf['content_id'], mf['filename'],
+        # print "%10s %5s %s" % (part.get_content_type(), ext, filename)
+
+        # Mailers may use Content-Id or Content-ID (or, presumably, various
+        # other capitalizations). So we can't just look it up simply.
+        content_id = None
+        for k in part.keys():
+            if k.lower() == 'content-id':
+                # Remove angle brackets, if present.
+                # part['Content-Id'] is unmutable -- attempts to change it
+                # are just ignored -- so copy it to a local mutable string.
+                content_id = part['Content-Id']
+                if content_id.startswith('<') and content_id.endswith('>'):
+                    content_id = content_id[1:-1]
+
+                subfiles.append({ 'filename': filename,
+                                  'Content-Id': content_id })
+                counter += 1
+                fp = open(filename, 'wb')
+                fp.write(part.get_payload(decode=True))
+                # print "wrote", os.path.join(tmpdir, filename)
+                fp.close()
+                break     # no need to look at other keys
+
+        if not content_id:
+            print filename, "doesn't have a Content-Id, not saving"
+            # print "keys:", part.keys()
+
+    # for sf in subfiles:
+    #     print sf
+
+    # We're done saving the parts. It's time to save the HTML part.
+    htmlfile = os.path.join(tmpdir, "viewhtml.html")
+    fp = open(htmlfile, 'wb')
+    htmlsrc = html_part.get_payload(decode=True)
+
+    # Substitute all the filenames for CIDs:
+    for sf in subfiles:
+        htmlsrc = re.sub('cid: ?' + sf['Content-Id'],
+                         'file://' + sf['filename'],
                          htmlsrc, flags=re.IGNORECASE)
 
-    # Now theoretically all the <img> links have been substituted.
-    # Write it to an html file.
-    htmlfile = os.path.join(tmpdir, html_part + '.html')
-    outhtml = open(htmlfile, 'w')
-    outhtml.write(htmlsrc)
-    outhtml.close()
+    fp.write(htmlsrc)
+    fp.close()
 
-    # Now call firefox on it
-    print "Running: firefox -new-window " + htmlfile
-    os.system("firefox -new-window " + htmlfile)
+    # Now we have the file. Call firefox on it.
+    print "Calling firefox -new-window file://" + htmlfile
+    os.system("firefox -new-window file://" + htmlfile)
 
     # Wait a while to make sure firefox has loads the imgaes, then clean up.
     time.sleep(6)
