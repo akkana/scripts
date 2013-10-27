@@ -6,6 +6,8 @@
 
 # Sample usage:
 # weatherwin 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
+# Note for testing -- sometimes get_location_ids breaks,
+# so if you need it, 'San Jose, CA' is u'USCA0987'
 
 import sys, os
 import pywapi
@@ -34,6 +36,8 @@ class WeatherWin(gtk.Window) :
         self.debug = debug
 
     def add_city(self, cityname):
+        # pywapi spews warnings for non-unicode strings
+        city = unicode(cityname)
         code, name = WeatherWin.get_code(city)
         if not code:
             print "No data for", city
@@ -177,7 +181,19 @@ class WeatherWin(gtk.Window) :
 
         print "Getting location code for", city
         loclist = pywapi.get_location_ids(city)
-        print loclist
+        # print loclist
+
+        if not loclist and ' ' in city:
+            # As of Oct 24 2013, get_location_ids doesn't work for anything
+            # with a space in it, even if it's an exact match for a known
+            # location. And searches only work if you start with the
+            # right letters (e.g. you can find San Jose, CA searching
+            # for "San" but not for "Jose").
+            # So if we get a null result, try searching only up to the
+            # first space, then see if we get a match.
+            searchcity = city[0:city.find(' ')]
+            loclist = pywapi.get_location_ids(searchcity)
+
         if not loclist:
             return None, None
 
@@ -188,6 +204,7 @@ class WeatherWin(gtk.Window) :
             # First see if any of the sites matches exactly
             for key in loclist.keys():
                 if loclist[key].lower() == city.lower():
+                    # print "Found an exact match:", key, loclist[key]
                     loc = key
 
             if not loc:
