@@ -1,0 +1,81 @@
+#! /usr/bin/env python
+
+# Convert HTML pages to PDF.
+# Copyright 2012 by Akkana Peck -- share and enjoy under the GPL v2 or later.
+#
+# Thx to http://notes.alexdong.com/xhtml-to-pdf-using-pyqt4-webkit-and-headless
+#
+# To convert all the output files into a single multi-page PDF, use this:
+# gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=multipage.pdf -dBATCH file*.pdf
+
+import sys
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+from PyQt4.QtWebKit import *
+from pyPdf import PdfFileWriter, PdfFileReader
+
+pagelist = sys.argv[1:]
+pagelistindex = 0
+pdflist = []
+
+app = QApplication(sys.argv)
+
+web = QWebView()
+
+# QPrinter always prints too small, and I can't figure out why.
+# Empirically, I can get dot-for-dot with this zoom factor:
+# Printing to 1366 (with speaker notes), use zoom factor 1.24.
+# Printing to 1024 to remove the speaker notes, use zoom factor 2.0.
+web.setZoomFactor(2.0)
+
+# You can show the window, but it's not necessary:
+#web.show()
+
+printer = QPrinter(mode = QPrinter.ScreenResolution)
+printer.setPaperSize(QSizeF(1024, 768), QPrinter.DevicePixel)
+printer.setOutputFormat(QPrinter.PdfFormat)
+printer.setPageMargins(0 , 0 , 0 , 0 , QPrinter.DevicePixel)
+printer.setFullPage(True)
+
+def makeMultipage(outfile, inlist) :
+    # Make a multi-page document from all the pages we've created:
+    output = PdfFileWriter()
+    for infile in inlist :
+        inpdf = PdfFileReader(file(infile, "rb"))
+        output.addPage(inpdf.getPage(0))
+
+    # finally, write "output" to document-output.pdf
+    outputStream = file(outfile, "wb")
+    output.write(outputStream)
+    outputStream.close()
+    print 'Wrote all pages to', outfile
+
+def print_next() :
+    '''Print the page that has just loaded, then start the load
+       of the next page in the list. Called from loadFinished signal.
+    '''
+    global pagelist, pagelistindex, web, printer
+
+    outputfile = "../pdf/file%03d.pdf" % pagelistindex
+    printer.setOutputFileName(outputfile)
+    pdflist.append(outputfile)
+    web.print_(printer)
+    print "Generated", outputfile, "from", pagelist[pagelistindex]
+
+    pagelistindex += 1
+    if pagelistindex >= len(pagelist) :
+        makeMultipage('../pdf/all.pdf', pdflist)
+
+        print "Exiting"
+        QApplication.exit()
+        # That doesn't always work, so hedge our bets:
+        sys.exit(0)
+
+    # Load the next URL in the list
+    print "Loading", pagelist[pagelistindex]
+    web.load(QUrl(pagelist[pagelistindex]))
+
+QObject.connect(web, SIGNAL("loadFinished(bool)"), print_next)
+web.load(QUrl(pagelist[pagelistindex]))
+
+sys.exit(app.exec_())
