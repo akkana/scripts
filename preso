@@ -30,8 +30,7 @@ class PresoViewer(gtk.Window):
 
         # If the physical display is bigger than displaywidth,
         # then it's better not to run fullscreen.
-        if gtk.gdk.screen_width() <= self.displaywidth and \
-                gtk.gdk.screen_height() <= self.displayheight :
+        if gtk.gdk.screen_height() <= self.displayheight :
             self.fullscreen()
 
         self._browser = webkit.WebView()
