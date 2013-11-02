@@ -6,6 +6,12 @@
 
 # Sample usage:
 # weatherwin 'White Rock, NM' 'Los Alamos, NM' 'Cortez, CO' 'Fallbrook, CA' 'Lompoc, CA' 95128
+# But alas that no longer works since Yahoo broke their search.
+# So use weather codes instead, e.g. weatherwin USNM0179 USNM0531 USCA0993
+# To get weather codes, go to weather.com, search for your city
+# and note the code in the URL. Or try
+# http://edg3.co.uk/snippets/weather-location-codes/united-states-of-america/
+# but it's sadly incomplete; I haven't found a complete list anywhere.
 
 import sys, os
 import pywapi
@@ -33,8 +39,15 @@ class WeatherWin(gtk.Window) :
 
         self.debug = debug
 
-    def add_city(self, cityname):
-        code, name = WeatherWin.get_code(city)
+    def add_city(self, city):
+        # If it's a weather code already, no need to look it up.
+        if city.startswith('US') and len(city) == 8:
+            code = city
+            name = city
+        else:
+            # pywapi spews warnings for non-unicode strings
+            city = unicode(city)
+            code, name = WeatherWin.get_code(city)
         if not code:
             print "No data for", city
             return
@@ -44,6 +57,7 @@ class WeatherWin(gtk.Window) :
         thisbox['name'] = name
 
         label = gtk.Label(name)
+        thisbox['namelabel'] = label
         label.modify_font(pango.FontDescription(self.bigfont))
         self.mainbox.attach(label,
                             0, len(sources)+1,
@@ -127,6 +141,13 @@ class WeatherWin(gtk.Window) :
                     print "Getting from Yahoo ..."
                 weatherY = pywapi.get_weather_from_yahoo(box['code'],
                                                          'imperial')
+
+                # Update the city name if we don't have it yet
+                if box['name'] == box['code']:
+                    box['name'] = weatherY['location']['city'] + ', ' + \
+                        weatherY['location']['region']
+                    box['namelabel'].set_text(box['name'])
+
                 if self.debug:
                     pprint(weatherY)
                 try:
@@ -152,6 +173,12 @@ class WeatherWin(gtk.Window) :
                                                                'imperial')
                 if self.debug:
                     pprint(weatherW)
+
+                # Update the city name if we don't have it yet
+                if box['name'] == box['code']:
+                    box['name'] = weatherW['location']['name']
+                    box['namelabel'].set_text(box['name'])
+
                 try:
                     update_boxes('W',
                                  weatherW['current_conditions']['temperature'],
@@ -174,10 +201,25 @@ class WeatherWin(gtk.Window) :
 
     @staticmethod
     def get_code(city):
+        '''Get the weather code for a city name using Yahoo search.
+           Unfortunately Yahoo changed their backend so this no longer works.
+        '''
 
         print "Getting location code for", city
         loclist = pywapi.get_location_ids(city)
-        print loclist
+        # print loclist
+
+        if not loclist and ' ' in city:
+            # As of Oct 24 2013, get_location_ids doesn't work for anything
+            # with a space in it, even if it's an exact match for a known
+            # location. And searches only work if you start with the
+            # right letters (e.g. you can find San Jose, CA searching
+            # for "San" but not for "Jose").
+            # So if we get a null result, try searching only up to the
+            # first space, then see if we get a match.
+            searchcity = city[0:city.find(' ')]
+            loclist = pywapi.get_location_ids(searchcity)
+
         if not loclist:
             return None, None
 
@@ -188,6 +230,7 @@ class WeatherWin(gtk.Window) :
             # First see if any of the sites matches exactly
             for key in loclist.keys():
                 if loclist[key].lower() == city.lower():
+                    # print "Found an exact match:", key, loclist[key]
                     loc = key
 
             if not loc:

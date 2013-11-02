@@ -83,7 +83,7 @@ def view_html_message(mbox, tmpdir):
                 # Remove angle brackets, if present.
                 # part['Content-Id'] is unmutable -- attempts to change it
                 # are just ignored -- so copy it to a local mutable string.
-                content_id = part['Content-Id']
+                content_id = part[k]
                 if content_id.startswith('<') and content_id.endswith('>'):
                     content_id = content_id[1:-1]
 
