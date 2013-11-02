@@ -8,11 +8,28 @@
 # To convert all the output files into a single multi-page PDF, use this:
 # gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=multipage.pdf -dBATCH file*.pdf
 
-import sys
+import sys, os
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 from pyPdf import PdfFileWriter, PdfFileReader
+
+# Parameters that should be specifiable on the commandline.
+# Currently only the resolution is.
+x_res = 1024
+outdir = "pdf"
+
+if len(sys.argv) < 2 :
+    print "Usage: %s a.html b.html ..." % sys.argv[0]
+    sys.exit(1)
+
+# First check for flags. -1366 means include the whole 1366-pixel width
+# instead of only the 1024 pixels the projector sees.
+# You can specify other X resolutions there too.
+if sys.argv[1][0] == '-' and sys.argv[1][1].isdigit() :
+    x_res = int(sys.argv[1][1:])
+    print "Using X resolution of", x_res
+    sys.argv = sys.argv[1:]
 
 pagelist = sys.argv[1:]
 pagelistindex = 0
@@ -32,7 +49,7 @@ web.setZoomFactor(2.0)
 #web.show()
 
 printer = QPrinter(mode = QPrinter.ScreenResolution)
-printer.setPaperSize(QSizeF(1024, 768), QPrinter.DevicePixel)
+printer.setPaperSize(QSizeF(x_res, 768), QPrinter.DevicePixel)
 printer.setOutputFormat(QPrinter.PdfFormat)
 printer.setPageMargins(0 , 0 , 0 , 0 , QPrinter.DevicePixel)
 printer.setFullPage(True)
@@ -56,7 +73,7 @@ def print_next() :
     '''
     global pagelist, pagelistindex, web, printer
 
-    outputfile = "../pdf/file%03d.pdf" % pagelistindex
+    outputfile = os.path.join(outdir, "file%03d.pdf" % pagelistindex)
     printer.setOutputFileName(outputfile)
     pdflist.append(outputfile)
     web.print_(printer)
@@ -64,7 +81,7 @@ def print_next() :
 
     pagelistindex += 1
     if pagelistindex >= len(pagelist) :
-        makeMultipage('../pdf/all.pdf', pdflist)
+        makeMultipage(os.path.join(outdir, 'all.pdf'), pdflist)
 
         print "Exiting"
         QApplication.exit()
