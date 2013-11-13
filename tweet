@@ -19,7 +19,7 @@
 
 import sys, string, os, types
 
-calldir = os.environ["HOME"] + "/Sounds/Birds"
+calldir = os.environ["HOME"] + "/Sounds/Birds/Stokes"
 os.chdir(calldir)
 
 callfiles = os.listdir(calldir)
@@ -31,11 +31,20 @@ def getMatchingFiles(pat, files) :
     matches = []
     bird = string.lower(pat)
     for fil in range(0, len(files)) :
+        # Skip directories (should recurse/walk instead)
+        if os.path.isdir(files[fil]) :
+            continue
+        # Omit .aup files -- audacity sometimes leaves them
+        # but play can't play them.
         #print "Looking for", bird, "in", files[fil]
         callfile = string.lower(files[fil])
-        if (string.find(callfile, bird) >= 0) :
+        if callfile.endswith('.aup') :
+            print "Skipping aup"
+            continue
+        if (callfile.find(bird) >= 0) :
             matches.append(files[fil])
             #print "Appended: matches is now", matches
+    print "Returning", matches
     return matches
 
 def play(fil) :
