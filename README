@@ -17,6 +17,9 @@ chatsounds.py:
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
 
+countsyl:
+    Count likely syllables in words, giving best guess and likely max.
+
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
