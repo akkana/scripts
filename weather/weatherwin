@@ -25,7 +25,7 @@ import time
 sources = [ 'Yahoo', 'Weather.com' ]
 
 class WeatherWin(gtk.Window) :
-    def __init__(self, cities, debug=False):
+    def __init__(self, cities):
         super(WeatherWin, self).__init__()
 
         self.mainbox = gtk.Table(rows=len(cities), columns=len(sources))
@@ -38,7 +38,7 @@ class WeatherWin(gtk.Window) :
 
         self.updating = False
 
-        self.debug = debug
+        self.debug = False
 
     def add_city(self, city):
         # If it's a weather code already, no need to look it up.
@@ -273,16 +273,18 @@ def Usage():
     sys.exit(1)
 
 if __name__ == '__main__':
-    debug = False
     if len(sys.argv) <= 1:
         Usage()
 
-    win = WeatherWin(sys.argv[1:], debug=debug)
+    win = WeatherWin(sys.argv[1:])
 
     for city in sys.argv[1:]:
-        win.add_city(city)
+        if city == '-d':
+            win.debug = True
+        else:
+            win.add_city(city)
 
-    if debug:
+    if win.debug:
         print "Debug mode: not forking"
         win.run()
     else:
