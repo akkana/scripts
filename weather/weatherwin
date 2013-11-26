@@ -18,6 +18,7 @@ import pywapi
 import gtk, gobject
 import pango
 from pprint import pprint
+import time
 
 # What sources should we use? pywapi claims to support Yahoo, Weather.com
 # and NOAA, but its NOAA support doesn't work.
@@ -129,7 +130,9 @@ class WeatherWin(gtk.Window) :
         self.updating = True
 
         if self.debug:
-            print "Updating"
+            print "Updating at", \
+                time.strftime("%a, %d %b %Y %X", time.localtime())
+            sys.stdout.flush()
         def update_boxes(l, temp, condition, forecast):
             box['curtemp' + l].set_text(temp)
             box['curcond' + l].set_text(condition)
