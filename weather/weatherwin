@@ -183,12 +183,18 @@ class WeatherWin(gtk.Window) :
                     box['namelabel'].set_text(box['name'])
 
                 try:
+                    windspeed = weatherW['current_conditions']['wind']['speed']
+                    if windspeed.lower() == 'calm' or windspeed == '0':
+                        windstr = 'Calm'
+                    else:
+                        windstr = 'Wind %s mph %s' % \
+                            (weatherW['current_conditions']['wind']['speed'],
+                             weatherW['current_conditions']['wind']['text'])
                     update_boxes('W',
                                  weatherW['current_conditions']['temperature'],
-                                 '%s, Wind %s mph %s' % \
+                                 '%s, %s' % \
                                      (weatherW['current_conditions']['text'],
-                                      weatherW['current_conditions']['wind']['speed'],
-                                      weatherW['current_conditions']['wind']['text']),
+                                      windstr),
                                  'Humidity ' + \
                                    weatherW['current_conditions']['humidity'] \
                                    + ', Dewpoint: ' + \
