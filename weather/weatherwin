@@ -156,7 +156,7 @@ class WeatherWin(gtk.Window) :
                 try:
                     update_boxes('Y', weatherY['condition']['temp'],
                                  weatherY['condition']['text'] + \
-                                ', humidity ' +  \
+                                    ', humidity ' +  \
                                      weatherY['atmosphere']['humidity'],
                                  'Expecting %s, %s' % \
                                      (weatherY['forecasts'][0]['high'],
@@ -185,7 +185,10 @@ class WeatherWin(gtk.Window) :
                 try:
                     update_boxes('W',
                                  weatherW['current_conditions']['temperature'],
-                                 weatherW['current_conditions']['text'],
+                                 '%s, Wind %s mph %s' % \
+                                     (weatherW['current_conditions']['text'],
+                                      weatherW['current_conditions']['wind']['speed'],
+                                      weatherW['current_conditions']['wind']['text']),
                                  'Humidity ' + \
                                    weatherW['current_conditions']['humidity'] \
                                    + ', Dewpoint: ' + \
