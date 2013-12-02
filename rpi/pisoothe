@@ -75,8 +75,8 @@ class SoundPlayer :
         print "Next sound"
         self.samplenum += direction
         if self.samplenum < 0:
-            self.samplenum = len(sys.argv) - 1
-        elif self.samplenum > len(sys.argv):
+            self.samplenum = len(self.file_list) - 1
+        elif self.samplenum >= len(self.file_list):
             self.samplenum = 0
         self.play(True)
 
@@ -319,6 +319,12 @@ if __name__ == "__main__" :
             if (evdev.ecodes.BTN_LEFT, 1) in events and \
                     (evdev.ecodes.BTN_RIGHT, 1) in events:
                 print "Yowee! Right and left buttons pressed at once!"
+                # On most systems. use sys.exit. On the RPi, shut down.
+                if os.path.exists("/etc/rpi-issue"):
+                    print "We're on a Raspberry Pi -- shutting down!"
+                    os.system("/sbin/poweroff")
+                    sys.exit(0)
+                print "(not a Raspberry Pi)"
                 sys.exit(0)
 
             for ev in events:
