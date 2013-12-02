@@ -16,15 +16,20 @@
 # /path/to/pisoothe file1.wav file2.wav ...
 # /sbin/poweroff
 #
-# Eventually I'll also monitor the state of some pushbuttons
-# to control Next and Shutdown so no keyboard is needed;
-# I just need to assemble the hardware in one place.
+# Take input from a keyboard if there is one, or mouse if we're not in X,
+# for volume, changing track, and shutdown.
+# http://pythonhosted.org/evdev/
 
 import sys, os
 import subprocess
 import time             # for sleep()
 import termios, fcntl   # For non-blocking key reads
 import alsaaudio
+try:
+    import evdev
+    use_mouse = True
+except:
+    use_mouse = False
 
 class SoundPlayer :
     """
@@ -166,8 +171,8 @@ class KeyReader :
             return None
 
 # main
-# For instance,
-# pisooth pop.wav pop.wav pop.wav meow.wav meow.wav pop.wav pop.wav
+# Pass sound files as arguments.
+# pisoothe ambient_rain.wav caribbeanbeach_near.wav storm_water_2.wav
 if __name__ == "__main__" :
     if len(sys.argv) < 1 :
         print "Usage: %s soundfile soundfile soundfile ..." % sys.argv[0]
@@ -180,13 +185,22 @@ if __name__ == "__main__" :
         mixer = None
     vol_increment = 4
 
-    readkey = KeyReader()
+    # Use input from a mouse if we're reading one:
+    if use_mouse:
+
+    try:
+        readkey = KeyReader()
+    except:
+        readkey = None
     player = SoundPlayer()
     samplenum = 1
     player.play(sys.argv[samplenum])
     while True :
         time.sleep(.5)
-        c = readkey.getch()
+        if readkey:
+            c = readkey.getch()
+        else:
+            c = None
         if not c :   # Didn't read anything. Is the current sound still playing?
             if player.is_done() :
                 player.play(sys.argv[samplenum])
