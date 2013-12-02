@@ -27,6 +27,7 @@ import termios, fcntl   # For non-blocking key reads
 import alsaaudio
 try:
     import evdev
+    import select
     use_mouse = True
 except:
     use_mouse = False
@@ -170,6 +171,68 @@ class KeyReader :
         except IOError:
             return None
 
+class MouseReader:
+    def __init__(self):
+        self.mousedevice = None
+        devices = map(evdev.InputDevice, evdev.list_devices())
+        for dev in devices:
+            caps = dev.capabilities()
+            keys = caps.keys()
+            # 1L is "EV_KEY" events (mouse buttons);
+            # 2L is 'EV_REL' for the wheel.
+            if evdev.ecodes.EV_KEY in keys and evdev.ecodes.EV_REL in keys:
+                if evdev.ecodes.BTN_LEFT in caps[evdev.ecodes.EV_KEY] and \
+                        evdev.ecodes.BTN_RIGHT in caps[evdev.ecodes.EV_KEY] \
+                        and evdev.ecodes.REL_WHEEL in caps[evdev.ecodes.EV_REL]:
+                       # Quacks like a mouse. Use it.
+                    self.mousedevice = dev
+                    return
+
+        if not mousedevice:
+            print "Didn't see a mouse device"
+
+    def pval(self, code, val):
+        try:
+            codes = evdev.ecodes.BTN[code]
+            if type(codes) is list:
+                print codes[0],
+            else:
+                print codes,
+        except:
+            try:
+                print evdev.ecodes.REL[code],
+            except:
+                print "Unknown code", code
+
+        if val == 1:
+            if code == evdev.ecodes.REL_WHEEL:
+                print "scroll up"
+            else:
+                print "press"
+        elif val == 0:
+            print "release"
+        elif val == -1:
+            print "scroll down"
+        else:
+            print "unknown value", val
+
+    def read_mouse(self, timeout=None):
+        '''Returns an evdev event.
+           timeout is specified in floating-point seconds.
+           timeout=None will block until there's something to read.
+        '''
+        r,w,x = select.select([self.mousedevice], [], [], timeout)
+        events = []
+        for event in self.mousedevice.read():
+            # event.value will be 1 for button down, 0 for button up,
+            # 1 for wheel up, -1 for wheel down.
+            if event.code in (evdev.ecodes.REL_WHEEL,
+                              evdev.ecodes.BTN_LEFT,
+                              evdev.ecodes.BTN_RIGHT,
+                              evdev.ecodes.BTN_MIDDLE):
+                events.append((event.code, event.value))
+        return events
+
 # main
 # Pass sound files as arguments.
 # pisoothe ambient_rain.wav caribbeanbeach_near.wav storm_water_2.wav
@@ -187,6 +250,14 @@ if __name__ == "__main__" :
 
     # Use input from a mouse if we're reading one:
     if use_mouse:
+        try:
+            mousereader = MouseReader()
+            if not mousereader.mousedevice:
+                mousereader = None
+        except:
+            mousereader = None
+    else:
+        mousereader = None
 
     try:
         readkey = KeyReader()
@@ -195,8 +266,40 @@ if __name__ == "__main__" :
     player = SoundPlayer()
     samplenum = 1
     player.play(sys.argv[samplenum])
+
     while True :
-        time.sleep(.5)
+        time.sleep(2)
+
+        if mousereader:
+            events = mousereader.read_mouse()
+
+            # First look for a left and right pressed at the same time.
+            # That will be a signal to exit or maybe power down
+            # the computer.
+            if (evdev.ecodes.BTN_LEFT, 1) in events and \
+                    (evdev.ecodes.BTN_RIGHT, 1) in events:
+                print "Yowee! Right and left buttons pressed at once!"
+                sys.exit(0)
+
+            for ev in events:
+                if ev[0] == evdev.ecodes.BTN_RIGHT and ev[1] == 1:
+                    print "Next sound"
+                    samplenum += 1
+                    player.play(sys.argv[samplenum], True)
+                    continue
+                   
+                if ev[0] == evdev.ecodes.BTN_LEFT and ev[1] == 1:
+                    print "Previous sound"
+                    samplenum -= 1
+                    player.play(sys.argv[samplenum], True)
+                    continue
+                   
+                if ev[0] == evdev.ecodes.REL_WHEEL:
+                    if ev[1] == -1:
+                        print "Scroll down"
+                    elif ev[1] == 1:
+                        print "Scroll up"
+
         if readkey:
             c = readkey.getch()
         else:
