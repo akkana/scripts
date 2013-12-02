@@ -69,6 +69,10 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+mouseevent.py:
+    Read mouse events from /dev/input even if not running X,
+    using the python evdev module. Linux only.
+
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
