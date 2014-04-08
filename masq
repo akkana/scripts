@@ -4,7 +4,7 @@
 # Partially adapted from
 # http://www.ibiblio.org/pub/linux/docs/howto/other-formats/html_single/Masquerading-Simple-HOWTO.html
 
-pi_net=192.168.0
+pi_net=192.168.2
 ext_iface=wlan0   # Would be nice to figure this out
 pi_iface=eth0
 
