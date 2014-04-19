@@ -112,17 +112,22 @@ class MotionDetector:
 
         if debug_buf:
             # If we consider the image to have changed,
-            # draw a blue border around the borders of each test area.
+            # draw blue and white borders around each test area.
             if changed:
                 halfwidth = 1
                 for piece in self.test_borders:
-                    print "Drawing borders around", piece
                     for x in xrange(piece[0][0]-1, piece[0][1]):
+                        if piece[1][0] > 1:
+                            debug_buf[x, piece[1][0]-2]  = (255, 255, 255)
                         debug_buf[x, piece[1][0]-1]  = (0, 0, 255)
                         debug_buf[x, piece[1][1]-1]  = (0, 0, 255)
+                        debug_buf[x, piece[1][1]]  = (255, 255, 255)
                     for y in xrange(piece[1][0]-1, piece[1][1]):
+                        if piece[0][0] > 1:
+                            debug_buf[piece[0][0]-2, y]  = (255, 255, 255)
                         debug_buf[piece[0][0]-1, y]  = (0, 0, 255)
                         debug_buf[piece[0][1]-1, y]  = (0, 0, 255)
+                        debug_buf[piece[0][1], y]  = (255, 255, 255)
 
             debugimage.save("/tmp/debug.png") # save debug image as bmp
             print "debug.png saved, %s changed pixel" % changed_pixels
