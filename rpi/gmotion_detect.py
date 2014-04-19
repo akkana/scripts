@@ -19,7 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-import gtk, gobject
+import gtk, gobject, glib
 import gc
 from PIL import Image
 
@@ -85,8 +85,6 @@ class MotionDetectorViewer() :
         '''Load the image passed in, and show it.
            Return True for success, False for error.
         '''
-        print "Trying to load", filename
-
         self.cur_img = filename
 
         # Clean up memory from any existing pixbuf.
@@ -126,10 +124,9 @@ class MotionDetectorViewer() :
 
     def idle_handler(self, widget):
 
-        print "\nTaking a still ..."
+        print "\n"
         tmpfile = "/tmp/still.jpg"
-        take_still(outfile=tmpfile, res=self.test_res, verbose=True)
-        print "Took it!", tmpfile
+        take_still(outfile=tmpfile, res=self.test_res, verbose=False)
         im = Image.open(tmpfile)
         different = self.md.compare_images(im)
         if different:
