@@ -22,18 +22,69 @@
 # else throw an exception.
 #
 
-import os
+import os, sys
 import subprocess
 import time
+import StringIO
 
-def take_photo(outfile='/tmp/still.jpg', res=[640, 480]):
+def take_still_or_video(still=True, outfile='/tmp/still.jpg',
+                        res=[640, 480], seconds=10, verbose=False):
+    '''Take either a still photo or a video.
+       outfile can be specified as '-', in which case we will return
+       a StringIO object containing the image data in memory
+       which you can pass to PIL.Image.open().
+       Don't forget to close it after opening the image!
+    '''
     # Do we have a USB camera for which we can use fswebcam?
     if os.path.exists('/dev/video0'):
-        rv = subprocess.call(['/usr/bin/fswebcam', '-d', '/dev/video0',
-                              '-r', '%dx%d' % tuple(res), outfile])
+        if verbose:
+            print "Taking photo with fswebcam ..."
+
+        if still:
+            args = ['/usr/bin/fswebcam', '-q',
+                    # '-d', '/dev/video0',
+                    '-r', '%dx%d' % tuple(res), outfile]
+            if outfile == '-':
+                args.append('--png')
+                args.append('5')
+                    # the png compression level makes almost no difference
+                print "Calling fswebcam"
+                imageData = StringIO.StringIO()
+                imageData.write(subprocess.check_output(args))
+                imageData.seek(0)
+                return imageData
+            else:
+                rv = subprocess.call(args)
+        else:
+            # Rupa's pidoorbell_recognizer used:
+            # rv = call(['ffmpeg', '-f', 'video4linux2', '-s',
+            #            '%dx%d' % tuple(res), '-i', '/dev/video0',
+            #            '-f', 'alsa', '-ar', '22050', '-ac', '1',
+            #            '-i', 'hw:1,0', '-ab', '48k', '-timelimit', '10',
+            #            outfile])
+            # but debian tells me ffmpeg is deprecated and I should use avconv.
+            # Unfortunately, avconv seems to have no non-interactive option
+            # to disable prompting if there's a file to be overwritten,
+            # so check whether the target file already exists.
+            if os.path.exists(outfile):
+                if verbose:
+                    print outfile, "already exists. Removing it!"
+                os.unlink(outfile)
+
+            print ['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
+                       '-s', '%dx%d' % tuple(res), '-t', str(seconds),
+                       outfile]
+            rv = subprocess.call(['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
+                       '-s', '%dx%d' % tuple(res), '-t', str(seconds),
+                       outfile])
+
         if not rv:
             return
-        print "fswebcam failed! Returned %d" % rv
+
+        if still:
+            print "fswebcam failed! Error code %d" % rv
+        else:
+            print "avconv failed! Error code %d" % rv
 
     # No luck with a USB camera. Is there a Pi camera?
     if not os.path.exists('/dev/fb0'):
@@ -43,25 +94,85 @@ def take_photo(outfile='/tmp/still.jpg', res=[640, 480]):
     try:
         import picamera
     except ImportError:
-        # picamera isn't installed. Can we use raspistill?
-        if not os.path.exists('/usr/bin/raspistill'):
-            raise SystemError, \
-                "Neither python-picamera nor raspistill is installed"
-        rv = subprocess.call(['/usr/bin/raspistill', '-o', outfile])
-        if rv:
-            raise "raspistill exited with %d" % rv
-        return
+        if still:
+            # picamera isn't installed. Can we use raspistill?
+            if not os.path.exists('/usr/bin/raspistill'):
+                raise SystemError, \
+                    "Neither python-picamera nor raspistill is installed"
+            if verbose:
+                print "Taking photo with raspistill"
+            args = ['/usr/bin/raspistill',
+                    '-w', str(res[0]), '-h', str(res[1]),
+                    '-o', outfile]
+            # If the outfile is specified as -, we want raw data.
+            # PIL expects bmp data, apparently.
+            if outfile == '-':
+                args.append('-e')
+                args.append('bmp')
 
+                imageData = StringIO.StringIO()
+                imageData.write(subprocess.check_output(args))
+                imageData.seek(0)
+                im = Image.open(imageData)
+                buffer = im.load()
+                imageData.close()
+            else:
+                rv = subprocess.call(args)
+            if rv:
+                raise "raspistill exited with %d" % rv
+            return
+        else:
+            if not os.path.exists('/usr/bin/raspivid'):
+                raise SystemError, \
+                    "Neither python-picamera nor raspivid is installed"
+            if verbose:
+                print "Taking video with raspivid"
+            rv = subprocess.call(['raspivid', '-o', filename, '-t', '10000'])
+            if rv:
+                raise "raspivid exited with %d" % rv
+            return
+
+    if verbose:
+        print "Taking photo with picamera"
     with picamera.PiCamera() as camera:
         camera.resolution = res
         camera.start_preview()
         # Camera warm-up time
         time.sleep(2)
-        camera.capture(outfile)
+        if still:
+            camera.capture(outfile)
+        else:
+            camera.brightness = 60
+            camera.start_recording('video.h264')
+            sleep(10)
+            camera.stop_recording()
 
         # Is this needed? What does previewing mean?
         camera.stop_preview()
 
+def take_still(outfile='/tmp/still.jpg', res=[640, 480], verbose=False):
+    take_still_or_video(True, outfile, res=res, verbose=verbose)
+
+def take_video(outfile='/tmp/video.mpg', res=[320, 240], seconds=10,
+               verbose=False):
+    take_still_or_video(False, outfile, res=res, seconds=seconds,
+                        verbose=verbose)
+
 if __name__ == '__main__':
-    take_photo()
+    from optparse import OptionParser
+    optparser = OptionParser()
+    optparser.add_option("-v", "--verbose",
+                         action="store_true", dest="verbose",
+                         help="Verbose: chatter about what it's doing")
+    optparser.add_option("-s", "--seconds", metavar="seconds",
+                         action="store", dest="seconds",
+                         help="Take video for s seconds, instead of a still")
+    (options, args) = optparser.parse_args()
+
+    print "Seconds:", options.seconds
+
+    if options.seconds:
+        take_video(seconds=options.seconds, verbose=options.verbose)
+    else:
+        take_still('-', verbose=options.verbose)
 
