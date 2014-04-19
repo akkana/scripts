@@ -150,12 +150,18 @@ if __name__ == '__main__':
     bufnew = None
     bufold = None
     while True:
-        tmpfile = "/tmp/still.jpg"
         print "Taking a still ..."
-        take_still(outfile=tmpfile, res=test_res, verbose=True)
+        if use_tmp_file:
+            tmpfile = "/tmp/still.jpg"
+            take_still(outfile=tmpfile, res=test_res, verbose=True)
+            im = Image.open(tmpfile)
+        else:   # keep it all in memory, no temp files
+            img_data = take_still(outfile=tmpfile, res=test_res, verbose=True)
+            im = Image.open(imageData)
+
         print "Took it!", tmpfile
-        im = Image.open(tmpfile)
         different = md.compare_images(im)
+        imageData.close()
         if different:
             print "They're different!"
 
