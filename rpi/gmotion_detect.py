@@ -30,16 +30,20 @@ from motion_detect import MotionDetector
 class MotionDetectorViewer() :
     '''
     '''
-    def __init__(self, test_res, test_borders=None):
+    def __init__(self, test_res, test_borders=None, secs=5):
         self.test_res = test_res
         self.width = test_res[0]
         self.height = test_res[1]
+        self.millisecs = secs * 1000
 
         self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.win.set_border_width(10)
 
-        self.win.connect("delete_event", gtk.main_quit)
-        self.win.connect("destroy", gtk.main_quit)
+        # Unfortunately delete and destroy events don't work on the RPi.
+        # Not sure why, but most of the time the event never gets passed.
+        # It works on other Linux platforms.
+        self.win.connect("delete_event", self.quit)
+        self.win.connect("destroy", self.quit)
 
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.set_size_request(self.width, self.height)
@@ -50,7 +54,8 @@ class MotionDetectorViewer() :
         # Just for testing, temporarily
         self.num = 0
 
-        gobject.timeout_add(2000, self.idle_handler, self.drawing_area)
+        gobject.timeout_add(self.millisecs, self.idle_handler,
+                            self.drawing_area)
 
         self.gc = None
         self.pixbuf = None
@@ -66,6 +71,14 @@ class MotionDetectorViewer() :
                                  verbose=2)
         self.buf1 = None
         self.buf2 = None
+
+    # There doesn't seem to be any way to predict reliably whether a
+    # windowmanager delete event will pass 3 arguments or 2, so make
+    # them all optional. We don't need them anyway.
+    # Also, this is sometimes called twice (or, on the Pi, not at all).
+    def quit(self, widget=None, event=None):
+        print "Quitting"
+        gtk.main_quit()
 
     def expose_handler(self, widget, event):
         #print "Expose"
@@ -122,12 +135,21 @@ class MotionDetectorViewer() :
 
         self.drawing_area.window.draw_pixbuf(self.gc, self.pixbuf, 0, 0, 0, 0)
 
+    # This is the function that actually takes and compares photos
+    # every few seconds and does all the work.
     def idle_handler(self, widget):
-
+        use_tmp_file = False
         print "\n"
-        tmpfile = "/tmp/still.jpg"
-        take_still(outfile=tmpfile, res=self.test_res, verbose=False)
-        im = Image.open(tmpfile)
+        if use_tmp_file:
+            tmpfile = "/tmp/still.jpg"
+            take_still(outfile=tmpfile, res=self.test_res, verbose=False)
+            im = Image.open(tmpfile)
+        else:
+            print "Taking a still to memory"
+            img_data = take_still(outfile='-', res=self.test_res, verbose=False)
+            print "img_data is", img_data
+            im = Image.open(img_data)
+
         different = self.md.compare_images(im)
         if different:
             print "They're different!"
@@ -140,13 +162,11 @@ class MotionDetectorViewer() :
 
 if __name__ == '__main__':
 
-    import time
-
     res=[320, 240]
     test_borders = [ [ [140, 180], [105, 135] ] ]
-    md = MotionDetectorViewer(test_res=res, test_borders=test_borders)
+    md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
+                              secs=5)
 
-    #iv.load_image('/home/akkana/src/pho/test-img/1.jpg')
     md.run()
 
 

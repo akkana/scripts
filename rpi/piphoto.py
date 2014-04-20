@@ -48,11 +48,12 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
                 args.append('--png')
                 args.append('5')
                     # the png compression level makes almost no difference
-                print "Calling fswebcam"
-                imageData = StringIO.StringIO()
-                imageData.write(subprocess.check_output(args))
-                imageData.seek(0)
-                return imageData
+                if verbose:
+                    print "Calling fswebcam"
+                image_data = StringIO.StringIO()
+                image_data.write(subprocess.check_output(args))
+                image_data.seek(0)
+                return image_data
             else:
                 rv = subprocess.call(args)
         else:
@@ -71,12 +72,13 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
                     print outfile, "already exists. Removing it!"
                 os.unlink(outfile)
 
-            print ['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
+            args = ['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
                        '-s', '%dx%d' % tuple(res), '-t', str(seconds),
                        outfile]
-            rv = subprocess.call(['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
-                       '-s', '%dx%d' % tuple(res), '-t', str(seconds),
-                       outfile])
+            if verbose:
+                print args
+            rv = subprocess.call(args)
+
 
         if not rv:
             return
@@ -92,7 +94,9 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
 
     # Can we use the picamera module?
     try:
-        import picamera
+        import picameraXXX
+        # temporarily not using picamera until we know how to
+        # take a picture in memory
     except ImportError:
         if still:
             # picamera isn't installed. Can we use raspistill?
@@ -108,18 +112,16 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
             # PIL expects bmp data, apparently.
             if outfile == '-':
                 args.append('-e')
-                args.append('bmp')
+                args.append('bmp')   # should compare png performance
 
-                imageData = StringIO.StringIO()
-                imageData.write(subprocess.check_output(args))
-                imageData.seek(0)
-                im = Image.open(imageData)
-                buffer = im.load()
-                imageData.close()
+                image_data = StringIO.StringIO()
+                image_data.write(subprocess.check_output(args))
+                image_data.seek(0)
+                return image_data
             else:
                 rv = subprocess.call(args)
             if rv:
-                raise "raspistill exited with %d" % rv
+                raise SystemError, "raspistill exited with %d" % rv
             return
         else:
             if not os.path.exists('/usr/bin/raspivid'):
@@ -129,7 +131,7 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
                 print "Taking video with raspivid"
             rv = subprocess.call(['raspivid', '-o', filename, '-t', '10000'])
             if rv:
-                raise "raspivid exited with %d" % rv
+                raise SystemError, "raspivid exited with %d" % rv
             return
 
     if verbose:
@@ -151,12 +153,12 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
         camera.stop_preview()
 
 def take_still(outfile='/tmp/still.jpg', res=[640, 480], verbose=False):
-    take_still_or_video(True, outfile, res=res, verbose=verbose)
+    return take_still_or_video(True, outfile, res=res, verbose=verbose)
 
 def take_video(outfile='/tmp/video.mpg', res=[320, 240], seconds=10,
                verbose=False):
-    take_still_or_video(False, outfile, res=res, seconds=seconds,
-                        verbose=verbose)
+    return take_still_or_video(False, outfile, res=res, seconds=seconds,
+                               verbose=verbose)
 
 if __name__ == '__main__':
     from optparse import OptionParser

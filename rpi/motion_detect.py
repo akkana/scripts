@@ -68,12 +68,10 @@ class MotionDetector:
 
         # What area of the image should we scan for changes?
         # Default setting (if None passed in): use whole image.
-        print "Creating a new object with test_borders = ", test_borders
         if not test_borders:
             self.test_borders = [ [[1,test_res[0]],[1,test_res[1]]] ]
         else:
             self.test_borders = test_borders
-        print "Now self.test_borders is", self.test_borders
 
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
@@ -156,7 +154,7 @@ if __name__ == '__main__':
             take_still(outfile=tmpfile, res=test_res, verbose=True)
             im = Image.open(tmpfile)
         else:   # keep it all in memory, no temp files
-            img_data = take_still(outfile=tmpfile, res=test_res, verbose=True)
+            img_data = take_still(outfile='-', res=test_res, verbose=True)
             im = Image.open(imageData)
 
         print "Took it!", tmpfile
