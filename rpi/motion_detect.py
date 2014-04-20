@@ -26,6 +26,9 @@ from piphoto import take_still
 
 from PIL import Image
 
+import os
+import datetime
+
 class MotionDetector:
     def __init__(self,
                  test_res=[320, 240], threshold=30, sensitivity=20,
@@ -141,27 +144,50 @@ class MotionDetector:
 if __name__ == '__main__':
     import time
 
+    localdir = os.path.expanduser('~/snapshots')
+    remotedir = os.path.expanduser('~/moontrade/snapshots')
+
     test_res=[320, 240]
     test_borders = [ [ [140, 180], [105, 135] ] ]
+
     md = MotionDetector(test_res=test_res, test_borders=test_borders)
+
+    # We want the full snapshots to use the full resolution of the camera.
+    # fswebcam has no way to do that, and no way to check first,
+    # we do specify a res that's too high and let it adjust downward.
+    full_res = [3648, 2736]
 
     bufnew = None
     bufold = None
     while True:
         print "Taking a still ..."
+        use_tmp_file = False
         if use_tmp_file:
             tmpfile = "/tmp/still.jpg"
             take_still(outfile=tmpfile, res=test_res, verbose=True)
             im = Image.open(tmpfile)
         else:   # keep it all in memory, no temp files
             img_data = take_still(outfile='-', res=test_res, verbose=True)
-            im = Image.open(imageData)
+            im = Image.open(img_data)
 
-        print "Took it!", tmpfile
         different = md.compare_images(im)
-        imageData.close()
+        img_data.close()
         if different:
             print "They're different!"
+
+            # If they're different, snap a high-res photo.
+            # Upload it if possible, otherwise save it locally.
+            # Check it every time, since the network might go down.
+            if os.access(remotedir, os.W_OK):
+                snapdir = remotedir
+            else:
+                snapdir = localdir
+            now = datetime.datetime.now()
+            snapfile = os.path.join(snapdir, 'snap-%d-%d-%d-%d-%d-%d.jpg' % \
+                                        (now.year, now.month, now.day,
+                                         now.hour, now.minute, now.second))
+            print "Saving to", snapfile
+            take_still(outfile=snapfile, res=full_res, verbose=True)
 
         time.sleep(5)
 
