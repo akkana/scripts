@@ -27,12 +27,14 @@ from piphoto import take_still
 from PIL import Image
 
 import os
+import time
 import datetime
 
 class MotionDetector:
     def __init__(self,
                  test_res=[320, 240], threshold=30, sensitivity=20,
-                 test_borders=None,
+                 test_borders=None, full_res=None,
+                 localdir=None, remotedir=None,
                  verbose=0):
         '''test_res: resolution of test images to be compared.
               XXX Can't we get that from the images passed in?
@@ -66,6 +68,9 @@ class MotionDetector:
         self.threshold = threshold
         self.sensitivity = sensitivity
         self.verbose = verbose
+        self.localdir = localdir
+        self.remotedir = remotedir
+        self.full_res = full_res
 
         self.bufold = None
 
@@ -85,7 +90,7 @@ class MotionDetector:
         # Is this the first time?
         if not self.bufold:
             self.bufold = new_image.load()
-            return False
+            return False, new_image
 
         bufnew = new_image.load()
 
@@ -94,6 +99,7 @@ class MotionDetector:
             debugimage = new_image.copy()
             debug_buf = debugimage.load()
         else:
+            debugimage = None
             debug_buf = None
 
         changed_pixels = 0
@@ -112,26 +118,26 @@ class MotionDetector:
         changed = changed_pixels > self.sensitivity
 
         if debug_buf:
-            # If we consider the image to have changed,
-            # draw blue and white borders around each test area.
-            if changed:
-                halfwidth = 1
-                for piece in self.test_borders:
-                    for x in xrange(piece[0][0]-1, piece[0][1]):
+            # Draw blue borders around the test areas no matter what,
+            # and add white borders if something has changed.
+            for piece in self.test_borders:
+                for x in xrange(piece[0][0]-1, piece[0][1]):
+                    debug_buf[x, piece[1][0]-1]  = (0, 0, 255)
+                    debug_buf[x, piece[1][1]-1]  = (0, 0, 255)
+                    if changed:
                         if piece[1][0] > 1:
                             debug_buf[x, piece[1][0]-2]  = (255, 255, 255)
-                        debug_buf[x, piece[1][0]-1]  = (0, 0, 255)
-                        debug_buf[x, piece[1][1]-1]  = (0, 0, 255)
-                        debug_buf[x, piece[1][1]]  = (255, 255, 255)
-                    for y in xrange(piece[1][0]-1, piece[1][1]):
+                            debug_buf[x, piece[1][1]]  = (255, 255, 255)
+                for y in xrange(piece[1][0]-1, piece[1][1]):
+                    debug_buf[piece[0][0]-1, y]  = (0, 0, 255)
+                    debug_buf[piece[0][1]-1, y]  = (0, 0, 255)
+                    if changed:
+                        debug_buf[piece[0][1], y]  = (255, 255, 255)
                         if piece[0][0] > 1:
                             debug_buf[piece[0][0]-2, y]  = (255, 255, 255)
-                        debug_buf[piece[0][0]-1, y]  = (0, 0, 255)
-                        debug_buf[piece[0][1]-1, y]  = (0, 0, 255)
-                        debug_buf[piece[0][1], y]  = (255, 255, 255)
 
-            debugimage.save("/tmp/debug.png") # save debug image as bmp
-            print "debug.png saved, %s changed pixel" % changed_pixels
+            # debugimage.save("/tmp/debug.png") # save debug image as bmp
+            # print "debug.png saved, %s changed pixel" % changed_pixels
 
         if self.verbose:
             if changed:
@@ -139,28 +145,44 @@ class MotionDetector:
             print changed_pixels, "pixels changed"
 
         self.bufold = bufnew
-        return changed
+
+        if changed and self.full_res:
+            # If they're different, snap a high-res photo.
+            # Upload it if possible, otherwise save it locally.
+            # Check it every time, since the network might go down.
+            if self.remotedir and os.access(self.remotedir, os.W_OK):
+                snapdir = self.remotedir
+            else:
+                snapdir = self.localdir
+            if snapdir:
+                now = datetime.datetime.now()
+                snapfile = os.path.join(snapdir,
+                                   'snap-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
+                                            (now.year, now.month, now.day,
+                                             now.hour, now.minute, now.second))
+                print "Saving to", snapfile
+                take_still(outfile=snapfile, res=self.full_res, verbose=True)
+        return changed, debugimage
 
 if __name__ == '__main__':
-    import time
-
     localdir = os.path.expanduser('~/snapshots')
     remotedir = os.path.expanduser('~/moontrade/snapshots')
 
     test_res=[320, 240]
-    test_borders = [ [ [140, 180], [105, 135] ] ]
+    # test_borders = [ [ [60, 200], [125, 190] ] ]
+    test_borders = None
+    # full_res = [3648, 2736]
+    full_res = None
 
-    md = MotionDetector(test_res=test_res, test_borders=test_borders)
+    md = MotionDetector(test_res=test_res, test_borders=test_borders,
+                        full_res=full_res, verbose=1,
+                        localdir=localdir, remotedir=remotedir)
 
     # We want the full snapshots to use the full resolution of the camera.
     # fswebcam has no way to do that, and no way to check first,
-    # we do specify a res that's too high and let it adjust downward.
-    full_res = [3648, 2736]
+    # so we specify a res that's too high and let it adjust downward.
 
-    bufnew = None
-    bufold = None
     while True:
-        print "Taking a still ..."
         use_tmp_file = False
         if use_tmp_file:
             tmpfile = "/tmp/still.jpg"
@@ -170,24 +192,8 @@ if __name__ == '__main__':
             img_data = take_still(outfile='-', res=test_res, verbose=True)
             im = Image.open(img_data)
 
-        different = md.compare_images(im)
+        different, debugimage = md.compare_images(im)
         img_data.close()
-        if different:
-            print "They're different!"
-
-            # If they're different, snap a high-res photo.
-            # Upload it if possible, otherwise save it locally.
-            # Check it every time, since the network might go down.
-            if os.access(remotedir, os.W_OK):
-                snapdir = remotedir
-            else:
-                snapdir = localdir
-            now = datetime.datetime.now()
-            snapfile = os.path.join(snapdir, 'snap-%d-%d-%d-%d-%d-%d.jpg' % \
-                                        (now.year, now.month, now.day,
-                                         now.hour, now.minute, now.second))
-            print "Saving to", snapfile
-            take_still(outfile=snapfile, res=full_res, verbose=True)
 
         time.sleep(5)
 

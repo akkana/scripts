@@ -41,20 +41,26 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
             print "Taking photo with fswebcam ..."
 
         if still:
-            args = ['/usr/bin/fswebcam', '-q',
+            args = ['/usr/bin/fswebcam', '-q', '--no-banner']
                     # '-d', '/dev/video0',
-                    '-r', '%dx%d' % tuple(res), outfile]
+            if res:
+                args.append('-r')
+                args.append('%dx%d' % tuple(res))
             if outfile == '-':
                 args.append('--png')
                 args.append('5')
                     # the png compression level makes almost no difference
+                args.append(outfile)
                 if verbose:
-                    print "Calling fswebcam"
+                    print "Calling check_output", args
                 image_data = StringIO.StringIO()
                 image_data.write(subprocess.check_output(args))
                 image_data.seek(0)
                 return image_data
             else:
+                args.append(outfile)
+                if verbose:
+                    print "Calling", args
                 rv = subprocess.call(args)
         else:
             # Rupa's pidoorbell_recognizer used:
@@ -105,9 +111,18 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
                     "Neither python-picamera nor raspistill is installed"
             if verbose:
                 print "Taking photo with raspistill"
-            args = ['/usr/bin/raspistill',
-                    '-w', str(res[0]), '-h', str(res[1]),
-                    '-o', outfile]
+            args = ['/usr/bin/raspistill', '-o', outfile]
+            if res:
+                args.append('-w')
+                args.append(str(res[0]))
+                args.append('-h')
+                args.append(str(res[1]))
+            # Was hoping that increasing sharpness would help focus, but no.
+            # if not res or res[1] >= 1600:
+            #     args.append('-sh')
+            #     args.append('100')
+            print "Calling:", args
+                    
             # If the outfile is specified as -, we want raw data.
             # PIL expects bmp data, apparently.
             if outfile == '-':

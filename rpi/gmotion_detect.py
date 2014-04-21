@@ -21,6 +21,7 @@
 
 import gtk, gobject, glib
 import gc
+import os
 from PIL import Image
 
 from piphoto import take_still
@@ -30,10 +31,16 @@ from motion_detect import MotionDetector
 class MotionDetectorViewer() :
     '''
     '''
-    def __init__(self, test_res, test_borders=None, secs=5):
+    def __init__(self, test_res, test_borders=None,
+                 full_res=None,
+                 localdir=None, remotedir=None,
+                 secs=5):
         self.test_res = test_res
         self.width = test_res[0]
         self.height = test_res[1]
+        self.localdir = localdir
+        self.remotedir = remotedir
+        self.full_res = full_res
         self.millisecs = secs * 1000
 
         self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -49,7 +56,15 @@ class MotionDetectorViewer() :
         self.drawing_area.set_size_request(self.width, self.height)
         self.win.add(self.drawing_area)
 
+        self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
+                                     # gtk.gdk.POINTER_MOTION_MASK |
+                                     # gtk.gdk.POINTER_MOTION_HINT_MASK |
+                                     gtk.gdk.BUTTON_PRESS_MASK |
+                                     gtk.gdk.BUTTON_RELEASE_MASK )
         self.drawing_area.connect("expose-event", self.expose_handler)
+        self.drawing_area.connect("button_press_event", self.button_press)
+        self.drawing_area.connect("button_release_event", self.button_release)
+        self.drawing_area.connect("motion_notify_event", self.drag_handler)
 
         # Just for testing, temporarily
         self.num = 0
@@ -62,12 +77,17 @@ class MotionDetectorViewer() :
         self.imgwidth = None
         self.imgheight = None
         self.cur_img = None
+        self.drag_start_x = None
+        self.drag_start_y = None
 
         self.win.show_all()
 
         # And the motion detecting parts,
         # which are infinitely simpler than the GTK garbage:
         self.md = MotionDetector(test_res=test_res, test_borders=test_borders,
+                                 full_res=self.full_res,
+                                 localdir=self.localdir,
+                                 remotedir=self.localdir,
                                  verbose=2)
         self.buf1 = None
         self.buf2 = None
@@ -94,11 +114,62 @@ class MotionDetectorViewer() :
 
         self.show_image()
 
-    def load_image(self, filename):
+    def button_press(self, widget, event):
+        print "Button press for button", event.button
+        if event.button != 1 :
+            return False
+        # For some reason, button press events give float arguments
+        # though draw_line won't accept floats
+        self.drag_start_x = int(event.x)
+        self.drag_start_y = int(event.y)
+        return True
+
+    def button_release(self, widget, event):
+        print "Button release for button", event.button
+        x = int(event.x)
+        y = int(event.y)
+        self.md.test_borders = [[[self.drag_start_x, x],
+                                 [self.drag_start_y, y]]]
+        print "Reset test borders to", self.md.test_borders
+        self.drag_start_x = None
+        self.drag_start_y = None
+        return True
+
+    def drag_handler(self, widget, event):
+        return True
+
+    def load_image(self, img):
         '''Load the image passed in, and show it.
+           Image can be a PIL Image or a filename.
            Return True for success, False for error.
         '''
-        self.cur_img = filename
+        self.cur_img = img
+        if not img:
+            return
+
+        # Is this a PIL Image? Does it have a mode attribute?
+        # XXX There must be a better way to test that than try/except.
+        try:
+            has_alpha = img.mode == 'RGBA'
+            in_mem = True
+        except AttributeError:
+            in_mem = False
+        if in_mem:
+            print "Displaying the image already in memory"
+            has_alpha = img.mode=='RGBA'
+            newpb = gtk.gdk.pixbuf_new_from_data(
+                img.tostring(),         # data
+                gtk.gdk.COLORSPACE_RGB, # color mode
+                has_alpha,
+                8,                      # bits
+                img.size[0],            # width
+                img.size[1],            # height
+                (has_alpha and 4 or 3) * img.size[0] # rowstride
+                )
+        # Else is it a file?
+        else:
+            print "Reading an image in from", img
+            newpb = gtk.gdk.pixbuf_new_from_file(img)
 
         # Clean up memory from any existing pixbuf.
         # This still needs to be garbage collected before returning.
@@ -106,7 +177,6 @@ class MotionDetectorViewer() :
             self.pixbuf = None
 
         try :
-            newpb = gtk.gdk.pixbuf_new_from_file(filename)
             self.pixbuf = newpb
 
         except glib.GError, e :
@@ -139,21 +209,22 @@ class MotionDetectorViewer() :
     # every few seconds and does all the work.
     def idle_handler(self, widget):
         use_tmp_file = False
-        print "\n"
         if use_tmp_file:
             tmpfile = "/tmp/still.jpg"
+            print "Snapping to", tmpfile
             take_still(outfile=tmpfile, res=self.test_res, verbose=False)
             im = Image.open(tmpfile)
         else:
-            print "Taking a still to memory"
+            print "Snapping to memory"
             img_data = take_still(outfile='-', res=self.test_res, verbose=False)
-            print "img_data is", img_data
             im = Image.open(img_data)
 
-        different = self.md.compare_images(im)
+        different, debugimage = self.md.compare_images(im)
         if different:
             print "They're different!"
-        self.load_image('/tmp/debug.png')
+
+        # debugimage.load()
+        self.load_image(debugimage)
         self.show_image()
 
         self.buf1 = self.buf2
@@ -163,8 +234,15 @@ class MotionDetectorViewer() :
 if __name__ == '__main__':
 
     res=[320, 240]
-    test_borders = [ [ [140, 180], [105, 135] ] ]
+    test_borders = [ [ [60, 200], [125, 190] ] ]
+    localdir = os.path.expanduser('~/snapshots')
+    remotedir = os.path.expanduser('~/moontrade/snapshots')
+    #full_res = [3648, 2736]
+    full_res = None
+
     md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
+                              full_res=full_res,
+                              localdir=localdir, remotedir=remotedir,
                               secs=5)
 
     md.run()
