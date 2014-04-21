@@ -148,15 +148,9 @@ class MotionDetectorViewer() :
             return
 
         # Is this a PIL Image? Does it have a mode attribute?
-        # XXX There must be a better way to test that than try/except.
-        try:
-            has_alpha = img.mode == 'RGBA'
-            in_mem = True
-        except AttributeError:
-            in_mem = False
-        if in_mem:
+        if hasattr(img, 'mode'):
             print "Displaying the image already in memory"
-            has_alpha = img.mode=='RGBA'
+            has_alpha = img.mode == 'RGBA'
             newpb = gtk.gdk.pixbuf_new_from_data(
                 img.tostring(),         # data
                 gtk.gdk.COLORSPACE_RGB, # color mode
@@ -166,7 +160,7 @@ class MotionDetectorViewer() :
                 img.size[1],            # height
                 (has_alpha and 4 or 3) * img.size[0] # rowstride
                 )
-        # Else is it a file?
+        # If it's not an image, assume it's a file.
         else:
             print "Reading an image in from", img
             newpb = gtk.gdk.pixbuf_new_from_file(img)
