@@ -28,17 +28,23 @@ import time
 import StringIO
 
 def take_still_or_video(still=True, outfile='/tmp/still.jpg',
-                        res=[640, 480], seconds=10, verbose=False):
+                        res=[640, 480], seconds=10, format=None,
+                        verbose=False):
     '''Take either a still photo or a video.
        outfile can be specified as '-', in which case we will return
        a StringIO object containing the image data in memory
        which you can pass to PIL.Image.open().
+       You may want to specify format= when using outfile='-'.
        Don't forget to close it after opening the image!
+       Not specifying res means try to use the full resolution of the camera.
     '''
     # Do we have a USB camera for which we can use fswebcam?
     if os.path.exists('/dev/video0'):
         if verbose:
             print "Taking photo with fswebcam ..."
+
+        if format:
+            format = format.lower()
 
         if still:
             args = ['/usr/bin/fswebcam', '-q', '--no-banner']
@@ -46,9 +52,21 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
             if res:
                 args.append('-r')
                 args.append('%dx%d' % tuple(res))
+            else:
+                # fswebcam defaults to 352 x 288 (??) and has no "full-res"
+                # option, but passing a huge resolution seems to make it
+                # fall back to the camera's maximum native resolution
+                args.append('-r')
+                args.append('3648x2736')
             if outfile == '-':
-                args.append('--png')
-                args.append('5')
+                if format == 'jpeg' or format == 'jpg':
+                    args.append('--jpeg')
+                    args.append('85')
+                else:
+                    if format != 'PNG':
+                        "Can't handle format", format, "-- defaulting to PNG"
+                    args.append('--png')
+                    args.append('5')
                     # the png compression level makes almost no difference
                 args.append(outfile)
                 if verbose:
@@ -121,13 +139,21 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
             # if not res or res[1] >= 1600:
             #     args.append('-sh')
             #     args.append('100')
-            print "Calling:", args
+            if verbose:
+                print "Calling:", args
                     
             # If the outfile is specified as -, we want raw data.
             # PIL expects bmp data, apparently.
             if outfile == '-':
                 args.append('-e')
-                args.append('bmp')   # should compare png performance
+                if format:
+                    if verbose:
+                        print "Using", format, "format"
+                    args.append(format)
+                else:
+                    if verbose:
+                        print "No format specified, falling back to BMP"
+                    args.append('bmp')   # should compare png performance
 
                 image_data = StringIO.StringIO()
                 image_data.write(subprocess.check_output(args))
@@ -150,7 +176,7 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
             return
 
     if verbose:
-        print "Taking photo with picamera"
+        print "Taking photo with picamera module"
     with picamera.PiCamera() as camera:
         camera.resolution = res
         camera.start_preview()
@@ -167,13 +193,15 @@ def take_still_or_video(still=True, outfile='/tmp/still.jpg',
         # Is this needed? What does previewing mean?
         camera.stop_preview()
 
-def take_still(outfile='/tmp/still.jpg', res=[640, 480], verbose=False):
-    return take_still_or_video(True, outfile, res=res, verbose=verbose)
+def take_still(outfile='/tmp/still.jpg', res=[640, 480],
+               format=None, verbose=False):
+    return take_still_or_video(True, outfile, res=res,
+                               format=format, verbose=verbose)
 
 def take_video(outfile='/tmp/video.mpg', res=[320, 240], seconds=10,
-               verbose=False):
+               format=None, verbose=False):
     return take_still_or_video(False, outfile, res=res, seconds=seconds,
-                               verbose=verbose)
+                               format=format, verbose=verbose)
 
 if __name__ == '__main__':
     from optparse import OptionParser
