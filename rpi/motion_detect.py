@@ -214,17 +214,20 @@ class MotionDetector:
                         print "Cropping"
                     img_data = take_still(outfile='-', res=self.full_res,
                                           format='jpg', verbose=self.verbose)
-                    # img_data is a StringIO instance
-                    # print "take_still returned", img_data
-                    # print "Calling", ['/usr/bin/jpegtran', '-crop', self.crop]
+                    # img_data is a StringIO instance.
+                    # But Popen can't take a StringIO as input;
+                    # instead, have to write the data into a pipe.
                     p = subprocess.Popen(['/usr/bin/jpegtran',
                                           '-crop', self.crop],
                                          shell=False,
                                          stdin=subprocess.PIPE,
                                          stdout=subprocess.PIPE)
-                    p.stdin.write(img_data.getvalue())
+                    # Better to use communicate() than write()
+                    img_data = p.communicate(input=img_data.getvalue())[0]
+                    # Or use img_data.read() instead of getvalue --
+                    # not clear if there's any efficiency difference
+                    # since we have to keep the whole string in mem either way.
                     p.stdin.close()
-                    img_data = p.stdout.read()
                     snapout = open(snappath, 'w')
                     snapout.write(img_data)
                     snapout.close()
