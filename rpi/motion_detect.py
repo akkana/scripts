@@ -248,6 +248,12 @@ Example: motion_detect.py -v -r 320x240 -b 150x150+100+50 -c /tmp /mnt/server/pi
     LongVersion = "%prog 0.1: Motion detection and still capture.\n\
 Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later."
     optparser = OptionParser(usage=usage, version=LongVersion)
+    optparser.add_option("-t", "--threshold", metavar="threshold",
+                         action="store", dest="threshold",
+                 help="""Threshold: How different does a pixel need to be?""")
+    optparser.add_option("-s", "--sensitivity", metavar="sensitivity",
+                         action="store", dest="sensitivity",
+                         help="""Sensitivity: How many pixels must change?""")
     optparser.add_option("-v", "--verbose",
                          action="store_true", dest="verbose",
                          help="Verbose: chatter about what it's doing")
@@ -269,7 +275,20 @@ E.g. 100x50:5:20:100x50:200:150""")
     optparser.add_option("-c", "--crop",
                          action="store_true", dest="crop",
           help="Crop full-resolution images to the size of the test borders.")
+
     (options, args) = optparser.parse_args()
+
+    if options.threshold:
+        threshold = int(options.threshold)
+        print "Using threshold of %d" % threshold
+    else:
+        threshold = None
+
+    if options.sensitivity:
+        sensitivity = int(options.sensitivity)
+        print "Using threshold of %d pixels" % sensitivity
+    else:
+        sensitivity = None
 
     def resparse(res_str, default_res):
         if not res_str:
@@ -321,14 +340,18 @@ E.g. 100x50:5:20:100x50:200:150""")
         print "Please specify a local directory to save full-res snapshots."
         sys.exit(1)
     localdir = args[0]
-    if len(args) > 2:
+    if len(args) == 2:
         remotedir = args[1]
     else:
         remotedir = None
     if options.verbose:
         print "local", localdir, "remote", remotedir
+    if options.verbose:
+        print
 
-    md = MotionDetector(test_res=test_res, test_borders=test_borders,
+    md = MotionDetector(test_res=test_res,
+                        threshold=threshold, sensitivity=sensitivity,
+                        test_borders=test_borders,
                         full_res=full_res,
                         localdir=localdir,
                         remotedir=remotedir,
