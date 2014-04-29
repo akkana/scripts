@@ -251,53 +251,41 @@ class MotionDetector:
 
 if __name__ == '__main__':
     # Usage: motion_detect.py [-c] [-v] localdir [remotedir]
-    from optparse import OptionParser
-    usage = """Usage: %prog [-c] [-v] localdir [remotedir]
-Example: motion_detect.py -v -r 320x240 -b 150x150+100+50 -c /tmp /mnt/server/pix"""
-    LongVersion = "%prog 0.1: Motion detection and still capture.\n\
-Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later."
-    optparser = OptionParser(usage=usage, version=LongVersion)
-    optparser.add_option("-t", "--threshold", metavar="threshold",
-                         action="store", dest="threshold",
-                 help="""Threshold: How different does a pixel need to be?""")
-    optparser.add_option("-s", "--sensitivity", metavar="sensitivity",
-                         action="store", dest="sensitivity",
-                         help="""Sensitivity: How many pixels must change?""")
-    optparser.add_option("-v", "--verbose",
-                         action="store_true", dest="verbose",
-                         help="Verbose: chatter about what it's doing")
-    optparser.add_option("-r", "--resolution", metavar="resolution",
-                         action="store", dest="resolution",
-                         help="""Resolution of the test image (WxH).
-Default 320x240.""")
-    optparser.add_option("-f", "--fullres", metavar="full_resolution",
-                         action="store", dest="full_resolution",
-                         help="""Full resolution to save images.
+    import argparse
+
+    parser = argparse.ArgumentParser(description="""Monitor a camera and snap photos when something has changed.
+
+Example: motion_detect.py -v -r 320x240 -c 150x150+100+50 -b 50x50+125+75 /tmp /mnt/server/pix
+
+Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument("-s", "--sensitivity", type=int,
+        help="Sensitivity: How many pixels must change?")
+    parser.add_argument("-t", "--threshold", type=int,
+        help="Threshold: How different does a pixel need to be?")
+    parser.add_argument("-r", "--resolution", default='320x240',
+        help="Resolution of the test image (WxH). Default 320x240.")
+    parser.add_argument("-f", "--fullres",
+        help="""Full resolution to save images.
 Defaults to the resolution of the camera if we can get it.
 Actual resolution may be different if the camera can't take a photo
 at the specified resolution.""")
-    optparser.add_option("-b", "--borders", metavar="borders",
-                         action="store", dest="borders",
-                         help="""Borders of the test region we'll monitor.
+    parser.add_argument("-b", "--borders",
+                        help="""Borders of the test region we'll monitor.
 A colon-separated list of wxh+x+y identifiers.
 E.g. 100x50:5:20:100x50:200:150""")
-    optparser.add_option("-c", "--crop",
-                         action="store_true", dest="crop",
-          help="Crop full-resolution images to the size of the test borders.")
+    parser.add_argument("-c", "--crop", action='store_true', default=False,
+        help="Crop full-resolution images to the size of the test borders.")
+    parser.add_argument("-v", "--verbose", action='store_true', default=False,
+        help="Verbose: chatter about what the program is doing.")
 
-    (options, args) = optparser.parse_args()
-
-    if options.threshold:
-        threshold = int(options.threshold)
-        print "Using threshold of %d" % threshold
-    else:
-        threshold = None
-
-    if options.sensitivity:
-        sensitivity = int(options.sensitivity)
-        print "Using threshold of %d pixels" % sensitivity
-    else:
-        sensitivity = None
+    parser.add_argument("localdir")
+        # type=argparse.FileType('w')
+    parser.add_argument("remotedir", nargs='?')
+    
+    args = parser.parse_args()
+    print args
 
     def resparse(res_str, default_res):
         if not res_str:
@@ -312,18 +300,18 @@ E.g. 100x50:5:20:100x50:200:150""")
             sys.exit(1)
         return parsed_res
 
-    test_res = resparse(options.resolution, [320, 240])
+    test_res = resparse(args.resolution, [320, 240])
     print "Using test resolution of", test_res
 
-    full_res = resparse(options.full_resolution, None)
+    full_res = resparse(args.fullres, None)
     if full_res:
         print "Saving stills using full resolution of", full_res
     else:
         print "Will try to use full resolution of camera for saved stills"
 
-    if options.borders:
+    if args.borders:
         test_borders = []
-        border_list = options.borders.split(':')
+        border_list = args.borders.split(':')
         # Each item in border_list is a WxH+x+y
         for b in border_list:
             match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', b)
@@ -344,27 +332,21 @@ E.g. 100x50:5:20:100x50:200:150""")
     else:
         # test_borders = [ [ [60, 200], [125, 190] ] ]
         test_borders = None
+        if args.verbose:
+            print "No test region, using full image"
 
-    if not args:
-        print "Please specify a local directory to save full-res snapshots."
-        sys.exit(1)
-    localdir = args[0]
-    if len(args) == 2:
-        remotedir = args[1]
-    else:
-        remotedir = None
-    if options.verbose:
-        print "local", localdir, "remote", remotedir
-    if options.verbose:
+    if args.verbose:
+        print "local", args.localdir, "remote", args.remotedir
+    if args.verbose:
         print
 
     md = MotionDetector(test_res=test_res,
-                        threshold=threshold, sensitivity=sensitivity,
+                        threshold=args.threshold, sensitivity=args.sensitivity,
                         test_borders=test_borders,
-                        full_res=full_res,
-                        localdir=localdir,
-                        remotedir=remotedir,
-                        crop=options.crop, verbose=options.verbose)
+                        full_res=args.fullres,
+                        localdir=args.localdir,
+                        remotedir=args.remotedir,
+                        crop=args.crop, verbose=args.verbose)
 
     # We want the full snapshots to use the full resolution of the camera.
     # fswebcam has no way to do that, and no way to check first,
@@ -376,11 +358,11 @@ E.g. 100x50:5:20:100x50:200:150""")
             if use_tmp_file:
                 tmpfile = "/tmp/still.jpg"
                 take_still(outfile=tmpfile, res=test_res,
-                           verbose=options.verbose)
+                           verbose=args.verbose)
                 im = Image.open(tmpfile)
             else:   # keep it all in memory, no temp files
                 img_data = take_still(outfile='-', res=test_res,
-                                      verbose=options.verbose)
+                                      verbose=args.verbose)
                 im = Image.open(img_data)
 
             different, debugimage = md.compare_images(im)
