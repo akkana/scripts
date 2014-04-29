@@ -133,10 +133,10 @@ class MotionDetector:
            Image is a PIL.Image.
            We'll remember the pixel data from the previous image.
         '''
-        # Is this the first time?
-        if not self.bufold:
-            self.bufold = new_image.load()
-            return False, new_image
+        # # Is this the first time?
+        # if not self.bufold:
+        #     self.bufold = new_image.load()
+        #     return False, new_image
 
         bufnew = new_image.load()
 
@@ -149,18 +149,21 @@ class MotionDetector:
             debug_buf = None
 
         changed_pixels = 0
-        for piece in self.test_borders:
-            for x in xrange(piece[0][0]-1, piece[0][1]):
-                for y in xrange(piece[1][0]-1, piece[1][1]):
-                    # Just check green channel as it's the highest quality
-                    pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
-                    if pixdiff > self.threshold:
-                        changed_pixels += 1
-                        # If debugging, rewrite changed pixels -> green
-                        if (debug_buf):
-                            debug_buf[x,y] = (0, 255, 0)
-
-        changed = changed_pixels > self.sensitivity
+        if self.bufold:
+            for piece in self.test_borders:
+                for x in xrange(piece[0][0]-1, piece[0][1]):
+                    for y in xrange(piece[1][0]-1, piece[1][1]):
+                        # Just check green channel as it's the highest quality
+                        pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
+                        if pixdiff > self.threshold:
+                            changed_pixels += 1
+                            # If debugging, rewrite changed pixels -> green
+                            if (debug_buf):
+                                debug_buf[x,y] = (0, 255, 0)
+            changed = changed_pixels > self.sensitivity
+        else:
+            print "First time, forcing a snap"
+            changed = True
 
         if debug_buf:
             # Draw blue borders around the test areas no matter what,
@@ -189,20 +192,26 @@ class MotionDetector:
         elif self.verbose:
             print changed_pixels, "pixels changed"
 
+        if not self.bufold:
+            fileroot = 'first'
+            print "Saving initial image"
+        else:
+            fileroot = 'snap'
         self.bufold = bufnew
 
         if changed and self.localdir:
             # If they're different, snap a high-res photo.
             # Upload it if possible, otherwise save it locally.
-            # Check it every time, since the network might go down.
+            # Check it every time, since the network might go downls.
             if self.remotedir and os.access(self.remotedir, os.W_OK):
                 snapdir = self.remotedir
             else:
                 snapdir = self.localdir
             if snapdir:
                 now = datetime.datetime.now()
-                snapfile = 'snap-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
-                    (now.year, now.month, now.day,
+                snapfile = '%s-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
+                    (fileroot,
+                     now.year, now.month, now.day,
                      now.hour, now.minute, now.second)
                 snappath = os.path.join(snapdir, snapfile)
 
