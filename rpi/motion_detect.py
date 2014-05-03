@@ -37,7 +37,7 @@ class MotionDetector:
                  test_res=[320, 240], threshold=30, sensitivity=20,
                  test_borders=None, full_res=None,
                  localdir=None, remotedir=None,
-                 crop=None, verbose=0):
+                 crop=False, verbose=0):
         '''test_res: resolution of test images to be compared.
               XXX Can't we get that from the images passed in?
            threshold: How different does a pixel need to be?
@@ -45,26 +45,28 @@ class MotionDetector:
            verbose: 0 = quiet, 1 = chatter on stdout, 2 = save debug pics
 
            test_borders: [ [ [left, right], [top, bottom] ], ... ]
-             testBorders are NOT zero-based, the first pixel is 1
-             and the last pixel is testWidth or testHeight
+               testBorders are NOT zero-based, the first pixel is 1
+               and the last pixel is testWidth or testHeight
 
-             You can define areas to scan for changed pixels.
-             For example, if your picture looks like this:
+               You can define areas to scan for changed pixels.
+               For example, if your picture looks like this:
 
                  ....XXXX
                  ........
                  ........
 
-             "." is a street or a house,
-             "X" are trees which move like crazy when the wind is blowing,
-             to prevent constant photos, your setting might look like this:
+               "." is a street or a house,
+               "X" are trees which move like crazy when the wind is blowing,
+               to prevent constant photos, your setting might look like this:
 
-             testBorders = [ [[1,50],[1,75]], [[51,100],[26,75]] ]
-             area y=1 to 25 not scanned in x=51 to 100
+               testBorders = [ [[1,50],[1,75]], [[51,100],[26,75]] ]
+               area y=1 to 25 not scanned in x=51 to 100
 
-             Even more complex example
-             testBorders = [ [[1,39],[1,75]], [[40,67],[43,75]],
-                             [[68,85],[48,75]], [[86,100],[41,75]] ]
+               Even more complex example
+               testBorders = [ [[1,39],[1,75]], [[40,67],[43,75]],
+                               [[68,85],[48,75]], [[86,100],[41,75]] ]
+           crop: you may pass in a WxH+X+Y specifier, False (don't crop
+               at all), or '-' (crop to match the test borders)
         '''
         self.test_res = test_res
         self.threshold = threshold
@@ -86,7 +88,7 @@ class MotionDetector:
         # Find a crop rectangle that includes all the test borders.
         # XXX Should move crop functionality to piphoto.py
         # and then it can let fswebcam do the work.
-        if crop:
+        if crop == '-':
             left = test_res[0]
             right = 0
             top = test_res[1]
@@ -119,13 +121,21 @@ class MotionDetector:
                 self.crop = '%dx%d+%d+%d' % ((right-left)*convX,
                                              (bottom-top)*convY,
                                              left*convX, top*convY)
-                print "Cropping to", self.crop
+                if self.verbose:
+                    print "Cropping to test borders", self.crop
             else:
-                print "Problem finding borders of test area: got", \
+                print "Not cropping: problem finding borders of test area:", \
                     left, right, top, bottom
-                self.crop = None
+                self.crop = False
         else:
-            self.crop = None
+            self.crop = crop    # Should be either False, or a specifier
+            if self.verbose:
+                if self.crop:
+                    print "Not cropping"
+                else:
+                    print "Cropping to", self.crop
+
+        sys.exit(0)
 
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
@@ -275,8 +285,20 @@ at the specified resolution.""")
                         help="""Borders of the test region we'll monitor.
 A colon-separated list of wxh+x+y identifiers.
 E.g. 100x50:5:20:100x50:200:150""")
-    parser.add_argument("-c", "--crop", action='store_true', default=False,
-        help="Crop full-resolution images to the size of the test borders.")
+
+    # --crop can either be omitted (don't crop at all), included without
+    # an additional argument (crop to the test border boundaries),
+    # or included with its own WxH+X+Y specifier.
+    # With a default=False and nargs='?', argparse gives us False if -c
+    # isn't specified, None if it's specified with no argument, otherwise
+    # the argument that follows it.
+    parser.add_argument("-c", "--crop", nargs='?', default=False,
+                        help="""Crop full-resolution images.
+You can specify a crop region as WxH+0+0 (with the coordinates relative
+to the test image size, not the final image size).
+Specifying -c - or omitting the region specifier will result in
+a crop to the boundaries of the test region.""")
+
     parser.add_argument("-v", "--verbose", action='store_true', default=False,
         help="Verbose: chatter about what the program is doing.")
 
@@ -286,8 +308,10 @@ E.g. 100x50:5:20:100x50:200:150""")
     
     args = parser.parse_args()
     print args
+    print
+    print "Crop:", args.crop
 
-    def resparse(res_str, default_res):
+    def resparse(res_str, default_res=None):
         if not res_str:
             return default_res
         try:
@@ -335,9 +359,22 @@ E.g. 100x50:5:20:100x50:200:150""")
         if args.verbose:
             print "No test region, using full image"
 
+    # If a crop region is specified, make sure it at least parses.
+    if args.crop == None:
+        args.crop = '-'
+    elif args.crop and args.crop != '-':
+        check_crop = resparse(args.crop)
+    # else it's False, meaning don't crop
+
     if args.verbose:
-        print "local", args.localdir, "remote", args.remotedir
-    if args.verbose:
+        print
+        print "Parameters:"
+        for param in ('sensitivity', 'threshold', 'resolution', 'fullres',
+                      'borders', 'crop', 'verbose', 'localdir', 'remotedir'):
+            if vars(args)[param]:
+                print '  %s: %s' % (param, vars(args)[param])
+            else:
+                print '  %s not specified' % param
         print
 
     md = MotionDetector(test_res=test_res,
