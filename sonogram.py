@@ -99,7 +99,6 @@ def my_specgram(x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
 
     return Pxx, freqs, bins, im
 
-
 def sonogram(wav_file, startsecs=None, endsecs=None):
     '''Plot a sonogram for the given file,
        optionally specifying the start and end time in seconds.
@@ -132,12 +131,15 @@ def sonogram(wav_file, startsecs=None, endsecs=None):
     t = arange(startsecs, startsecs + secs, 1.0 / frame_rate / chans)
 
     ax1 = subplot(211)
+    title(wav_file)
+
     plot(t, sound_info)
     subplot(212, sharex=ax1)
 
     Pxx, freqs, bins, im = my_specgram(sound_info, Fs=frame_rate*chans,
                                        # cmap=cm.Accent,
                                        minfreq = 0, maxfreq = 10000)
+
     show()
     close()
 
