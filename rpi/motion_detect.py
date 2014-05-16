@@ -22,15 +22,16 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-from piphoto import take_still
-
-from PIL import Image
-
 import os, sys
 import time
 import datetime
 import re
 import subprocess
+
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+import pycamera
+
+from PIL import Image
 
 class MotionDetector:
     def __init__(self,
@@ -109,8 +110,8 @@ class MotionDetector:
                 # even if we specify one, the camera may decide otherwise.
                 # The only way, apparently, is to take a full-res photo
                 # and see how big it comes out. And hope that doesn't change.
-                img_data = take_still(outfile='-', res=full_res, format='jpg',
-                                      verbose=self.verbose)
+                img_data = self.hicam.take_still(outfile='-', res=full_res,
+                                                 format='jpg')
                 im = Image.open(img_data)
                 self.full_res = im.size
                 print "Using full resolution of %d x %d" % self.full_res
@@ -134,8 +135,47 @@ class MotionDetector:
                     print "Not cropping"
                 else:
                     print "Cropping to", self.crop
+                print
 
-        sys.exit(0)
+        # What cameras are available? We may use a different camera
+        # for the regular low-res test images vs. the high-res snaps.
+        cams = pycamera.find_cameras(self.verbose)
+        if not cams or len(cams) < 1:
+            print "No cameras available"
+            sys.exit(0)
+        if args.verbose:
+            print "Cameras available:"
+            for cam in cams:
+                print ' ', str(cam.__class__)
+
+        self.hicam = cams[0]
+        self.locam = cams[-1]
+        if args.verbose:
+            print "High-res camera:", str(self.hicam.__class__)
+            print " Low-res camera:", str(self.locam.__class__)
+
+        # Use a temp file, or keep data in memory?
+        # The gphoto class has no way yet to save to memory,
+        # so use a tmp file until I fix that.
+        self.use_tmp_file = True
+
+    def loop(self, secs=5):
+        while True:
+            self.step()
+            time.sleep(secs)
+
+    def step(self):
+        if self.use_tmp_file:
+            tmpfile = "/tmp/still.jpg"
+            self.locam.take_still(outfile=tmpfile, res=test_res)
+            im = Image.open(tmpfile)
+        else:   # keep it all in memory, no temp files
+            img_data = self.locam.take_still(outfile='-', res=test_res,
+                                             verbose=args.verbose)
+            im = Image.open(img_data)
+
+        different, debugimage = self.compare_images(im)
+        img_data.close()
 
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
@@ -231,8 +271,9 @@ class MotionDetector:
                     # write it to the file ourselves.
                     if self.verbose:
                         print "Cropping"
-                    img_data = take_still(outfile='-', res=self.full_res,
-                                          format='jpg', verbose=self.verbose)
+                    img_data = self.hicam.take_still(outfile='-',
+                                                     res=self.full_res,
+                                                     format='jpg')
                     # img_data is a StringIO instance.
                     # But Popen can't take a StringIO as input;
                     # instead, have to write the data into a pipe.
@@ -253,14 +294,14 @@ class MotionDetector:
                     p = None
                     print "Saved cropped still", snappath
                 else:
-                    take_still(outfile=snappath, res=self.full_res,
-                               verbose=self.verbose)
+                    self.hicam.take_still(outfile=snappath, res=self.full_res)
                     print "Saving to", snappath
 
         return changed, debugimage
 
+# Sample usage:
+# ./motion_detect.py -s 100 -t 30 -r 320x240 -b 70x65+125+100 -c -v /root/snapshots /root/moontrade/snapshots >& /tmp/otion.out &
 if __name__ == '__main__':
-    # Usage: motion_detect.py [-c] [-v] localdir [remotedir]
     import argparse
 
     parser = argparse.ArgumentParser(description="""Monitor a camera and snap photos when something has changed.
@@ -317,7 +358,7 @@ a crop to the boundaries of the test region.""")
         try:
             parsed_res = map(int, res_str.split('x'))
         except ValueError:
-            print "Please specify resolution as WxH"
+            print res_str, ": Please specify resolution as WxH"
             sys.exit(1)
         if len(parsed_res) != 2:
             print "Please specify resolution as WxH"
@@ -363,7 +404,10 @@ a crop to the boundaries of the test region.""")
     if args.crop == None:
         args.crop = '-'
     elif args.crop and args.crop != '-':
-        check_crop = resparse(args.crop)
+        match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', args.crop)
+        if not match:
+            print "Crop %s must be in format WxH[+X+Y]"
+            sys.exit(1)
     # else it's False, meaning don't crop
 
     if args.verbose:
@@ -385,27 +429,9 @@ a crop to the boundaries of the test region.""")
                         remotedir=args.remotedir,
                         crop=args.crop, verbose=args.verbose)
 
-    # We want the full snapshots to use the full resolution of the camera.
-    # fswebcam has no way to do that, and no way to check first,
-    # so we specify a res that's too high and let it adjust downward.
-
     try:
-        while True:
-            use_tmp_file = False
-            if use_tmp_file:
-                tmpfile = "/tmp/still.jpg"
-                take_still(outfile=tmpfile, res=test_res,
-                           verbose=args.verbose)
-                im = Image.open(tmpfile)
-            else:   # keep it all in memory, no temp files
-                img_data = take_still(outfile='-', res=test_res,
-                                      verbose=args.verbose)
-                im = Image.open(img_data)
+        md.loop(5)
 
-            different, debugimage = md.compare_images(im)
-            img_data.close()
-
-            time.sleep(5)
     except KeyboardInterrupt:
         print "Interrupt: exiting"
 
