@@ -32,12 +32,16 @@ class PiCamera:
     def __init__(self, verbose=False):
         self.verbose = verbose
         try:
-            import picamera
+            import picameraXXX
             self.use_picamera = True
             # temporarily not using picamera until we know how to
             # take a picture in memory
+            if self.verbose:
+                print "Using picamera module"
         except ImportError:
             self.use_picamera = False
+            if self.verbose:
+                print "Using raspistill"
 
     def take_still(self, outfile='/tmp/still.jpg',
                    res=[640, 480], format=None):

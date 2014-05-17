@@ -15,7 +15,7 @@
 __version__ = "0.1"
 __author__ = "Akkana Peck <akkana@shallowsky.com>"
 __license__ = "GPL v2"
-__all__ = [ 'gphoto', "webcam", "picamera" ]
+__all__ = [ 'gphoto', "webcam", "piphoto" ]
 
 # from . import *
 

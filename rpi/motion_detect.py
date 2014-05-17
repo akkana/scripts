@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# /usr/bin/env python
 
 # Detect motion or change between successive camera images.
 # Snap a higher resolution photo when something has changed.
@@ -43,7 +43,7 @@ class MotionDetector:
               XXX Can't we get that from the images passed in?
            threshold: How different does a pixel need to be?
            sensitivity: How many pixels must change?
-           verbose: 0 = quiet, 1 = chatter on stdout, 2 = save debug pics
+           verbose: print debugging messages.
 
            test_borders: [ [ [left, right], [top, bottom] ], ... ]
                testBorders are NOT zero-based, the first pixel is 1
@@ -70,12 +70,27 @@ class MotionDetector:
                at all), or '-' (crop to match the test borders)
         '''
         self.test_res = test_res
-        self.threshold = threshold
-        self.sensitivity = sensitivity
+
+	# We must have threshold and sensitivity, even if they're
+	# passed in as None. So repeat the default arguments here.
+	# XXX Ugh -- there must be a cleaner way to do this!
+	if threshold:
+            self.threshold = threshold
+	else:
+	    self.threshold = 20
+	if sensitivity:
+            self.sensitivity = sensitivity
+	else:
+            self.sensitivity = 30
         self.verbose = verbose
         self.localdir = localdir
         self.remotedir = remotedir
         self.full_res = full_res
+
+        # Should we save debug images, so the user can tell where
+        # the test region is and what's happening?
+        # For now, tie it to verbose.
+        self.save_debug_image = self.verbose
 
         self.bufold = None
 
@@ -85,6 +100,23 @@ class MotionDetector:
             self.test_borders = [ [[1,test_res[0]],[1,test_res[1]]] ]
         else:
             self.test_borders = test_borders
+
+        # What cameras are available? We may use a different camera
+        # for the regular low-res test images vs. the high-res snaps.
+        cams = pycamera.find_cameras(self.verbose)
+        if not cams or len(cams) < 1:
+            print "No cameras available"
+            sys.exit(0)
+        if args.verbose:
+            print "Cameras available:"
+            for cam in cams:
+                print ' ', str(cam.__class__)
+
+        self.hicam = cams[0]
+        self.locam = cams[-1]
+        if args.verbose:
+            print "High-res camera:", str(self.hicam.__class__)
+            print " Low-res camera:", str(self.locam.__class__)
 
         # Find a crop rectangle that includes all the test borders.
         # XXX Should move crop functionality to piphoto.py
@@ -132,27 +164,10 @@ class MotionDetector:
             self.crop = crop    # Should be either False, or a specifier
             if self.verbose:
                 if self.crop:
-                    print "Not cropping"
-                else:
                     print "Cropping to", self.crop
+                else:
+                    print "Not cropping"
                 print
-
-        # What cameras are available? We may use a different camera
-        # for the regular low-res test images vs. the high-res snaps.
-        cams = pycamera.find_cameras(self.verbose)
-        if not cams or len(cams) < 1:
-            print "No cameras available"
-            sys.exit(0)
-        if args.verbose:
-            print "Cameras available:"
-            for cam in cams:
-                print ' ', str(cam.__class__)
-
-        self.hicam = cams[0]
-        self.locam = cams[-1]
-        if args.verbose:
-            print "High-res camera:", str(self.hicam.__class__)
-            print " Low-res camera:", str(self.locam.__class__)
 
         # Use a temp file, or keep data in memory?
         # The gphoto class has no way yet to save to memory,
@@ -169,13 +184,26 @@ class MotionDetector:
             tmpfile = "/tmp/still.jpg"
             self.locam.take_still(outfile=tmpfile, res=test_res)
             im = Image.open(tmpfile)
+            img_data = None
         else:   # keep it all in memory, no temp files
             img_data = self.locam.take_still(outfile='-', res=test_res,
                                              verbose=args.verbose)
             im = Image.open(img_data)
 
         different, debugimage = self.compare_images(im)
-        img_data.close()
+        if img_data:
+            img_data.close()
+
+    def get_outdir(self):
+        '''Does the remotedir exist and is it still accessible?
+           We check this every time, since a remote filesystem
+           could disappear at any moment, in which case we'll want
+           to revert to a local directory.
+        '''
+        if self.remotedir and os.access(self.remotedir, os.W_OK):
+            return self.remotedir
+        else:
+            return self.localdir
 
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
@@ -190,8 +218,7 @@ class MotionDetector:
 
         bufnew = new_image.load()
 
-        # if debugimage:
-        if (self.verbose > 1):
+        if self.save_debug_image:
             debugimage = new_image.copy()
             debug_buf = debugimage.load()
         else:
@@ -234,13 +261,9 @@ class MotionDetector:
                         if piece[0][0] > 1:
                             debug_buf[piece[0][0]-2, y]  = (255, 255, 255)
 
-            # debugimage.save("/tmp/debug.png") # save debug image as bmp
-            # print "debug.png saved, %s changed pixel" % changed_pixels
-
-        if changed:
-            print "=====================", changed_pixels, "pixels changed"
-        elif self.verbose:
-            print changed_pixels, "pixels changed"
+            debugimage.save(os.path.join(self.get_outdir(), "debug.png"))
+            if self.verbose:
+                print "debug.png saved, %s changed pixel" % changed_pixels
 
         if not self.bufold:
             fileroot = 'first'
@@ -249,14 +272,12 @@ class MotionDetector:
             fileroot = 'snap'
         self.bufold = bufnew
 
-        if changed and self.localdir:
+        if changed:
+            print "=====================", changed_pixels, "pixels changed"
             # If they're different, snap a high-res photo.
             # Upload it if possible, otherwise save it locally.
             # Check it every time, since the network might go downls.
-            if self.remotedir and os.access(self.remotedir, os.W_OK):
-                snapdir = self.remotedir
-            else:
-                snapdir = self.localdir
+            snapdir = self.get_outdir()
             if snapdir:
                 now = datetime.datetime.now()
                 snapfile = '%s-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
@@ -296,6 +317,9 @@ class MotionDetector:
                 else:
                     self.hicam.take_still(outfile=snappath, res=self.full_res)
                     print "Saving to", snappath
+
+        elif self.verbose:   # Not enough changed, but report the diff anyway
+            print changed_pixels, "pixels changed"
 
         return changed, debugimage
 
@@ -401,12 +425,13 @@ a crop to the boundaries of the test region.""")
             print "No test region, using full image"
 
     # If a crop region is specified, make sure it at least parses.
+    print "args.crop is", args.crop
     if args.crop == None:
         args.crop = '-'
     elif args.crop and args.crop != '-':
         match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', args.crop)
         if not match:
-            print "Crop %s must be in format WxH[+X+Y]"
+            print "Crop %s must be in format WxH[+X+Y], or just -" % args.crop
             sys.exit(1)
     # else it's False, meaning don't crop
 
