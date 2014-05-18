@@ -142,9 +142,10 @@ class MotionDetector:
                 # even if we specify one, the camera may decide otherwise.
                 # The only way, apparently, is to take a full-res photo
                 # and see how big it comes out. And hope that doesn't change.
-                img_data = self.hicam.take_still(outfile='-', res=full_res,
-                                                 format='jpg')
-                im = Image.open(img_data)
+                tmpfile = '/tmp/still.jpg'
+                self.hicam.take_still(outfile=tmpfile,
+                                      res=full_res, format='jpg')
+                im = Image.open(tmpfile)
                 self.full_res = im.size
                 print "Using full resolution of %d x %d" % self.full_res
                 img_data = None
@@ -171,8 +172,11 @@ class MotionDetector:
 
         # Use a temp file, or keep data in memory?
         # The gphoto class has no way yet to save to memory,
-        # so use a tmp file until I fix that.
-        self.use_tmp_file = True
+        # so we have to use a temp file if we're using gphoto.
+        if print str(self.hicam.__class__).endswith('Gphoto'):
+            self.use_tmp_file = True
+        else:
+            self.use_tmp_file = False
 
     def loop(self, secs=5):
         while True:
@@ -292,31 +296,42 @@ class MotionDetector:
                     # write it to the file ourselves.
                     if self.verbose:
                         print "Cropping"
-                    img_data = self.hicam.take_still(outfile='-',
-                                                     res=self.full_res,
-                                                     format='jpg')
-                    # img_data is a StringIO instance.
-                    # But Popen can't take a StringIO as input;
-                    # instead, have to write the data into a pipe.
-                    p = subprocess.Popen(['/usr/bin/jpegtran',
-                                          '-crop', self.crop],
-                                         shell=False,
-                                         stdin=subprocess.PIPE,
-                                         stdout=subprocess.PIPE)
-                    # Better to use communicate() than write()
-                    img_data = p.communicate(input=img_data.getvalue())[0]
-                    # Or use img_data.read() instead of getvalue --
-                    # not clear if there's any efficiency difference
-                    # since we have to keep the whole string in mem either way.
-                    p.stdin.close()
+                    if self.use_tmp_file:
+                        tmpfile = "/tmp/still.jpg"
+                        img_data = self.hicam.take_still(outfile=tmpfile,
+                                                         res=self.full_res,
+                                                         format='jpg')
+                        p = subprocess.Popen(["/usr/bin/jpegtran",
+                                              "-crop", self.crop,
+                                              tmpfile, shell=False,
+                                              stdout=subprocess.PIPE])
+                        img_data = p.communicate()[0]
+                    else:
+                        img_data = self.hicam.take_still(outfile='-',
+                                                         res=self.full_res,
+                                                         format='jpg')
+                        # img_data is a StringIO instance.
+                        # But Popen can't take a StringIO as input;
+                        # instead, have to write the data into a pipe.
+                        p = subprocess.Popen(['/usr/bin/jpegtran',
+                                              '-crop', self.crop],
+                                             shell=False,
+                                             stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE)
+                        # Better to use communicate() than write()
+                        img_data = p.communicate(input=img_data.getvalue())[0]
+                        # Or use img_data.read() instead of getvalue --
+                        # not clear if there's any efficiency difference since
+                        # we have to keep the whole string in mem either way.
+                        p.stdin.close()
                     snapout = open(snappath, 'w')
                     snapout.write(img_data)
                     snapout.close()
                     p = None
-                    print "Saved cropped still", snappath
+                    print "Saved high-res cropped still", snappath
                 else:
                     self.hicam.take_still(outfile=snappath, res=self.full_res)
-                    print "Saving to", snappath
+                    print "Saving high-res to", snappath
 
         elif self.verbose:   # Not enough changed, but report the diff anyway
             print changed_pixels, "pixels changed"
@@ -324,13 +339,16 @@ class MotionDetector:
         return changed, debugimage
 
 # Sample usage:
-# ./motion_detect.py -s 100 -t 30 -r 320x240 -b 70x65+125+100 -c -v /root/snapshots /root/moontrade/snapshots >& /tmp/otion.out &
+# motion_detect.py -v -s 250 -t 30 -r 320x240 -b 100x100+130+85 -c - /tmp ~pi/moontrade/snapshots/
+# motion_detect.py -s 100 -t 30 -r 320x240 -b 70x65+125+100 -c - -v /root/snapshots /root/moontrade/snapshots >& /tmp/otion.out
+# or, un-cropped:
+# motion_detect.py -v -r 320x240 -c 150x150+100+50 -b 50x50+125+75 /tmp /mnt/server/pix
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description="""Monitor a camera and snap photos when something has changed.
 
-Example: motion_detect.py -v -r 320x240 -c 150x150+100+50 -b 50x50+125+75 /tmp /mnt/server/pix
+Example: 
 
 Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
