@@ -181,6 +181,9 @@ class MotionDetector:
     def loop(self, secs=5):
         while True:
             self.step()
+            # flush stdout, since we may be logging to a file
+            # that we'll want to monitor.
+            sys.stdout.flush()
             time.sleep(secs)
 
     def step(self):
