@@ -47,6 +47,7 @@ class Gphoto :
         # For some reason gphoto2 --list-config ALWAYS exits with nonzero
         # and "*** Error (-1: 'Unspecified error') ***"
         # so alas we have to ignore error returns.
+        # gphoto2 --set-config capture=1 --list-config is the right way.
         try:
             args = [ "/usr/bin/gphoto2",
                      # "--debug", "--debug-logfile=/tmp/log.txt",

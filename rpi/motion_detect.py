@@ -179,6 +179,12 @@ class MotionDetector:
             self.use_tmp_file = False
 
     def loop(self, secs=5):
+        '''Main loop detecting motion. The timeout you pass in here
+           doesn't really matter; the RPi is so slow at taking photos
+           and writing to ssh filesystems that you should expect
+           at least 10 seconds per loop in overhead, on top of any
+           delay you pass in.
+        '''
         while True:
             self.step()
             # flush stdout, since we may be logging to a file
@@ -269,8 +275,6 @@ class MotionDetector:
                             debug_buf[piece[0][0]-2, y]  = (255, 255, 255)
 
             debugimage.save(os.path.join(self.get_outdir(), "debug.png"))
-            if self.verbose:
-                print "debug.png saved, %s changed pixel" % changed_pixels
 
         if not self.bufold:
             fileroot = 'first'
@@ -337,7 +341,8 @@ class MotionDetector:
                     print "Saving high-res to", snappath
 
         elif self.verbose:   # Not enough changed, but report the diff anyway
-            print changed_pixels, "pixels changed"
+            print changed_pixels, "pixels changed\t",
+            print str(datetime.datetime.now())
 
         return changed, debugimage
 
