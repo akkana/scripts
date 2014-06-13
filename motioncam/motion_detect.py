@@ -173,7 +173,7 @@ class MotionDetector:
         # Use a temp file, or keep data in memory?
         # The gphoto class has no way yet to save to memory,
         # so we have to use a temp file if we're using gphoto.
-        if print str(self.hicam.__class__).endswith('Gphoto'):
+        if str(self.hicam.__class__).endswith('Gphoto'):
             self.use_tmp_file = True
         else:
             self.use_tmp_file = False
@@ -199,8 +199,8 @@ class MotionDetector:
             im = Image.open(tmpfile)
             img_data = None
         else:   # keep it all in memory, no temp files
-            img_data = self.locam.take_still(outfile='-', res=test_res,
-                                             verbose=args.verbose)
+            img_data = self.locam.take_still(outfile='-', res=test_res)
+                                             # verbose=args.verbose)
             im = Image.open(img_data)
 
         different, debugimage = self.compare_images(im)
@@ -260,19 +260,19 @@ class MotionDetector:
             # and add white borders if something has changed.
             for piece in self.test_borders:
                 for x in xrange(piece[0][0]-1, piece[0][1]):
-                    debug_buf[x, piece[1][0]-1]  = (0, 0, 255)
-                    debug_buf[x, piece[1][1]-1]  = (0, 0, 255)
+                    debug_buf[x, piece[1][0]-1] = (0, 0, 255)
+                    debug_buf[x, piece[1][1]-1] = (0, 0, 255)
                     if changed:
                         if piece[1][0] > 1:
-                            debug_buf[x, piece[1][0]-2]  = (255, 255, 255)
-                            debug_buf[x, piece[1][1]]  = (255, 255, 255)
+                            debug_buf[x, piece[1][0]-2] = (255, 255, 255)
+                            debug_buf[x, piece[1][1]] = (255, 255, 255)
                 for y in xrange(piece[1][0]-1, piece[1][1]):
-                    debug_buf[piece[0][0]-1, y]  = (0, 0, 255)
-                    debug_buf[piece[0][1]-1, y]  = (0, 0, 255)
+                    debug_buf[piece[0][0]-1, y] = (0, 0, 255)
+                    debug_buf[piece[0][1]-1, y] = (0, 0, 255)
                     if changed:
-                        debug_buf[piece[0][1], y]  = (255, 255, 255)
+                        debug_buf[piece[0][1], y] = (255, 255, 255)
                         if piece[0][0] > 1:
-                            debug_buf[piece[0][0]-2, y]  = (255, 255, 255)
+                            debug_buf[piece[0][0]-2, y] = (255, 255, 255)
 
             debugimage.save(os.path.join(self.get_outdir(), "debug.png"))
 
@@ -310,8 +310,9 @@ class MotionDetector:
                                                          format='jpg')
                         p = subprocess.Popen(["/usr/bin/jpegtran",
                                               "-crop", self.crop,
-                                              tmpfile, shell=False,
-                                              stdout=subprocess.PIPE])
+                                              tmpfile],
+                                             shell=False,
+                                             stdout=subprocess.PIPE)
                         img_data = p.communicate()[0]
                     else:
                         img_data = self.hicam.take_still(outfile='-',
