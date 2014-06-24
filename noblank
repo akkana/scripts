@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Disable screen blanking: a good idea from
+# http://www.troubleshooters.com/lpm/201406/201406.htm
+while true; do
+        sleep 90
+        xset dpms force on
+done
+
