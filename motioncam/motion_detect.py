@@ -1,4 +1,4 @@
-# /usr/bin/env python
+#!/usr/bin/python
 
 # Detect motion or change between successive camera images.
 # Snap a higher resolution photo when something has changed.
@@ -33,9 +33,19 @@ import pycamera
 
 from PIL import Image
 
+# Unfortunately, we have to import RPi.GPIO here at the top level, before we've
+# parsed the arguments and know we need to use it for a PIR sensor,
+# because we need it in scope for everything.
+try:
+    import RPi.GPIO
+    imported_GPIO = True
+except ImportError:
+    imported_GPIO = False
+
 class MotionDetector:
     def __init__(self,
-                 test_res=[320, 240], threshold=30, sensitivity=20,
+                 test_res=[320, 240], pir=None,
+                 threshold=30, sensitivity=20,
                  test_borders=None, full_res=None,
                  localdir=None, remotedir=None,
                  crop=False, verbose=0):
@@ -69,6 +79,18 @@ class MotionDetector:
            crop: you may pass in a WxH+X+Y specifier, False (don't crop
                at all), or '-' (crop to match the test borders)
         '''
+        if pir:
+            self.pir = pir
+            if not imported_GPIO:
+                print "PIR specified, but can't import RPi.GPIO!"
+                print
+                sys.exit(1)
+
+            RPi.GPIO.setmode(RPi.GPIO.BCM)
+            RPi.GPIO.setup(self.pir, RPi.GPIO.IN)
+        else:
+            self.pir = None
+
         self.test_res = test_res
 
 	# We must have threshold and sensitivity, even if they're
@@ -193,6 +215,12 @@ class MotionDetector:
             time.sleep(secs)
 
     def step(self):
+        if self.pir:
+            if RPi.GPIO.input(self.pir):
+                print "===================== Detected motion"
+                self.snap_full_res()
+            return
+
         if self.use_tmp_file:
             tmpfile = "/tmp/still.jpg"
             self.locam.take_still(outfile=tmpfile, res=test_res)
@@ -218,17 +246,78 @@ class MotionDetector:
         else:
             return self.localdir
 
+    def snap_full_res(self):
+        # If there's been motion, snap a high-res photo.
+        # Upload it if possible, otherwise save it locally.
+        # Check for that every time, since the network might go down.
+        snapdir = self.get_outdir()
+        if not snapdir:
+            print "Not snapping full resolution, couldn't get output dir"
+            return
+
+        if not self.bufold and not self.pir:
+            fileroot = 'first'
+            print "Saving initial image"
+        else:
+            fileroot = 'snap'
+
+        now = datetime.datetime.now()
+        snapfile = '%s-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
+            (fileroot,
+             now.year, now.month, now.day,
+             now.hour, now.minute, now.second)
+        snappath = os.path.join(snapdir, snapfile)
+
+        if self.crop:
+            # Snap data to memory, then pass it to jpegtran to crop.
+            # jpegtran can only write to stdout so we'll have to
+            # write it to the file ourselves.
+            if self.verbose:
+                print "Cropping"
+            if self.use_tmp_file:
+                tmpfile = "/tmp/still.jpg"
+                img_data = self.hicam.take_still(outfile=tmpfile,
+                                                 res=self.full_res,
+                                                 format='jpg')
+                p = subprocess.Popen(["/usr/bin/jpegtran",
+                                      "-crop", self.crop,
+                                      tmpfile],
+                                     shell=False,
+                                     stdout=subprocess.PIPE)
+                img_data = p.communicate()[0]
+            else:
+                img_data = self.hicam.take_still(outfile='-',
+                                                 res=self.full_res,
+                                                 format='jpg')
+                # img_data is a StringIO instance.
+                # But Popen can't take a StringIO as input;
+                # instead, have to write the data into a pipe.
+                p = subprocess.Popen(['/usr/bin/jpegtran',
+                                      '-crop', self.crop],
+                                     shell=False,
+                                     stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE)
+                # Better to use communicate() than write()
+                img_data = p.communicate(input=img_data.getvalue())[0]
+                # Or use img_data.read() instead of getvalue --
+                # not clear if there's any efficiency difference since
+                # we have to keep the whole string in mem either way.
+                p.stdin.close()
+            snapout = open(snappath, 'w')
+            snapout.write(img_data)
+            snapout.close()
+            p = None
+            print "Saved high-res cropped still", snappath
+        else:
+            self.hicam.take_still(outfile=snappath, res=self.full_res)
+            print "Saving high-res to", snappath
+
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
            and return True if we think they differ enough.
-           Image is a PIL.Image.
+           new_image is a PIL.Image.
            We'll remember the pixel data from the previous image.
         '''
-        # # Is this the first time?
-        # if not self.bufold:
-        #     self.bufold = new_image.load()
-        #     return False, new_image
-
         bufnew = new_image.load()
 
         if self.save_debug_image:
@@ -238,6 +327,16 @@ class MotionDetector:
             debugimage = None
             debug_buf = None
 
+        # Modify threshold for time of day. Obviously this isn't
+        # the right way to do it, and it should be done by light
+        # levels.
+        now = datetime.datetime.now()
+        if (now.hour > 20 and now.minute > 45) or \
+           (now.hour <= 5 and now.minute < 30):
+            threshold = self.threshold / 3
+        else:
+            threshold = self.threshold
+
         changed_pixels = 0
         if self.bufold:
             for piece in self.test_borders:
@@ -245,7 +344,7 @@ class MotionDetector:
                     for y in xrange(piece[1][0]-1, piece[1][1]):
                         # Just check green channel as it's the highest quality
                         pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
-                        if pixdiff > self.threshold:
+                        if pixdiff > threshold:
                             changed_pixels += 1
                             # If debugging, rewrite changed pixels -> green
                             if (debug_buf):
@@ -276,70 +375,10 @@ class MotionDetector:
 
             debugimage.save(os.path.join(self.get_outdir(), "debug.png"))
 
-        if not self.bufold:
-            fileroot = 'first'
-            print "Saving initial image"
-        else:
-            fileroot = 'snap'
-        self.bufold = bufnew
-
         if changed:
             print "=====================", changed_pixels, "pixels changed"
-            # If they're different, snap a high-res photo.
-            # Upload it if possible, otherwise save it locally.
-            # Check it every time, since the network might go downls.
-            snapdir = self.get_outdir()
-            if snapdir:
-                now = datetime.datetime.now()
-                snapfile = '%s-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
-                    (fileroot,
-                     now.year, now.month, now.day,
-                     now.hour, now.minute, now.second)
-                snappath = os.path.join(snapdir, snapfile)
-
-                if self.crop:
-                    # Snap data to memory, then pass it to jpegtran to crop.
-                    # jpegtran can only write to stdout so we'll have to
-                    # write it to the file ourselves.
-                    if self.verbose:
-                        print "Cropping"
-                    if self.use_tmp_file:
-                        tmpfile = "/tmp/still.jpg"
-                        img_data = self.hicam.take_still(outfile=tmpfile,
-                                                         res=self.full_res,
-                                                         format='jpg')
-                        p = subprocess.Popen(["/usr/bin/jpegtran",
-                                              "-crop", self.crop,
-                                              tmpfile],
-                                             shell=False,
-                                             stdout=subprocess.PIPE)
-                        img_data = p.communicate()[0]
-                    else:
-                        img_data = self.hicam.take_still(outfile='-',
-                                                         res=self.full_res,
-                                                         format='jpg')
-                        # img_data is a StringIO instance.
-                        # But Popen can't take a StringIO as input;
-                        # instead, have to write the data into a pipe.
-                        p = subprocess.Popen(['/usr/bin/jpegtran',
-                                              '-crop', self.crop],
-                                             shell=False,
-                                             stdin=subprocess.PIPE,
-                                             stdout=subprocess.PIPE)
-                        # Better to use communicate() than write()
-                        img_data = p.communicate(input=img_data.getvalue())[0]
-                        # Or use img_data.read() instead of getvalue --
-                        # not clear if there's any efficiency difference since
-                        # we have to keep the whole string in mem either way.
-                        p.stdin.close()
-                    snapout = open(snappath, 'w')
-                    snapout.write(img_data)
-                    snapout.close()
-                    p = None
-                    print "Saved high-res cropped still", snappath
-                else:
-                    self.hicam.take_still(outfile=snappath, res=self.full_res)
-                    print "Saving high-res to", snappath
+            self.snap_full_res()
+            self.bufold = bufnew
 
         elif self.verbose:   # Not enough changed, but report the diff anyway
             print changed_pixels, "pixels changed\t",
@@ -348,8 +387,8 @@ class MotionDetector:
         return changed, debugimage
 
 # Sample usage:
-# motion_detect.py -v -s 250 -t 30 -r 320x240 -b 100x100+130+85 -c - /tmp ~pi/moontrade/snapshots/
-# motion_detect.py -s 100 -t 30 -r 320x240 -b 70x65+125+100 -c - -v /root/snapshots /root/moontrade/snapshots >& /tmp/otion.out
+# motion_detect.py -v -s 250 -t 30 -r 320x240 -b 100x100+130+85 -c - /tmp ~pi/trade/snapshots/
+# motion_detect.py -s 100 -t 30 -r 320x240 -b 70x65+125+100 -c - -v /root/snapshots /root/trade/snapshots >& /tmp/motion.out
 # or, un-cropped:
 # motion_detect.py -v -r 320x240 -c 150x150+100+50 -b 50x50+125+75 /tmp /mnt/server/pix
 if __name__ == '__main__':
@@ -373,10 +412,14 @@ Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
 Defaults to the resolution of the camera if we can get it.
 Actual resolution may be different if the camera can't take a photo
 at the specified resolution.""")
+
     parser.add_argument("-b", "--borders",
                         help="""Borders of the test region we'll monitor.
 A colon-separated list of wxh+x+y identifiers.
 E.g. 100x50:5:20:100x50:200:150""")
+    parser.add_argument("-p", "--pir", type=int,
+                        help="""Use a PIR motion sensor instead of a test image.
+Specify Raspberry Pi pin number, e.g. 7.""")
 
     # --crop can either be omitted (don't crop at all), included without
     # an additional argument (crop to the test border boundaries),
@@ -417,7 +460,10 @@ a crop to the boundaries of the test region.""")
         return parsed_res
 
     test_res = resparse(args.resolution, [320, 240])
-    print "Using test resolution of", test_res
+    if args.pir:
+        print "Using pir sensor on pin %d instead of test image" % args.pir
+    else:
+        print "Using test resolution of", test_res
 
     full_res = resparse(args.fullres, None)
     if full_res:
@@ -466,6 +512,7 @@ a crop to the boundaries of the test region.""")
         print
         print "Parameters:"
         for param in ('sensitivity', 'threshold', 'resolution', 'fullres',
+                      'pir',
                       'borders', 'crop', 'verbose', 'localdir', 'remotedir'):
             if vars(args)[param]:
                 print '  %s: %s' % (param, vars(args)[param])
@@ -473,7 +520,7 @@ a crop to the boundaries of the test region.""")
                 print '  %s not specified' % param
         print
 
-    md = MotionDetector(test_res=test_res,
+    md = MotionDetector(test_res=test_res, pir=args.pir,
                         threshold=args.threshold, sensitivity=args.sensitivity,
                         test_borders=test_borders,
                         full_res=args.fullres,
