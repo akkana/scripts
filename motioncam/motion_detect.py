@@ -220,6 +220,7 @@ class MotionDetector:
             # a callback so it will be called if the PIR device triggers.
             while True:
                 print "Sleeping 300 seconds ..."
+                sys.stdout.flush()
                 time.sleep(300);
         else:
             while True:
