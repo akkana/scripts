@@ -7,6 +7,7 @@
 
 import sys, os
 import email
+import email.utils
 
 progname = os.path.basename(sys.argv[0])
 Usage = """Usage: %s [-a] headername [filename]
@@ -17,6 +18,22 @@ Without a filemame, will read standard input.
 Adding -a will print all matches within the given file, not just the first.
 
 Example: %s -a Subject: /var/mail/yourname""" % (progname, progname)
+
+def decode_piece(piece):
+    ret = ''
+    for part in email.Header.decode_header(piece) :
+        ret += part[0]
+
+        # Special case: the header itself comes out with charset None
+        # and decode doesn't add a space between it and the next part,
+        # even though there was a space in the original. So add one.
+        # I'm taking a wild guess that the relevant factor here is
+        # the None charset rather than the fact that it matched
+        # the header, but keep an eye open for counterexamples.
+        if not part[1] :
+            ret += ' '
+
+    return ret
 
 def decode_file(filename, header_wanted) :
     if filename == '-' :
@@ -36,16 +53,23 @@ def decode_file(filename, header_wanted) :
             # since one header can be split over several lines.
             # print "Original:", line
             found_something = True
-            for part in email.Header.decode_header(line) :
-                output += part[0]
-                # Special case: the header itself comes out with charset None
-                # and decode doesn't add a space between it and the next part,
-                # even though there was a space in the original. So add one.
-                # I'm taking a wild guess that the relevant factor here is
-                # the None charset rather than the fact that it matched
-                # the header, but keep an eye open for counterexamples.
-                if not part[1] :
-                    output += ' '
+
+            # If the header is an address, we have to split it into parts
+            # before we can decode it. If it's another header such as Subject,
+            # we can't do that.
+            if header_wanted.startswith("From") \
+                    or header_wanted.startswith("To") \
+                    or header_wanted.startswith("Cc") \
+                    or header_wanted.startswith("Bcc"):
+                pieces = email.utils.parseaddr(line)
+                if pieces[0] or pieces[1]:
+                    output += header_wanted + ' '
+                    output += email.utils.formataddr(map(decode_piece, pieces))
+                else:
+                    output += line
+                    print "parseaddr failed on", line,
+            else:
+                output += decode_piece(line)
 
         elif output :
             # if we've already matched the header, and this isn't a
