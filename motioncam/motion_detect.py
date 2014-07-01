@@ -338,6 +338,8 @@ class MotionDetector:
             RPi.GPIO.add_event_detect(self.pir, RPi.GPIO.RISING,
                                       callback=self.snap_full_res)
 
+        return snappath
+
     def compare_images(self, new_image):
         '''Compare an image with the previous one,
            and return True if we think they differ enough.
@@ -353,7 +355,7 @@ class MotionDetector:
             debugimage = None
             debug_buf = None
 
-        # Modify threshold for time of day. Obviously this isn't
+        # XXX Modify threshold for time of day. Obviously this isn't
         # the right way to do it, and it should be done by light
         # levels.
         now = datetime.datetime.now()
@@ -399,12 +401,17 @@ class MotionDetector:
                         if piece[0][0] > 1:
                             debug_buf[piece[0][0]-2, y] = (255, 255, 255)
 
-            debugimage.save(os.path.join(self.get_outdir(), "debug.png"))
-
         if changed:
             print "=====================", changed_pixels, "pixels changed"
-            self.snap_full_res()
+            snapparts = os.path.split(self.snap_full_res())
             self.bufold = bufnew
+
+            if self.save_debug_image:
+                # Save the debug image, but not if it's a first image.
+                if "snap" in snapparts[1]:
+                    debugimage.save(os.path.join(snapparts[0],
+                                                 snapparts[1].replace('snap',
+                                                                      'debug')))
 
         elif self.verbose:   # Not enough changed, but report the diff anyway
             print changed_pixels, "pixels changed\t",
@@ -555,7 +562,7 @@ a crop to the boundaries of the test region.""")
                         crop=args.crop, verbose=args.verbose)
 
     try:
-        md.loop(5)
+        md.loop(1)
 
     except KeyboardInterrupt:
         print "Interrupt: exiting"
