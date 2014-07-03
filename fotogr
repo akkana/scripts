@@ -21,7 +21,7 @@ def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
                 if f == "Tags" or f == "Keywords":
                     search_for_keywords_in(root, f, orpats, andpats, notpats,
                                            separate)
-                    break
+                    break   # Would prefer to break out of this root, not f
     print
 
 def search_for_keywords_in(d, f, orpats, andpats, notpats, separate) :
@@ -29,6 +29,7 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, separate) :
        Those have lines in a format like:
        [tag ]keyword, keyword: file.jpg file.jpg
     '''
+    filetags = {}
     for line in open(os.path.join(d, f)):
         line = line.strip()
         if not line:
@@ -37,18 +38,31 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, separate) :
             line = line[4:]
         elif line.startswith("category "):
             continue
+        # Now we know it's a tag line.
         parts = line.split(':')
         if len(parts) < 2:
             continue
         tags = parts[0].strip()
         # There may be several comma-separated tags here, but we
         # actually don't care about that for matching purposes.
+
+        for imgfile in parts[1].strip().split():
+            if not os.path.exists(os.path.join(d, imgfile)):
+                continue
+            if imgfile not in filetags.keys():
+                filetags[imgfile] = tags
+            else:
+                filetags[imgfile] += ', ' + tags
+
+    # Now we have a list of tagged files in the directory, and their tags.
+    for imgfile in filetags.keys():
+        tags = filetags[imgfile]
+
         if has_match(tags, orpats, andpats, notpats):
             if separate:
-                print line
+                print tags, ':', imgfile
             else:
-                for imgfile in parts[1].strip().split():
-                    print imgfile,
+                print imgfile,
 
 def has_match(tags, orpats, andpats, notpats):
     '''Do the tags contain any of the patterns in orpats,
@@ -62,6 +76,8 @@ def has_match(tags, orpats, andpats, notpats):
     for pat in andpats:
         if pat not in tags:
             return False
+    if not orpats:
+        return True
     for pat in orpats:
         if pat in tags:
             return True
