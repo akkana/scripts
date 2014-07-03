@@ -1,11 +1,42 @@
 A collection of useful scripts and snippets, in various languges.
 
+----------------
+Subdirectories:
+----------------
+
+jsjupiter:
+    My Jupiter's Moons Javascript web app: show the Galilean moons and
+    their shadows, and predict transits, shadow transits and eclipses.
+
+motioncam:
+    An automated motion-sensitive camera driver, for Raspberry Pi or
+    other machines. Requires pycamera module.
+
+pycamera:
+    A wrapper that can drive a Pi camera module, a USB webcam or an
+    external gphoto2-compatible camera using similar APIs.
+
+rpi:
+    Scripts for the Raspberry Pi. Mostly wrappers to talk to sensors.
+
+weather:
+    Some attempts at accessing various weather APIs and plotting
+    statistics.
+
+--------------------------
+Scripts in this directory:
+--------------------------
+
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
 aptver:
     Search for Debian packages, installed or uninstalled, matching
     a pattern, and print out versions and descriptions.
+
+balanceparens.py:
+    A very simple parenthesis (and brace and bracket) counter.
+    Why isn't there a better one already on Linux?
 
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
@@ -51,10 +82,6 @@ fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
 
-jsjupiter:
-    My Jupiter's Moons Javascript web app: show the Galilean moons and
-    their shadows, and predict transits, shadow transits and eclipses.
-
 langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).
@@ -72,6 +99,9 @@ masq:
 mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
+
+noblank:
+    Turn off screen blanking. Run this when you're giving a presentation.
 
 pathmatch:
     Search your executable path to find programs matching a string.
