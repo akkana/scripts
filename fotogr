@@ -11,78 +11,97 @@
 
 import sys, os, string
 
-def system_out (cmdstr) :
-    retlist = []
-    fp = os.popen(cmdstr)
-    while 1:
-        s = fp.readline()
-        if not s : break
-        retlist.append(s)
-    fp.close()
-    return retlist
+def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
+    '''Inside grepdirs, open files named Tags or Keywords.
+       Search those lines looking for matches in the keywords for pats.
+    '''
+    for d in grepdirs:
+        for root, dirs, files in os.walk(d) :
+            for f in files :
+                if f == "Tags" or f == "Keywords":
+                    search_for_keywords_in(root, f, orpats, andpats, notpats,
+                                           separate)
+                    break
+    print
 
-def search_for_keywords(opts, pat, grepdirs) :
-    matchfiles = []
-    for grepdir in grepdirs :
-        matches = system_out("find " + grepdir + \
-                             " \\( -name 'Keywords' -or -name 'Tags' \\) -print0 | xargs -0 grep -i '" \
-                             + pat + "' /dev/null")
-        # matches is an array of lines that are either empty, or look like this:
-        # ./missionpeak/Tags:dave: pict1166.jpg pict1167.jpg pict1168.jpg
-        for line in (matches) :
-            if opts.separate :
-                if line[0:2] == "./" :
-                    print line[2:]
-                else :
-                    print line
-                continue
+def search_for_keywords_in(d, f, orpats, andpats, notpats, separate) :
+    '''Search in d/f for lines matching or, and and not pats.
+       Those have lines in a format like:
+       [tag ]keyword, keyword: file.jpg file.jpg
+    '''
+    for line in open(os.path.join(d, f)):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("tag "):
+            line = line[4:]
+        elif line.startswith("category "):
+            continue
+        parts = line.split(':')
+        if len(parts) < 2:
+            continue
+        tags = parts[0].strip()
+        # There may be several comma-separated tags here, but we
+        # actually don't care about that for matching purposes.
+        if has_match(tags, orpats, andpats, notpats):
+            if separate:
+                print line
+            else:
+                for imgfile in parts[1].strip().split():
+                    print imgfile,
 
-            # print "Have a match: -", line, "-"
-            pieces = line.split(':')
-            #print "dir is", pieces[0], "middle", pieces[1], "rest", pieces[2]
-    
-            matchsplit = pieces[2].split()
-            #print "matchsplit", matchsplit
-    
-            subdir = os.path.normpath(os.path.dirname(pieces[0]))
-    
-            # Don't add "./" if . is the current path
-            if subdir == "." :
-                subdir = None
-            #print "subdir is", subdir
-    
-            for fil in matchsplit :
-                if subdir :
-                    fnam = os.path.join(subdir, fil)
-                else :
-                    fnam = fil
-    
-                # Only print files that actually exist and are readable:
-                if os.access(fnam, os.R_OK) :
-                    if fnam not in matchfiles :
-                        matchfiles.append(fnam)
-                    #print fnam,
+def has_match(tags, orpats, andpats, notpats):
+    '''Do the tags contain any of the patterns in orpats,
+       AND all of the patterns in andpats,
+       AND none of the patterns in notpats?
+    '''
+    #print "Looking for OR", orpats, "AND", andpats, "NOT", notpats, "IN", tags
+    for pat in notpats:
+        if pat in tags:
+            return False
+    for pat in andpats:
+        if pat not in tags:
+            return False
+    for pat in orpats:
+        if pat in tags:
+            return True
+    return False
 
-    for f in matchfiles :
-        print f,
+if __name__ == "__main__":
+    # Sadly, we can't use argparse if we want to be able to use -term
+    # to indicate "don't search for that term".
+    def Usage():
+        print '''Usage: %s [-s] condition [condition ...]
+Optional arguments:
+  -s, --separate  print separate lines from different tag files
 
-if __name__ == "__main__" :
-    from optparse import OptionParser
-    usage = "Usage: %prog [options] gpx_file(s)"
-    version = "%prog 0.2: search for photos with keywords.\n\
-Copyright 2009 by Akkana Peck; share and enjoy under the GPL v2 or later."
-    parser = OptionParser(usage=usage, version=version)
-    parser.add_option("-s", "--separate",
-                      action="store_true", dest="separate",
-                      help="print separate lines from different Keywords files")
-    (options, args) = parser.parse_args()
+Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.'''
+        sys.exit(0)
 
-    if len(args) == 0 :
-        parser.print_help()
-    elif len(args) == 1 :
-        search_for_keywords(options, args[0], [ "." ])
-    else :
-        search_for_keywords(options, args[0], args[1:])
+    args = sys.argv[1:]
+    if args[0] == '-h' or args[0] == '--help':
+        Usage()
+    if args[0] == '-s':
+        separate = True
+        args = args[1:]
+    else:
+        separate = False
 
+    # Args can include three types of patterns:
+    # 1. Starts with +: must be present.
+    # 2. Starts with -: must NOT be present.
+    # 3. Starts with neither: one of these (OR) must be present.
+    andpats = []
+    orpats  = []
+    notpats = []
+    for pat in args:
+        if pat[0] == '+':
+            andpats.append(pat[1:])
+        elif pat[0] == '-':
+            notpats.append(pat[1:])
+        else:
+            orpats.append(pat)
+
+    search_for_keywords(['.'], orpats, andpats, notpats, separate)
 
 
