@@ -88,10 +88,18 @@ if __name__ == "__main__":
     # to indicate "don't search for that term".
     def Usage():
         print '''Usage: %s [-s] condition [condition ...]
+
+Search for files matching patterns in Tags or Keywords files.
+
+Conditions can include three types of patterns:
+  1. Starts with +: must be present (AND).
+  2. Starts with -: must NOT be present (NOT).
+  3. Starts with neither: one of these must be present (OR).
+
 Optional arguments:
   -s, --separate  print separate lines from different tag files
 
-Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.'''
+Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0])
         sys.exit(0)
 
     args = sys.argv[1:]
@@ -103,10 +111,6 @@ Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''
     else:
         separate = False
 
-    # Args can include three types of patterns:
-    # 1. Starts with +: must be present.
-    # 2. Starts with -: must NOT be present.
-    # 3. Starts with neither: one of these (OR) must be present.
     andpats = []
     orpats  = []
     notpats = []
