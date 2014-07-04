@@ -429,8 +429,6 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="""Monitor a camera and snap photos when something has changed.
 
-Example: 
-
 Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
 
