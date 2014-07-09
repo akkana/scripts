@@ -6,32 +6,29 @@
 # Can be run from within a mailer like mutt, or independently
 # on a single message file.
 #
-# Usage: viewhtmlmail.py [mbox [tmpdir]]
-#    Defaults: /tmp/mutttmpbox, /tmp/viewhtmltmp
+# Usage: viewhtmlmail
 #
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
 #
 # Copyright 2013 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Changes:
+#   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
 
 # To use it from mutt, put the following lines in your .muttrc:
-# macro  index  <F10>  "<copy-message>/tmp/mutttmpbox\n<enter><shell-escape>~/bin/viewhtmlmail.py\n" "View HTML in browser"
-# macro  pager  <F10>  "<copy-message>/tmp/mutttmpbox\n<enter><shell-escape>~/bin/viewhtmlmail.py\n" "View HTML in browser"
+# macro  index  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
+# macro  pager  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
 
 import os, sys
 import re
 import time
 import shutil
 import email, mimetypes
+import tempfile
 
-def view_html_message(mbox, tmpdir):
+def view_html_message(tmpdir):
 
-    if not os.path.exists(tmpdir):
-        os.makedirs(tmpdir)
-
-    fp = open(mbox)
-    msg = email.message_from_file(fp)
-    fp.close()
+    msg = email.message_from_string(sys.stdin.read())
 
     html_part = None
     counter = 1
@@ -118,21 +115,13 @@ def view_html_message(mbox, tmpdir):
     fp.close()
 
     # Now we have the file. Call firefox on it.
-    print "Calling firefox -new-window file://" + htmlfile
+    print "Calling firefox for file://" + htmlfile
     os.system("firefox -new-window file://" + htmlfile)
 
     # Wait a while to make sure firefox has loads the imgaes, then clean up.
     time.sleep(6)
     shutil.rmtree(tmpdir)
-    os.unlink(mbox)
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        mbox = sys.argv[1]
-    else:
-        mbox = '/tmp/mutttmpbox'
-    if len(sys.argv) > 2:
-        tmpdir = sys.argv[2]
-    else:
-        tmpdir = '/tmp/viewhtmltmp'
-    view_html_message(mbox, tmpdir)
+    tmpdir = tempfile.mkdtemp()
+    view_html_message(tmpdir)
