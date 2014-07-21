@@ -11,7 +11,7 @@ def set_random_bg(bgdir, arg) :
     images = os.listdir(bgdir)
     while len(images) > 0 :
         img = random.choice(images)
-        if img.find('.') :
+        if img.find('.') >= 0 :
             print "Setting background to", os.path.join(bgdir, img)
             subprocess.call(['hsetroot', arg, os.path.join(bgdir, img)])
             sys.exit(0)
@@ -43,6 +43,7 @@ bgdir = os.path.join(basedir, '%dx%d' % (width, height))
 if os.path.exists(bgdir) :
     print bgdir, "exists: using it"
     set_random_bg(bgdir, '-fill')
+    sys.exit(0)
 
 # We don't have images at exactly the right resolution.
 # Try to find the closest match:
