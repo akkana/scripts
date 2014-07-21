@@ -47,12 +47,15 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, separate) :
         # actually don't care about that for matching purposes.
 
         for imgfile in parts[1].strip().split():
-            if not os.path.exists(os.path.join(d, imgfile)):
+            fullpath = os.path.join(d, imgfile)
+            if fullpath.startswith('./'):
+                fullpath = fullpath[2:]
+            if not os.path.exists(fullpath):
                 continue
             if imgfile not in filetags.keys():
-                filetags[imgfile] = tags
+                filetags[fullpath] = tags
             else:
-                filetags[imgfile] += ', ' + tags
+                filetags[fullpath] += ', ' + tags
 
     # Now we have a list of tagged files in the directory, and their tags.
     for imgfile in filetags.keys():
