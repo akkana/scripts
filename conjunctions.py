@@ -198,7 +198,7 @@ while d < end_date :
 
     observer.date = d
     sunset = observer.previous_setting(sun)
-    sunrise = observer.next_rising(sun)
+    # sunrise = observer.next_rising(sun)
     # print  "Sunset:", sunset, "  Sunrise:", sunrise
 
     visible_planets = []
