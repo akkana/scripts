@@ -7,32 +7,39 @@
 import sys, os, subprocess
 import random
 
-def set_random_bg(bgdir, arg) :
-    images = os.listdir(bgdir)
-    while len(images) > 0 :
-        img = random.choice(images)
-        if img.find('.') >= 0 :
-            print "Setting background to", os.path.join(bgdir, img)
-            subprocess.call(['hsetroot', arg, os.path.join(bgdir, img)])
-            sys.exit(0)
-    print "No images in", bgdir
-    sys.exit(1)
+def recursive_read(rootdir):
+    file_list = []
+    for root, dirs, files in os.walk(rootdir):
+        for filename in files:
+            # Exclude files without extensions, like Tags.
+            if '.' in filename:
+                file_list.append(os.path.join(rootdir, root, filename))
+    return file_list
+
+def set_random_bg(bgdir, arg):
+    images = recursive_read(bgdir)
+    if not images:
+        print "No images in", bgdir
+        sys.exit(1)
+    img = random.choice(images)
+    print "Setting background to", img
+    subprocess.call(['hsetroot', arg, img])
 
 # If the dir is specified explicitly, go ahead and do it.
-if len(sys.argv) > 1 :
+if len(sys.argv) > 1:
     set_random_bg(sys.argv[1], '-fill')
 
 # Find the current resolution:
 fp = os.popen("xdpyinfo")
-while True :
+while True:
     line = fp.readline().strip()
-    if line[0:11] == 'dimensions:' :
+    if line[0:11] == 'dimensions:':
         parts = line[12:].split()[0].split('x')
         width = int(parts[0])
         height = int(parts[1])
         break
 fp.close()
-if not width or not height :
+if not width or not height:
     print "Couldn't find screen dimensions!"
     sys.exit(1)
 
@@ -40,7 +47,7 @@ basedir = os.path.expanduser("~/Images/Backgrounds")
 bgdir = os.path.join(basedir, '%dx%d' % (width, height))
 
 # If the exact right directory exists, use it.
-if os.path.exists(bgdir) :
+if os.path.exists(bgdir):
     print bgdir, "exists: using it"
     set_random_bg(bgdir, '-fill')
     sys.exit(0)
@@ -50,17 +57,17 @@ if os.path.exists(bgdir) :
 print "Looking for the closest match"
 mindiff = 99999
 bgdir = None
-for d in os.listdir(basedir) :
-    try :
+for d in os.listdir(basedir):
+    try:
         parts = d.split('x')
-        if len(parts) == 2 :
+        if len(parts) == 2:
             w = int(parts[0])
             h = int(parts[1])
             diff = abs(w - width) + abs(h - height)
-            if diff < mindiff :
+            if diff < mindiff:
                 mindiff = diff
                 bgdir = os.path.join(basedir, d)
-    except :
+    except:
         continue
 
 print "Will use", bgdir
