@@ -33,15 +33,6 @@ import pycamera
 
 from PIL import Image
 
-# Unfortunately, we have to import RPi.GPIO here at the top level, before we've
-# parsed the arguments and know we need to use it for a PIR sensor,
-# because we need it in scope for everything.
-try:
-    import RPi.GPIO
-    imported_GPIO = True
-except ImportError:
-    imported_GPIO = False
-
 class MotionDetector:
     def __init__(self,
                  test_res=[320, 240], pir=None,
@@ -80,14 +71,9 @@ class MotionDetector:
                at all), or '-' (crop to match the test borders)
         '''
         if pir:
-            self.pir = pir
-            if not imported_GPIO:
-                print "PIR specified, but can't import RPi.GPIO!"
-                print
-                sys.exit(1)
-
-            RPi.GPIO.setmode(RPi.GPIO.BCM)
-            RPi.GPIO.setup(self.pir, RPi.GPIO.IN)
+            sys.path.insert(1, os.path.join(sys.path[0], '../rpi'))
+            import PIR_motion
+            self.pir = PIR_motion.PIR(pir)
         else:
             self.pir = None
 
@@ -107,7 +93,13 @@ class MotionDetector:
         self.verbose = verbose
         self.localdir = localdir
         self.remotedir = remotedir
-        self.full_res = full_res
+        if full_res:
+            if len(full_res) == 2:
+                self.full_res = full_res
+            else:
+                self.full_res = map(int, full_res.split('x'))
+        else:
+            self.full_res = None
 
         # Should we save debug images, so the user can tell where
         # the test region is and what's happening?
@@ -200,7 +192,7 @@ class MotionDetector:
         else:
             self.use_tmp_file = False
 
-    def loop(self, secs=5):
+    def loop(self, secs=1):
         '''Main loop detecting motion. The timeout you pass in here
            doesn't really matter; the RPi is so slow at taking photos
            and writing to ssh filesystems that you should expect
@@ -213,24 +205,21 @@ class MotionDetector:
             # we don't use bufold at all, so we can overload it
             # to indicate filename.
             self.bufold = None
-            self.snap_full_res(pin=self.pir)
+            self.snap_full_res()
             self.bufold = True
 
-            # Loop with a long timeout. snap_full_res will set up
-            # a callback so it will be called if the PIR device triggers.
-            while True:
-                print "Sleeping 300 seconds ..."
-                sys.stdout.flush()
-                time.sleep(300);
-        else:
-            while True:
-                self.step()
-                # flush stdout, since we may be logging to a file
-                # that we'll want to monitor.
-                sys.stdout.flush()
-                time.sleep(secs)
+        while True:
+            self.step()
+            # flush stdout, since we may be logging to a file.
+            sys.stdout.flush()
+            time.sleep(secs)
 
     def step(self):
+        if self.pir:
+            if self.pir.poll():
+                self.snap_full_res()
+            return
+
         if self.use_tmp_file:
             tmpfile = "/tmp/still.jpg"
             self.locam.take_still(outfile=tmpfile, res=test_res)
@@ -256,15 +245,11 @@ class MotionDetector:
         else:
             return self.localdir
 
-    def snap_full_res(self, pin=None):
-        # If there's been motion, snap a high-res photo.
-        # Turn PIR event detection off so we won't get events
-        # while we're busy processing a photo:
-        if self.pir:
-            RPi.GPIO.remove_event_detect(self.pir)
+    def snap_full_res(self):
+        '''If there's been motion, snap a high-res photo.'''
 
-        # Upload it if possible, otherwise save it locally.
-        # Check for that every time, since the network might go down.
+        # Use the remote directory if possible.
+        # But check for that every time, since the network might go down.
         snapdir = self.get_outdir()
         if not snapdir:
             print "Not snapping full resolution, couldn't get output dir"
@@ -328,15 +313,6 @@ class MotionDetector:
             print "Saving high-res to", snappath
 
         sys.stdout.flush()
-
-        # Turn PIR event detection back on:
-        if self.pir:
-            # Unfortunately, we sometimes get callbacks for
-            # falling edges despite specifying RISING.
-            # This seems to be a commonly reported problem with RPi.GPIO
-            # but may be fixed some day.
-            RPi.GPIO.add_event_detect(self.pir, RPi.GPIO.RISING,
-                                      callback=self.snap_full_res)
 
         return snappath
 
