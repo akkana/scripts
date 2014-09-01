@@ -17,7 +17,10 @@ min_alt = 10. * math.pi / 180.
 max_sep = 3.5 * math.pi / 180.
 
 # How little percent illuminated do we need to consider something a crescent?
-crescent_frac = 40
+crescent_percent = 40
+
+# Start and end times for seeing a crescent phase:
+crescents = { "Mercury": [ None, None ], "Venus": [ None, None ] }
 
 sun = ephem.Sun()
 
@@ -141,9 +144,9 @@ class Conjunction:
             print s
         else:
             print "Conjunction of", self.andjoin(self.bodies),
-            print "lasts from %s to %s" % (datestr(startdate), datestr(enddate))
+            print "lasts from %s to %s." % (datestr(startdate), datestr(enddate))
             for m in minseps:
-                print "  %s and %s are closest on %s (%s)" % \
+                print "  %s and %s are closest on %s (%s)." % \
                     (m[2], m[3], datestr(m[0]), sepstr(m[1]))
 
     def merge(self, conj):
@@ -210,9 +213,28 @@ def quotecsv(s):
         return '"' + s.replace('"', '""') + '"'
     return s
 
-def finish_planet(p, d, phase):
+def finish_planet(p, d):
     if not planets_up[p]:
         return
+
+    if p in descriptions.keys():
+        if output_csv:
+            isvis = quotecsv(descriptions[p])
+        else:
+            isvis = descriptions[p]
+    elif p == "Venus" or p == "Mercury":
+        isvis = p + " is visible in the early evening sky."
+    else:
+        isvis = p + " is visible."
+
+    # How about crescent info?
+    if p in crescents.keys():
+        if crescents[p][0]:
+            isvis += " A telescope will show a crescent from " \
+                     + datestr(crescents[p][0])
+            if crescents[p][1]:
+                isvis += " to " + datestr(crescents[p][1])
+        crescents[p] = [ None, None ]
 
     if output_csv:
         if p != 'Moon':
@@ -226,22 +248,12 @@ def finish_planet(p, d, phase):
                 cred = ""
                 w = ""
                 h = ""
-            if p in descriptions.keys():
-                isvis = quotecsv(descriptions[p])
-            elif p == "Venus" or p == "Mercury":
-                if phase < 35:
-                    isvis = p + " is visible in the early evening sky. A telescope will show it as a crescent"
-                else:
-                    isvis = p + " is visible in the early evening sky."
-            else:
-                isvis = p + " is visible."
+
             print "%s,%s,%s,,%s,,%s,%s,%s,%s" % \
                 (p, datestr(planets_up[p]), datestr(d), isvis,
                  img, w, h, cred)
     else:
-        print p, "visible from", \
-            datestr(planets_up[p]),\
-            "to", datestr(d)
+        print datestr(planets_up[p]), "to", datestr(d), ":", isvis
 
     planets_up[p] = None
 
@@ -257,8 +269,24 @@ def run(start, end, observer, toolate):
     if output_csv:
         print 'name,start,end,time,longname,URL,image,image width,image height,image credit'
     else:
-        print "Looking for planetary events between %s and %s" % \
+        print "Looking for planetary events between %s and %s:\n" % \
             (datestr(d), datestr(end))
+
+    def planet_is_up(planet, d):
+        global crescents
+        if not planets_up[planet.name]:
+            planets_up[planet.name] = d;
+        visible_planets.append(planet)
+
+        if planet.name not in crescents.keys():
+            return
+
+        # Is it a crescent? Update its crescent dates.
+        if planet.phase <= crescent_percent:   # It's a crescent now
+            if not crescents[planet.name][0]:
+                crescents[planet.name][0] = d
+            else:
+                crescents[planet.name][1] = d
 
     while d < end:
         observer.date = d
@@ -283,10 +311,7 @@ def run(start, end, observer, toolate):
             planet.compute(observer)
             # print planet.name, "alt at sunset:", planet.alt
             if planet.alt > min_alt:
-                if not planets_up[planet.name]:
-                    # print datestr(d), planet.name, "is already up at sunset"
-                    planets_up[planet.name] = d;
-                visible_planets.append(planet)
+                planet_is_up(planet, d)
 
             else:
                 # Try midnight
@@ -295,14 +320,11 @@ def run(start, end, observer, toolate):
                     observer.date += oneday
                 planet.compute(observer)
                 if planet.alt > min_alt:
-                    if not planets_up[planet.name]:
-                        # print datestr(d), planet.name, "rises before midnight"
-                        planets_up[planet.name] = d;
-                    visible_planets.append(planet)
+                    planet_is_up(planet, d)
 
                 # Planet is not up. Was it up yesterday?
                 elif planets_up[planet.name]:
-                    finish_planet(planet.name, d, planet.phase)
+                    finish_planet(planet.name, d)
 
         # print datestr(d), "visible planets:", \
         #     ' '.join([p.name for p in visible_planets])
@@ -330,18 +352,16 @@ def run(start, end, observer, toolate):
         d = ephem.date(d + oneday)
 
     for p in visible_planets:
-        finish_planet(p.name, d, p.phase)
+        finish_planet(p.name, d)
 
 if __name__ == '__main__':
-    global output_csv
-
     output_csv = False
 
     # Loop from start date to end date,
     # using a time of 10pm MST, which is 4am GMT the following day.
     start = ephem.date('2014/8/15 04:00')
     # end = ephem.date('2017/1/1')
-    end = ephem.date('2015/1/1')
+    end = ephem.date('2016/1/1')
     # For testing, this spans a Mars/Moon/Venus conjunction:
     # d = ephem.date('2015/2/10 04:00')
     # end = ephem.date('2015/3/10')
