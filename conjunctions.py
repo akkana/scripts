@@ -211,36 +211,39 @@ def quotecsv(s):
     return s
 
 def finish_planet(p, d, phase):
-    if planets_up[p]:
-        if output_csv:
-            if p != 'Moon':
-                if web_image[p]:
-                    img = web_image[p][0]
-                    cred = web_image[p][1]
-                    w = web_image[p][2]
-                    h = web_image[p][3]
+    if not planets_up[p]:
+        return
+
+    if output_csv:
+        if p != 'Moon':
+            if web_image[p]:
+                img = web_image[p][0]
+                cred = web_image[p][1]
+                w = web_image[p][2]
+                h = web_image[p][3]
+            else:
+                img = ""
+                cred = ""
+                w = ""
+                h = ""
+            if p in descriptions.keys():
+                isvis = quotecsv(descriptions[p])
+            elif p == "Venus" or p == "Mercury":
+                if phase < 35:
+                    isvis = p + " is visible in the early evening sky. A telescope will show it as a crescent"
                 else:
-                    img = ""
-                    cred = ""
-                    w = ""
-                    h = ""
-                if p in descriptions.keys():
-                    isvis = " " + quotecsv(descriptions[p])
-                elif p == "Venus" or p == "Mercury":
-                    if phase < 35:
-                        isvis = p + " is visible in the early evening sky. A telescope will show it as a crescent"
-                    else:
-                        isvis = p + " is visible in the early evening sky."
-                else:
-                    isvis = p + " is visible."
-                print "%s,%s,%s,,%s,,%s,%s,%s,%s" % \
-                    (p, datestr(planets_up[p]), datestr(d), isvis,
-                     img, w, h, cred)
-        else:
-            print p, "visible from", \
-                datestr(planets_up[p]),\
-                "to", datestr(d)
-        planets_up[planet.name] = None
+                    isvis = p + " is visible in the early evening sky."
+            else:
+                isvis = p + " is visible."
+            print "%s,%s,%s,,%s,,%s,%s,%s,%s" % \
+                (p, datestr(planets_up[p]), datestr(d), isvis,
+                 img, w, h, cred)
+    else:
+        print p, "visible from", \
+            datestr(planets_up[p]),\
+            "to", datestr(d)
+
+    planets_up[p] = None
 
 def run(start, end, observer, toolate):
     '''Find planetary visibility between dates start and end,
@@ -296,8 +299,9 @@ def run(start, end, observer, toolate):
                         # print datestr(d), planet.name, "rises before midnight"
                         planets_up[planet.name] = d;
                     visible_planets.append(planet)
-                else:
-                    # Planet is not up. Was it up yesterday?
+
+                # Planet is not up. Was it up yesterday?
+                elif planets_up[planet.name]:
                     finish_planet(planet.name, d, planet.phase)
 
         # print datestr(d), "visible planets:", \
@@ -330,14 +334,14 @@ def run(start, end, observer, toolate):
 
 if __name__ == '__main__':
     global output_csv
-    import datetime
 
-    output_csv = True
+    output_csv = False
 
     # Loop from start date to end date,
     # using a time of 10pm MST, which is 4am GMT the following day.
     start = ephem.date('2014/8/15 04:00')
-    end = ephem.date('2017/1/1')
+    # end = ephem.date('2017/1/1')
+    end = ephem.date('2015/1/1')
     # For testing, this spans a Mars/Moon/Venus conjunction:
     # d = ephem.date('2015/2/10 04:00')
     # end = ephem.date('2015/3/10')
