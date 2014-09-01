@@ -39,7 +39,7 @@ for planet in planets:
 
 def datestr(d):
     tup = d.tuple()
-    return "%d/%d/%d" % (tup[1], tup[2], tup[0])
+    return "%d/%d/%d" % (tup[0], tup[1], tup[2])
 
 def sepstr(sep):
     deg = float(sep) * 180. / math.pi
@@ -234,6 +234,7 @@ def finish_planet(p, d):
                      + datestr(crescents[p][0])
             if crescents[p][1]:
                 isvis += " to " + datestr(crescents[p][1])
+            isvis += '.'
         crescents[p] = [ None, None ]
 
     if output_csv:
@@ -272,14 +273,21 @@ def run(start, end, observer, toolate):
         print "Looking for planetary events between %s and %s:\n" % \
             (datestr(d), datestr(end))
 
-    def planet_is_up(planet, d):
-        global crescents
+    def check_if_planet_up(planet, d):
+        '''If the planet is currently up, do housekeeping to remember
+           that status, then return True if it's up, False otherwise.
+        '''
+        global crescents, planets_up
+
+        if planet.alt < min_alt:    # planet is not up
+            return False
+
         if not planets_up[planet.name]:
             planets_up[planet.name] = d;
         visible_planets.append(planet)
 
         if planet.name not in crescents.keys():
-            return
+            return True
 
         # Is it a crescent? Update its crescent dates.
         if planet.phase <= crescent_percent:   # It's a crescent now
@@ -287,6 +295,8 @@ def run(start, end, observer, toolate):
                 crescents[planet.name][0] = d
             else:
                 crescents[planet.name][1] = d
+
+        return True
 
     while d < end:
         observer.date = d
@@ -310,21 +320,16 @@ def run(start, end, observer, toolate):
             observer.date = sunset
             planet.compute(observer)
             # print planet.name, "alt at sunset:", planet.alt
-            if planet.alt > min_alt:
-                planet_is_up(planet, d)
-
-            else:
-                # Try midnight
+            if not check_if_planet_up(planet, observer.date):
+                # If it's not up at sunset, try midnight
                 observer.date = midnight
                 if observer.date < sunset:
                     observer.date += oneday
                 planet.compute(observer)
-                if planet.alt > min_alt:
-                    planet_is_up(planet, d)
-
-                # Planet is not up. Was it up yesterday?
-                elif planets_up[planet.name]:
-                    finish_planet(planet.name, d)
+                if not check_if_planet_up(planet, observer.date):
+                    # Planet is not up. Was it up yesterday?
+                    if planets_up[planet.name]:
+                        finish_planet(planet.name, observer.date)
 
         # print datestr(d), "visible planets:", \
         #     ' '.join([p.name for p in visible_planets])
@@ -355,13 +360,26 @@ def run(start, end, observer, toolate):
         finish_planet(p.name, d)
 
 if __name__ == '__main__':
-    output_csv = False
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "-c":
+        output_csv = True
+        sys.argv = sys.argv[1:]
+    else:
+        output_csv = False
+
+    if len(sys.argv) > 1:
+        start = ephem.date(sys.argv[1])
+    else:
+        start = ephem.date('2014/8/15 04:00')
+    if len(sys.argv) > 2:
+        end = ephem.date(sys.argv[2])
+    else:
+        end = ephem.date('2017/1/1')
 
     # Loop from start date to end date,
     # using a time of 10pm MST, which is 4am GMT the following day.
-    start = ephem.date('2014/8/15 04:00')
-    # end = ephem.date('2017/1/1')
-    end = ephem.date('2016/1/1')
+    # end = ephem.date('2016/1/1')
     # For testing, this spans a Mars/Moon/Venus conjunction:
     # d = ephem.date('2015/2/10 04:00')
     # end = ephem.date('2015/3/10')
