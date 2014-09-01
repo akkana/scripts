@@ -7,6 +7,7 @@
 import ephem
 import math
 
+verbose = False
 output_csv = True
 
 # How low can a planet be at sunset or midnight before it's not interesting?
@@ -14,6 +15,9 @@ min_alt = 10. * math.pi / 180.
 
 # How close do two bodies have to be to consider it a conjunction?
 max_sep = 3.5 * math.pi / 180.
+
+# How little percent illuminated do we need to consider something a crescent?
+crescent_frac = 40
 
 sun = ephem.Sun()
 
@@ -30,20 +34,6 @@ planets_up = {}
 for planet in planets:
     planets_up[planet.name] = None
 
-observer = ephem.Observer()
-observer.name = "Los Alamos"
-observer.lon = '-106.2978'
-observer.lat = '35.8911'
-observer.elevation = 2286  # meters, though the docs don't actually say
-
-# Loop from start date to end date,
-# using a time of 10pm MST, which is 4am GMT the following day.
-d = ephem.date('2014/8/15 04:00')
-end_date = ephem.date('2017/1/1')
-# For testing, this spans a Mars/Moon/Venus conjunction:
-# d = ephem.date('2015/2/10 04:00')
-# end_date = ephem.date('2015/3/10')
-
 def datestr(d):
     tup = d.tuple()
     return "%d/%d/%d" % (tup[1], tup[2], tup[0])
@@ -55,12 +45,6 @@ def sepstr(sep):
     # if deg < 1.:
     #     return "less than a degree (%.2f)" % deg
     return "%.1f deg" % deg
-
-if output_csv:
-    print 'name,start,end,time,longname,URL,image,image width,image height,image credit'
-else:
-    print "Looking for planetary events between %s and %s" % (datestr(d),
-                                                              datestr(end_date))
 
 class ConjunctionPair:
     '''A conjunction between a pair of objects'''
@@ -215,7 +199,18 @@ web_image = {
     "Saturn" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Saturn_%28planet%29_large.jpg/384px-Saturn_%28planet%29_large.jpg", "Voyager 2", 192, 240)
 }
 
-def finish_planet(p, d):
+descriptions = {
+    "Mars": "Mars is visible as a bright, reddish \"star\".",
+    "Saturn": "Saturn is visible. A small telescope will show its rings.",
+    "Jupiter": "Jupiter is visible. With binoculars you can see its four brightest moons."
+    }
+
+def quotecsv(s):
+    if ',' in s or '"' in s:
+        return '"' + s.replace('"', '""') + '"'
+    return s
+
+def finish_planet(p, d, phase):
     if planets_up[p]:
         if output_csv:
             if p != 'Moon':
@@ -229,87 +224,139 @@ def finish_planet(p, d):
                     cred = ""
                     w = ""
                     h = ""
-                if p == "Venus" or p == "Mercury":
-                    isvis = " is visible in the early evening sky"
+                if p in descriptions.keys():
+                    isvis = " " + quotecsv(descriptions[p])
+                elif p == "Venus" or p == "Mercury":
+                    if phase < 35:
+                        isvis = p + " is visible in the early evening sky. A telescope will show it as a crescent"
+                    else:
+                        isvis = p + " is visible in the early evening sky."
                 else:
-                    isvis = " is visible"
+                    isvis = p + " is visible."
                 print "%s,%s,%s,,%s,,%s,%s,%s,%s" % \
-                    (p, datestr(planets_up[p]), datestr(d), p + isvis,
+                    (p, datestr(planets_up[p]), datestr(d), isvis,
                      img, w, h, cred)
         else:
             print p, "visible from", \
                 datestr(planets_up[p]),\
                 "to", datestr(d)
         planets_up[planet.name] = None
-    
-conjunctions = ConjunctionList()
-while d < end_date :
-    #for planet in planets:
-    #    planet.compute(observer)
 
-    observer.date = d
-    sunset = observer.previous_setting(sun)
-    # sunrise = observer.next_rising(sun)
-    # print  "Sunset:", sunset, "  Sunrise:", sunrise
+def run(start, end, observer, toolate):
+    '''Find planetary visibility between dates start and end,
+       for an observer whose location has been set,
+       between sunset and "toolate" on each date, where toolate is a GMT hour,
+       e.g. toolate=7 means we'll stop at 0700 GMT or midnight MDT.
+    '''
+    d = start
+    conjunctions = ConjunctionList()
 
-    midnight = list(observer.date.tuple())
-    midnight[3:6] = [7, 0, 0]
-    midnight = ephem.date(tuple(midnight))
+    if output_csv:
+        print 'name,start,end,time,longname,URL,image,image width,image height,image credit'
+    else:
+        print "Looking for planetary events between %s and %s" % \
+            (datestr(d), datestr(end))
 
-    visible_planets = []
-    for planet in planets:
-        # A planet is observable this evening (not morning)
-        # if its altitude at sunset OR its altitude at midnight
-        # is greater than a threshold, which we'll set at 10 degrees.
-        observer.date = sunset
-        planet.compute(observer)
-        # print planet.name, "alt at sunset:", planet.alt
-        if planet.alt > min_alt:
-            if not planets_up[planet.name]:
-                # print datestr(d), planet.name, "is already up at sunset"
-                planets_up[planet.name] = d;
-            visible_planets.append(planet)
+    while d < end:
+        observer.date = d
+        sunset = observer.previous_setting(sun)
+        # sunrise = observer.next_rising(sun)
+        # print  "Sunset:", sunset, "  Sunrise:", sunrise
 
-        else:
-            # Try midnight
-            observer.date = midnight
-            if observer.date < sunset:
-                observer.date += oneday
+        midnight = list(observer.date.tuple())
+        midnight[3:6] = [toolate, 0, 0]
+        midnight = ephem.date(tuple(midnight))
+
+        # We have two lists of planets: planets_up and visible_planets.
+        # planets_up is a dictionary of the time we first saw each planet
+        # in its current apparition. It's global, and used by finish_planet.
+        # visible_planets is a list of planets currently visible.
+        visible_planets = []
+        for planet in planets:
+            # A planet is observable this evening (not morning)
+            # if its altitude at sunset OR its altitude at midnight
+            # is greater than a threshold, which we'll set at 10 degrees.
+            observer.date = sunset
             planet.compute(observer)
+            # print planet.name, "alt at sunset:", planet.alt
             if planet.alt > min_alt:
                 if not planets_up[planet.name]:
-                    # print datestr(d), planet.name, "will rise before midnight"
+                    # print datestr(d), planet.name, "is already up at sunset"
                     planets_up[planet.name] = d;
                 visible_planets.append(planet)
+
             else:
-                # Planet is not up. Was it up yesterday?
-                finish_planet(planet.name, d)
+                # Try midnight
+                observer.date = midnight
+                if observer.date < sunset:
+                    observer.date += oneday
+                planet.compute(observer)
+                if planet.alt > min_alt:
+                    if not planets_up[planet.name]:
+                        # print datestr(d), planet.name, "rises before midnight"
+                        planets_up[planet.name] = d;
+                    visible_planets.append(planet)
+                else:
+                    # Planet is not up. Was it up yesterday?
+                    finish_planet(planet.name, d, planet.phase)
 
-    # print datestr(d), "visible planets:", \
-    #     ' '.join([p.name for p in visible_planets])
-    # print "planets_up:", planets_up
+        # print datestr(d), "visible planets:", \
+        #     ' '.join([p.name for p in visible_planets])
+        # print "planets_up:", planets_up
 
-    # Done with computing visible_planets.
-    # Now look for conjunctions, anything closer than 5 degrees.
-    # Split the difference, use a time halfway between sunset and midnight.
-    saw_conjunction = False
-    observer.date = ephem.date((sunset + midnight)/2)
-    if len(visible_planets) > 1:
-        for p, planet in enumerate(visible_planets):
-            for planet2 in visible_planets[p+1:]:
-                sep = ephem.separation(planet, planet2)
-                if sep <= max_sep:
-                    # print datestr(observer.date), planet.name, \
-                    #     planet2.name, sepstr(sep)
-                    conjunctions.add(planet.name, planet2.name,
-                                     observer.date, sep)
-                    saw_conjunction = True
-    if not saw_conjunction:
-        conjunctions.closeout()
+        # Done with computing visible_planets.
+        # Now look for conjunctions, anything closer than 5 degrees.
+        # Split the difference, use a time halfway between sunset and midnight.
+        saw_conjunction = False
+        observer.date = ephem.date((sunset + midnight)/2)
+        if len(visible_planets) > 1:
+            for p, planet in enumerate(visible_planets):
+                for planet2 in visible_planets[p+1:]:
+                    sep = ephem.separation(planet, planet2)
+                    if sep <= max_sep:
+                        # print datestr(observer.date), planet.name, \
+                        #     planet2.name, sepstr(sep)
+                        conjunctions.add(planet.name, planet2.name,
+                                         observer.date, sep)
+                        saw_conjunction = True
+        if not saw_conjunction:
+            conjunctions.closeout()
 
-    # Add a day:
-    d = ephem.date(d + oneday)
+        # Add a day:
+        d = ephem.date(d + oneday)
 
-for p in visible_planets:
-    finish_planet(p.name, d)
+    for p in visible_planets:
+        finish_planet(p.name, d, p.phase)
+
+if __name__ == '__main__':
+    global output_csv
+    import datetime
+
+    output_csv = True
+
+    # Loop from start date to end date,
+    # using a time of 10pm MST, which is 4am GMT the following day.
+    start = ephem.date('2014/8/15 04:00')
+    end = ephem.date('2017/1/1')
+    # For testing, this spans a Mars/Moon/Venus conjunction:
+    # d = ephem.date('2015/2/10 04:00')
+    # end = ephem.date('2015/3/10')
+
+    observer = ephem.Observer()
+    observer.name = "Los Alamos"
+    observer.lon = '-106.2978'
+    observer.lat = '35.8911'
+    observer.elevation = 2286  # meters, though the docs don't actually say
+
+    # What hour GMT corresponds to midnight here?
+    # Note: we're not smart about time zones. This will calculate
+    # a time based on the time zone offset right now, whether we're
+    # currently in DST or not.
+    # And for now we don't even calculate it, just hardwire it.
+    midnight = 7
+
+    try:
+        run(start, end, observer, midnight)
+    except KeyboardInterrupt:
+        print "Interrupted"
 
