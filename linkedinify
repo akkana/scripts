@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+
+# Take a LinkedIn URL in the PRIMARY selection,
+# remove any newlines, fix the errors LinkedIn makes (entity substitution)
+# and add infinite pagination.
+# Then call Firefox on the fixed URL.
+
+import sys
+import subprocess
+import gtk
+
+primary = gtk.clipboard_get(gtk.gdk.SELECTION_PRIMARY)
+if not primary.wait_is_text_available() :
+    sys.exit(0)
+link = primary.wait_for_text()
+
+link = link.replace("\n", "").replace("&amp;", "&") + \
+       "&amp;count=1000&amp;paginationToken="
+
+if len(sys.argv) > 1 and (sys.argv[1] == '-s' or sys.argv[1] == '--same-tab'):
+    subprocess.call(["firefox", link])
+else:
+    subprocess.call(["firefox", "-new-tab", link])
+
