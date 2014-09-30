@@ -197,7 +197,7 @@ web_image = {
     "Moon" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Phase-088.jpg/240px-Phase-088.jpg", '''"<a href='http://commons.wikimedia.org/wiki/User:JayTanner/gallery'>Jay Tanner</a>"''', 240, 240),
     "Mercury" : ("../resources/astronomy/mercury.jpg", "", 240, 182),
     "Venus" : ("../resources/astronomy/venus.jpg", "", 240, 192),
-    "Mars" : ("http://upload.wikimedia.org/wikipedia/commons/7/76/Mars_Hubble.jpg", "Hubble Space Telescope", 240, 240),
+    "Mars" : ("http://imgsrc.hubblesite.org/hu/db/images/hs-2001-24-a-small_web.jpg,200,200", "Hubble Space Telescope", 200, 200),
     "Jupiter" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Jupiter.jpg/240px-Jupiter.jpg", '"USGS, JPL and NASA"', 240, 240),
     "Saturn" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Saturn_%28planet%29_large.jpg/384px-Saturn_%28planet%29_large.jpg", "Voyager 2", 192, 240)
 }
