@@ -47,7 +47,6 @@ lang = sys.argv[1]
 
 # After the language, any flag argument plus the grep pattern
 # gets appended to args -- these will be the grep args.
-print "argv:", sys.argv
 patindex = 0
 for i in range(2, len(sys.argv)) :
     if sys.argv[i][0] != '-' :
@@ -58,7 +57,6 @@ args = sys.argv[2:patindex]
 # Now args are the arguments passed to grep;
 # the file list, if any, is sys.argv[patindex+1:]
 # If no file list, use ~/bin/*
-print "argv is len", len(sys.argv), ", patindex is", patindex
 if patindex >= len(sys.argv):
     os.chdir(os.path.join(os.getenv("HOME"), "bin"))
     files = os.listdir(".")
