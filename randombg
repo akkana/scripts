@@ -12,8 +12,11 @@ def recursive_read(rootdir):
     for root, dirs, files in os.walk(rootdir):
         for filename in files:
             # Exclude files without extensions, like Tags.
-            if '.' in filename:
-                file_list.append(os.path.join(rootdir, root, filename))
+            if filename.startswith("Tags"):
+                continue
+            if '.' not in filename:
+                continue
+            file_list.append(os.path.join(rootdir, root, filename))
     return file_list
 
 def set_random_bg(bgdir, arg):
@@ -70,6 +73,5 @@ for d in os.listdir(basedir):
     except:
         continue
 
-print "Will use", bgdir
 set_random_bg(bgdir, '-fill')
 
