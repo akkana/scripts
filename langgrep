@@ -45,30 +45,35 @@ if len(sys.argv) < 3 :
     Usage()
 lang = sys.argv[1]
 
-args = ""
+# After the language, any flag argument plus the grep pattern
+# gets appended to args -- these will be the grep args.
+print "argv:", sys.argv
+patindex = 0
 for i in range(2, len(sys.argv)) :
-    if sys.argv[i][0] == '-' :
-        args = args + " " + sys.argv[i]
-    else :
-        args = args + " " + sys.argv[i]
+    if sys.argv[i][0] != '-' :
+        patindex = i+1
         break
+args = sys.argv[2:patindex]
 
-# Now sys.argv[i:] is the file list, if any.
-# If none, substitute ~/bin/*
-if i >= len(sys.argv) - 1 :
+# Now args are the arguments passed to grep;
+# the file list, if any, is sys.argv[patindex+1:]
+# If no file list, use ~/bin/*
+print "argv is len", len(sys.argv), ", patindex is", patindex
+if patindex >= len(sys.argv):
     os.chdir(os.path.join(os.getenv("HOME"), "bin"))
     files = os.listdir(".")
 else :
-    files = sys.argv[i:]
+    files = sys.argv[patindex:]
 
 try :
     for fil in files :
         if check_file_lang(fil, lang) :
             #os.system("grep -H" + args + " " + fil)
             arglist = ['grep', '-H']
-            arglist.extend(shlex.split(args))
+            arglist.extend(args)
             arglist.append(fil)
             subprocess.call(arglist)
+
 # Try to catch ctrl-C and print a nicer message. This doesn't work, though:
 # subprocess.call just terminates the whole process.
 except KeyboardInterrupt, e :
