@@ -17,9 +17,12 @@ if curses.has_colors():
     curses.start_color()
     curses.use_default_colors()
     curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_CYAN)
+    curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
     colorpair = curses.color_pair(1)
+    highlightpair = curses.color_pair(2)
 else:
     colorpair = curses.A_REVERSE
+    highlightpair = curses.A_BOLD
 
 def cleanup():
     curses.nocbreak()
@@ -44,7 +47,7 @@ attributes = [0] * (maxnum+2)
 logf = open("/tmp/sieve.log", "w", buffering=1)
 print >>logf, "Maxnum is", maxnum
 
-def redraw_screen():
+def redraw_screen(highlight=None):
     num = 0
     while True:
         num += 1
@@ -58,7 +61,11 @@ def redraw_screen():
         print >>logf, "'%s' @ (%d, %d) " % (fmt % num, x, y),
         #errstr += "'%s' @ (%d, %d) " % (fmt % num, x, y)
         #errstr += "\nstdscr.addstr(%d, %d, '%s')" % (y, x, fmt % num)
-        stdscr.addstr(y, x, fmt % num, attributes[num])
+        if highlight == num:
+            stdscr.addstr(y, x, fmt % num, highlightpair)
+        else:
+            stdscr.addstr(y, x, fmt % num, attributes[num])
+
     stdscr.refresh()
     print >>logf, "Refreshed"
     return num
@@ -76,13 +83,13 @@ try:
         print >>logf, divisor, "is prime"
 
         for i in xrange(1, maxnum):
-            if i % divisor == 0:
+            if i > divisor and i % divisor == 0:
                 print >>logf, "Setting attribute for", i
                 attributes[i] = colorpair
 
         print >>logf, "Finished setting attributes for", divisor
 
-        redraw_screen()
+        redraw_screen(highlight=divisor)
         key = stdscr.getch()
         
 except Exception, e:
