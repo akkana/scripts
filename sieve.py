@@ -12,6 +12,14 @@ fmt = '%%%dd' % numwidth
 stdscr = curses.initscr()
 curses.noecho()
 curses.cbreak()
+#if curses.can_change_color():
+if curses.has_colors():
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_CYAN)
+    colorpair = curses.color_pair(1)
+else:
+    colorpair = curses.A_REVERSE
 
 def cleanup():
     curses.nocbreak()
@@ -19,10 +27,8 @@ def cleanup():
     curses.echo()
     curses.endwin()
 
-    print "\nWindow size was", width, "x", height
     if errstr:
         print "Errors:", errstr
-    else: print "No errors"
     sys.exit(0)
 
 height, width = stdscr.getmaxyx()
@@ -68,10 +74,12 @@ try:
             divisor += 1
             print >>logf, "divisor++ to", divisor
         print >>logf, divisor, "is prime"
+
         for i in xrange(1, maxnum):
             if i % divisor == 0:
                 print >>logf, "Setting attribute for", i
-                attributes[i] = curses.A_REVERSE
+                attributes[i] = colorpair
+
         print >>logf, "Finished setting attributes for", divisor
 
         redraw_screen()
