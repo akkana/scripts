@@ -48,6 +48,10 @@ chatsounds.py:
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
 
+conjunctions.py:
+    Predict planetary visibility and conjunctions for a specified
+    date range.
+
 countsyl:
     Count likely syllables in words, giving best guess and likely max.
 
@@ -151,6 +155,10 @@ readkey.py:
 serio:
     A proof-of-concept serial terminal app in Python.
     Don't take this seriously; it's not meant as a real app (yet?)
+
+sieve.py:
+    Visualization of the Sieve of Eratosthenes, using Python curses.
+    (Not very useful, but makes a good curses example.)
 
 shorturl:
     Use a URL shortening service to get a shorter URL.
