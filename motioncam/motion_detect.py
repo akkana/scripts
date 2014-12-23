@@ -35,7 +35,7 @@ from PIL import Image
 
 class MotionDetector:
     def __init__(self,
-                 test_res=[320, 240], pir=None,
+                 test_res=[320, 240], pir=None, rangefinder=False,
                  threshold=30, sensitivity=20,
                  test_borders=None, full_res=None,
                  localdir=None, remotedir=None,
@@ -70,12 +70,17 @@ class MotionDetector:
            crop: you may pass in a WxH+X+Y specifier, False (don't crop
                at all), or '-' (crop to match the test borders)
         '''
-        if pir:
+        self.pir = None
+        self.rangefinder = False
+        if rangefinder or pir:
             sys.path.insert(1, os.path.join(sys.path[0], '../rpi'))
+        if rangefinder:
+            import HC_SR04
+            print "Imported HC_SR04"
+            self.rangefinder = HC_SR04.HC_SR04()
+        if pir:
             import PIR_motion
             self.pir = PIR_motion.PIR(pir)
-        else:
-            self.pir = None
 
         self.test_res = test_res
 
@@ -192,6 +197,13 @@ class MotionDetector:
         else:
             self.use_tmp_file = False
 
+    def cleanup(self):
+        if self.pir or self.rangefinder:
+            import RPi.GPIO as GPIO
+            if self.verbose:
+                print "Cleaning up GPIO"
+            GPIO.cleanup()
+
     def loop(self, secs=1):
         '''Main loop detecting motion. The timeout you pass in here
            doesn't really matter; the RPi is so slow at taking photos
@@ -199,7 +211,7 @@ class MotionDetector:
            at least 10 seconds per loop in overhead, on top of any
            delay you pass in.
         '''
-        if self.pir:
+        if self.pir or self.rangefinder:
             # snap_full_res uses bufold to decide whether this is
             # the first image or not. If we're using a PIR sensor,
             # we don't use bufold at all, so we can overload it
@@ -215,6 +227,16 @@ class MotionDetector:
             time.sleep(secs)
 
     def step(self):
+
+        if self.rangefinder:
+            dist = self.rangefinder.measure_distance_in()
+            if self.verbose:
+                print "Distance:", dist
+                sys.stdout.flush()
+            if dist < 100:
+                self.snap_full_res()
+            return
+
         if self.pir:
             if self.pir.poll():
                 self.snap_full_res()
@@ -424,9 +446,6 @@ at the specified resolution.""")
                         help="""Borders of the test region we'll monitor.
 A colon-separated list of wxh+x+y identifiers.
 E.g. 100x50:5:20:100x50:200:150""")
-    parser.add_argument("-p", "--pir", type=int,
-                        help="""Use a PIR motion sensor instead of a test image.
-Specify Raspberry Pi pin number, e.g. 7.""")
 
     # --crop can either be omitted (don't crop at all), included without
     # an additional argument (crop to the test border boundaries),
@@ -440,6 +459,14 @@ You can specify a crop region as WxH+0+0 (with the coordinates relative
 to the test image size, not the final image size).
 Specifying -c - or omitting the region specifier will result in
 a crop to the boundaries of the test region.""")
+
+    parser.add_argument("-p", "--pir", type=int,
+                        help="""Use a PIR motion sensor instead of a test image.
+Specify Raspberry Pi pin number, e.g. 7.""")
+    parser.add_argument("-R", "--rangefinder",
+                        action='store_true', default=False,
+                        help="""Use a HC_SR04 rangefinder.
+Assumes pins 23 for trigger, 24 for echo.""")
 
     parser.add_argument("-v", "--verbose", action='store_true', default=False,
         help="Verbose: chatter about what the program is doing.")
@@ -467,7 +494,9 @@ a crop to the boundaries of the test region.""")
         return parsed_res
 
     test_res = resparse(args.resolution, [320, 240])
-    if args.pir:
+    if args.rangefinder:
+        print "Using a rangefinder on pins 23 and 24 instead of test image"
+    elif args.pir:
         print "Using pir sensor on pin %d instead of test image" % args.pir
     else:
         print "Using test resolution of", test_res
@@ -527,7 +556,8 @@ a crop to the boundaries of the test region.""")
                 print '  %s not specified' % param
         print
 
-    md = MotionDetector(test_res=test_res, pir=args.pir,
+    md = MotionDetector(test_res=test_res,
+                        pir=args.pir, rangefinder=args.rangefinder,
                         threshold=args.threshold, sensitivity=args.sensitivity,
                         test_borders=test_borders,
                         full_res=args.fullres,
@@ -540,4 +570,5 @@ a crop to the boundaries of the test region.""")
 
     except KeyboardInterrupt:
         print "Interrupt: exiting"
+        md.cleanup()
 
