@@ -35,68 +35,65 @@
 import RPi.GPIO as GPIO
 import time
 
-GPIO_TRIGGER = 23
-GPIO_ECHO    = 24
+class HC_SR04:
+    def __init__(self, trigger=23, echo=24):
+        self.GPIO_TRIGGER = trigger
+        self.GPIO_ECHO    = echo
 
-def init_HC_SR04():
-    '''Call this once at the beginning of the script
-       before measuring any distances.
-    '''
-    
-    # Use BCM instead of physical pin numbering:
-    GPIO.setmode(GPIO.BCM)
+        # Use BCM instead of physical pin numbering:
+        GPIO.setmode(GPIO.BCM)
 
-    # Set trigger and echo pins as output and input
-    GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
-    GPIO.setup(GPIO_ECHO, GPIO.IN)
+        # Set trigger and echo pins as output and input
+        GPIO.setup(self.GPIO_TRIGGER, GPIO.OUT)
+        GPIO.setup(self.GPIO_ECHO, GPIO.IN)
 
-    # Initialize trigger to low:
-    GPIO.output(GPIO_TRIGGER, False)
+        # Initialize trigger to low:
+        GPIO.output(self.GPIO_TRIGGER, False)
 
-def measure_distance_cm(verbose=False):
-    '''Measure a single distance, in cemtimeters.
-    '''
-    return measure_distance_in(verbose) * 2.54
+    def measure_distance_cm(self, verbose=False):
+        '''Measure a single distance, in cemtimeters.
+        '''
+        return self.measure_distance_in(verbose) * 2.54
 
-def measure_distance_in(verbose=False):
-    '''Measure a single distance, in inches.
-    '''
-    if verbose:
-        print "Sending trigger pulse ..."
-    GPIO.output(GPIO_TRIGGER, True)
-    time.sleep(0.00001)
-    GPIO.output(GPIO_TRIGGER, False)
-    if verbose:
-        print "Waiting for ECHO to go low:"
+    def measure_distance_in(self, verbose=False):
+        '''Measure a single distance, in inches.
+        '''
+        if verbose:
+            print "Sending trigger pulse ..."
+        GPIO.output(self.GPIO_TRIGGER, True)
+        time.sleep(0.00001)
+        GPIO.output(self.GPIO_TRIGGER, False)
+        if verbose:
+            print "Waiting for ECHO to go low:"
 
-    start = time.time()
-    while GPIO.input(GPIO_ECHO) == 0:
         start = time.time()
+        while GPIO.input(self.GPIO_ECHO) == 0:
+            start = time.time()
 
-    if verbose:
-        print "Waiting for ECHO to go high:"
-    stop = time.time()
-    while GPIO.input(GPIO_ECHO) == 1:
+        if verbose:
+            print "Waiting for ECHO to go high:"
         stop = time.time()
-    if verbose:
-        print "Got the echo."
+        while GPIO.input(self.GPIO_ECHO) == 1:
+            stop = time.time()
+        if verbose:
+            print "Got the echo."
 
-    # Convert to inches:
-    return (((stop - start) * 34300)/2)*0.393701
+        # Convert to inches:
+        return (((stop - start) * 34300)/2)*0.393701
 
-def average_distance(samples=3, verbose=False):
-    tot = 0.0
-    for i in xrange(samples):
-        tot += measure_distance_in(verbose)
-        time.sleep(0.1)
-    return tot / samples
+    def average_distance_in(self, samples=3, verbose=False):
+        tot = 0.0
+        for i in xrange(samples):
+            tot += self.measure_distance_in(verbose)
+            time.sleep(0.1)
+        return tot / samples
 
 if __name__ == '__main__':
     try:
         print "Initializing the rangefinder ..."
-        init_HC_SR04()
+        rf = HC_SR04()
         while True:
-            print "Distance: %.1f inches" % average_distance(verbose=True)
+            print "Distance: %.1f inches" % rf.average_distance(verbose=True)
             time.sleep(1)
     except KeyboardInterrupt:
         # User pressed CTRL-C: reset GPIO settings.
