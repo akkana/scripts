@@ -36,7 +36,7 @@ from PIL import Image
 class MotionDetector:
     def __init__(self,
                  test_res=[320, 240], pir=None, rangefinder=False,
-                 threshold=30, sensitivity=20,
+                 threshold=30, sensitivity=0,
                  test_borders=None, full_res=None,
                  localdir=None, remotedir=None,
                  crop=False, verbose=0):
@@ -70,34 +70,49 @@ class MotionDetector:
            crop: you may pass in a WxH+X+Y specifier, False (don't crop
                at all), or '-' (crop to match the test borders)
         '''
+        self.verbose = verbose
+        self.localdir = localdir
+        self.remotedir = remotedir
+
+        # Do we have any sensors specified?
         self.pir = None
         self.rangefinder = False
         if rangefinder or pir:
             sys.path.insert(1, os.path.join(sys.path[0], '../rpi'))
         if rangefinder:
             import HC_SR04
-            print "Imported HC_SR04"
             self.rangefinder = HC_SR04.HC_SR04()
         if pir:
             import PIR_motion
             self.pir = PIR_motion.PIR(pir)
 
-        self.test_res = test_res
+        # If sensitivity is nonzero, then we're using image detection.
+        # Otherwise we don't need things like threshold, test_res, etc.
+        if sensitivity:
+            self.test_res = test_res
 
-	# We must have threshold and sensitivity, even if they're
-	# passed in as None. So repeat the default arguments here.
-	# XXX Ugh -- there must be a cleaner way to do this!
-	if threshold:
-            self.threshold = threshold
-	else:
-	    self.threshold = 20
-	if sensitivity:
+            if threshold:
+                self.threshold = threshold
+            else:
+                self.threshold = 20
+
             self.sensitivity = sensitivity
+
+            # Should we save debug images, so the user can tell where
+            # the test region is and what's happening?
+            # For now, tie it to verbose.
+            self.save_debug_image = self.verbose
+
+            # What area of the image should we scan for changes?
+            # Default setting (if None passed in): use whole image.
+            if not test_borders:
+                self.test_borders = [ [[1,test_res[0]],[1,test_res[1]]] ]
+            else:
+                self.test_borders = test_borders
 	else:
-            self.sensitivity = 30
-        self.verbose = verbose
-        self.localdir = localdir
-        self.remotedir = remotedir
+            self.sensitivity = 0
+            self.save_debug_image = False
+
         if full_res:
             if len(full_res) == 2:
                 self.full_res = full_res
@@ -106,19 +121,7 @@ class MotionDetector:
         else:
             self.full_res = None
 
-        # Should we save debug images, so the user can tell where
-        # the test region is and what's happening?
-        # For now, tie it to verbose.
-        self.save_debug_image = self.verbose
-
         self.bufold = None
-
-        # What area of the image should we scan for changes?
-        # Default setting (if None passed in): use whole image.
-        if not test_borders:
-            self.test_borders = [ [[1,test_res[0]],[1,test_res[1]]] ]
-        else:
-            self.test_borders = test_borders
 
         # What cameras are available? We may use a different camera
         # for the regular low-res test images vs. the high-res snaps.
@@ -135,7 +138,8 @@ class MotionDetector:
         self.locam = cams[-1]
         if args.verbose:
             print "High-res camera:", str(self.hicam.__class__)
-            print " Low-res camera:", str(self.locam.__class__)
+            if self.sensitivity:
+                print " Low-res camera:", str(self.locam.__class__)
 
         # Find a crop rectangle that includes all the test borders.
         # XXX Should move crop functionality to piphoto.py
@@ -211,15 +215,6 @@ class MotionDetector:
            at least 10 seconds per loop in overhead, on top of any
            delay you pass in.
         '''
-        if self.pir or self.rangefinder:
-            # snap_full_res uses bufold to decide whether this is
-            # the first image or not. If we're using a PIR sensor,
-            # we don't use bufold at all, so we can overload it
-            # to indicate filename.
-            self.bufold = None
-            self.snap_full_res()
-            self.bufold = True
-
         while True:
             self.step()
             # flush stdout, since we may be logging to a file.
@@ -227,34 +222,50 @@ class MotionDetector:
             time.sleep(secs)
 
     def step(self):
+        '''Check camera snapshot or motion sensors to decide
+           whether there's anything worth taking a picture of.
+        '''
+        if self.verbose:
+            print ""    # Blank line so we can tell when each step starts
+        if self.sensitivity:
+            if self.use_tmp_file:
+                tmpfile = "/tmp/still.jpg"
+                self.locam.take_still(outfile=tmpfile, res=test_res)
+                im = Image.open(tmpfile)
+                img_data = None
+            else:   # keep it all in memory, no temp files
+                img_data = self.locam.take_still(outfile='-', res=test_res)
+                im = Image.open(img_data)
+
+            different = self.compare_images(im)
+            print "Different?", different
+
+            if img_data:
+                img_data.close()
+
+            # If the image didn't change, no point checking the other sensors.
+            if not different:
+                return
 
         if self.rangefinder:
-            dist = self.rangefinder.measure_distance_in()
+            print "It's different. Checking the rangefinder ..."
+            dist = self.rangefinder.average_distance_in(samples=5)
             if self.verbose:
                 print "Distance:", dist
                 sys.stdout.flush()
-            if dist < 100:
-                self.snap_full_res()
-            return
+            # Use a range limit of 100 inches -- the rangefinder
+            # can't reliably see distances much greater than that anyway.
+            # Of course this should be configurable.
+            if dist >= 100:
+                return
 
         if self.pir:
-            if self.pir.poll():
-                self.snap_full_res()
-            return
+            if not self.pir.poll():
+                return
 
-        if self.use_tmp_file:
-            tmpfile = "/tmp/still.jpg"
-            self.locam.take_still(outfile=tmpfile, res=test_res)
-            im = Image.open(tmpfile)
-            img_data = None
-        else:   # keep it all in memory, no temp files
-            img_data = self.locam.take_still(outfile='-', res=test_res)
-                                             # verbose=args.verbose)
-            im = Image.open(img_data)
-
-        different, debugimage = self.compare_images(im)
-        if img_data:
-            img_data.close()
+        # If we get here, everything says there's motion.
+        # So take a full-res snapshot.
+        self.snap_full_res()
 
     def get_outdir(self):
         '''Does the remotedir exist and is it still accessible?
@@ -267,7 +278,7 @@ class MotionDetector:
         else:
             return self.localdir
 
-    def snap_full_res(self):
+    def get_snap_path(self, fileroot):
         '''If there's been motion, snap a high-res photo.'''
 
         # Use the remote directory if possible.
@@ -275,20 +286,20 @@ class MotionDetector:
         snapdir = self.get_outdir()
         if not snapdir:
             print "Not snapping full resolution, couldn't get output dir"
-            return
-
-        if not self.bufold:
-            fileroot = 'first'
-            print "Saving initial image"
-        else:
-            fileroot = 'snap'
+            return None
 
         now = datetime.datetime.now()
         snapfile = '%s-%02d-%02d-%02d-%02d-%02d-%02d.jpg' % \
             (fileroot,
              now.year, now.month, now.day,
              now.hour, now.minute, now.second)
-        snappath = os.path.join(snapdir, snapfile)
+        return os.path.join(snapdir, snapfile)
+
+    def snap_full_res(self):
+        # XXX May want to save the first image with a fileroot of "first".
+        snappath = self.get_snap_path("snap")
+        if not snappath:
+            return
 
         if self.crop:
             # Snap data to memory, then pass it to jpegtran to crop.
@@ -354,8 +365,7 @@ class MotionDetector:
             debug_buf = None
 
         # XXX Modify threshold for time of day. Obviously this isn't
-        # the right way to do it, and it should be done by light
-        # levels.
+        # the right way to do it, and it should be done by light levels.
         now = datetime.datetime.now()
         if (now.hour > 20 and now.minute > 45) or \
            (now.hour <= 5 and now.minute < 30):
@@ -363,22 +373,24 @@ class MotionDetector:
         else:
             threshold = self.threshold
 
+        # If bufold isn't set yet, it's our first time through.
+        # All we can do is copy it to prepare for the next time.
+        if not self.bufold:
+            self.bufold = bufnew
+            return False
+
         changed_pixels = 0
-        if self.bufold:
-            for piece in self.test_borders:
-                for x in xrange(piece[0][0]-1, piece[0][1]):
-                    for y in xrange(piece[1][0]-1, piece[1][1]):
-                        # Just check green channel as it's the highest quality
-                        pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
-                        if pixdiff > threshold:
-                            changed_pixels += 1
-                            # If debugging, rewrite changed pixels -> green
-                            if (debug_buf):
-                                debug_buf[x,y] = (0, 255, 0)
-            changed = changed_pixels > self.sensitivity
-        else:
-            print "First time, forcing a snap"
-            changed = True
+        for piece in self.test_borders:
+            for x in xrange(piece[0][0]-1, piece[0][1]):
+                for y in xrange(piece[1][0]-1, piece[1][1]):
+                    # Just check green channel as it's the highest quality
+                    pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
+                    if pixdiff > threshold:
+                        changed_pixels += 1
+                        # If debugging, rewrite changed pixels -> green
+                        if (debug_buf):
+                            debug_buf[x,y] = (0, 255, 0)
+        changed = changed_pixels > self.sensitivity
 
         if debug_buf:
             # Draw blue borders around the test areas no matter what,
@@ -399,23 +411,20 @@ class MotionDetector:
                         if piece[0][0] > 1:
                             debug_buf[piece[0][0]-2, y] = (255, 255, 255)
 
+        self.bufold = bufnew
+
         if changed:
             print "=====================", changed_pixels, "pixels changed"
-            snapparts = os.path.split(self.snap_full_res())
-            self.bufold = bufnew
 
             if self.save_debug_image:
-                # Save the debug image, but not if it's a first image.
-                if "snap" in snapparts[1]:
-                    debugimage.save(os.path.join(snapparts[0],
-                                                 snapparts[1].replace('snap',
-                                                                      'debug')))
+                print "Saving debug image to", self.get_snap_path("debug")
+                debugimage.save(self.get_snap_path("debug"))
 
-        elif self.verbose:   # Not enough changed, but report the diff anyway
-            print changed_pixels, "pixels changed\t",
+        elif self.verbose:
+            print changed_pixels, "pixels changed, not enough\t",
             print str(datetime.datetime.now())
 
-        return changed, debugimage
+        return changed
 
 # Sample usage:
 # motion_detect.py -v -s 250 -t 30 -r 320x240 -b 100x100+130+85 -c - /tmp ~pi/trade/snapshots/
@@ -431,7 +440,8 @@ Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument("-s", "--sensitivity", type=int,
-        help="Sensitivity: How many pixels must change?")
+        help="""Sensitivity: How many pixels must change? 
+If 0, we will use a motion sensor rather than image detection.""")
     parser.add_argument("-t", "--threshold", type=int,
         help="Threshold: How different does a pixel need to be?")
     parser.add_argument("-r", "--resolution", default='320x240',
