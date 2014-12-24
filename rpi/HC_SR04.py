@@ -21,16 +21,6 @@
 # Adapted from code by Matt Hawkins of RaspberryPi-Spy.co.uk
 # Wire the circuit as shown in
 # http://www.raspberrypi-spy.co.uk/2013/01/ultrasonic-distance-measurement-using-python-part-2/
-#
-#  Modifications:
-#
-#      Author: Rupa Dachere
-#      Date: March 19, 2014
-#      Changes: 
-#    	    	1. Fixed typo for call to measure_distance_cm()
-#		2. Created measure_distance_in() for inches
-#		3. Initialized stop in measure_distance_cm() and measure_distance_in()
-
 
 import RPi.GPIO as GPIO
 import time
