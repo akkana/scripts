@@ -16,12 +16,12 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
     zf = zipfile.ZipFile(filename)
     content = None
     for f in zf.namelist() :
-        if os.path.basename(f) == 'content.opf' :
+        if os.path.basename(f).endswith('.opf') :
             contentfile = f
             content = zf.open(f)
             break
     if not content :
-        raise RuntimeException('No content.opf in %s' % filename)
+        raise RuntimeError('No content.opf in %s' % filename)
 
     # Now content is a file handle on the content.opf XML file
     try :
@@ -47,7 +47,7 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
             if delete_tags :
                 print "Deleting:", el.childNodes[0].wholeText
                 el.parentNode.removeChild(el)
-            else :
+            elif el.childNodes :
                 # el.childNodes[0].wholeText is the unicode.
                 # Turn it into UTF-8 before returning.
                 # Uncomment the next line and run on micromegas.epub
@@ -59,6 +59,8 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
                 # matches.append(el.childNodes[0].wholeText)
                 matches.append(el.childNodes[0].wholeText.encode('utf-8',
                                                         'backslashreplace'))
+            else :
+                print "Empty", elname, "tag"
 
         return matches, elements, parent
 
