@@ -260,6 +260,7 @@ class MotionDetector:
                 return
 
         if self.pir:
+            print "It's different. Checking the PIR ..."
             if not self.pir.poll():
                 return
 
