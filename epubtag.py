@@ -44,9 +44,14 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
                 parent = el.parentNode
             else :
                 assert parent == el.parentNode
+
             if delete_tags :
-                print "Deleting:", el.childNodes[0].wholeText
+                if el.childNodes :
+                    print "Deleting:", el.childNodes[0].wholeText
+                else :
+                    print "Deleting empty", elname, "tag"
                 el.parentNode.removeChild(el)
+
             elif el.childNodes :
                 # el.childNodes[0].wholeText is the unicode.
                 # Turn it into UTF-8 before returning.
@@ -142,11 +147,11 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
         print "Adding:", new_tag
 
     # Open a new zip file to write to, and copy everything
-    # but change the content.opf to the new one:
+    # but change the content.opf (or whatever.opf) to the new one:
     new_epub_file = filename + '.tmp'
     ozf = zipfile.ZipFile(new_epub_file, 'w')
     for info in zf.infolist() :
-        if os.path.basename(info.filename) == 'content.opf' :
+        if os.path.basename(info.filename).endswith('.opf') :
             # dom.toprettyprintxml() returns unicode, which zipfile.writestr()
             # can't write. If you pass in encoding= then it works ...
             # but minidom gives us no way to find out the encoding
