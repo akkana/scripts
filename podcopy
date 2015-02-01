@@ -40,6 +40,7 @@ def copy_pods(indir, outdir):
 
         #  Save the extension:
         base, ext = os.path.splitext(f)
+        f = os.path.join(indir, f)
 
         if first_bad >= 0:
             # Try just chopping off everything starting with the
@@ -51,12 +52,21 @@ def copy_pods(indir, outdir):
         base = today + os.path.split(base)[-1]
 
         while os.path.exists(os.path.join(outdir, base + ext)):
+            # Is it the same file? Don't want to copy the same file
+            # there by a different name.
+            src_stat = os.stat(f)
+            dst_stat = os.stat(os.path.join(outdir, base + ext))
+            if src_stat.st_size == dst_stat.st_size:
+                print base+ext, "is already there, not re-copying"
+                base = None
+                break
+
+            # Otherwise, we have a name collision. Add an X.
             base += 'X'
 
-        # print "cp '" + os.path.join(indir, f) + "'", \
-        #     os.path.join(outdir, base + ext)
-        shutil.copyfile(os.path.join(indir, f),
-                        os.path.join(outdir, base + ext))
+        if base:
+            print "cp '" + f + "'", os.path.join(outdir, base + ext)
+            shutil.copyfile(f, os.path.join(outdir, base + ext))
 
 copy_pods(sys.argv[1], sys.argv[2])
 
