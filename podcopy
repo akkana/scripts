@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+
+import sys, os
+import datetime
+import shutil
+
+# Copy podcasts from podget to an mp3 device (or other directory).
+def copy_pods(indir, outdir):
+
+    illegal_chars = '?=&;:"\''
+    today = datetime.datetime.now().strftime('%y-%m-%d-')
+
+    # podget runs are stored in .m3u files.
+    # We need the one with the most recent last-modified date.
+    playlist = None
+    mtime = 0
+    for f in os.listdir(indir):
+        if not f.endswith('.m3u'):
+            continue
+        fpath = os.path.join(indir, f)
+        statbuf = os.stat(fpath)
+        if not playlist or statbuf.st_mtime > mtime:
+            mtime = statbuf.st_mtime
+            playlist = fpath
+
+    if not playlist:
+        print "No m3u files in", indir
+        return
+
+    fp = open(playlist)
+    for f in fp:
+        f = f.strip()
+
+        first_bad = -1
+        for c in illegal_chars:
+            if c in f:
+                i = f.find(c)
+                if i >= 0 and (first_bad < 0 or i < first_bad):
+                    first_bad = i
+
+        #  Save the extension:
+        base, ext = os.path.splitext(f)
+
+        if first_bad >= 0:
+            # Try just chopping off everything starting with the
+            # first bad character.
+            base = base[0:first_bad]
+
+        # Split off the local dir path, e.g. Science/filename.mp3
+        # and add today's date.
+        base = today + os.path.split(base)[-1]
+
+        while os.path.exists(os.path.join(outdir, base + ext)):
+            base += 'X'
+
+        # print "cp '" + os.path.join(indir, f) + "'", \
+        #     os.path.join(outdir, base + ext)
+        shutil.copyfile(os.path.join(indir, f),
+                        os.path.join(outdir, base + ext))
+
+copy_pods(sys.argv[1], sys.argv[2])
+

@@ -117,6 +117,11 @@ pisoothe:
     in a loop, reacting to key events for volume control or to skip
     to the next sample.
 
+podcopy:
+    Copy podcasts (fetched with podget) to a mounted mp3 player or directory.
+    Remove characters in filenames that would cause problems on vfat
+    filesystems, and ensure filenames are unique.
+
 preso:
     A lightweight presentation program for displaying HTML slides.
 
