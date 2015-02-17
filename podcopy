@@ -5,28 +5,40 @@ import datetime
 import shutil
 
 # Copy podcasts from podget to an mp3 device (or other directory).
-def copy_pods(indir, outdir):
+def copy_pods(indir, outdir, playlist=None):
 
     illegal_chars = '?=&;:"\''
     today = datetime.datetime.now().strftime('%y-%m-%d-')
 
     # podget runs are stored in .m3u files.
-    # We need the one with the most recent last-modified date.
-    playlist = None
-    mtime = 0
-    for f in os.listdir(indir):
-        if not f.endswith('.m3u'):
-            continue
-        fpath = os.path.join(indir, f)
-        statbuf = os.stat(fpath)
-        if not playlist or statbuf.st_mtime > mtime:
-            mtime = statbuf.st_mtime
-            playlist = fpath
+    # We need the one with the most recent last-modified date,
+    # unless we've been handed one.
+    if playlist:
+        playlist = os.path.join(indir, playlist)
+    else:
+        mtime = 0
+        for f in os.listdir(indir):
+            if not f.endswith('.m3u'):
+                continue
+            fpath = os.path.join(indir, f)
+            statbuf = os.stat(fpath)
+            if not playlist or statbuf.st_mtime > mtime:
+                mtime = statbuf.st_mtime
+                playlist = fpath
 
     if not playlist:
         print "No m3u files in", indir
         return
 
+    # Get a list of the files already in the output dir.
+    # We'll compare names and sizes to try to avoid duplicate copies.
+    existing_files = os.listdir(outdir)
+    existing_sizes = []
+    for f in existing_files:
+        statbuf = os.stat(os.path.join(outdir, f))
+        existing_sizes.append(statbuf.st_size)
+
+    # Now try to copy the input files.
     fp = open(playlist)
     for f in fp:
         f = f.strip()
@@ -48,19 +60,28 @@ def copy_pods(indir, outdir):
             base = base[0:first_bad]
 
         # Split off the local dir path, e.g. Science/filename.mp3
-        # and add today's date.
-        base = today + os.path.split(base)[-1]
+        base = os.path.split(base)[-1]
+
+        # Is the file already there?
+        # Some sites, NPR in particular, put the same show
+        # out there several times on different dates and with
+        # similar but different filenames.
+        # E.g. npr_378885682.mp3 and npr_378885682?orgId=1&amp;e=378885682&amp;d=257&amp;ft=pod&amp;f=344098539.mp3
+        src_size = os.stat(f).st_size
+        try:
+            i = existing_sizes.index(src_size)
+            print "\n**** Duplicate!", existing_files[i], \
+                "is the same size as", f
+            # Skip this file. XXX Should probably check for similar filenames.
+            continue
+
+        except ValueError:
+            pass
+
+        # add today's date.
+        base = today + base
 
         while os.path.exists(os.path.join(outdir, base + ext)):
-            # Is it the same file? Don't want to copy the same file
-            # there by a different name.
-            src_stat = os.stat(f)
-            dst_stat = os.stat(os.path.join(outdir, base + ext))
-            if src_stat.st_size == dst_stat.st_size:
-                print base+ext, "is already there, not re-copying"
-                base = None
-                break
-
             # Otherwise, we have a name collision. Add an X.
             base += 'X'
 
@@ -68,5 +89,9 @@ def copy_pods(indir, outdir):
             print "cp '" + f + "'", os.path.join(outdir, base + ext)
             shutil.copyfile(f, os.path.join(outdir, base + ext))
 
-copy_pods(sys.argv[1], sys.argv[2])
+if len(sys.argv) > 3:
+    playlist = sys.argv[3]
+else:
+    playlist = None
+copy_pods(sys.argv[1], sys.argv[2], playlist)
 
