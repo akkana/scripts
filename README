@@ -8,6 +8,9 @@ jsjupiter:
     My Jupiter's Moons Javascript web app: show the Galilean moons and
     their shadows, and predict transits, shadow transits and eclipses.
 
+mapping:
+    Scripts related to mapping / GIS.
+
 motioncam:
     An automated motion-sensitive camera driver, for Raspberry Pi or
     other machines. Requires pycamera module.
@@ -47,6 +50,9 @@ chatsounds.py:
 
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
+
+colormatch.php:
+    Find the nearest matching color name. http://shallowsky.com/colormatch/
 
 conjunctions.py:
     Predict planetary visibility and conjunctions for a specified
