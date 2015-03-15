@@ -110,6 +110,9 @@ mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
 
+musicplayer.py:
+    A little toy music player in Python, illustrating how to play audio.
+
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
 
