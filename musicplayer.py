@@ -11,7 +11,7 @@ import gtk, gobject
 import pango
 
 class MusicWin(gtk.Window) :
-    def __init__(self, init_songs):
+    def __init__(self, init_songs, random=True):
         super(MusicWin, self).__init__()
 
         self.songs = []
@@ -28,6 +28,8 @@ class MusicWin(gtk.Window) :
         # Alas, the mixer doesn't reset its time limits when skipping,
         # so we have to remember that.
         self.skipped_seconds = 0
+
+        self.random = random
 
         # The window and UI:
         mainbox = gtk.VBox(spacing=8)
@@ -80,6 +82,11 @@ class MusicWin(gtk.Window) :
         next_btn.connect("clicked", self.next_song);
         buttonbox.add(next_btn)
 
+        self.connect("key-press-event", self.key_press_event)
+
+        self.add_events(gtk.gdk.SCROLL_MASK)
+        self.connect("scroll-event", self.scroll_event)
+
         self.add_songs_and_directories(init_songs)
 
         mixer.init()
@@ -97,7 +104,8 @@ class MusicWin(gtk.Window) :
 
         # Play music in random order:
         random.seed(os.getpid())
-        random.shuffle(self.songs)
+        if self.random:
+            random.shuffle(self.songs)
 
     def run(self):
         self.connect("delete_event", gtk.main_quit)
@@ -112,7 +120,8 @@ class MusicWin(gtk.Window) :
         gtk.main()
 
     def restart(self, w):
-        #mixer.music.rewind()
+        # mixer.music.rewind() loses all track of the current position.
+        # So instead, just stop and start again.
         self.skipped_seconds = 0
         self.stop()
         self.song_ptr = (self.song_ptr - 1) % len(self.songs)
@@ -170,6 +179,16 @@ class MusicWin(gtk.Window) :
     def skip_back(self, w=None):
         self.skip(-10000)
 
+    def volume_change(self, delta):
+        vol = mixer.music.get_volume()
+        mixer.music.set_volume(vol + delta)
+
+    def volume_up(self, w=None):
+        self.volume_change(.1)
+
+    def volume_down(self, w=None):
+        self.volume_change(-.1)
+
     def update_content_area(self):
         text = self.songs[self.song_ptr]
         has_title = False
@@ -195,6 +214,33 @@ class MusicWin(gtk.Window) :
         text += '</span>'
 
         self.content_area.set_label(text)
+
+    def key_press_event(self, widget, event):
+        if event.keyval == gtk.keysyms.q and \
+           event.state == gtk.gdk.CONTROL_MASK:
+            gtk.main_quit()
+        elif event.keyval == gtk.keysyms.Left:
+            self.prev_song()
+        elif event.keyval == gtk.keysyms.Right:
+            self.next_song()
+        elif event.keyval == gtk.keysyms.Up:
+            self.volume_up()
+        elif event.keyval == gtk.keysyms.Down:
+            self.volume_down()
+        elif event.keyval == gtk.keysyms.space:
+            self.pause()
+        elif event.string == '.':
+            self.stop()
+        elif event.string == '0':
+            self.restart()
+
+        return True
+
+    def scroll_event(self, widget, event):
+        if event.direction == gtk.gdk.SCROLL_UP:
+            self.volume_up()
+        elif event.direction == gtk.gdk.SCROLL_DOWN:
+            self.volume_down()
 
     def timer_func(self):
         # If we're stopped, don't change anything.
@@ -227,9 +273,4 @@ if __name__ == '__main__':
         win.run()
     else:
         sys.exit(0)
-
-# Other things we can do once we have a UI:
-# mixer.set_volume(.9)
-# mixer.music.pause()
-
 
