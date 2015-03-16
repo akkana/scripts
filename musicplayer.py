@@ -99,6 +99,11 @@ class MusicWin(gtk.Window) :
                     for filename in files:
                         if '.' in filename:
                             self.songs.append(os.path.join(s, root, filename))
+            elif s.endswith('.m3u'):
+                path = os.path.split(s)[0]
+                with open(s) as m3ufile:
+                    for line in m3ufile:
+                        self.songs.append(os.path.join(path, line.strip()))
             else:
                 self.songs.append(s)
 
@@ -202,14 +207,15 @@ class MusicWin(gtk.Window) :
         #         has_title = True
         #     text += '\n' + k + ' : ' + v
 
-        text += '<span size="25000">'
+        text += '<span size="25000">\n'
         try:
-            text += '\n' + id3info['TITLE']
-        except ID3.InvalidTagError:
-            pass
+            text += id3info['TITLE']
+        except KeyError:
+            text += os.path.basename(self.songs[self.song_ptr])
+        text += '\n'
         try:
-            text += '\n' + id3info['ARTIST']
-        except ID3.InvalidTagError:
+            text += id3info['ARTIST']
+        except KeyError:
             pass
         text += '</span>'
 
