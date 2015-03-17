@@ -6,9 +6,9 @@ import random
 
 from pygame import mixer
 import ID3
+import cgi
 
 import gtk, gobject
-import pango
 
 class MusicWin(gtk.Window) :
     def __init__(self, init_songs, random=True):
@@ -40,9 +40,16 @@ class MusicWin(gtk.Window) :
         mainbox.add(self.content_area)
 
         views = gtk.HBox(spacing=4)
+        # views.padding = 8 So frustrating that we can't set this in general!
         mainbox.add(views)
         self.time_label = gtk.Label()
-        views.add(self.time_label)
+
+        views.pack_start(self.time_label, expand=False, padding=8)
+
+        randomBtn = gtk.ToggleButton("Shuffle")
+        randomBtn.set_active(self.random)
+        randomBtn.connect("toggled", self.toggle_random);
+        views.pack_end(randomBtn, fill=True, expand=False, padding=8)
 
         buttonbox = gtk.HBox(spacing=4)
         mainbox.add(buttonbox)
@@ -160,6 +167,21 @@ class MusicWin(gtk.Window) :
             self.stop_btn.set_tooltip_text("Play")
             self.play_state = MusicWin.PLAYING
 
+    def toggle_random(self, w):
+        self.random = w.get_active()
+        cursong = self.songs[self.song_ptr]
+        if self.random:
+            random.shuffle(self.songs)
+        else:
+            self.songs.sort()
+        # Now re-find the song we were playing:
+        try:
+            self.song_ptr = self.songs.index(cursong)
+        except:
+            print "Current song doesn't seem to be in the list any more!"
+            print cursong
+            self.song_ptr = 0
+
     def next_song(self, w=None):
         mixer.music.stop()
         self.play_state = MusicWin.PLAYING
@@ -209,12 +231,12 @@ class MusicWin(gtk.Window) :
 
         text += '<span size="25000">\n'
         try:
-            text += id3info['TITLE']
+            text += cgi.escape(id3info['TITLE'])
         except KeyError:
-            text += os.path.basename(self.songs[self.song_ptr])
+            text += cgi.escape(os.path.basename(self.songs[self.song_ptr]))
         text += '\n'
         try:
-            text += id3info['ARTIST']
+            text += cgi.escape(id3info['ARTIST'])
         except KeyError:
             pass
         text += '</span>'
@@ -264,8 +286,13 @@ class MusicWin(gtk.Window) :
         self.skipped_seconds = 0
         self.song_ptr = (self.song_ptr + 1) % len(self.songs)
         self.update_content_area()
-        mixer.music.load(self.songs[self.song_ptr])
-        mixer.music.play()
+        try:
+            mixer.music.load(self.songs[self.song_ptr])
+            mixer.music.play()
+        except:
+            print "Can't play", self.songs[self.song_ptr]
+            del self.songs[self.song_ptr]
+            self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         return True
 
 if __name__ == '__main__':
