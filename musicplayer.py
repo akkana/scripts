@@ -241,7 +241,7 @@ class MusicWin(gtk.Window) :
             pass
         text += '</span>'
 
-        self.content_area.set_label(text)
+        self.content_area.set_label(unicode(text, 'utf-8', errors='replace'))
 
     def key_press_event(self, widget, event):
         if event.keyval == gtk.keysyms.q and \
