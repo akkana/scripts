@@ -3,6 +3,7 @@
 import sys, os
 import time
 import random
+import re
 
 from pygame import mixer
 import ID3
@@ -11,11 +12,54 @@ import cgi
 import gtk, gobject
 
 class MusicWin(gtk.Window) :
-    def __init__(self, init_songs, random=True):
+    def __init__(self, init_songs, random=None):
         super(MusicWin, self).__init__()
 
         self.songs = []
         self.song_ptr = -1
+
+        self.configdir = os.path.expanduser('~/.config/musicplayer')
+
+        # If no songs or playlists specified, play from our favorites playlist.
+        if not init_songs:
+            self.playlist = os.path.join(self.configdir, "favorites.m3u")
+            print "Playing favorites"
+            init_songs = [ self.playlist ]
+        # Did the user specify one single playlist?
+        elif len(init_songs) == 1 \
+           and init_songs[-1].endswith('.m3u'):
+            self.playlist = os.path.join(self.configdir,
+                                         os.path.basename(init_songs[-1]))
+        else:
+            self.playlist = os.path.join(self.configdir, 'playlist.m3u')
+
+        # Right now, random is the only thing that can be specified
+        # in the config file.
+        if random == None:
+            configfile = os.path.join(self.configdir, "config")
+            if os.path.exists(configfile):
+                fp = open(configfile)
+                randomre = re.compile('random *= *([^ ]+)')
+                for line in fp:
+                    if line.startswith('#'):
+                        continue
+                    m = randomre.search(line)
+                    if m:
+                        val = m.group(1).strip().lower()
+                        if val == "true" or val == '1':
+                            self.random = True
+                        elif val == "false" or val == '0':
+                            self.random = False
+                        else:
+                            print "Config file error: '%s'" . line.strip()
+                    break
+                fp.close()
+
+            else:
+                # If there's no config file, default to not random.
+                self.random = False
+        else:
+            self.random = random
 
         # Are we stopped, paused or playing?
         MusicWin.STOPPED = 0
@@ -28,8 +72,6 @@ class MusicWin(gtk.Window) :
         # Alas, the mixer doesn't reset its time limits when skipping,
         # so we have to remember that.
         self.skipped_seconds = 0
-
-        self.random = random
 
         # The window and UI:
         mainbox = gtk.VBox(spacing=8)
@@ -107,21 +149,36 @@ class MusicWin(gtk.Window) :
                         if '.' in filename:
                             self.songs.append(os.path.join(s, root, filename))
             elif s.endswith('.m3u'):
-                path = os.path.split(s)[0]
-                with open(s) as m3ufile:
-                    for line in m3ufile:
-                        self.songs.append(os.path.join(path, line.strip()))
+                if os.path.exists(s):
+                    self.add_songs_in_playlist(s)
+                elif os.path.exists(os.path.join(self.configdir, s)):
+                    self.add_songs_in_playlist(os.path.join(self.configdir, s))
+                else:
+                    print s, ": No such playlist"
             else:
-                self.songs.append(s)
+                if os.path.exists(s):
+                    self.songs.append(s)
+                else:
+                    print s, ": No such file"
 
         # Play music in random order:
         random.seed(os.getpid())
         if self.random:
             random.shuffle(self.songs)
 
+    def add_songs_in_playlist(self, playlist):
+        path = os.path.split(playlist)[0]
+        with open(playlist) as m3ufile:
+            for line in m3ufile:
+                self.songs.append(os.path.join(path, line.strip()))
+
     def run(self):
-        self.connect("delete_event", gtk.main_quit)
-        self.connect("destroy", gtk.main_quit)
+        if not self.songs:
+            print "No songs to play!"
+            return
+
+        self.connect("delete_event", self.quit)
+        self.connect("destroy", self.quit)
         # self.winsig = self.connect("configure_event", self.configure_event)
 
         self.show_all()
@@ -130,6 +187,10 @@ class MusicWin(gtk.Window) :
         gobject.timeout_add(500, self.timer_func)
 
         gtk.main()
+
+    def quit(self, w=None, data=None):
+        self.save_playlist()
+        gtk.main_quit()
 
     def restart(self, w):
         # mixer.music.rewind() loses all track of the current position.
@@ -216,6 +277,55 @@ class MusicWin(gtk.Window) :
     def volume_down(self, w=None):
         self.volume_change(-.1)
 
+    def delete_song(self, from_disk):
+        if from_disk:
+            delstr = "Delete song from disk PERMANENTLY?"
+        else:
+            delstr = "Delete song from playlist?"
+        dialog = gtk.MessageDialog(self,
+                                   gtk.DIALOG_DESTROY_WITH_PARENT,
+                                   gtk.MESSAGE_QUESTION,
+                                   gtk.BUTTONS_OK_CANCEL,
+                                   delstr)
+        dialog.set_default_response(gtk.RESPONSE_OK)
+        response = dialog.run()
+        dialog.destroy()
+        if response == gtk.RESPONSE_OK:
+            cur_song = self.songs[self.song_ptr]
+            del self.songs[self.song_ptr]
+            self.song_ptr = (self.song_ptr - 1) % len(self.songs)
+            self.save_playlist()
+            if from_disk:
+                os.remove(cur_song)
+
+            # Either way, skip to the next song.
+            mixer.music.stop()
+
+    def delete_song_from_playlist(self):
+        self.delete_song(False)
+
+    def delete_song_from_disk(self):
+        self.delete_song(True)
+
+    def save_playlist(self):
+        '''Save the current playlist.'''
+        if not self.playlist:
+            print "No playlist to save to!"
+            return
+
+        if not os.path.exists(self.configdir):
+            os.makedirs(configdir)
+
+        if os.path.exists(self.playlist):
+            os.rename(self.playlist, self.playlist + '.bak')
+
+        fp = open(self.playlist, "w")
+        newlist = self.songs[:]
+        newlist.sort()
+        for song in newlist:
+            fp.write(song + '\n')
+        fp.close()
+
     def update_content_area(self):
         text = self.songs[self.song_ptr]
         has_title = False
@@ -246,7 +356,7 @@ class MusicWin(gtk.Window) :
     def key_press_event(self, widget, event):
         if event.keyval == gtk.keysyms.q and \
            event.state == gtk.gdk.CONTROL_MASK:
-            gtk.main_quit()
+            self.quit()
         elif event.keyval == gtk.keysyms.Left:
             self.prev_song()
         elif event.keyval == gtk.keysyms.Right:
@@ -261,6 +371,19 @@ class MusicWin(gtk.Window) :
             self.stop()
         elif event.string == '0':
             self.restart()
+
+        # d means delete from the current playlist;
+        # ctrl-d actually deletes the song from disk.
+        elif event.keyval == gtk.keysyms.d:
+            if event.state == gtk.gdk.CONTROL_MASK:
+                self.delete_song_from_disk()
+            else:
+                self.delete_song_from_playlist()
+
+        elif event.keyval == gtk.keysyms.s and \
+           event.state == gtk.gdk.CONTROL_MASK:
+            print "Saving playlist"
+            self.save_playlist()
 
         return True
 
@@ -289,6 +412,10 @@ class MusicWin(gtk.Window) :
         try:
             mixer.music.load(self.songs[self.song_ptr])
             mixer.music.play()
+
+            # Make sure the buttons are sane:
+            self.pause_btn.set_label('||')
+            self.stop_btn.set_label(u"\u25A0") # black square
         except:
             print "Can't play", self.songs[self.song_ptr]
             del self.songs[self.song_ptr]
@@ -296,13 +423,19 @@ class MusicWin(gtk.Window) :
         return True
 
 if __name__ == '__main__':
-    if len(sys.argv) <= 1:
-        print "Usage:", sys.argv[0], "files or directories"
-        sys.exit(1)
-
     rc = os.fork()
     if not rc:
-        win = MusicWin(sys.argv[1:])
+        args = sys.argv[1:]
+        rand = None
+        if args:
+            if args[0] == '-r' or args[0] == '--random':
+                rand = True
+                args = args[1:]
+            elif args[0] == '-s' or args[0] == '--sequential':
+                rand = False
+                args = args[1:]
+
+        win = MusicWin(args, random=rand)
         win.run()
     else:
         sys.exit(0)
