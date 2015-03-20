@@ -8,15 +8,18 @@ import re
 from pygame import mixer
 import ID3
 import cgi
+from mutagen.mp3 import MP3
 
 import gtk, gobject
 
 class MusicWin(gtk.Window) :
-    def __init__(self, init_songs, random=None):
+    def __init__(self, init_songs, random=None, backward=False):
         super(MusicWin, self).__init__()
 
         self.songs = []
         self.song_ptr = -1
+
+        self.cur_song_length = 0
 
         self.configdir = os.path.expanduser('~/.config/musicplayer')
 
@@ -61,6 +64,8 @@ class MusicWin(gtk.Window) :
         else:
             self.random = random
 
+        self.backward = backward
+
         # Are we stopped, paused or playing?
         MusicWin.STOPPED = 0
         MusicWin.PAUSED = 1
@@ -76,25 +81,9 @@ class MusicWin(gtk.Window) :
         # The window and UI:
         mainbox = gtk.VBox(spacing=8)
         self.add(mainbox)
-        self.content_area = gtk.Label()
-        self.content_area.set_use_markup(True)
-        self.content_area.set_justify(gtk.JUSTIFY_CENTER)
-        mainbox.add(self.content_area)
-
-        views = gtk.HBox(spacing=4)
-        # views.padding = 8 So frustrating that we can't set this in general!
-        mainbox.add(views)
-        self.time_label = gtk.Label()
-
-        views.pack_start(self.time_label, expand=False, padding=8)
-
-        randomBtn = gtk.ToggleButton("Shuffle")
-        randomBtn.set_active(self.random)
-        randomBtn.connect("toggled", self.toggle_random);
-        views.pack_end(randomBtn, fill=True, expand=False, padding=8)
 
         buttonbox = gtk.HBox(spacing=4)
-        mainbox.add(buttonbox)
+        mainbox.pack_end(buttonbox, expand=False)
 
         prev_btn = gtk.Button("<<")
         prev_btn.set_tooltip_text("Previous song")
@@ -131,11 +120,36 @@ class MusicWin(gtk.Window) :
         next_btn.connect("clicked", self.next_song);
         buttonbox.add(next_btn)
 
+        # Assorted info, like the random button and progress indicator:
+        views = gtk.HBox(spacing=4)
+        # views.padding = 8 So frustrating that we can't set this in general!
+        mainbox.pack_end(views, expand=False)
+        self.time_label = gtk.Label()
+
+        views.pack_start(self.time_label, expand=False, padding=8)
+
+        randomBtn = gtk.ToggleButton("Shuffle")
+        randomBtn.set_active(self.random)
+        randomBtn.connect("toggled", self.toggle_random);
+        views.pack_end(randomBtn, fill=True, expand=False, padding=8)
+
+        # The content area where the song title and info will be shown:
+        self.content_area = gtk.Label()
+        self.content_area.set_use_markup(True)
+        self.content_area.set_line_wrap(True)
+        self.content_area.set_justify(gtk.JUSTIFY_CENTER)
+        mainbox.pack_start(self.content_area, expand=False)
+
+        # Add events we need to listen to:
         self.connect("key-press-event", self.key_press_event)
 
         self.add_events(gtk.gdk.SCROLL_MASK)
         self.connect("scroll-event", self.scroll_event)
 
+        # Try to set a maximum size:
+        self.set_size_request(550, 225)
+
+        # Done with UI! Now we can build up the song list.
         self.add_songs_and_directories(init_songs)
 
         mixer.init()
@@ -165,6 +179,8 @@ class MusicWin(gtk.Window) :
         random.seed(os.getpid())
         if self.random:
             random.shuffle(self.songs)
+        else:
+            self.songs.sort(reverse=self.backward)
 
     def add_songs_in_playlist(self, playlist):
         path = os.path.split(playlist)[0]
@@ -234,7 +250,8 @@ class MusicWin(gtk.Window) :
         if self.random:
             random.shuffle(self.songs)
         else:
-            self.songs.sort()
+            self.songs.sort(reverse=self.backward)
+
         # Now re-find the song we were playing:
         try:
             self.song_ptr = self.songs.index(cursong)
@@ -321,7 +338,7 @@ class MusicWin(gtk.Window) :
 
         fp = open(self.playlist, "w")
         newlist = self.songs[:]
-        newlist.sort()
+        newlist.sort(reverse=self.backward)
         for song in newlist:
             fp.write(song + '\n')
         fp.close()
@@ -393,7 +410,18 @@ class MusicWin(gtk.Window) :
         elif event.direction == gtk.gdk.SCROLL_DOWN:
             self.volume_down()
 
+    def sec_to_str(self, sec):
+        '''Convert seconds (int) to h:m:s (string)'''
+        s = sec % 60
+        m = int(sec / 60)
+        h = int(sec / 3600)
+        if h:
+            return '%d:%02d:%02d' % (h, m, s)
+        else:
+            return '%d:%02d' % (m, s)
+
     def timer_func(self):
+        '''The timer func is what does the actual playing of songs.'''
         # If we're stopped, don't change anything.
         if self.play_state == MusicWin.STOPPED:
             return True
@@ -401,23 +429,32 @@ class MusicWin(gtk.Window) :
         # Are we still playing the same song?
         if mixer.music.get_busy():
             # This sadly still isn't right. Sigh.
-            self.time_label.set_label(str(int(self.skipped_seconds
-                                              + mixer.music.get_pos()/1000)))
+            self.time_label.set_label(self.sec_to_str(self.skipped_seconds +
+                                                      (mixer.music.get_pos()
+                                                       /1000))
+                                      + " / " + self.cur_song_length_str)
             return True
 
         # Else time to play the next song.
         self.skipped_seconds = 0
         self.song_ptr = (self.song_ptr + 1) % len(self.songs)
         self.update_content_area()
+
+        # Get the length:
+        mp3info = MP3(self.songs[self.song_ptr])
+        self.cur_song_length = mp3info.info.length
+        self.cur_song_length_str = self.sec_to_str(self.cur_song_length)
+
         try:
+            # Then load and play the song.
             mixer.music.load(self.songs[self.song_ptr])
             mixer.music.play()
 
             # Make sure the buttons are sane:
             self.pause_btn.set_label('||')
             self.stop_btn.set_label(u"\u25A0") # black square
-        except:
-            print "Can't play", self.songs[self.song_ptr]
+        except Exception, e:
+            print "Can't play", self.songs[self.song_ptr], ':', str(e)
             del self.songs[self.song_ptr]
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         return True
@@ -427,6 +464,7 @@ if __name__ == '__main__':
     if not rc:
         args = sys.argv[1:]
         rand = None
+        backward = False
         if args:
             if args[0] == '-r' or args[0] == '--random':
                 rand = True
@@ -434,8 +472,12 @@ if __name__ == '__main__':
             elif args[0] == '-s' or args[0] == '--sequential':
                 rand = False
                 args = args[1:]
+            elif args[0] == '-b' or args[0] == '--backward':
+                backward = True
+                rand = False
+                args = args[1:]
 
-        win = MusicWin(args, random=rand)
+        win = MusicWin(args, random=rand, backward=backward)
         win.run()
     else:
         sys.exit(0)
