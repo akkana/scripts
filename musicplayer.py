@@ -161,7 +161,7 @@ class MusicWin(gtk.Window) :
                 for root, dirs, files in os.walk(s):
                     for filename in files:
                         if '.' in filename:
-                            self.songs.append(os.path.join(s, root, filename))
+                            self.songs.append(os.path.join(root, filename))
             elif s.endswith('.m3u'):
                 if os.path.exists(s):
                     self.add_songs_in_playlist(s)
@@ -205,7 +205,9 @@ class MusicWin(gtk.Window) :
         gtk.main()
 
     def quit(self, w=None, data=None):
-        self.save_playlist()
+        # Save playlist? But we really shouldn't need to,
+        # since we saved it after anything that would change it.
+        # self.save_playlist()
         gtk.main_quit()
 
     def restart(self, w):
@@ -331,7 +333,7 @@ class MusicWin(gtk.Window) :
             return
 
         if not os.path.exists(self.configdir):
-            os.makedirs(configdir)
+            os.makedirs(self.configdir)
 
         if os.path.exists(self.playlist):
             os.rename(self.playlist, self.playlist + '.bak')
@@ -438,12 +440,22 @@ class MusicWin(gtk.Window) :
         # Else time to play the next song.
         self.skipped_seconds = 0
         self.song_ptr = (self.song_ptr + 1) % len(self.songs)
+
+        while not os.path.exists(self.songs[self.song_ptr]):
+            print self.songs[self.song_ptr], "doesn't exist!"
+            del self.songs[self.song_ptr]
+            # self.song_ptr = (self.song_ptr - 1) % len(self.songs)
+
         self.update_content_area()
 
         # Get the length:
-        mp3info = MP3(self.songs[self.song_ptr])
-        self.cur_song_length = mp3info.info.length
-        self.cur_song_length_str = self.sec_to_str(self.cur_song_length)
+        try:
+            mp3info = MP3(self.songs[self.song_ptr])
+            self.cur_song_length = mp3info.info.length
+            self.cur_song_length_str = self.sec_to_str(self.cur_song_length)
+        except:
+            self.cur_song_length = 0
+            self.cur_song_length_str = '?'
 
         try:
             # Then load and play the song.
