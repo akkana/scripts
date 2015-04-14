@@ -67,6 +67,10 @@ class Spider:
         self.outside_urls = []
         self.files_succeeded = []
 
+        # Eventually, the list of excludes should be a commandline argument.
+        # For now, let's just make sure all the .git objects aren't orphaned.
+        self.excludes = [ '.git' ]
+
     def spide(self):
         '''Check all urls in urls_to_check, which has new urls
            being added to it during the spidering process.
@@ -82,7 +86,8 @@ class Spider:
            find all files in self.rootdir that weren't in succeeded.
         '''
         self.orphans = []
-        for root, dirs, files in os.walk(self.rootdir):
+        for root, dirs, files in os.walk(self.rootdir, topdown=True):
+            dirs[:] = [d for d in dirs if d not in self.excludes]
             for filename in files:
                 f = os.path.join(root, filename)
                 if f not in self.files_succeeded:
@@ -157,7 +162,7 @@ class Spider:
         if url in self.urls_succeeded or url in self.urls_failed:
             return
 
-        print "=============================== Checking", url
+        # print "=============================== Checking", url
 
         # If we got this far, we'll be comparing links.
         # So we'll need to know the parsed parts of this url.
@@ -174,7 +179,7 @@ class Spider:
         # we need to know what relative links are relative_to,
         # but if they themselves XXX
         localpath = self.get_local_for_url(urlparsed.path)
-        print "=== local for", urlparsed.path, "is", localpath
+        # print "=== local for", urlparsed.path, "is", localpath
 
         if not localpath:
             # print urlparsed.path, "is outside original directory; skipping"
