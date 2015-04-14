@@ -14,6 +14,8 @@ from BeautifulSoup import BeautifulSoup
 
 class Spider:
     def __init__(self, rootdir, starturl):
+        self.debug = True
+
         self.starturl = starturl
         self.rootdir = os.path.normpath(rootdir)
         if not os.path.isdir(rootdir):
@@ -22,6 +24,8 @@ class Spider:
         else:
             # It's already a directory, so self.rootdir is fine.
             rootfile = None
+
+        # XXX This next bit isn't platform-agnostic:
         if not self.rootdir.endswith('/'):
             self.rootdir += '/'
 
@@ -35,12 +39,18 @@ class Spider:
         self.host = parsed.netloc
         self.rooturlpath = posixpath.normpath(parsed.path)
         dirpart, basepart = posixpath.split(self.rooturlpath)
+        # If the path is a directory and ends in / (as it should)
+        # then posixpath will split on that slash, not the previous one.
+        if not basepart:
+            dirpart, basepart = posixpath.split(dirpart)
 
         # Now basepart is the last part of the path, which might
         # be a directory name on the server or it might be index.*
         # Compare it to the last part of self.rootdir, which is
         # guaranteed to be a directory.
-        lastdir = posixpath.basename(self.rootdir)
+        # But we have to split it twice, because self.rootdir ends in /
+        # so the first split will return '' as the basename.
+        lastdir = posixpath.basename(posixpath.dirname(self.rootdir))
         if basepart != lastdir:
             self.rooturlpath = posixpath.dirname(self.rooturlpath)
 
@@ -55,10 +65,10 @@ class Spider:
             self.rooturl += '/'
 
         print "rootdir:", self.rootdir
+        print "rooturl:", self.rooturl
         print "rooturlpath:", self.rooturlpath
         print "scheme:", self.scheme
         print "host:", self.host
-        print "rooturl:", self.rooturl
         print
 
         self.urls_to_check = [ self.rooturl ]
@@ -115,11 +125,7 @@ class Spider:
     def get_local_for_url(self, urlpath):
         '''Get a local file path for a path parsed from an absolute URL.
         '''
-        # parsed = urlparse.urlparse(url)
-        # if parsed.netloc != self.host:
-        #     print "Eek, non-local URL passed to get_local_and_url", url
-        #     return None, None
-        # # Now compare parsed.path with self.rooturlpath
+        # Now compare parsed.path with self.rooturlpath
         if self.rooturlpath not in urlpath:
             return None
         return os.path.normpath(urlpath.replace(self.rooturlpath,
@@ -136,7 +142,8 @@ class Spider:
             # XXX If we ever extend this to check validity of
             # external URLs, this next condition is the one to change.
             if parsed.netloc != self.host:
-                # print "Ignoring external link", url
+                if self.debug:
+                    print "Ignoring external link", url
                 return None
             return url
 
@@ -159,17 +166,22 @@ class Spider:
 
     def check_url(self, url):
         '''Check a URL. This should be an absolute URL on the server.'''
-        if url in self.urls_succeeded or url in self.urls_failed:
-            return
-
-        # print "=============================== Checking", url
-
         # If we got this far, we'll be comparing links.
         # So we'll need to know the parsed parts of this url.
         urlparsed = urlparse.urlparse(url)
         if not urlparsed.scheme or not urlparsed.path.startswith('/'):
             print "EEK! Non-relative URL passed to check_url, bailing"
             return
+
+        # URL encode special characters like spaces:
+        urlpath = urllib.quote(urlparsed.path)
+
+        # This check must come after the special char substitution.
+        if urlpath in self.urls_succeeded or url in self.urls_failed:
+            return
+
+        if self.debug:
+            print "=============================== Checking", url
 
         # Now we need just the directory part. This might be
         # dirname(urlparsed.path), if the url is a file, or it
@@ -179,28 +191,28 @@ class Spider:
         # we need to know what relative links are relative_to,
         # but if they themselves XXX
         localpath = self.get_local_for_url(urlparsed.path)
-        # print "=== local for", urlparsed.path, "is", localpath
+        if self.debug:
+            print "=== local for", urlparsed.path, "is", localpath
 
         if not localpath:
-            # print urlparsed.path, "is outside original directory; skipping"
+            if self.debug:
+                print urlparsed.path, "is outside original directory; skipping"
             if url not in self.outside_urls:
                 self.outside_urls.append(url)
             return
 
         if not os.path.exists(localpath):
             print "Local path '%s' doesn't exist! %s" % (localpath,  url)
-            self.urls_failed.append(url)
+            self.urls_failed.append(urlpath)
             return
-
-        # URL encode special characters like spaces:
-        urlpath = urllib.quote(urlparsed.path)
 
         # If we substituted any special characters, rebuild the URL:
         if urlpath != urlparsed.path:
             lurl = list(urlparsed)
             lurl[2] = urlpath
             url = urlparse.urlunparse(lurl)
-            print "Substituted characters, recombined to", url
+            if self.debug:
+                print "Substituted characters, recombined to", url
 
         if os.path.isdir(localpath):
             # The web server will substitute index.something,
@@ -221,8 +233,9 @@ class Spider:
             localdir = os.path.dirname(localpath)
             urldir = posixpath.dirname(urlpath)
 
-        # print "localpath", localpath, "localdir", localdir
-        # print "urldir:", urldir
+        if self.debug:
+            print "localpath", localpath, "localdir", localdir
+            print "urldir:", urldir
 
         try:
             request = urllib2.Request(url)
@@ -232,6 +245,7 @@ class Spider:
 
         if not handle:
             print "Can't open", url
+
         # request.add_header("User-Agent", AGENT)
 
         try:
@@ -239,8 +253,9 @@ class Spider:
             info = response.info()
             if 'content-type' not in info.keys() or \
                not info['content-type'].startswith('text/html'):
-                print url, "isn't HTML; skipping"
-                self.urls_succeeded.append(url)
+                if self.debug:
+                    print url, "isn't HTML; skipping"
+                self.urls_succeeded.append(urlpath)
                 self.files_succeeded.append(localpath)
                 return
             content = unicode(response.read(), "utf-8", errors="replace")
@@ -250,20 +265,21 @@ class Spider:
                 print >> sys.stderr, "ERROR: %s -> %s" % (error, error.url)
             else:
                 print >> sys.stderr, "ERROR: %s" % error
-            self.urls_failed.append(url)
+            self.urls_failed.append(urlpath)
             return
 
         except urllib2.URLError, error:
             print >> sys.stderr, "ERROR: %s" % error
-            self.urls_failed.append(url)
+            self.urls_failed.append(urlpath)
             return
 
-        self.urls_succeeded.append(url)
+        self.urls_succeeded.append(urlpath)
         self.files_succeeded.append(localpath)
 
         ctype = response.headers['content-type']
         if not ctype.startswith("text/html"):
-            print url, "isn't HTML (%s); not reading content" % ctype
+            if self.debug:
+                print url, "isn't HTML (%s); not reading content" % ctype
             return
 
         soup = BeautifulSoup(content)
@@ -282,7 +298,9 @@ class Spider:
                 if href not in self.outside_urls:
                     self.outside_urls.append(href)
                 continue
-            
+
+            # This check won't get everything, because href
+            # hasn't been special char substituted yet.
             if href not in self.urls_to_check and \
                href not in self.urls_succeeded and \
                href not in self.urls_failed:
@@ -300,7 +318,7 @@ class Spider:
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print "Usage: %s local_dir url"
+        print "Usage: %s local_dir url" % os.path.basename(sys.argv[0])
         sys.exit(1)
 
     spider = Spider(sys.argv[1], sys.argv[2])
