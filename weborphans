@@ -231,7 +231,9 @@ class Spider:
 
         try:
             response = handle.open(request)
-            if response.info()['content-type'] != 'text/html':
+            info = response.info()
+            if 'content-type' not in info.keys() or \
+               not info['content-type'].startswith('text/html'):
                 print url, "isn't HTML; skipping"
                 self.urls_succeeded.append(url)
                 self.files_succeeded.append(localpath)
@@ -255,8 +257,8 @@ class Spider:
         self.files_succeeded.append(localpath)
 
         ctype = response.headers['content-type']
-        if ctype != "text/html":
-            print url, "isn't HTML; not reading content"
+        if not ctype.startswith("text/html"):
+            print url, "isn't HTML (%s); not reading content" % ctype
             return
 
         soup = BeautifulSoup(content)
@@ -283,13 +285,16 @@ class Spider:
 
         for tag in soup.findAll('img', src=True):
             src = self.make_absolute(tag.get('src'), urldir)
+            if not src:
+                self.outside_urls.append(tag.get('src'))
+                continue
             # self.urls_succeeded.append(src)
             urlparsed = urlparse.urlparse(src)
             localpath = self.get_local_for_url(urlparsed.path)
             self.files_succeeded.append(localpath)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3):
+    if len(sys.argv) < 3:
         print "Usage: %s local_dir url"
         sys.exit(1)
 
