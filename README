@@ -219,6 +219,10 @@ weather/weatherwin:
     Display a window showing temperature and today's forecast
     for several cities at once.
 
+weborphans:
+    Check a web site (perhaps localhost) against a local mirror,
+    checking for broken links and orphaned files.
+
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
     the xlrd package to parse the spreadsheet.
