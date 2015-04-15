@@ -314,7 +314,7 @@ class Spider:
             # self.urls_succeeded.append(src)
             urlparsed = urlparse.urlparse(src)
             localpath = self.get_local_for_url(urlparsed.path)
-            self.files_succeeded.append(localpath)
+            self.urls_to_check.append(src)
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
