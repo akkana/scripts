@@ -14,7 +14,7 @@ from BeautifulSoup import BeautifulSoup
 
 class Spider:
     def __init__(self, rootdir, starturl):
-        self.debug = True
+        self.debug = False
 
         self.starturl = starturl
         self.rootdir = os.path.normpath(rootdir)
@@ -103,7 +103,7 @@ class Spider:
                 if f not in self.files_succeeded:
                     self.orphans.append(f)
 
-    def summarize(self):
+    def print_summary(self):
         print
         print "URLs succeeded:"
         print '\n'.join(self.urls_succeeded)
@@ -177,7 +177,7 @@ class Spider:
         urlpath = urllib.quote(urlparsed.path)
 
         # This check must come after the special char substitution.
-        if urlpath in self.urls_succeeded or url in self.urls_failed:
+        if urlpath in self.urls_succeeded or urlpath in self.urls_failed:
             return
 
         if self.debug:
@@ -192,7 +192,7 @@ class Spider:
         # but if they themselves XXX
         localpath = self.get_local_for_url(urlparsed.path)
         if self.debug:
-            print "=== local for", urlparsed.path, "is", localpath
+            print "=== local for", urlpath, "is", localpath
 
         if not localpath:
             if self.debug:
@@ -202,7 +202,8 @@ class Spider:
             return
 
         if not os.path.exists(localpath):
-            print "Local path '%s' doesn't exist! %s" % (localpath,  url)
+            if self.debug:
+                print "Local path '%s' doesn't exist! %s" % (localpath,  url)
             self.urls_failed.append(urlpath)
             return
 
@@ -262,14 +263,14 @@ class Spider:
 
         except urllib2.HTTPError, error:
             if error.code == 404:
-                print >> sys.stderr, "ERROR: %s -> %s" % (error, error.url)
+                print "ERROR: %s -> %s" % (error, error.url)
             else:
-                print >> sys.stderr, "ERROR: %s" % error
+                print "ERROR: %s" % error
             self.urls_failed.append(urlpath)
             return
 
         except urllib2.URLError, error:
-            print >> sys.stderr, "ERROR: %s" % error
+            print "ERROR: %s" % error
             self.urls_failed.append(urlpath)
             return
 
@@ -325,7 +326,7 @@ if __name__ == '__main__':
     try:
         spider.spide()
         spider.check_orphans()
-        spider.summarize()
+        spider.print_summary()
     except KeyboardInterrupt:
         print "Interrupt"
 
