@@ -33,13 +33,14 @@ class PresoViewer(gtk.Window):
         if gtk.gdk.screen_height() <= self.displayheight :
             self.fullscreen()
 
-        self._browser = webkit.WebView()
-        self.add(self._browser)
+        self.browser = webkit.WebView()
+        self.add(self.browser)
         self.connect('destroy', gtk.main_quit)
+        self.browser.connect("title-changed", self.title_changed)
 
-        self._browser.connect("key-press-event", self.key_press_event)
+        self.browser.connect("key-press-event", self.key_press_event)
 
-        self._browser.open(url)    # throw err if url isn't defined
+        self.browser.open(url)    # throw err if url isn't defined
         self.show_all()
 
     # An attempt to print to PDF. None of this works.
@@ -56,7 +57,7 @@ class PresoViewer(gtk.Window):
     #   http://notes.alexdong.com/xhtml-to-pdf-using-pyqt4-webkit-and-headless
     #
     # def pdf(self) :
-    #     webframe = self._browser.get_main_frame()
+    #     webframe = self.browser.get_main_frame()
     #     # Even the simple print dialog solution they use from the
     #     # python-webkit example doesn't work. It doesn't work in
     #     # the example, either.
@@ -101,8 +102,16 @@ class PresoViewer(gtk.Window):
             if self.make_screenshots :
                 self.screenshot()
                 return False
-             
+        elif event.keyval == gtk.keysyms.r :
+            if event.state == gtk.gdk.SHIFT_MASK :
+                self.browser.reload_bypass_cache()
+            else :
+                self.browser.reload()
+            return True
         return False     # False means we haven't handled, pass event on
+
+    def title_changed(self, webview, frame, title):
+        self.set_title(title)
 
 if __name__ == "__main__":
     if len(sys.argv) <= 1 :
