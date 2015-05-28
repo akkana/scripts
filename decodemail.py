@@ -51,8 +51,17 @@ def decode_file(filename, header_wanted) :
           or (output and (line.startswith(' ') or line.startswith('\t'))) :
             # We have a match! But we may need to read multiple lines,
             # since one header can be split over several lines.
-            # print "Original:", line
             found_something = True
+
+            # Strip output because we don't want the final newline.
+            # But add a space if this is a continuation.
+            if output:
+                output += ' '
+            output += decode_piece(line.strip())
+
+        elif output :
+            # if we've already matched the header, and this isn't a
+            # continuation line, then we're done. Print and exit.
 
             # If the header is an address, we have to split it into parts
             # before we can decode it. If it's another header such as Subject,
@@ -61,19 +70,14 @@ def decode_file(filename, header_wanted) :
                     or header_wanted.startswith("To") \
                     or header_wanted.startswith("Cc") \
                     or header_wanted.startswith("Bcc"):
-                pieces = email.utils.parseaddr(line)
+                pieces = email.utils.parseaddr(output)
                 if pieces[0] or pieces[1]:
-                    output += header_wanted + ' '
-                    output += email.utils.formataddr(map(decode_piece, pieces))
+                    output = header_wanted + ' ' + \
+                             email.utils.formataddr(map(decode_piece, pieces))
                 else:
                     output += line
                     print "parseaddr failed on", line,
-            else:
-                output += decode_piece(line)
 
-        elif output :
-            # if we've already matched the header, and this isn't a
-            # continuation line, then we're done. Print and exit.
 
             #sys.stdout.write("<<" + part[0] + '>>')
             print output.strip()
@@ -82,7 +86,8 @@ def decode_file(filename, header_wanted) :
             else :
                 sys.exit(0)
 
-    # If we get here, we never matched a header, or ended with a continuation line.
+    # If we get here, we never matched a header,
+    # or ended with a continuation line.
     if not found_something :
         print "No such header", header_wanted, "in", filename
         return
