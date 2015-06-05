@@ -78,8 +78,13 @@ class Spider:
         self.files_succeeded = []
 
         # Eventually, the list of excludes should be a commandline argument.
-        # For now, let's just make sure all the .git objects aren't orphaned.
-        self.excludes = [ '.git' ]
+        # For now, let's just make sure all the .git objects aren't orphaned,
+        # nor web stats or archived files.
+        self.excludes = [ ".git", "stats", "0-pre2011", "0-calendars" ]
+
+        # Files that aren't explicitly referenced by the website,
+        # but might be needed for other purposes.
+        self.nonorphans = [ "favicon.ico", "robots.txt", ".htaccess" ]
 
     def spide(self):
         '''Check all urls in urls_to_check, which has new urls
@@ -99,6 +104,8 @@ class Spider:
         for root, dirs, files in os.walk(self.rootdir, topdown=True):
             dirs[:] = [d for d in dirs if d not in self.excludes]
             for filename in files:
+                if filename in self.nonorphans:
+                    continue
                 f = os.path.join(root, filename)
                 if f not in self.files_succeeded:
                     self.orphans.append(f)
