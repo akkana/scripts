@@ -4,7 +4,7 @@
 # paste the link, read the result page, copy that link, go paste it in
 # twitter, close the tab.
 
-#import urllib, urllib2, urlparse, httplib
+#import urllib, urllib2, httplib
 import sys
 import urllib, urllib2
 import gtk
