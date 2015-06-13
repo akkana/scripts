@@ -275,16 +275,17 @@ class MusicWin(gtk.Window) :
         pos = mixer.music.get_pos() / 1000.0 + self.skipped_seconds
         # get_pos returns milliseconds.
         # Supposedly the position argument of play() takes seconds.
-        pos += self.skip_sec
+        pos += sec
         if pos < 0: pos = 0.
         self.skipped_seconds = pos
         mixer.music.play(0, pos)
 
     def skip_fwd(self, w=None):
-        self.skip(10000)
+        self.skip(20)
 
     def skip_back(self, w=None):
-        self.skip(-10000)
+        # self.skip(-10000)
+        self.skip(-20)
 
     def volume_change(self, delta):
         vol = mixer.music.get_volume()
