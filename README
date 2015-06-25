@@ -116,10 +116,6 @@ musicplayer.py:
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
 
-nokeywords:
-    Find directories under the current one that *don't* include a file
-    named Tags or Keywords: photo directories that still need to be tagged.
-
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
