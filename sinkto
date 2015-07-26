@@ -1,0 +1,138 @@
+#! /bin/bash
+
+#
+# Akkana's script to sync mail, docs, dotfiles and a few other important
+# directories # when transitioning between home machine and a laptop.
+# Called as sinkto host or sinkfrom host
+# (make a symlink from sinkto to sinkfrom).
+#
+# And in case you're wondering, yes, I do know how to spell sync.
+# But if I called it syncfrom/syncto then I couldn't use tab-completion
+# to distinguish it from the sync program.
+#
+# This is GPLv2 free to reuse or modify blah blah
+#
+
+# Try to get ssh-agent started, so we don't get prompted for password
+# sixteen bazillion times:
+# But of course this doesn't work, because when has ssh-agent ever worked?
+# That's okay, no longer need it if we're using rsync -R (relative).
+#eval `ssh-agent`
+#ssh-add ~/.ssh/id_rsa
+
+# The directories we need to keep synchronized.
+# This list will be different for everybody.
+dir_list='Documents/ .config/musicplayer/ Mail/ web/ .fetchmail .emacs-lisp .vim .mutt .themes bin Procmail'
+# Can't include .config/openbox because menu.rc must vary
+# depending on what distro we're on and what programs it has available.
+
+# Individual files to keep in sync:
+file_list=".zshrc .zlogin .zprofile .zshrc-$(hostname -s) .zshrc-$1 .cshrc .bashrc .emacs .emacs.bmk .muttrc .fetchmailrc .procmailrc .xinitrc .mailcap .mime.types .gtkrc-2.0 .gtkrc.mine .gitconfig .XCompose"
+
+# Would like .Xdefaults but that has to be different on different screens.
+
+# Files to exclude, e.g. huge log files:
+exclude_list="log LOG .git *.mp4 .img bin/crikey neoncache feeds web/feedme"
+
+##### End customization.
+
+#
+# First figure out if we're going from or to ... src and dst.
+#
+
+if [ x$USER == x ]; then
+  me=$(whoami)
+else
+  me=$USER
+fi
+
+srclist=""
+dstpath=""
+
+##########################################################
+# Some utility functions
+#
+
+#
+# echo_and_do something.
+#
+echo_and_do() {
+  echo $*
+  $*
+}
+
+#
+# make_host_dir host dir
+# build up an rsync host:dir term
+#
+make_host_dir() {
+  if [ x$1 == xmoon -o x$1 == xshallowsky.com -o x$1 == xtimocharis.com ]; then
+    echo "$1:/back/$me/$2"
+  elif [ x$1 == x ]; then
+    echo $2
+  elif [ -d $1 ]; then
+    echo $1/$2
+  else
+    echo "$1:$2"
+  fi
+}
+
+#
+# end utility functions, back to main
+##########################################################
+
+progname=$(basename $0)
+
+# optional -n argument which must come first
+if [ $1 == '-n' ]; then
+    extras='-n'
+    shift
+fi
+
+if [ $progname == 'sinkfrom' ]; then
+  for sp in $file_list $dir_list; do
+    srclist="$srclist $(make_host_dir $1 $sp)"
+  done
+
+  dstpath='~/'
+
+elif [ $progname == 'sinkto' ]; then
+  # To use relative paths, we'd better be in ~ to begin with!
+  echo_and_do cd $HOME
+  srclist="$file_list $dir_list"
+  dstpath=$(make_host_dir $1 './')
+
+else
+  echo "Unknown program name:" $progname
+  echo $*
+fi
+
+# echo -n "Okay to sink from $src to $dst ? "
+# read ans
+# if [ x$ans != 'xy' -a x$ans != 'xY' -a x$ans != "xyes" ]; then
+#   echo "Exiting by your request"
+#   exit 1
+# fi
+
+# Handle sync-to mail spool:
+# Actually, this isn't quite so critical now that mutt no longer
+# insists on using atime for everything.
+# if [ $progname == 'sinkto' ]; then
+#   # Make sure fetchmail is stopped before updating mailboxes:
+#   echo_and_do killall fetchmail
+
+#   # We'll want to copy the mail spool along with other mail
+#   echo_and_do cp /var/mail/$me $HOME/Msgs/spool
+# fi
+
+# Build up the exclude list:
+excludes=""
+for f in $exclude_list; do
+    excludes="$excludes --exclude=$f"
+done
+
+#
+# Now copy the various directories and files, using rsync -R (relative).
+#
+echo_and_do rsync -avRu --delete $extras $excludes $srclist $dstpath
+
