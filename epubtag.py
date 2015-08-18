@@ -18,8 +18,7 @@ class EpubBook:
 
     def open(self, filename):
         if not zipfile.is_zipfile(filename):
-            print filename, "isn't an epub file (not zipped)"
-            return
+            raise RuntimeError(filename + " isn't an epub file (not zipped)")
 
         self.filename = filename
         self.zip = zipfile.ZipFile(filename)
@@ -89,6 +88,9 @@ class EpubBook:
     def get_titles(self):
         titles, elements, parent = self.get_matches('dc:title')
         return titles
+
+    def get_title(self):
+        return self.get_titles()[0]
 
     def get_authors(self):
         authors, elements, parent = self.get_matches('dc:creator')
@@ -268,21 +270,24 @@ if __name__ == "__main__":
         Usage()
 
     for f in epubfiles:
-        if not brief:
-            print "======="
+        try:
+            if not brief:
+                print "======="
 
-        book = EpubBook()
-        book.open(f)
-        
-        if delete_tags:
-            book.delete_tags()
+            book = EpubBook()
+            book.open(f)
 
-        if tags:
-            book.add_tags(tags)
+            if delete_tags:
+                book.delete_tags()
 
-        if tags or delete_tags:
-            book.save_changes()
+            if tags:
+                book.add_tags(tags)
 
-        print book.info_string(brief)
+            if tags or delete_tags:
+                book.save_changes()
 
-        book.close()
+            print book.info_string(brief)
+
+            book.close()
+        except RuntimeError, e:
+            print e

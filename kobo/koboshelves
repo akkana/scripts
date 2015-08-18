@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+import os
 import kobo_utils
 
 # Initialize with the path where the Kobo is mounted:
 koboDB = kobo_utils.KoboDB('/dkobo')
 
 # For testing: for a real Kobo, don't specify a path, just connect().
-koboDB.connect('kobo/d-KoboReader-shelves.sqlite')
+koboDB.connect(os.path.expanduser('~/kobo/d-KoboReader-shelves.sqlite'))
 
 print "========= Shelf =========="
 koboDB.print_table("Shelf")
