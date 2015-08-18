@@ -33,16 +33,31 @@ def copy_pods(indir, outdir, playlist=None):
     # Get a list of the files already in the output dir.
     # We'll compare names and sizes to try to avoid duplicate copies.
     existing_files = os.listdir(outdir)
+
     existing_sizes = []
     for f in existing_files:
         statbuf = os.stat(os.path.join(outdir, f))
         existing_sizes.append(statbuf.st_size)
 
+    files_in_playlist = []
+
+    # Read the playlist
     # Now try to copy the input files.
     fp = open(playlist)
     for f in fp:
-        f = f.strip()
+        files_in_playlist.append(f.strip())
 
+    # If there are no files there already, most likely we haven't
+    # mounted the /mp3 device yet. However, it might be handy to
+    # know what we *would* copy there if it was mounted ...
+    if len(existing_files) == 0:
+        print outdir, "is empty (probably not mounted)"
+        print "\nWould copy:"
+        for f in files_in_playlist:
+            print f
+        sys.exit(1)
+
+    for f in files_in_playlist:
         first_bad = -1
         for c in illegal_chars:
             if c in f:
