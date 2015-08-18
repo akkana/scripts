@@ -7,9 +7,17 @@ import zipfile
 import xml.dom.minidom
 
 import kobo_utils
-
-sys.path.insert(0, '..')
 import epubtag
+
+# Create only shelves in this list. Otherwise ignore tags.
+# Don't create shelves for all the zillions of Gutenberg tags.
+# Lower-case only.
+shelves_wanted = [ "mystery", "science fiction", "science", "astronomy",
+                   "history", "short stories", "politics", "philosophy",
+                   "dogs", "animals", "humor", "biography", "medicine",
+                   "nonfiction", "poetry", "plays", "travel",
+                   "war", "civil war", "historical fiction", "adventure",
+                   "juvenile", "fantasy" ]
 
 booklist = {}
 
@@ -68,6 +76,9 @@ for kobobook in kobobooks:
     # Iterate through the tags and see if it's in appropriate shelves:
     print kobobook['Title'], "has tags", booklist[kobobook['Title']]
     for tag in booklist[kobobook['Title']]:
+        if tag not in shelves_wanted:
+            continue
+
         # See if there's already a shelf for this tag:
         if tag not in kobo_shelves:
             make_new_shelf(tag)
