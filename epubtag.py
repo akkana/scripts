@@ -17,7 +17,7 @@ class EpubBook:
         self.dom = None
 
     def open(self, filename):
-        if not zipfile.is_zipfile(filename) :
+        if not zipfile.is_zipfile(filename):
             print filename, "isn't an epub file (not zipped)"
             return
 
@@ -28,8 +28,8 @@ class EpubBook:
         if not self.zip:
             raise RuntimeError('Epub book not opened')
 
-        for f in self.zip.namelist() :
-            if os.path.basename(f).endswith('.opf') :
+        for f in self.zip.namelist():
+            if os.path.basename(f).endswith('.opf'):
                 self.contentfile = f
                 content = self.zip.open(f)
                 break
@@ -38,9 +38,9 @@ class EpubBook:
             return None
 
         # Now content is a file handle on the content.opf XML file
-        try :
+        try:
             self.dom = xml.dom.minidom.parse(content)
-        except IOError, e :
+        except IOError, e:
             raise IOError, filename + ': ' + str(e)
 
         content.close()
@@ -51,25 +51,25 @@ class EpubBook:
         self.zip = None
         self.dom = None
  
-    def get_matches(self, elname, delete_tags=False) :
+    def get_matches(self, elname, delete_tags=False):
         elements = self.dom.getElementsByTagName(elname)
         parent = None
         matches = []
-        for el in elements :
+        for el in elements:
             # Obviously there should be more error checking here
-            if not parent :
+            if not parent:
                 parent = el.parentNode
-            else :
+            else:
                 assert parent == el.parentNode
 
-            if delete_tags :
-                if el.childNodes :
+            if delete_tags:
+                if el.childNodes:
                     print "Deleting:", el.childNodes[0].wholeText
-                else :
+                else:
                     print "Deleting empty", elname, "tag"
                 el.parentNode.removeChild(el)
 
-            elif el.childNodes :
+            elif el.childNodes:
                 # el.childNodes[0].wholeText is the unicode.
                 # Turn it into UTF-8 before returning.
                 # Uncomment the next line and run on micromegas.epub
@@ -81,7 +81,7 @@ class EpubBook:
                 # matches.append(el.childNodes[0].wholeText)
                 matches.append(el.childNodes[0].wholeText.encode('utf-8',
                                                         'backslashreplace'))
-            else :
+            else:
                 print "Empty", elname, "tag"
 
         return matches, elements, parent
@@ -108,29 +108,29 @@ class EpubBook:
 
         # grab the title and author
         titles = self.get_titles()
-        if brief :
+        if brief:
             outstr += ', '.join(titles) + " | "
-        else :
-            for t in titles :
+        else:
+            for t in titles:
                 outstr += "Title: " + t + "\n"
 
         authors = self.get_authors()
-        if brief :
+        if brief:
             outstr += ', '.join(authors) + ' | '
-        else :
-            if len(authors) > 1 :
+        else:
+            if len(authors) > 1:
                 outstr += "Authors: "
-            else :
+            else:
                 outstr += "Author: "
             outstr += ', '.join(authors) + "\n"
 
         tags = self.get_tags()
-        if brief :
+        if brief:
             outstr += ', '.join(tags)
-        else :
-            if tags :
+        else:
+            if tags:
                 outstr += "Tags: "
-                for tag in tags :
+                for tag in tags:
                     outstr += '\n   ' + tag
 
         return outstr
@@ -143,22 +143,22 @@ class EpubBook:
 
         # If we didn't see a dc:subject, we still need a parent,
         # the <metadata> tag.
-        if not parent :
+        if not parent:
             print "Warning: didn't see any subject tags previously"
             parent = self.dom.getElementsByTagName("metadata")[0]
 
             # If there's no metadata tag, maybe we should add one,
             # but it might be better to throw an error.
-            if not parent :
+            if not parent:
                 raise RuntimeError("No metadata tag! Bailing.")
 
         # We'll want to add the new subject tags after the last one.
-        if elements :
+        if elements:
             last_tag_el = elements[-1]
-        else :
+        else:
             last_tag_el = None
 
-        for new_tag in new_tag_list :
+        for new_tag in new_tag_list:
             # Make the new node:
             #newnode = tag.cloneNode(False)
             newnode = self.dom.createElement(self.subjectTag)
@@ -171,12 +171,12 @@ class EpubBook:
             textnode = self.dom.createTextNode('\n')
 
             # Append newnode after the last tag node we saw:
-            if last_tag_el and last_tag_el.nextSibling :
+            if last_tag_el and last_tag_el.nextSibling:
                 parent.insertBefore(textnode, last_tag_el.nextSibling)
                 parent.insertBefore(newnode, textnode)
             # If we didn't see a tag, or the tag was the last child
             # of its parent, we have to do it this way:
-            else :
+            else:
                 parent.appendChild(newnode)
                 parent.appendChild(textnode)
 
@@ -187,8 +187,8 @@ class EpubBook:
         # but change the content.opf (or whatever.opf) to the new one:
         new_epub_file = self.filename + '.tmp'
         ozf = zipfile.ZipFile(new_epub_file, 'w')
-        for info in self.zip.infolist() :
-            if info.filename.endswith('.opf') :
+        for info in self.zip.infolist():
+            if info.filename.endswith('.opf'):
                 # dom.toprettyprintxml() returns unicode, which
                 # zipfile.writestr() can't write. If you pass in
                 # encoding= then it works ... but minidom gives us
@@ -203,7 +203,7 @@ class EpubBook:
                 # ozf.writestr(info,
                 #              self.dom.toprettyxml().encode(encoding,
                 #                                      'xmlcharrefreplace'))
-            else :
+            else:
                 # For every other file, just copy directly.
                 ozf.writestr(info, self.zip.read(info.filename))
 
@@ -218,9 +218,9 @@ class EpubBook:
         os.remove(bakfile)
 
 # main
-if __name__ == "__main__" :
+if __name__ == "__main__":
 
-    def Usage() :
+    def Usage():
         print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
             % os.path.basename(sys.argv[0])
         print "Display, add or remove tags in epub ebooks."
@@ -244,31 +244,31 @@ if __name__ == "__main__" :
     add_tags = False
     delete_tags = False
     brief = False
-    for arg in sys.argv[1:] :
-        if arg == '-d' :
+    for arg in sys.argv[1:]:
+        if arg == '-d':
             delete_tags = True
             continue
-        if arg == '-t' :
+        if arg == '-t':
             add_tags = True
             continue
-        if arg == '-b' :
+        if arg == '-b':
             brief = True
             continue
-        if arg[0] == '-' :
+        if arg[0] == '-':
             Usage()
         if not add_tags :    # still adding files
-            if os.access(arg, os.R_OK) :
+            if os.access(arg, os.R_OK):
                 epubfiles.append(arg)
-            else :
+            else:
                 print "Can't read", arg, "-- skipping"
         else :               # done adding files, adding tags now
             tags.append(arg)
 
-    if not epubfiles :
+    if not epubfiles:
         Usage()
 
-    for f in epubfiles :
-        if not brief :
+    for f in epubfiles:
+        if not brief:
             print "======="
 
         book = EpubBook()
