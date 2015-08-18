@@ -1,41 +1,58 @@
 #! /usr/bin/env python
 
+# Utilities for reading epub books.
+#
+# Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+
 import os, sys
 import zipfile
 import xml.dom.minidom
 
-def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
+class EpubBook:
     subjectTag = 'dc:subject'
-    if brief :
-        print filename, '|',
-    else :
-        print filename
-    if not zipfile.is_zipfile(filename) :
-        print filename, "isn't an epub file (not zipped)"
-        return
-    zf = zipfile.ZipFile(filename)
-    content = None
-    for f in zf.namelist() :
-        if os.path.basename(f).endswith('.opf') :
-            contentfile = f
-            content = zf.open(f)
-            break
-    if not content :
-        raise RuntimeError('No content.opf in %s' % filename)
 
-    # Now content is a file handle on the content.opf XML file
-    try :
-        dom = xml.dom.minidom.parse(content)
-    except IOError, e :
-        raise IOError, filename + ': ' + str(e)
+    def __init__(self):
+        self.filename = None
+        self.zip = None
+        self.dom = None
 
-    # Tags are inside <metadata> and look like this:
-    # <metadata>
-    #   <dc:subject>Presidents -- United States -- Biography</dc:subject>
-    # Author (dc:creator) and Title (dc:title) are stored similarly.
+    def open(self, filename):
+        if not zipfile.is_zipfile(filename) :
+            print filename, "isn't an epub file (not zipped)"
+            return
 
-    def get_matches(elname, delete_tags=False) :
-        elements = dom.getElementsByTagName(elname)
+        self.filename = filename
+        self.zip = zipfile.ZipFile(filename)
+
+        # Parse the OPF file into self.dom.
+        if not self.zip:
+            raise RuntimeError('Epub book not opened')
+
+        for f in self.zip.namelist() :
+            if os.path.basename(f).endswith('.opf') :
+                self.contentfile = f
+                content = self.zip.open(f)
+                break
+        if not content:
+            raise RuntimeError('No .opf file in %s' % self.filename)
+            return None
+
+        # Now content is a file handle on the content.opf XML file
+        try :
+            self.dom = xml.dom.minidom.parse(content)
+        except IOError, e :
+            raise IOError, filename + ': ' + str(e)
+
+        content.close()
+
+    def close(self):
+        self.zip.close()
+        self.filename = None
+        self.zip = None
+        self.dom = None
+ 
+    def get_matches(self, elname, delete_tags=False) :
+        elements = self.dom.getElementsByTagName(elname)
         parent = None
         matches = []
         for el in elements :
@@ -69,130 +86,151 @@ def tag_epub_file(filename, new_tag_list=None, delete_tags=False, brief=False) :
 
         return matches, elements, parent
 
-    # But first, grab the title and author
-    titles, elements, parent = get_matches('dc:title')
-    if titles :
+    def get_titles(self):
+        titles, elements, parent = self.get_matches('dc:title')
+        return titles
+
+    def get_authors(self):
+        authors, elements, parent = self.get_matches('dc:creator')
+        return authors
+
+    def get_tags(self):
+        # Tags are inside <metadata> and look like this:
+        # <metadata>
+        #   <dc:subject>Presidents -- United States -- Biography</dc:subject>
+        # Author (dc:creator) and Title (dc:title) are stored similarly.
+
+        tags, elements, parent = self.get_matches(self.subjectTag)
+        return tags
+
+    def info_string(self, brief=False):
+        outstr = ''
+
+        # grab the title and author
+        titles = self.get_titles()
         if brief :
-            print ', '.join(titles), '|',
+            outstr += ', '.join(titles) + " | "
         else :
             for t in titles :
-                print "Title:", t
-    authors, elements, parent = get_matches('dc:creator')
-    if brief :
-        print ', '.join(authors), '|',
-    else :
-        if len(authors) > 1 :
-            print 'Authors:',
+                outstr += "Title: " + t + "\n"
+
+        authors = self.get_authors()
+        if brief :
+            outstr += ', '.join(authors) + ' | '
         else :
-            print 'Author:',
-        print ', '.join(authors)
+            if len(authors) > 1 :
+                outstr += "Authors: "
+            else :
+                outstr += "Author: "
+            outstr += ', '.join(authors) + "\n"
 
-    # Now get the subject tags, deleting them if appropriate.
-    tags, elements, parent = get_matches(subjectTag, delete_tags)
-    if brief :
-        print ', '.join(tags)
-    else :
-        if tags :
-            print "Tags:"
-            for tag in tags :
-                print '  ', tag
+        tags = self.get_tags()
+        if brief :
+            outstr += ', '.join(tags)
+        else :
+            if tags :
+                outstr += "Tags: "
+                for tag in tags :
+                    outstr += '\n   ' + tag
 
-    # Now add new tags, if any
-    content.close()
-    if not new_tag_list :
-        zf.close()
-        return
+        return outstr
 
-    # There are new tags to add.
+    def delete_tags(self):
+        tags, elements, parent = self.get_matches(self.subjectTag, True)
 
-    # If we didn't see a dc:subject, we still need a parent, the <metadata> tag.
-    if not parent :
-        print "Warning: didn't see any subject tags previously"
-        parent = dom.getElementsByTagName("metadata")[0]
+    def add_tags(self, new_tag_list):
+        tags, elements, parent = self.get_matches(self.subjectTag)
 
-        # If there's no metadata tag, maybe we should add one,
-        # but it might be better to throw an error.
+        # If we didn't see a dc:subject, we still need a parent,
+        # the <metadata> tag.
         if not parent :
-            print "No metadata tag! Bailing."
-            return
+            print "Warning: didn't see any subject tags previously"
+            parent = self.dom.getElementsByTagName("metadata")[0]
 
-    # We'll want to add the new subject tags after the last one.
-    if elements :
-        last_tag_el = elements[-1]
-    else :
-        last_tag_el = None
+            # If there's no metadata tag, maybe we should add one,
+            # but it might be better to throw an error.
+            if not parent :
+                raise RuntimeError("No metadata tag! Bailing.")
 
-    for new_tag in new_tag_list :
-        # Make the new node:
-        #newnode = tag.cloneNode(False)
-        newnode = dom.createElement(subjectTag)
-
-        # Make a text node inside it:
-        textnode = dom.createTextNode(new_tag)
-        newnode.appendChild(textnode)
-
-        # Also add a newline after each new node
-        textnode = dom.createTextNode('\n')
-
-        # Append nodenode after the last tag node we saw:
-        if last_tag_el and last_tag_el.nextSibling :
-            parent.insertBefore(textnode, last_tag_el.nextSibling)
-            parent.insertBefore(newnode, textnode)
-        # If we didn't see a tag, or the tag was the last child
-        # of its parent, we have to do it this way:
+        # We'll want to add the new subject tags after the last one.
+        if elements :
+            last_tag_el = elements[-1]
         else :
-            parent.appendChild(newnode)
-            parent.appendChild(textnode)
+            last_tag_el = None
 
-        print "Adding:", new_tag
+        for new_tag in new_tag_list :
+            # Make the new node:
+            #newnode = tag.cloneNode(False)
+            newnode = self.dom.createElement(self.subjectTag)
 
-    # Open a new zip file to write to, and copy everything
-    # but change the content.opf (or whatever.opf) to the new one:
-    new_epub_file = filename + '.tmp'
-    ozf = zipfile.ZipFile(new_epub_file, 'w')
-    for info in zf.infolist() :
-        if os.path.basename(info.filename).endswith('.opf') :
-            # dom.toprettyprintxml() returns unicode, which zipfile.writestr()
-            # can't write. If you pass in encoding= then it works ...
-            # but minidom gives us no way to find out the encoding
-            # of the XML file we just parsed!
-            # So the best we can do is force it to UTF-8,
-            # barring re-opening the file and parsing the first line manually.
-            # So crazy!
-            encoding = 'UTF-8'
-            ozf.writestr(info, dom.toprettyxml(encoding=encoding,
-                                               newl=''))
-            # This also works:
-            #ozf.writestr(info, dom.toprettyxml().encode(encoding,
-            #                                            'xmlcharrefreplace'))
-        else :
-            bytes = zf.read(info.filename)
-            ozf.writestr(info, bytes)
+            # Make a text node inside it:
+            textnode = self.dom.createTextNode(new_tag)
+            newnode.appendChild(textnode)
 
-    ozf.close()
-    zf.close()
+            # Also add a newline after each new node
+            textnode = self.dom.createTextNode('\n')
 
-    # Now we have the new file in new_epub_file, old in filename.
-    # Rename appropriately:
-    bakfile = filename + ".bak"
-    os.rename(filename, bakfile)
-    os.rename(new_epub_file, filename)
-    print "Wrote", filename
-    os.remove(bakfile)
+            # Append newnode after the last tag node we saw:
+            if last_tag_el and last_tag_el.nextSibling :
+                parent.insertBefore(textnode, last_tag_el.nextSibling)
+                parent.insertBefore(newnode, textnode)
+            # If we didn't see a tag, or the tag was the last child
+            # of its parent, we have to do it this way:
+            else :
+                parent.appendChild(newnode)
+                parent.appendChild(textnode)
 
-def Usage() :
-    print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
-        % os.path.basename(sys.argv[0])
-    print "Display, add or remove tags in epub ebooks."
-    print "Copyright 2012 by Akkana Peck -- share and enjoy under the GPL."
-    print "Options:"
-    print "    -t: add tags (otherwise, just print existing tags)"
-    print "    -d: delete existing tags before adding new ones"
-    print "    -b: print only one line for each book (useful with grep)"
-    sys.exit(1)
+            print "Adding:", new_tag
+
+    def save_changes(self):
+        # Open a new zip file to write to, and copy everything
+        # but change the content.opf (or whatever.opf) to the new one:
+        new_epub_file = self.filename + '.tmp'
+        ozf = zipfile.ZipFile(new_epub_file, 'w')
+        for info in self.zip.infolist() :
+            if info.filename.endswith('.opf') :
+                # dom.toprettyprintxml() returns unicode, which
+                # zipfile.writestr() can't write. If you pass in
+                # encoding= then it works ... but minidom gives us
+                # no way to find out the encoding of the XML file
+                # we just parsed! So the best we can do is force
+                # it to UTF-8, barring re-opening the file and
+                # parsing the first line manually. So crazy!
+                encoding = 'UTF-8'
+                ozf.writestr(info, self.dom.toprettyxml(encoding=encoding,
+                                                   newl=''))
+                # This also works:
+                # ozf.writestr(info,
+                #              self.dom.toprettyxml().encode(encoding,
+                #                                      'xmlcharrefreplace'))
+            else :
+                # For every other file, just copy directly.
+                ozf.writestr(info, self.zip.read(info.filename))
+
+        ozf.close()
+
+        # Now we have the new file in new_epub_file, old in filename.
+        # Rename appropriately:
+        bakfile = self.filename + ".bak"
+        os.rename(self.filename, bakfile)
+        os.rename(new_epub_file, self.filename)
+        print "Wrote", self.filename
+        os.remove(bakfile)
 
 # main
 if __name__ == "__main__" :
+
+    def Usage() :
+        print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
+            % os.path.basename(sys.argv[0])
+        print "Display, add or remove tags in epub ebooks."
+        print "Copyright 2012 by Akkana Peck -- share and enjoy under the GPL."
+        print "Options:"
+        print "    -t: add tags (otherwise, just print existing tags)"
+        print "    -d: delete existing tags before adding new ones"
+        print "    -b: print only one line for each book (useful with grep)"
+        sys.exit(1)
+
     # optparse can't handle multiple arguments of the same type
     # (e.g. multiple tags), and the argparse doc is impenetrable.
     # So let's just do this: any argument corresponding to a readable
@@ -232,4 +270,19 @@ if __name__ == "__main__" :
     for f in epubfiles :
         if not brief :
             print "======="
-        tag_epub_file(f, tags, delete_tags, brief)
+
+        book = EpubBook()
+        book.open(f)
+        
+        if delete_tags:
+            book.delete_tags()
+
+        if tags:
+            book.add_tags(tags)
+
+        if tags or delete_tags:
+            book.save_changes()
+
+        print book.info_string(brief)
+
+        book.close()
