@@ -17,7 +17,7 @@ shelves_wanted = [ "mystery", "science fiction", "science", "astronomy",
                    "dogs", "animals", "humor", "biography", "medicine",
                    "nonfiction", "poetry", "plays", "travel",
                    "war", "civil war", "historical fiction", "adventure",
-                   "juvenile", "fantasy" ]
+                   "juvenile", "fantasy", 'suspense' ]
 
 booklist = {}
 
@@ -42,8 +42,9 @@ for dir in sys.argv[1:]:
 # The path where the Kobo is mounted:
 koboDB = kobo_utils.KoboDB('/dkobo')
 
-# For testing: for a real Kobo, don't specify a path, just connect().
-koboDB.connect(os.path.expanduser('~/kobo/d-KoboReader-shelves.sqlite'))
+# For testing: for a real Kobo that's mounted, don't specify a path,
+# just connect() and it will use the mounted path.
+koboDB.connect(os.path.expanduser('~/kobo/d-KoboReader.sqlite'))
 
 # Shelf names on the Kobo:
 kobo_shelves = []
@@ -60,12 +61,6 @@ kobobooks = koboDB.get_dlist("content",
                              modifiers="content.BookTitle is null",
                              order="content.Title")
 
-def make_new_shelf(shelfname):
-    print "Making a new shelf called", shelfname
-
-def add_new_shelf_content(kobobook, shelfname):
-    print "Adding", kobobook["Title"], "to shelf", shelfname
-
 # Iterate over books on the Kobo:
 for kobobook in kobobooks:
     if kobobook['Title'] not in booklist:
@@ -81,8 +76,9 @@ for kobobook in kobobooks:
 
         # See if there's already a shelf for this tag:
         if tag not in kobo_shelves:
-            make_new_shelf(tag)
-            add_new_shelf_content(kobobook, tag)
+            koboDB.make_new_shelf(tag)
+            kobo_shelves.append(tag)
+            koboDB.add_new_shelf_content(kobobook, tag)
             continue
 
         # There's already a shelf named tag. Is this book in it?
@@ -96,7 +92,9 @@ for kobobook in kobobooks:
 
         if already_on_shelf:
             print kobobook['Title'], "is already on shelf", tag
-            continue
+        else:
+            koboDB.add_new_shelf_content(kobobook, tag)
 
-        add_new_shelf_content(kobobook, tag)
+koboDB.close()
+
 
