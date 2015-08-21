@@ -84,6 +84,36 @@ class KoboDB:
         self.cursor.execute(sql)
         return self.cursor.fetchall()[0]
 
+    def list_books(self):
+        books = self.get_dlist("content",
+                               selectors=[ 'ContentID', 'Title', 'Attribution',
+                                           'Description', 'NumShortcovers',
+                                           'IsEncrypted', 'IsDownloaded',
+                                           'adobe_location' ],
+                               modifiers="content.BookTitle is null",
+                               order="content.Title")
+
+        for book in books:
+            print "%s (%s)" % (book["Title"], book["Attribution"])
+            print "  ContentID:", book["ContentID"]
+            if book["NumShortcovers"]:
+                print "  Chapters:", book["NumShortcovers"]
+            print "  Encrypted?", book["IsEncrypted"],
+            print "   Downloaded?", book["IsDownloaded"],
+            if book["adobe_location"]:
+                if book["adobe_location"] == book["ContentID"]:
+                    print "    adobe_location: Yes"
+                else:
+                    print "\n  adobe_location:", book["adobe_location"]
+            else:
+                print
+
+            # Description is very long; make this optional.
+            # print "  Description:", book["Description"]
+
+            print
+
+
     def list_shelves(self, names=None):
         allshelves = {}
         if names:
@@ -156,3 +186,47 @@ VALUES ('%s', '%s', DATE('now'), 0, 0);''' % (shelfname,
         self.cursor.execute(query)
         self.conn.commit()
 
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description="""Show details about a Kobo ebook reader.
+By default, show a list of books.
+
+Copyright 2015 by Akkana Peck; share and enjoy under the GPLv2 or later.""",
+                         formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # Options:
+    parser.add_argument("-m", "--mountdir", default="/kobo",
+                    help="""Path where the Kobo is mounted. Default: /kobo""")
+    parser.add_argument("-d", "--db",
+                        default="$mountdir/.kobo/KoboReader.sqlite",
+                        help="""Path to the database.
+Default: $mountdir/.kobo/KoboReader.sqlite""")
+
+    # Things we can do:
+    parser.add_argument("-s", "--shelves", action='store_true', default=False,
+                        help="""Show shelves""")
+    parser.add_argument("-S", "--shelfnames", action='store_true',
+                        default=False,
+                        help="""Show shelf names but not their contents""")
+
+    args = parser.parse_args()
+    args.db = args.db.replace('$mountdir', args.mountdir)
+
+    try:
+        koboDB = KoboDB(args.mountdir)
+        koboDB.connect(args.db)
+    except Exception, e:
+        print "Couldn't open database at %s for Kobo mounted at %s" % \
+            (args.db, args.mountdir)
+        print e
+        sys.exit(1)
+
+    if args.shelfnames:
+        shelves = koboDB.get_dlist("Shelf", selectors=[ "Name" ])
+        for shelf in shelves:
+            print shelf["Name"]
+    elif args.shelves:
+        koboDB.list_shelves()
+    else:
+        koboDB.list_books()
