@@ -3,6 +3,9 @@
 import os, sys
 import sqlite3
 
+def escape_quotes(s):
+    return s.replace("'", "''")
+
 class KoboDB:
     def __init__(self, mountpath):
         self.mountpath = mountpath
@@ -43,17 +46,22 @@ class KoboDB:
         modifiers = ''
         order = ''
         if kwargs:
-            if 'selectors' in kwargs:
-                selectors = ','.join(kwargs['selectors'])
-            if 'modifiers' in kwargs:
-                modifiers = " WHERE " + kwargs['modifiers']
-            if 'order' in kwargs:
+            if 'selectors' in kwargs and kwargs['selectors']:
+                if type(kwargs['selectors']) is list:
+                    selectors = ','.join(kwargs['selectors'])
+                else:
+                    selectors = kwargs['selectors']
+            if 'modifiers' in kwargs and kwargs['modifiers']:
+                if type(kwargs['modifiers']) is list:
+                    modifiers = " WHERE " + 'AND'.join(kwargs['modifiers'])
+                else:
+                    modifiers = " WHERE " + kwargs['modifiers']
+            if 'order' in kwargs and kwargs['order']:
                 order = " ORDER BY " + kwargs['order']
 
-        sql = "SELECT %s FROM %s%s%s" % (selectors, tablename,
-                                         modifiers, order)
+        sql = "SELECT %s FROM %s%s%s;" % (selectors, tablename,
+                                          modifiers, order)
         print sql
-        print
         self.cursor.execute(sql)
         return self.cursor.fetchall()
 
@@ -69,21 +77,48 @@ class KoboDB:
 
         return [ dict(zip(fields, values)) for values in l ]
 
-        # dlist = []
-        # for row in l:
-        #     d = {}
-        #     for i, field in enumerate(fields):
-        #         d[field] = l[i]
-        #     dlist.append(d)
-        # return dlist
+    def get_book_by_id(self, id):
+        sql = "SELECT Title,Attribution FROM content WHERE ContentID='%s';" \
+              % escape_quotes(id);
+        # print sql
+        self.cursor.execute(sql)
+        return self.cursor.fetchall()[0]
+
+    def list_shelves(self, names=None):
+        allshelves = {}
+        if names:
+            modifiers = " AND ".join(["ShelfName=%s" % name for name in names])
+        else:
+            modifiers = None
+
+        sc = self.get_dlist("ShelfContent", modifiers=modifiers)
+
+        for item in sc:
+            if item["ShelfName"] not in allshelves:
+                allshelves[item["ShelfName"]] = [ item["ContentId"] ]
+            else:
+                allshelves[item["ShelfName"]].append(item["ContentId"])
+
+        for shelf in allshelves:
+            print "\n===", shelf, "==="
+            for id in allshelves[shelf]:
+                print "    %s (%s)" % self.get_book_by_id(id)
+
+    def has_shelf(self, shelfname):
+        shelves = self.get_dlist("Shelf", selectors=[ "Name" ],
+                                 modifiers=[ "Name='%s'" % shelfname ])
+        print "Has shelf %s?" % shelfname, bool(shelves)
+        return bool(shelves)
 
     def print_table(self, tablename, **kwargs):
         '''Usage: print_table(tablename, selectors='*', modifiers='', order='')
         '''
-        if kwargs and 'selectors' in kwargs:
+        if kwargs and 'selectors' in kwargs and kwargs['selectors']:
             fields = kwargs['selectors']
+            print "kwargs: fields =", fields
         else:
             fields = self.get_field_names(tablename)
+            print "no kwargs: fields =", fields
 
         for row in self.get_list(tablename, **kwargs):
             for i, f in enumerate(fields):
@@ -91,59 +126,33 @@ class KoboDB:
                 # even though it should be unicode already,
                 # because it could be null.
                 print f.encode('UTF-8'), ":", unicode(row[i]).encode('UTF-8')
-            print
 
     # Adding entries to shelves:
-    '''
-INSERT INTO Cars(Id, Name, Price) VALUES(1, 'Audi', 52642);
-
-select * from Shelf;
-2015-08-17T20:07:57Z||science fiction|2015-08-17T20:07:57Z|science fiction||false|true|false
-2015-08-17T20:09:06Z||mystery|2015-08-17T20:09:06Z|mystery||false|true|false
-
-select * from ShelfContent;
-science fiction|file:///mnt/onboard/books/the_martian.epub|2015-08-17T20:07:57Z|false|false
-science fiction|file:///mnt/onboard/books/some_remarks.epub|2015-08-17T20:07:57Z|false|false
-mystery|file:///mnt/onboard/books/The_Cold_Dish.epub|2015-08-17T20:09:06Z|false|false
-mystery|file:///mnt/onboard/books/Death_Without_Company.epub|2015-08-17T20:09:06Z|false|false
-mystery|file:///mnt/onboard/books/Pastime.epub|2015-08-17T20:09:06Z|false|false
-mystery|file:///mnt/onboard/books/Playmates.epub|2015-08-17T20:09:06Z|false|false
-mystery|8e8948a3-e946-43ed-8461-edd0957d050d|2015-08-17T20:09:06Z|false|false
-... etc.
-
- PRAGMA table_info(Shelf);
-0|CreationDate|TEXT|0||0
-1|Id|TEXT|0||0
-2|InternalName|TEXT|0||1
-3|LastModified|TEXT|0||0
-4|Name|TEXT|0||0
-5|Type|TEXT|0||0
-6|_IsDeleted|BOOL|0||0
-7|_IsVisible|BOOL|0||0
-8|_IsSynced|BOOL|0||0
-
-PRAGMA table_info(ShelfContent);
-0|ShelfName|TEXT|0||1
-1|ContentId|TEXT|0||2
-2|DateModified|TEXT|0||0
-3|_IsDeleted|BOOL|0||0
-4|_IsSynced|BOOL|0||0
-
-'''
     def make_new_shelf(self, shelfname):
+        print "=== Current shelves:"
+        self.print_table("Shelf", selectors=[ "Name" ])
+        print "==="
         print "Making a new shelf called", shelfname
-        # Skip type since it's not clear what it is and it's never set:
+        # Skip type since it's not clear what it is and it's never set.
+        # For the final three, PRAGMA table_info(Shelf); says they're
+        # type BOOL, and querying that table shows true and false there,
+        # but absolutely everyone on the web says you have to use
+        # 1 and 0 for sqlite3 and that there is no boolean type.
         query = '''INSERT INTO Shelf(CreationDate, Id, InternalName,
                   LastModified, Name, _IsDeleted, _IsVisible, _IsSynced)
-VALUES (DATE('now'), '', '%s', DATE('now'), '%s', 0, 1, 1);
-''' % (shelfname, shelfname)
+VALUES (DATETIME('now'), %s, '%s', DATETIME('now'), '%s', 0, 1, 1);
+''' % (shelfname, shelfname, shelfname)
         print query
         self.cursor.execute(query)
 
-    def add_new_shelf_content(self, kobobook, shelfname):
+    def add_to_shelf(self, kobobook, shelfname):
+        print "==="
         print "Adding", kobobook["Title"], "to shelf", shelfname
         query = '''INSERT INTO ShelfContent(ShelfName, ContentId, DateModified,
                          _IsDeleted, _IsSynced)
-VALUES ('%s', '%s', DATE('now'), 0, 0);''' % (shelfname, kobobook['ContentID'])
+VALUES ('%s', '%s', DATE('now'), 0, 0);''' % (shelfname,
+                                              escape_quotes(kobobook['ContentID']))
         print query
         self.cursor.execute(query)
+        self.conn.commit()
+
