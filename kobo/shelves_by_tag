@@ -1,6 +1,12 @@
 #! /usr/bin/env python
 
-# By convention we'll use lowercase for all tags and shelf names.
+# Add books to Kobo shelves according to their epub tag.
+# Copyright 2015 by Akkana Peck: share and enjoy under the GPL v2 or later.
+
+# Find all books recursively under a given directory,
+# and for each book that exists on the Kobo,
+# add it to the Kobo's shelves according to its epub tags
+# (always lowercased, and limited to a list of valid shelf names).
 
 import os, sys
 import zipfile
@@ -8,6 +14,12 @@ import xml.dom.minidom
 
 import kobo_utils
 import epubtag
+
+# Two variables you might want to change:
+# If KOBO_DB is defined, it will use that as the database,
+# otherwise it will use the database on the kobo mounted on KOBO_MOUNTED.
+KOBO_MOUNTED = '/kobo'
+KOBO_DB = os.path.expanduser('~/kobo/mykobo/KoboReader.sqlite')
 
 # Create only shelves in this list. Otherwise ignore tags.
 # Don't create shelves for all the zillions of Gutenberg tags.
@@ -17,12 +29,17 @@ shelves_wanted = [ "mystery", "science fiction", "science", "astronomy",
                    "dogs", "animals", "humor", "biography", "medicine",
                    "nonfiction", "poetry", "plays", "travel",
                    "war", "civil war", "historical fiction", "adventure",
-                   "juvenile", "fantasy", 'suspense' ]
+                   "juvenile", "fantasy" ]
 
 booklist = {}
 
 # First, make a dictionary of all the books we want to index.
 # Iterate over dirs of epubs provided on the command line:
+if len(sys.argv) <= 1:
+    print "Usage: %s dir dir dir ..." % sys.argv[0]
+    print "  where each dir will be searched recursively for epub books."
+    sys.exit(1)
+
 for dir in sys.argv[1:]:
     for root, dirs, files in os.walk(dir):
         for f in files:
@@ -40,18 +57,13 @@ for dir in sys.argv[1:]:
                     print e
 
 # The path where the Kobo is mounted:
-koboDB = kobo_utils.KoboDB('/dkobo')
+koboDB = kobo_utils.KoboDB(KOBO_MOUNTED)
 
 # For testing: for a real Kobo that's mounted, don't specify a path,
 # just connect() and it will use the mounted path.
-koboDB.connect(os.path.expanduser('~/kobo/d-KoboReader.sqlite'))
+koboDB.connect(KOBO_DB)
 
-# Shelf names on the Kobo:
-kobo_shelves = []
-for shelf in koboDB.get_dlist("Shelf", selectors=[ "Name" ]):
-    kobo_shelves.append(shelf["Name"])
-
-# What books are in those shelves?
+# What books are in shelves on the Kobo?
 kobo_shelf_content = koboDB.get_dlist("ShelfContent",
                                       selectors=["ShelfName", "ContentId"])
 
@@ -75,10 +87,9 @@ for kobobook in kobobooks:
             continue
 
         # See if there's already a shelf for this tag:
-        if tag not in kobo_shelves:
+        if not koboDB.has_shelf(tag):
             koboDB.make_new_shelf(tag)
-            kobo_shelves.append(tag)
-            koboDB.add_new_shelf_content(kobobook, tag)
+            koboDB.add_to_shelf(kobobook, tag)
             continue
 
         # There's already a shelf named tag. Is this book in it?
@@ -93,7 +104,7 @@ for kobobook in kobobooks:
         if already_on_shelf:
             print kobobook['Title'], "is already on shelf", tag
         else:
-            koboDB.add_new_shelf_content(kobobook, tag)
+            koboDB.add_to_shelf(kobobook, tag)
 
 koboDB.close()
 
