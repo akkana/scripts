@@ -106,7 +106,7 @@ class EpubBook:
         return tags
 
     def info_string(self, brief=False):
-        outstr = ''
+        outstr = self.filename + '\n'
 
         # grab the title and author
         titles = self.get_titles()
