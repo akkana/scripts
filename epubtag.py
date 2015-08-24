@@ -26,6 +26,10 @@ class EpubBook:
         self.filename = filename
         self.zip = zipfile.ZipFile(filename)
 
+    def namelist(self):
+        return self.zip.namelist()
+
+    def parse_contents(self):
         # Parse the OPF file into self.dom.
         if not self.zip:
             raise RuntimeError('Epub book not opened')
@@ -37,7 +41,7 @@ class EpubBook:
                 break
         if not content:
             raise RuntimeError('No .opf file in %s' % self.filename)
-            return None
+            return
 
         # Now content is a file handle on the content.opf XML file
         try:
@@ -300,6 +304,7 @@ if __name__ == "__main__":
 
             book = EpubBook()
             book.open(f)
+            book.parse_contents()
 
             if delete_tags:
                 book.delete_tags()
