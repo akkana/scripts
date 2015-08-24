@@ -11,11 +11,17 @@ import re
 
 import epubtag
 
-def convert_file(filename):
+def convert_file(filename, destdir):
     if not filename.lower().endswith(".epub"):
         print filename, "Doesn't end with .epub"
         return
-    outbookname = filename[:-5] + ".kepub.epub"
+
+    if destdir:
+        outbookname = os.path.join(destdir,
+                                   os.path.basename(filename[:-5])
+                                                    + ".kepub.epub")
+    else:
+        outbookname = filename[:-5] + ".kepub.epub"
 
     book = epubtag.EpubBook()
     book.open(filename)
@@ -53,6 +59,20 @@ def altertags(soup):
          new_tag.wrap(tag)
 
 if __name__ == '__main__':
-    for arg in sys.argv[1:]:
-        convert_file(arg)
+    if len(sys.argv) <= 1:
+        print "Usage: %s a.epub [b.epub c.epub ...] [destdir]" % \
+            os.path.basename(sys.argv[0])
+        sys.exit(1)
+
+    files = sys.argv[1:]
+    destdir = None
+
+    # Is the last argument a directory?
+    if os.path.isdir(files[-1]):
+        destdir = files[-1]
+        files = files[:-1]
+        print "Koboizing to directory", destdir
+
+    for arg in files:
+        convert_file(arg, destdir)
 
