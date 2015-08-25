@@ -38,14 +38,13 @@ def convert_file(filename, destdir):
             altertags(soup)
             fp.close()
             ozf.writestr(name, str(soup))
-            # Is this doing anything?
             print "altered", name
             of = open("/tmp/" + os.path.basename(name), "w")
             of.write(str(soup))
-            of.close
         else:
             ozf.writestr(name, book.zip.read(name))
 
+    book.close()
     ozf.close()
     print "Converted", filename, "to", outbookname
     
