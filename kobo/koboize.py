@@ -38,9 +38,6 @@ def convert_file(filename, destdir):
             altertags(soup)
             fp.close()
             ozf.writestr(name, str(soup))
-            print "altered", name
-            of = open("/tmp/" + os.path.basename(name), "w")
-            of.write(str(soup))
         else:
             ozf.writestr(name, book.zip.read(name))
 
