@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+'''Utilities for reading and writing a Kobo ebook reader's database.
+'''
+
 import os, sys
 import sqlite3
 
