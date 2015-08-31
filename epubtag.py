@@ -9,7 +9,9 @@ import zipfile
 import xml.dom.minidom
 
 class EpubBook:
+    # class constants:
     subjectTag = 'dc:subject'
+    image_exts = [ ".jpg", ".gif", ".png", ".svg", ".pdf" ]
 
     def __init__(self):
         self.filename = None
@@ -247,34 +249,65 @@ class EpubBook:
         print "Wrote", self.filename
         os.remove(bakfile)
 
+    def extract_images(self, outdir=''):
+        print "Extracting images from", self.filename,
+        if outdir:
+            print "to", outdir
+        else:
+            print
+
+        for f in self.zip.namelist():
+            ext = os.path.splitext(f)[-1].lower()
+            if ext in self.image_exts:
+                infp = self.zip.open(f)
+                outfilename = os.path.join(outdir, os.path.basename(f))
+                i = 1
+                while os.path.exists(outfilename):
+                    print os.path.basename(outfilename), "already exists"
+                    se = os.path.splitext(outfilename)
+                    outfilename = se[0] + '-' + str(i) + se[1]
+                outfp = open(outfilename, 'w')
+                outfp.write(infp.read())
+                print "Extracted", f, "to", outfilename
+                infp.close()
+                outfp.close()
+
 # main
 if __name__ == "__main__":
-
     def Usage():
-        print "Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]" \
-            % os.path.basename(sys.argv[0])
-        print "Display, add or remove tags in epub ebooks."
-        print "Copyright 2012 by Akkana Peck -- share and enjoy under the GPL."
-        print "Options:"
-        print "    -t: add tags (otherwise, just print existing tags)"
-        print "    -d: delete existing tags before adding new ones"
-        print "    -b: print only one line for each book (useful with grep)"
-        sys.exit(1)
+        progname = os.path.basename(sys.argv[0])
+        print """Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]
+       %s -i [imagedir] file.epub [file.epub...]
+Display, add or remove tags in epub ebooks,
+or extract images from them.
+
+Copyright 2012,2014 by Akkana Peck: share and enjoy under the GPL v2 or later.
+
+Options:
+    -t: add tags (otherwise, just print existing tags)
+    -d: delete existing tags before adding new ones
+    -b: print only one line for each book (useful with grep)
+    -i [dir]: extract images into given directory (default .)""" \
+            % (progname, progname)
+        sys.exit(0)
 
     # optparse can't handle multiple arguments of the same type
     # (e.g. multiple tags), and the argparse doc is impenetrable.
     # So let's just do this: any argument corresponding to a readable
     # file must be an epub filename to be read/modified;
     # any argument following a -t is a tag to be added;
-    # if there's a -d anywhere, we'll delete existing tags first;;
+    # if there's a -d anywhere, we'll delete existing tags first;
+    # if there's a -i anywhere, we'll extract images from the given book
+    # (if the arg following -i is a directory, we'll extract to there);
     # any other flag, print a usage statement.
 
+    imagedir = None
     epubfiles = []
     tags = []
     add_tags = False
     delete_tags = False
     brief = False
-    for arg in sys.argv[1:]:
+    for i, arg in enumerate(sys.argv[1:]):
         if arg == '-d':
             delete_tags = True
             continue
@@ -284,8 +317,18 @@ if __name__ == "__main__":
         if arg == '-b':
             brief = True
             continue
+        if arg == '-i':
+            imagedir = './'
+            continue
         if arg[0] == '-':
             Usage()
+
+        # If we're here, the argument doesn't start with '-'.
+        # It might still be the imagedir argument to -i, though:
+        if imagedir == './' and os.path.isdir(arg):
+            imagedir = arg
+            continue
+
         if not add_tags :    # still adding files
             if os.access(arg, os.R_OK):
                 epubfiles.append(arg)
@@ -304,6 +347,12 @@ if __name__ == "__main__":
 
             book = EpubBook()
             book.open(f)
+
+            if imagedir != None:
+                book.extract_images(imagedir)
+                book.close()
+                continue
+
             book.parse_contents()
 
             if delete_tags:
