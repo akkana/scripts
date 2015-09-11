@@ -325,9 +325,13 @@ Options:
 
         # If we're here, the argument doesn't start with '-'.
         # It might still be the imagedir argument to -i, though:
-        if imagedir == './' and os.path.isdir(arg):
-            imagedir = arg
-            continue
+        if imagedir == './' :
+            if  os.path.isdir(arg) :
+                imagedir = arg
+                continue
+            elif not arg.endswith('.epub') :
+                print "Argument after -i should be a directory if it's not an EPUB book\n"
+                Usage()
 
         if not add_tags :    # still adding files
             if os.access(arg, os.R_OK):
