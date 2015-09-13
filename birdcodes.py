@@ -2269,7 +2269,13 @@ htmlhead = '''Content-type: text/html
 
 htmlfoot = '''
 <hr>
-Uses bird codes from <a href="http://www.birdpop.org/">birdpop.org/</a>.
+Bird codes from
+<a href="http://birdpop.org/pages/birdSpeciesCodes.php">The Institute
+for Bird Populations</a>, used with permission.
+<p>
+This is a Python script that can also be run directly:
+the source is available on GitHub,
+<a href="https://github.com/akkana/scripts/blob/master/birdcodes.py">birdcodes.py</a>.
 <p>
 You might also be interested in my page,
 <a href="/birdmap.html">Bird sightings this year in Los Alamos County (or elsewhere)</a>.
