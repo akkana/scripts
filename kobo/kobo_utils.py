@@ -10,13 +10,22 @@ def escape_quotes(s):
     return s.replace("'", "''")
 
 class KoboDB:
+    '''Interact with a Kobo e-reader's database:
+       either one that's mounted live from the device, or a local copy.
+    '''
     def __init__(self, mountpath):
+        '''Initialize with the path to where your Kobo is mounted,
+           or where you keep local copies of the files.
+        '''
         self.mountpath = mountpath
         self.dbpath = None
         self.conn = None
         self.cursor = None
 
     def connect(self, dbpath=None):
+        '''Open the database at the specified path. Defaults to
+           .kobo/KoboReader.sqlite in the mountpath you've provided.
+        '''
         if dbpath:
             self.dbpath = dbpath
         elif self.mountpath:
@@ -29,13 +38,15 @@ class KoboDB:
         self.cursor = self.conn.cursor()
 
     def close(self):
+        '''Commit any changes and close the database.'''
         self.conn.commit()
         self.conn.close()
         self.conn = None
         self.cursor = None
 
     def get_field_names(self, tablename):
-        '''I haven't found documentation, but PRAGMA table_info returns:
+        '''Get names of fields within a specified table.
+           I haven't found documentation, but PRAGMA table_info returns:
            (index, fieldname, type, None, 0)
            I don't know what the None and 0 represent.
         '''
@@ -88,6 +99,8 @@ class KoboDB:
         return self.cursor.fetchall()[0]
 
     def list_books(self):
+        '''List all books in the database.
+        '''
         books = self.get_dlist("content",
                                selectors=[ 'ContentID', 'Title', 'Attribution',
                                            'Description', 'NumShortcovers',
@@ -118,6 +131,8 @@ class KoboDB:
 
 
     def list_shelves(self, names=None):
+        '''List all shelves (collections) in the database.
+        '''
         allshelves = {}
         if names:
             modifiers = " AND ".join(["ShelfName=%s" % name for name in names])
@@ -138,6 +153,9 @@ class KoboDB:
                 print "    %s (%s)" % self.get_book_by_id(id)
 
     def has_shelf(self, shelfname):
+        '''Does a given shelfname exist? Helpful when checking whether
+           to add a new shelf based on a tag.
+        '''
         shelves = self.get_dlist("Shelf", selectors=[ "Name" ],
                                  modifiers=[ "Name='%s'" % shelfname ])
         print "Has shelf %s?" % shelfname, bool(shelves)
@@ -162,6 +180,8 @@ class KoboDB:
 
     # Adding entries to shelves:
     def make_new_shelf(self, shelfname):
+        '''Create a new shelf/collection.
+        '''
         print "=== Current shelves:"
         self.print_table("Shelf", selectors=[ "Name" ])
         print "==="
