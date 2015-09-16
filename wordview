@@ -4,6 +4,10 @@
 
 import sys, os
 import subprocess
+import magic
+import time
+
+magic_parser = None
 
 def view_word_files(file_list):
     outfiles = []
@@ -13,20 +17,39 @@ def view_word_files(file_list):
         outfilename = os.path.join("/tmp", fileparts[0] + ".html")
         # Extra credit: could use tempfile.mkstemp
 
+        # wvHtml does a pretty good job with simple .doc files.
         if filename.lower().endswith(".doc"):
             subprocess.call(["wvHtml", filename, outfilename])
             outfiles.append(outfilename)
+
+        # docx is harder to convert to HTML. Use libreoffice's unoconv.
         elif filename.lower().endswith(".docx"):
             subprocess.call(["unoconv", "-f", "html", "-o", outfilename,
                              filename])
             outfiles.append(outfilename)
         else:
-            print "Unknown extension", filename
+            global magic_parser
+            if not magic_parser:
+                magic_parser = magic.open(magic.MAGIC_MIME)
+                magic_parser.load()
+            mimetype = magic_parser.file(filename)
+            print "mime type is", mimetype
+            if mimetype.startswith("application/msword"):
+                subprocess.call(["wvHtml", filename, outfilename])
+                outfiles.append(outfilename)
+            elif mimetype.startswith("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+                subprocess.call(["unoconv", "-f", "html", "-o", outfilename,
+                                 filename])
+                outfiles.append(outfilename)
 
-    # os.system("firefox -new-window file://" + htmlfile)
     if outfiles:
         subprocess.call(["firefox", "-new-window", outfiles[0]])
         for f in outfiles[1:]:
+            # If we don't wait for the new window to pop up before
+            # calling new-tab, bad things will happen: the document
+            # may load in a new tab in the old window and THEN pop up
+            # an unwanted third window. Go firefox.
+            time.sleep(1)
             subprocess.call(["firefox", "-new-tab", f])
 
 if __name__ == "__main__":
