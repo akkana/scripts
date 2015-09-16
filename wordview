@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+# Convert a doc or docx file to html, and call a new firefox window on it.
+
+import sys, os
+import subprocess
+
+def view_word_files(file_list):
+    outfiles = []
+    for filename in file_list:
+        pathparts = os.path.split(filename)
+        fileparts = os.path.splitext(pathparts[1])
+        outfilename = os.path.join("/tmp", fileparts[0] + ".html")
+        # Extra credit: could use tempfile.mkstemp
+
+        if filename.lower().endswith(".doc"):
+            subprocess.call(["wvHtml", filename, outfilename])
+            outfiles.append(outfilename)
+        elif filename.lower().endswith(".docx"):
+            subprocess.call(["unoconv", "-f", "html", "-o", outfilename,
+                             filename])
+            outfiles.append(outfilename)
+        else:
+            print "Unknown extension", filename
+
+    # os.system("firefox -new-window file://" + htmlfile)
+    if outfiles:
+        subprocess.call(["firefox", "-new-window", outfiles[0]])
+        for f in outfiles[1:]:
+            subprocess.call(["firefox", "-new-tab", f])
+
+if __name__ == "__main__":
+    view_word_files(sys.argv[1:])
+
