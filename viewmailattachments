@@ -1,0 +1,199 @@
+#! /usr/bin/env python
+
+# Take an mbox HTML message (e.g. from mutt), split it
+# and rewrite it so all of its attachments can be viewed in a browser
+# (perhaps after being converted to HTML from DOC or whatever first).
+#
+# Can be run from within a mailer like mutt, or independently
+# on a single message file.
+#
+# Grew out of a simpler script called viewhtmlmail.
+#
+# Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Changes:
+#   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
+
+# To use it from mutt, put the following lines in your .muttrc:
+# macro  index  <F10>  "<pipe-message>~/bin/viewmailattachments\n" "View attachments in browser"
+# macro  pager  <F10>  "<pipe-message>~/bin/viewmailattachments\n" "View attachments in browser"
+
+import os, sys
+import re
+import time
+import shutil
+import email, mimetypes
+import tempfile
+import subprocess
+
+class mysubprocess:
+    @staticmethod
+    def call(arr):
+        print "\n\n=================================\n=== Calling:", arr
+        subprocess.call(arr)
+
+def view_message_attachments(fp, tmpdir):
+    '''View message attachments coming from the file-like object fp.
+    '''
+
+    msg = email.message_from_string(fp.read())
+
+    html_part = None
+    counter = 1
+    subfiles = []
+    htmlfiles = []
+    htmlparts = []
+
+    def tmp_file_name(part):
+        partfile = part.get_filename()
+
+        # Applications should really sanitize the given filename so that an
+        # email message can't be used to overwrite important files.
+        # As a first step, warn about ../
+        if partfile and '../' in partfile:
+            print "Eek! Possible security problem in filename", partfile
+            return None
+
+        # Make a filename in the tmp dir:
+        if not partfile:
+            ext = mimetypes.guess_extension(part.get_content_type())
+            if not ext:
+                # Use a generic bag-of-bits extension
+                ext = '.bin'
+            partfile = 'part-%03d%s' % (counter, ext)
+
+        return os.path.join(tmpdir, partfile)
+
+    def save_tmp_file(part):
+        '''Saves this part's payload to a tmp file, returning the new filename.
+        '''
+        partfile = tmp_file_name(part)
+
+        tmpfile = open(partfile, "w")
+        tmpfile.write(part.get_payload(decode=True))
+        tmpfile.close()
+        print "Saved", part.get_content_type(), "to", partfile
+        return partfile
+
+    # Walk through the message a first, preliminary time
+    # to separate out any images that might be referred to by
+    # an HTML part.
+    print "Preliminary walkthrough"
+    for part in msg.walk():
+        print "--", part.get_content_type()
+        if part.get_content_maintype() == "image":
+            print "  It's an image file"
+            filename = save_tmp_file(part)
+
+            # Rewrite image and other inline URLs in terms of content-id.
+            # Mailers may use Content-Id or Content-ID (or, presumably, various
+            # other capitalizations). So we can't just look it up simply.
+            content_id = None
+            for k in part.keys():
+                if k.lower() == 'content-id':
+                    # Remove angle brackets, if present.
+                    # part['Content-Id'] is unmutable -- attempts to change it
+                    # are just ignored -- so copy it to a local mutable string.
+                    content_id = part[k]
+                    if content_id.startswith('<') and content_id.endswith('>'):
+                        content_id = content_id[1:-1]
+
+                    subfiles.append({ 'filename': filename,
+                                      'Content-Id': content_id })
+                    counter += 1
+                    fp = open(filename, 'wb')
+                    fp.write(part.get_payload(decode=True))
+                    # print "wrote", os.path.join(tmpdir, filename)
+                    fp.close()
+                    break     # no need to look at other keys
+
+            if not content_id:
+                print filename, "doesn't have a Content-Id, not saving"
+                # print "keys:", part.keys()
+
+    print "Subfiles:"
+    for sf in subfiles:
+        print sf
+
+    # Now walk through looking for the real parts:
+    # HTML, doc and docx.
+    print "Main walkthrough"
+    for part in msg.walk():
+        print "--", part.get_content_type()
+
+        # print ""
+
+        # part has, for example:
+        # items: [('Content-Type', 'image/jpeg'), ('Content-Transfer-Encoding', 'base64'), ('Content-ID', '<14.3631871432@web82503.mail.mud.yahoo.com>'), ('Content-Disposition', 'attachment; filename="ATT0001414.jpg"')]
+        # keys: ['Content-Type', 'Content-Transfer-Encoding', 'Content-ID', 'Content-Disposition']
+        # values: ['image/jpeg', 'base64', '<14.3631871432@web82503.mail.mud.yahoo.com>', 'attachment; filename="ATT0001414.jpg"']
+
+        # multipart/* are just containers
+        #if part.get_content_maintype() == 'multipart':
+        if part.is_multipart() or part.get_content_type == 'message/rfc822':
+            continue
+
+        if part.get_content_maintype() == "application":
+            partfile = save_tmp_file(part)
+            fileparts = os.path.splitext(partfile)
+            htmlfilename = os.path.join(fileparts[0] + ".html")
+            print "partfile:", partfile, "htmlfile", htmlfilename
+
+            if False and part.get_content_subtype() == "msword":
+                partfilename = save_tmp_file(part)
+                mysubprocess.call(["wvHtml", partfile, htmlfilename])
+                htmlfiles.append(htmlfilename)
+
+            elif part.get_content_subtype() == \
+                 "vnd.openxmlformats-officedocument.wordprocessingml.document" \
+                 or part.get_content_subtype() == "msword":
+                outfilename = save_tmp_file(part)
+                mysubprocess.call(["unoconv", "-f", "html", "-o", htmlfilename,
+                                 partfile])
+                htmlfiles.append(htmlfilename)
+
+        elif part.get_content_maintype() == "text" and \
+             part.get_content_subtype() == 'html':
+
+            htmlfile = tmp_file_name(part)
+
+            fp = open(htmlfile, 'wb')
+            htmlsrc = part.get_payload(decode=True)
+
+            # Substitute filenames for CIDs:
+            for sf in subfiles:
+                htmlsrc = re.sub('cid: ?' + sf['Content-Id'],
+                                 'file://' + sf['filename'],
+                                 htmlsrc, flags=re.IGNORECASE)
+
+            fp.write(htmlsrc)
+            fp.close()
+
+            htmlfiles.append(htmlfile)
+
+    # Done processing attachments. Call firefox on everything.
+    if htmlfiles:
+        mysubprocess.call(["firefox", "-new-window", htmlfiles[0]])
+        for f in htmlfiles[1:]:
+            # If we don't wait for the new window to pop up before
+            # calling new-tab, bad things will happen: the document
+            # may load in a new tab in the old window and THEN pop up
+            # an unwanted third window. Go firefox.
+            time.sleep(1)
+            mysubprocess.call(["firefox", "-new-tab", f])
+
+    # Wait a while to make sure firefox has loads the imgaes, then clean up.
+    # time.sleep(6)
+    # shutil.rmtree(tmpdir)
+
+if __name__ == '__main__':
+    # tmpdir = tempfile.mkdtemp()
+    tmpdir = "/tmp/TEST"
+    print "tmpdir:", tmpdir
+
+    if len(sys.argv) > 1:
+        for f in sys.argv[1:]:
+            fp = open(f)
+            view_message_attachments(fp, tmpdir)
+            fp.close()
+    else:
+        view_message_attachments(sys.stdin, tmpdir)
