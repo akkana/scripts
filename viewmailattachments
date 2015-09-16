@@ -71,13 +71,11 @@ def view_message_attachments(fp, tmpdir):
         tmpfile = open(partfile, "w")
         tmpfile.write(part.get_payload(decode=True))
         tmpfile.close()
-        print "Saved", part.get_content_type(), "to", partfile
         return partfile
 
     # Walk through the message a first, preliminary time
     # to separate out any images that might be referred to by
     # an HTML part.
-    print "Preliminary walkthrough"
     for part in msg.walk():
         print "--", part.get_content_type()
         if part.get_content_maintype() == "image":
@@ -110,17 +108,13 @@ def view_message_attachments(fp, tmpdir):
                 print filename, "doesn't have a Content-Id, not saving"
                 # print "keys:", part.keys()
 
-    print "Subfiles:"
-    for sf in subfiles:
-        print sf
+    # print "Subfiles:"
+    # for sf in subfiles:
+    #     print sf
 
     # Now walk through looking for the real parts:
     # HTML, doc and docx.
-    print "Main walkthrough"
     for part in msg.walk():
-        print "--", part.get_content_type()
-
-        # print ""
 
         # part has, for example:
         # items: [('Content-Type', 'image/jpeg'), ('Content-Transfer-Encoding', 'base64'), ('Content-ID', '<14.3631871432@web82503.mail.mud.yahoo.com>'), ('Content-Disposition', 'attachment; filename="ATT0001414.jpg"')]
@@ -136,7 +130,6 @@ def view_message_attachments(fp, tmpdir):
             partfile = save_tmp_file(part)
             fileparts = os.path.splitext(partfile)
             htmlfilename = os.path.join(fileparts[0] + ".html")
-            print "partfile:", partfile, "htmlfile", htmlfilename
 
             if False and part.get_content_subtype() == "msword":
                 partfilename = save_tmp_file(part)
@@ -188,7 +181,6 @@ def view_message_attachments(fp, tmpdir):
 if __name__ == '__main__':
     # tmpdir = tempfile.mkdtemp()
     tmpdir = "/tmp/TEST"
-    print "tmpdir:", tmpdir
 
     if len(sys.argv) > 1:
         for f in sys.argv[1:]:
