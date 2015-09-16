@@ -28,7 +28,7 @@ import subprocess
 class mysubprocess:
     @staticmethod
     def call(arr):
-        print "\n\n=================================\n=== Calling:", arr
+        # print "\n\n=================================\n=== Calling:", arr
         subprocess.call(arr)
 
 def view_message_attachments(fp, tmpdir):
@@ -79,7 +79,6 @@ def view_message_attachments(fp, tmpdir):
     for part in msg.walk():
         print "--", part.get_content_type()
         if part.get_content_maintype() == "image":
-            print "  It's an image file"
             filename = save_tmp_file(part)
 
             # Rewrite image and other inline URLs in terms of content-id.
@@ -100,13 +99,12 @@ def view_message_attachments(fp, tmpdir):
                     counter += 1
                     fp = open(filename, 'wb')
                     fp.write(part.get_payload(decode=True))
-                    # print "wrote", os.path.join(tmpdir, filename)
                     fp.close()
                     break     # no need to look at other keys
 
-            if not content_id:
-                print filename, "doesn't have a Content-Id, not saving"
-                # print "keys:", part.keys()
+            # if not content_id:
+            #     print filename, "doesn't have a Content-Id, not saving"
+            #     # print "keys:", part.keys()
 
     # print "Subfiles:"
     # for sf in subfiles:
@@ -129,7 +127,7 @@ def view_message_attachments(fp, tmpdir):
         if part.get_content_maintype() == "application":
             partfile = save_tmp_file(part)
             fileparts = os.path.splitext(partfile)
-            htmlfilename = os.path.join(fileparts[0] + ".html")
+            htmlfilename = fileparts[0] + ".html"
 
             if False and part.get_content_subtype() == "msword":
                 partfilename = save_tmp_file(part)
@@ -139,10 +137,18 @@ def view_message_attachments(fp, tmpdir):
             elif part.get_content_subtype() == \
                  "vnd.openxmlformats-officedocument.wordprocessingml.document" \
                  or part.get_content_subtype() == "msword":
-                outfilename = save_tmp_file(part)
-                mysubprocess.call(["unoconv", "-f", "html", "-o", htmlfilename,
-                                 partfile])
+                mysubprocess.call(["unoconv", "-f", "html", "-o",
+                                   htmlfilename, partfile])
+
                 htmlfiles.append(htmlfilename)
+                htmlfilename = os.path.join(fileparts[0] + ".html")
+
+            elif part.get_content_subtype() == "pdf":
+                mysubprocess.call(["pdftohtml", "-s", partfile])
+
+                # But pdftohtml is idiotic about output filename
+                # and won't let you override it:
+                htmlfiles.append(fileparts[0] + "-html.html")
 
         elif part.get_content_maintype() == "text" and \
              part.get_content_subtype() == 'html':
