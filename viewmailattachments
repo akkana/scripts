@@ -25,6 +25,11 @@ import email, mimetypes
 import tempfile
 import subprocess
 
+# Some prefs:
+USE_WVHTML_FOR_DOC = False
+CONVERT_PDF_TO_HTML = False
+
+# Temporary for debugging:
 class mysubprocess:
     @staticmethod
     def call(arr):
@@ -40,6 +45,7 @@ def view_message_attachments(fp, tmpdir):
     html_part = None
     counter = 1
     subfiles = []
+    subparts = []
     htmlfiles = []
     htmlparts = []
 
@@ -77,34 +83,51 @@ def view_message_attachments(fp, tmpdir):
     # to separate out any images that might be referred to by
     # an HTML part.
     for part in msg.walk():
-        print "--", part.get_content_type()
-        if part.get_content_maintype() == "image":
-            filename = save_tmp_file(part)
+        # walk() includes the top-level message
+        if part == msg:
+            # print "  Skipping the top-level message"
+            continue
+
+        if part.get_content_type() != "multipart/related":
+            continue
+
+        # It's multipart. Walk the subtree looking for image children.
+        for child in part.walk():
+            # print " ", child.get_content_type()
+
+            # At least for now, only save images as parts of multipart.
+            if child.get_content_maintype() != "image":
+                continue
+
+            filename = save_tmp_file(child)
+            # print "    Saved to", filename
 
             # Rewrite image and other inline URLs in terms of content-id.
-            # Mailers may use Content-Id or Content-ID (or, presumably, various
+            # Mailers may use Content-Id or Content-ID (or, presumably,
             # other capitalizations). So we can't just look it up simply.
             content_id = None
-            for k in part.keys():
+            for k in child.keys():
                 if k.lower() == 'content-id':
                     # Remove angle brackets, if present.
-                    # part['Content-Id'] is unmutable -- attempts to change it
-                    # are just ignored -- so copy it to a local mutable string.
-                    content_id = part[k]
-                    if content_id.startswith('<') and content_id.endswith('>'):
+                    # child['Content-Id'] is unmutable: attempts to change it
+                    # are just ignored. Copy it to a local mutable string.
+                    content_id = child[k]
+                    if content_id.startswith('<') and \
+                       content_id.endswith('>'):
                         content_id = content_id[1:-1]
 
                     subfiles.append({ 'filename': filename,
                                       'Content-Id': content_id })
+                    subparts.append(child)
                     counter += 1
                     fp = open(filename, 'wb')
-                    fp.write(part.get_payload(decode=True))
+                    fp.write(child.get_payload(decode=True))
                     fp.close()
                     break     # no need to look at other keys
 
             # if not content_id:
             #     print filename, "doesn't have a Content-Id, not saving"
-            #     # print "keys:", part.keys()
+            #     # print "keys:", child.keys()
 
     # print "Subfiles:"
     # for sf in subfiles:
@@ -115,9 +138,16 @@ def view_message_attachments(fp, tmpdir):
     for part in msg.walk():
 
         # part has, for example:
-        # items: [('Content-Type', 'image/jpeg'), ('Content-Transfer-Encoding', 'base64'), ('Content-ID', '<14.3631871432@web82503.mail.mud.yahoo.com>'), ('Content-Disposition', 'attachment; filename="ATT0001414.jpg"')]
-        # keys: ['Content-Type', 'Content-Transfer-Encoding', 'Content-ID', 'Content-Disposition']
-        # values: ['image/jpeg', 'base64', '<14.3631871432@web82503.mail.mud.yahoo.com>', 'attachment; filename="ATT0001414.jpg"']
+        # items: [('Content-Type', 'image/jpeg'),
+        #         ('Content-Transfer-Encoding', 'base64'),
+        #         ('Content-ID', '<14.3631871432@web82503.mail.mud.yahoo.com>'),
+        #         ('Content-Disposition',
+        #          'attachment; filename="ATT0001414.jpg"')]
+        # keys: ['Content-Type', 'Content-Transfer-Encoding',
+        #        'Content-ID', 'Content-Disposition']
+        # values: ['image/jpeg', 'base64',
+        #          '<14.3631871432@web82503.mail.mud.yahoo.com>',
+        # 'attachment; filename="ATT0001414.jpg"']
 
         # multipart/* are just containers
         #if part.get_content_maintype() == 'multipart':
@@ -129,8 +159,7 @@ def view_message_attachments(fp, tmpdir):
             fileparts = os.path.splitext(partfile)
             htmlfilename = fileparts[0] + ".html"
 
-            if False and part.get_content_subtype() == "msword":
-                partfilename = save_tmp_file(part)
+            if part.get_content_subtype() == "msword" and USE_WVHTML_FOR_DOC:
                 mysubprocess.call(["wvHtml", partfile, htmlfilename])
                 htmlfiles.append(htmlfilename)
 
@@ -140,15 +169,18 @@ def view_message_attachments(fp, tmpdir):
                 mysubprocess.call(["unoconv", "-f", "html", "-o",
                                    htmlfilename, partfile])
 
-                htmlfiles.append(htmlfilename)
                 htmlfilename = os.path.join(fileparts[0] + ".html")
+                htmlfiles.append(htmlfilename)
 
             elif part.get_content_subtype() == "pdf":
-                mysubprocess.call(["pdftohtml", "-s", partfile])
+                if CONVERT_PDF_TO_HTML:
+                    mysubprocess.call(["pdftohtml", "-s", partfile])
 
-                # But pdftohtml is idiotic about output filename
-                # and won't let you override it:
-                htmlfiles.append(fileparts[0] + "-html.html")
+                    # But pdftohtml is idiotic about output filename
+                    # and won't let you override it:
+                    htmlfiles.append(fileparts[0] + "-html.html")
+                else:
+                    htmlfiles.append(partfile)
 
         elif part.get_content_maintype() == "text" and \
              part.get_content_subtype() == 'html':
@@ -168,6 +200,9 @@ def view_message_attachments(fp, tmpdir):
             fp.close()
 
             htmlfiles.append(htmlfile)
+        elif part.get_content_maintype() == "image" and part not in subparts:
+            partfile = save_tmp_file(part)
+            htmlfiles.append(partfile)
 
     # Done processing attachments. Call firefox on everything.
     if htmlfiles:
@@ -185,8 +220,7 @@ def view_message_attachments(fp, tmpdir):
     # shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
-    # tmpdir = tempfile.mkdtemp()
-    tmpdir = "/tmp/TEST"
+    tmpdir = tempfile.mkdtemp()
 
     if len(sys.argv) > 1:
         for f in sys.argv[1:]:
