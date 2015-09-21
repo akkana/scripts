@@ -1,0 +1,122 @@
+#!/usr/bin/env python
+
+import sys
+import difflib
+
+def file_to_lines(filename):
+    '''Read an input file (HTML) and return a list of lines of text.
+       If the file doesn't have many line breaks, we'll split it
+       at html tags.
+    '''
+    # Eventually we might want to massage the HTML, prettyprint it,
+    # discard things like headers and sidebars.
+
+    # Lines shorter than this, we won't bother to try to break.
+    SHORT_ENOUGH = 60
+
+    lines = []
+
+    fp = open(filename)
+    for line in fp:
+        sys.stdout.flush()
+        if len(line) < SHORT_ENOUGH:
+            lines.append(line)
+            continue
+        while line:
+            # If the very first character (0) is already < then there's
+            # no need to break the line there, so start from char position 1.
+            lt = line.find('<', 1)
+            if lt < 0:
+                lines.append(line)
+                break
+            lines.append(line[:lt])
+            line = line[lt:]
+
+    fp.close()
+    print filename, "has", len(lines), "lines"
+    return lines
+
+def diff_lines(oldtext, newtext):
+    '''Find differences between lists of lines (not plain strings)
+       and print them as RSS items.
+    '''
+
+    # Using the function name is a way to get variables to have a scope
+    # s visible to the inner function. Otherwise Python's parser will see
+    # ret and numchanges first as belonging to add_item() and won't
+    # associate them with the ret and numchanges defined outside add_item().
+    diff_lines.numchanges = 0
+    diff_lines.ret = '''<rss version="1.0">
+<channel>
+  <title>Differences</title>
+  <description>Differences</description>
+  <language>en</language>
+</channel>
+'''
+
+    def add_item(newitem):
+        '''newitem is a list of lines.
+        '''
+        diff_lines.numchanges += 1
+        diff_lines.ret += '''<item>
+  <title>Difference %d</title>
+  <description>%s</description>
+</item>
+''' % (diff_lines.numchanges, ' '.join(newitem))
+
+    # sm = difflib.SequenceMatcher(lambda x: x == " ", oldtext, newtext)
+    sm = difflib.SequenceMatcher(None, oldtext, newtext)
+
+    lasti = None
+    lastj = None
+    lastn = None
+    blocks = sm.get_matching_blocks()
+    for curi, curj, curn in blocks:
+        # Each sequence block is a tuple (i, j, n)
+        # that means a[i:i+n] == b[j:j+n]
+        if lasti == None:
+            # On the first line, if curi or curj > 0 that means
+            # we had a difference. If curj > 0, the difference
+            # exists in the new file.
+            print "First: (%d, %d, %d)" % (curi, curj, curn)
+            if curj > 0:
+                add_item(newtext[:curj])
+        else:
+            print "(%d, %d, %d) -> (%d, %d, %d)" % (lasti, lastj, lastn,
+                                                    curi, curj, curn)
+
+            # We care about things that are in newfp and not in oldfp.
+            # The current diff starts at
+            #   oldtext[lasti+lastn, newtext[lastj+lastn]
+            # and lasts until
+            #   oldtext[curi], newtext[curj]
+            if curj > lastj + lastn:
+                print "=========== New differs in", lastj+lastn, "through", curj
+                print newtext[lastj+lastn:curj]
+                add_item(newtext[lastj+lastn:curj])
+            else:
+                print "===== Got a difference, but we're ignoring it."
+                print "      because", curj, lastj+lastn
+
+            print
+
+        # Remember the start of the differing section in each piece.
+        # Since SequenceMatcher only tells about which parts are the same,
+        # not which parts differ, we have to compare between blocks.
+        lasti, lastj, lastn = curi, curj, curn
+
+    diff_lines.ret += '''</rss>\n'''
+    return diff_lines.ret
+
+def diff_files(oldfile, newfile):
+    oldtext = file_to_lines(oldfile)
+    newtext = file_to_lines(newfile)
+    # print "====== Old lines:", oldtext
+    # print "====== New lines:", newtext
+
+    return diff_lines(oldtext, newtext)
+
+if __name__ == '__main__':
+    # diff_strings("Hello, world", "Hello, brave new world!")
+    rss = diff_files(sys.argv[1], sys.argv[2])
+    print rss
