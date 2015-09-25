@@ -172,6 +172,14 @@ def view_message_attachments(fp, tmpdir):
                 htmlfilename = os.path.join(fileparts[0] + ".html")
                 htmlfiles.append(htmlfilename)
 
+            # unoconv conversions from powerpoint to HTML drop all images.
+            # Try converting to PDF instead:
+            elif part.get_content_subtype() == "vnd.ms-powerpoint" :
+                pdffile = fileparts[0] + ".pdf"
+                mysubprocess.call(["unoconv", "-f", "pdf",
+                                   "-o", pdffile, partfile])
+                htmlfiles.append(pdffile)
+
             elif part.get_content_subtype() == "pdf":
                 if CONVERT_PDF_TO_HTML:
                     mysubprocess.call(["pdftohtml", "-s", partfile])
