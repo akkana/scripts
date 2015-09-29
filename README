@@ -8,8 +8,14 @@ jsjupiter:
     My Jupiter's Moons Javascript web app: show the Galilean moons and
     their shadows, and predict transits, shadow transits and eclipses.
 
+kobo:
+    Module of utilities useful with Kobo ebook readers.
+
 mapping:
     Scripts related to mapping / GIS.
+
+mailtests:
+    Messages with attachments for testing viewmailattachments.
 
 motioncam:
     An automated motion-sensitive camera driver, for Raspberry Pi or
@@ -33,6 +39,9 @@ Scripts in this directory:
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
+animate.js:
+    Simple code for animating a series of images in javascript.
+
 aptver:
     Search for Debian packages, installed or uninstalled, matching
     a pattern, and print out versions and descriptions.
@@ -40,6 +49,9 @@ aptver:
 balanceparens.py:
     A very simple parenthesis (and brace and bracket) counter.
     Why isn't there a better one already on Linux?
+
+birdcodes.py:
+    Give common name for those obscure 4-letter bird codes.
 
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
@@ -65,6 +77,10 @@ decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
 
+diff2rss:
+    Diff two files and output RSS of the differences.
+    A possible (though poor) solution for web pages that don't offer RSS feeds.
+
 diffiles.py:
     Find files that differ between two directories -- even if 
     they've been moved to different places in the directory structure.
@@ -75,6 +91,7 @@ eggtimer:
 epubtag.py:
     Display author, title and tag information for ebooks in epub format;
     or add or modify an ebook's topic tags.
+    Can be imported as a module (there are examples in the kobo/ directory).
 
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
@@ -115,6 +132,11 @@ musicplayer.py:
 
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
+
+nokeywords:
+    Find directories beneath the present one that don't contain a
+    Keywords or Tags file -- i.e. image directories that need to be tagged
+    with metapho.
 
 pathmatch:
     Search your executable path to find programs matching a string.
@@ -170,14 +192,20 @@ serio:
     A proof-of-concept serial terminal app in Python.
     Don't take this seriously; it's not meant as a real app (yet?)
 
-sieve.py:
-    Visualization of the Sieve of Eratosthenes, using Python curses.
-    (Not very useful, but makes a good curses example.)
-
 shorturl:
     Use a URL shortening service to get a shorter URL.
     Can take input from the current X selection, and automatically
     select its output for pasting into a browser or Twitter window.
+
+sieve.py:
+    Visualization of the Sieve of Eratosthenes, using Python curses.
+    (Not very useful, but makes a good curses example.)
+
+sinkto:
+    Synchronize files in a list between two machines.
+    Good for syncing updated scripts, dot files, documents,
+    email folders etc. to a laptop when preparing for or returning
+    from a trip, or just for keeping several machines in sync.
 
 termcolors:
     Display ANSI colors for the current terminal.
@@ -197,6 +225,11 @@ qhtmlprint:
 viewhtmlmail:
      Take an mbox HTML message (e.g. from mutt), split it using munpack,
      and rewrite it so it can be viewed in an external browser.
+
+viewmailattachments:
+     Show all attachments to an HTML message in a Firefox window,
+     first running them through unoconv or other conversion programs
+     as needed to convert MS Office formats to HTML or PDF.
 
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than
@@ -222,6 +255,10 @@ weather/weatherwin:
 weborphans:
     Check a web site (perhaps localhost) against a local mirror,
     checking for broken links and orphaned files.
+
+wordview:
+    Convert a doc or docx file to html, and call a new firefox window on it.
+    Predecessor to (and simpler than) viewmailattachments.
 
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
