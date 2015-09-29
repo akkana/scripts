@@ -136,7 +136,7 @@ def view_message_attachments(fp, tmpdir):
     # Call up the firefox window right away,
     # so the user can see something is happening:
     mysubprocess.call(["firefox", "-new-window",
-                       "javascript:document.writeln('<br><br><br><br><br><h1>Translating documents, please wait ...');"])
+                       "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."])
 
     # Now walk through looking for the real parts:
     # HTML, doc and docx.
