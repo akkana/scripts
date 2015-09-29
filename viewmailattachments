@@ -133,6 +133,11 @@ def view_message_attachments(fp, tmpdir):
     # for sf in subfiles:
     #     print sf
 
+    # Call up the firefox window right away,
+    # so the user can see something is happening:
+    mysubprocess.call(["firefox", "-new-window",
+                       "javascript:document.writeln('<br><br><br><br><br><h1>Translating documents, please wait ...');"])
+
     # Now walk through looking for the real parts:
     # HTML, doc and docx.
     for part in msg.walk():
@@ -174,7 +179,9 @@ def view_message_attachments(fp, tmpdir):
 
             # unoconv conversions from powerpoint to HTML drop all images.
             # Try converting to PDF instead:
-            elif part.get_content_subtype() == "vnd.ms-powerpoint" :
+            elif part.get_content_subtype() == "vnd.ms-powerpoint" \
+                 or part.get_content_subtype() == \
+                    "vnd.openxmlformats-officedocument.presentationml.presentation" :
                 pdffile = fileparts[0] + ".pdf"
                 mysubprocess.call(["unoconv", "-f", "pdf",
                                    "-o", pdffile, partfile])
@@ -214,7 +221,7 @@ def view_message_attachments(fp, tmpdir):
 
     # Done processing attachments. Call firefox on everything.
     if htmlfiles:
-        mysubprocess.call(["firefox", "-new-window", htmlfiles[0]])
+        mysubprocess.call(["firefox", htmlfiles[0]])
         for f in htmlfiles[1:]:
             # If we don't wait for the new window to pop up before
             # calling new-tab, bad things will happen: the document
