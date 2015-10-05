@@ -24,6 +24,7 @@ import shutil
 import email, mimetypes
 import tempfile
 import subprocess
+from bs4 import BeautifulSoup
 
 # Some prefs:
 USE_WVHTML_FOR_DOC = False
@@ -134,9 +135,37 @@ def view_message_attachments(fp, tmpdir):
     #     print sf
 
     # Call up the firefox window right away,
-    # so the user can see something is happening:
-    mysubprocess.call(["firefox", "-new-window",
-                       "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."])
+    # so the user can see something is happening.
+    # Firefox, alas, has no way from the commandline of calling up
+    # a new private window with content, then replacing that content.
+    # So we'll create a file that refreshes, so that when content is ready,
+    # it can redirect to the first content page.
+    def write_to_index(outfile, msg, timeout_secs, redirect_url):
+        if not redirect_url:
+            redirect_url = "file://" + outfile
+        ofp = open(outfile, "w")
+        ofp.write('''<html><head>
+<meta content="utf-8" http-equiv="encoding">
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta http-equiv="refresh" content="%d;URL=%s">
+</head><body>
+<br><br><br><br><br><br><big><big>%s</big></big>
+</body></html>
+''' % (timeout_secs, redirect_url, msg))
+        ofp.close()
+
+    redirect_timeout = 3
+    pleasewait_file = tmpdir + "/index.html"
+    write_to_index(pleasewait_file, "Please wait ...", redirect_timeout, None)
+    mysubprocess.call(["firefox", "-private-window",
+                       "file://" + pleasewait_file])
+                       # "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."
+                       # Use JS if we can figure out how to close or replace
+                       # the "please wait" tab once we have content to show.
+                       # But for now, setTimeout() doesn't work at all
+                       # in newly popped up private windows.
+                       # "javascript:document.writeln('<br><br><br><br><br><h1>Translating documents, please wait ...');setTimeout(function(){alert('hi');}, 500);"
+                     # ])
 
     # Now walk through looking for the real parts:
     # HTML, doc and docx.
@@ -205,13 +234,45 @@ def view_message_attachments(fp, tmpdir):
             fp = open(htmlfile, 'wb')
             htmlsrc = part.get_payload(decode=True)
 
-            # Substitute filenames for CIDs:
-            for sf in subfiles:
-                htmlsrc = re.sub('cid: ?' + sf['Content-Id'],
-                                 'file://' + sf['filename'],
-                                 htmlsrc, flags=re.IGNORECASE)
+            soup = BeautifulSoup(htmlsrc)
 
-            fp.write(htmlsrc)
+            # Substitute filenames for CIDs:
+            for tag in soup.body.find_all("img", src=True):
+                if tag['src'].lower().startswith("cid:"):
+                    for sf in subfiles:
+                        if tag['src'][4:] == sf['Content-Id']:
+                            tag['src'] = "file://" + sf['filename']
+            # for sf in subfiles:
+            #     htmlsrc = re.sub('cid: ?' + sf['Content-Id'],
+            #                      'file://' + sf['filename'],
+            #                      htmlsrc, flags=re.IGNORECASE)
+
+            # If it's HTML, we may need to add a meta charset tag. Sigh.
+            # If it's text/plain, there's nothing we can do to fix charset.
+            charset = part.get_charset()
+            if not charset:
+                charset = "UTF-8"
+            head = soup.find("head")
+            if not head:
+                head = soup.new_tag("head")
+                html = soup.find("html")
+                if html:
+                    html.insert(0, head)
+                else:
+                    soup.insert(0, head)
+
+            if not head.findAll("meta", attrs={"http-equiv": "encoding"}) and \
+               not head.findAll("meta", attrs={"http-equiv": "content-type"}):
+                meta = soup.new_tag("meta")
+                meta["content"] = charset
+                meta["http-equiv"] = "encoding"
+                head.insert(0, meta)
+                meta = soup.new_tag("meta")
+                meta["http-equiv"] = "content-type"
+                meta["content"] = "text/html; charset=%s" % charset
+                head.insert(0, meta)
+
+            fp.write(soup.prettify().encode("utf-8", "xmlcharrefreplace"))
             fp.close()
 
             htmlfiles.append(htmlfile)
@@ -221,14 +282,26 @@ def view_message_attachments(fp, tmpdir):
 
     # Done processing attachments. Call firefox on everything.
     if htmlfiles:
-        mysubprocess.call(["firefox", htmlfiles[0]])
+        # For the first URL, just put a redirect in
+        write_to_index(pleasewait_file,
+                       "Redirecting to file://" + htmlfiles[0],
+                       0, "file://" + htmlfiles[0])
+
+        # It may take the whole timeout before firefox actually redirects
+        # to the new page, so wait it out:
+        # XXX Actually we may not need this, we can probably start
+        # loading the other tabs right away.
+        # time.sleep(redirect_timeout)
+
+        # mysubprocess.call(["firefox", htmlfiles[0]])
+        # mysubprocess.call(["firefox", "-private-window", htmlfiles[0]])
         for f in htmlfiles[1:]:
             # If we don't wait for the new window to pop up before
             # calling new-tab, bad things will happen: the document
             # may load in a new tab in the old window and THEN pop up
             # an unwanted third window. Go firefox.
             time.sleep(1)
-            mysubprocess.call(["firefox", "-new-tab", f])
+            mysubprocess.call(["firefox", "-private-window", "file://" + f])
 
     # Wait a while to make sure firefox has loads the imgaes, then clean up.
     # time.sleep(6)
