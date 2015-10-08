@@ -175,6 +175,9 @@ pysync:
     Call rsync, but check first what would be changed, and save the
     password between the two calls.
 
+python-cheatsheet.py:
+    Cheatsheet and syntax reminders for useful Python features.
+
 randombg:
     Choose a random background (wallpaper) from a directory named based on
     current X resolution. So you can have different sets of backgrounds
