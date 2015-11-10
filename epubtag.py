@@ -61,6 +61,8 @@ class EpubBook:
  
     def get_matches(self, elname, delete_tags=False):
         '''Find matching tags in the OPF DOM.
+           If delete_tags is true, all such tags will be deleted
+           along with any children.
         '''
         elements = self.dom.getElementsByTagName(elname)
         parent = None
@@ -107,6 +109,14 @@ class EpubBook:
         '''Get the first (perhaps only) title.
         '''
         return self.get_titles()[0]
+
+    def set_title(self, newtitle):
+        titles, elements, parent = self.get_matches('dc:title')
+        for el in elements:
+            if el.firstChild.nodeType == el.TEXT_NODE:
+                el.firstChild.replaceWholeText(newtitle)
+            else:
+                print "Error: dc:title contains something other than text"
 
     def get_authors(self):
         '''Get the list of authors (perhaps only one of them).
@@ -230,7 +240,7 @@ class EpubBook:
                 # parsing the first line manually. So crazy!
                 encoding = 'UTF-8'
                 ozf.writestr(info, self.dom.toprettyxml(encoding=encoding,
-                                                   newl=''))
+                                                        newl=''))
                 # This also works:
                 # ozf.writestr(info,
                 #              self.dom.toprettyxml().encode(encoding,
@@ -277,6 +287,7 @@ if __name__ == "__main__":
     def Usage():
         progname = os.path.basename(sys.argv[0])
         print """Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]
+       %s -T "New title" file.epub [file.epub...]
        %s -i [imagedir] file.epub [file.epub...]
 Display, add or remove tags in epub ebooks,
 or extract images from them.
@@ -288,7 +299,7 @@ Options:
     -d: delete existing tags before adding new ones
     -b: print only one line for each book (useful with grep)
     -i [dir]: extract images into given directory (default .)""" \
-            % (progname, progname)
+            % (progname, progname, progname)
         sys.exit(0)
 
     # optparse can't handle multiple arguments of the same type
@@ -306,13 +317,23 @@ Options:
     tags = []
     add_tags = False
     delete_tags = False
+    change_title = False
+    new_title = None
     brief = False
-    for i, arg in enumerate(sys.argv[1:]):
+    for arg in sys.argv[1:]:
+        if change_title and not new_title:
+            new_title = arg
+            continue
         if arg == '-d':
             delete_tags = True
             continue
         if arg == '-t':
             add_tags = True
+            continue
+        if arg.startswith('-T'):
+            change_title = True
+            if len(arg) > 2:
+                new_title = arg[2:]
             continue
         if arg == '-b':
             brief = True
@@ -323,10 +344,14 @@ Options:
         if arg[0] == '-':
             Usage()
 
+        if change_title and not new_title:
+            print "Must specify a new title with -T\n"
+            Usage()
+
         # If we're here, the argument doesn't start with '-'.
-        # It might still be the imagedir argument to -i, though:
-        if imagedir == './' :
-            if  os.path.isdir(arg) :
+        # It might still be the imagedir argument to -i, though.
+        if imagedir == './':
+            if  os.path.isdir(arg):
                 imagedir = arg
                 continue
             elif not arg.endswith('.epub') :
@@ -358,6 +383,11 @@ Options:
                 continue
 
             book.parse_contents()
+
+            if new_title:
+                book.set_title(new_title)
+                print "Set title to", new_title, "in", f
+                book.save_changes()
 
             if delete_tags:
                 book.delete_tags()
