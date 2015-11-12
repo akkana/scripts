@@ -90,8 +90,9 @@ eggtimer:
 
 epubtag.py:
     Display author, title and tag information for ebooks in epub format;
-    or add or modify an ebook's topic tags.
-    Can be imported as a module (there are examples in the kobo/ directory).
+    or add or modify an ebook's topic tags, title or cover.
+    Can be imported as a module (there are examples in the kobo/ directory
+    and in fixbookcover).
 
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
@@ -101,6 +102,10 @@ fincompare.py:
     Download financial data from Yahoo finance and plot lots of
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
+
+fixbookcover:
+    Fix a book whose cover doesn't include the title, like many
+    Project Gutenberg books.
 
 fontasia:
     A Linux font chooser and categorizer.

@@ -27,6 +27,7 @@ class EpubBook:
 
         self.filename = filename
         self.zip = zipfile.ZipFile(filename)
+        self.replace_files = {}
 
     def namelist(self):
         return self.zip.namelist()
@@ -220,6 +221,13 @@ class EpubBook:
 
             print "Adding:", new_tag
 
+    def replace_file(self, oldfilename, newfile):
+        '''When we save_changes, replace the contents of oldfilename
+           (without changing its filename) with the contents of newfile,
+           a filename on the local filesystem.
+        '''
+        self.replace_files[oldfilename] = newfile
+
     def save_changes(self):
         '''Overwrite the old file with any changes that have been
            made to the epub's tags. The old file will be backed
@@ -230,7 +238,11 @@ class EpubBook:
         new_epub_file = self.filename + '.tmp'
         ozf = zipfile.ZipFile(new_epub_file, 'w')
         for info in self.zip.infolist():
-            if info.filename.endswith('.opf'):
+            if info.filename in self.replace_files:
+                fp = open(self.replace_files[info.filename])
+                ozf.writestr(info, fp.read())
+                fp.close()
+            elif info.filename.endswith('.opf'):
                 # dom.toprettyprintxml() returns unicode, which
                 # zipfile.writestr() can't write. If you pass in
                 # encoding= then it works ... but minidom gives us
@@ -259,7 +271,26 @@ class EpubBook:
         print "Wrote", self.filename
         os.remove(bakfile)
 
+    def extract_cover_image(self, outdir=''):
+        '''Extract just an image named cover.*.
+           Return (newfilename, filename_in_zip_archive)
+        '''
+        for f in self.zip.namelist():
+            basename = os.path.basename(f)
+            base, ext = os.path.splitext(basename)
+            if base.lower() == "cover" and ext.lower() in self.image_exts:
+                infp = self.zip.open(f)
+                outfilename = os.path.join(outdir, basename)
+                outfp = open(outfilename, 'w')
+                outfp.write(infp.read())
+                infp.close()
+                outfp.close()
+                return outfilename, f
+        return None
+
     def extract_images(self, outdir=''):
+        '''Extract all images in the book.
+        '''
         print "Extracting images from", self.filename,
         if outdir:
             print "to", outdir
@@ -313,6 +344,7 @@ Options:
     # any other flag, print a usage statement.
 
     imagedir = None
+    extract_images = False
     epubfiles = []
     tags = []
     add_tags = False
@@ -339,6 +371,11 @@ Options:
             brief = True
             continue
         if arg == '-i':
+            extract_images = True
+            imagedir = './'
+            continue
+        if arg == '-c':
+            extract_images = "cover"
             imagedir = './'
             continue
         if arg[0] == '-':
@@ -378,7 +415,12 @@ Options:
             book.open(f)
 
             if imagedir != None:
-                book.extract_images(imagedir)
+                if extract_images == "cover":
+                    coverfile, zipname = book.extract_cover_image(imagedir)
+                    if coverfile:
+                        print "extracted cover to", coverfile
+                else:
+                    book.extract_images(imagedir)
                 book.close()
                 continue
 

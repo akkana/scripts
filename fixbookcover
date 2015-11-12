@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+# Add a book's title to the cover of an epub book.
+# Useful for books such as Project Gutenberg that have a silly Palm picture
+# with no words for a cover image.
+
+import epubtag
+import tempfile
+import subprocess
+import sys, os
+from PIL import Image
+
+def fix_book_cover(epubfile):
+    book = epubtag.EpubBook()
+    book.open(epubfile)
+    book.parse_contents()
+
+    imagedir = tempfile.mkdtemp()
+    coverfile, coverfilename = book.extract_cover_image(imagedir)
+    if not coverfile:
+        print "Couldn't find a cover in", epubfile
+        return
+
+    # Get the image's size
+    im = Image.open(coverfile)
+    width, height = im.size
+    im.close()
+
+    # New cover file should be in the same directory.
+    newcoverfile = os.path.join(imagedir, "new%s" % os.path.basename(coverfile))
+
+    # XXX figure out how to do this with imagemagick python bindings
+    subprocess.call(["convert", "-background", "none", "-fill", "black",
+                     "-gravity", "center", "-size", "%dx%d" % (width, height/2),
+                     'caption:%s by %s' % (', '.join(book.get_titles()),
+                                             ', '.join(book.get_authors())),
+                     coverfile, "+swap", "-gravity", "center",
+                     "-composite", newcoverfile])
+    print "Wrote new cover to", newcoverfile
+    book.replace_file(coverfilename, newcoverfile)
+    book.save_changes()
+    book.close()
+
+if __name__ == "__main__":
+    for b in sys.argv[1:]:
+        fix_book_cover(b)
+
