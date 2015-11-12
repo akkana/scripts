@@ -10,38 +10,71 @@ import subprocess
 import sys, os
 from PIL import Image
 
-def fix_book_cover(epubfile):
-    book = epubtag.EpubBook()
-    book.open(epubfile)
-    book.parse_contents()
-
-    imagedir = tempfile.mkdtemp()
-    coverfile, coverfilename = book.extract_cover_image(imagedir)
-    if not coverfile:
-        print "Couldn't find a cover in", epubfile
-        return
-
+def fix_book_cover(book, localcover, coverzipname):
     # Get the image's size
-    im = Image.open(coverfile)
+    im = Image.open(localcover)
     width, height = im.size
     im.close()
 
     # New cover file should be in the same directory.
-    newcoverfile = os.path.join(imagedir, "new%s" % os.path.basename(coverfile))
+    newcoverfile = os.path.join(os.path.dirname(localcover),
+                                "new%s" % os.path.basename(localcover))
 
-    # XXX figure out how to do this with imagemagick python bindings
+    # XXX figure out how to do this with imagemagick python bindings.
+    # ImageMagick doesn't use the pretty font names with spaces in them;
+    # use convert -list font to find out what font names it understands.
+    # It doesn't understand aliases like "Serif", alas.
+    # Times-New-Roman-Bold is fairly safe.
     subprocess.call(["convert", "-background", "none", "-fill", "black",
                      "-gravity", "center", "-size", "%dx%d" % (width, height/2),
+                     "-font", "Times-New-Roman-Bold",
                      'caption:%s by %s' % (', '.join(book.get_titles()),
                                              ', '.join(book.get_authors())),
-                     coverfile, "+swap", "-gravity", "center",
+                     localcover, "+swap", "-gravity", "center",
                      "-composite", newcoverfile])
     print "Wrote new cover to", newcoverfile
-    book.replace_file(coverfilename, newcoverfile)
+    book.replace_file(coverzipname, newcoverfile)
     book.save_changes()
     book.close()
 
+def extract_cover(epubfile, imagedir):
+    book = epubtag.EpubBook()
+    book.open(epubfile)
+    book.parse_contents()
+
+    localcover, coverzipname = book.extract_cover_image(imagedir)
+    if not localcover:
+        print "Couldn't find a cover in", epubfile
+        return None, None, None
+
+    return book, localcover, coverzipname
+
+def allcovers(dir, imagedir):
+    files = os.listdir(dir)
+    for f in files:
+        if not f.lower().endswith(".epub"):
+            continue
+        if dir != ".":
+            f = os.path.join(dir, f)
+        book, localcover, coverzipname = extract_cover(f, imagedir)
+        if book == None:
+            continue
+
+        # Change the next line if you use an image viewer other than pho.
+        subprocess.call(["pho", "-P", localcover])
+        ans = raw_input("Fix cover for %s? " % book.get_title())
+        if ans.lower() == 'y':
+            print "Fixing", book.get_title()
+            fix_book_cover(book, localcover, coverzipname)
+
 if __name__ == "__main__":
+    imagedir = tempfile.mkdtemp()
+
+    if len(sys.argv) <= 1:
+        allcovers(".", imagedir)
+        sys.exit(0)
+
     for b in sys.argv[1:]:
-        fix_book_cover(b)
+        book, localcover, coverzipname = extract_cover(b, imagedir)
+        fix_book_cover(book, localcover, coverzipname)
 
