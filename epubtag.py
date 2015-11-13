@@ -11,7 +11,7 @@ import xml.dom.minidom
 class EpubBook:
     # class constants:
     subjectTag = 'dc:subject'
-    image_exts = [ ".jpg", ".gif", ".png", ".svg", ".pdf" ]
+    image_exts = [ ".jpg", ".jpeg", ".gif", ".png", ".svg", ".pdf" ]
 
     def __init__(self):
         self.filename = None
@@ -275,18 +275,141 @@ class EpubBook:
         '''Extract just an image named cover.*.
            Return (newfilename, filename_in_zip_archive)
         '''
-        for f in self.zip.namelist():
-            basename = os.path.basename(f)
-            base, ext = os.path.splitext(basename)
-            if base.lower() == "cover" and ext.lower() in self.image_exts:
-                infp = self.zip.open(f)
-                outfilename = os.path.join(outdir, basename)
-                outfp = open(outfilename, 'w')
-                outfp.write(infp.read())
-                infp.close()
-                outfp.close()
-                return outfilename, f
-        return None
+        '''
+        Notes on covers: the epub format doesn't actually specify how to make
+        a cover, so apparently there are all sorts of different conventions.
+
+        Gutenberg books tend to have
+        <metadata>
+            <meta content="item8" name="cover"/>
+        </metadata>
+        <manifest>
+            <item href="cover.jpg" id="item8" media-type="image/jpeg"/>
+        </manifest>
+        <guide>
+            <reference href="cover.jpg" title="Cover Image" type="cover"/>
+        </guide>
+
+        A book converted from HTML with early Calibre has:
+        <metadata>
+            <meta content="cover" name="cover"/>
+        </metadata>
+        <manifest>
+            <item href="Images/cover_image.jpg" id="cover" media-type="image/jpeg"/>
+        </manifest>
+        <guide>
+            <reference href="Text/titlepage.xhtml" title="Title Page" type="cover"/>
+        </guide>
+
+        A StoryBundle book has:
+        <metadata>
+            <meta name="cover" content="cover"/>
+        </metadata>
+        <manifest>
+            <item href="cover.jpeg" id="cover" media-type="image/jpeg"/>
+        </manifest>
+        <guide>
+            <reference href="titlepage.xhtml" title="Cover" type="cover"/>
+        </guide>
+
+        A random commercial book has:
+        <metadata>
+            <meta content="coverimg" name="cover"/>
+            <meta content="cover-image" name="cover"/>
+        </metadata>
+        <manifest>
+            <item href="OEBPS/images/bookname_epub3_001_cvi.jpg" id="coverimg" media-type="image/jpeg" properties="cover-image"/>
+        </manifest>
+        <guide>
+            <reference href="OEBPS/bookname_epub3_cvi_r1.xhtml" title="Cover" type="cover"/>
+        </guide>
+
+        What O'Reilly says to have:
+        <metadata>
+            <meta name="cover" content="cover-image" />
+        </metadata>
+        <manifest>
+            <item id="cover" href="cover.html" media-type="application/xhtml+xml"/>
+            <item id="cover-image" href="the_cover.jpg" media-type="image/jpeg"/>
+        </manifest>
+        <guide>
+            <reference href="cover.html" type="cover" title="Cover"/>
+        </guide>
+
+        What the MobileRead Wiki says to have:
+        <metadata>
+             <meta name="cover" content="cover-image"/>
+        </metadata>
+        <manifest>
+             <item id="cover" href="the-cover-filename.xhtml" media-type="application/xhtml+xml"/>
+             <item id="cover-image" href="the_cover.jpg" media-type="image/jpeg"/>
+        </manifest>
+        <guide>
+            <reference type="cover" href="the-cover-filename.xhtml" />
+        </guide>
+
+        Practically, what to look for:
+        1. <item id="cover-image" in <manifest>  # O'Reilly/MobileReads rec
+        2. <item id="coverimg" in <manifest>     # Commercial
+        3. <item id="cover" in <manifest>        # Early Calibre
+        4. <reference type="cover" in <guide>    # Gutenberg
+        What a mess!
+
+        Some URLs suggesting best practices:
+        https://www.safaribooksonline.com/blog/2009/11/20/best-practices-in-epub-cover-images/
+        http://wiki.mobileread.com/wiki/Ebook_Covers
+        http://www.chickensinenvelopes.net/2013/01/setting-a-cover-image-on-an-epub-ebook/
+        '''
+
+        coverimg = None
+        parent = self.dom.getElementsByTagName("manifest")[0]
+        for item in parent.getElementsByTagName("item"):
+            id = item.getAttribute("id").lower()
+            if id.startswith("cover"):
+                coverimg = item.getAttribute("href")
+                base, ext = os.path.splitext(coverimg)
+                if ext in self.image_exts:
+                    break
+                # If it doesn't end with an image type, we can't use it
+                coverimg = None
+
+        # If we didn't find one in the manifest, try looking in guide:
+        if not coverimg:
+            parent = self.dom.getElementsByTagName("guide")[0]
+            for item in parent.getElementsByTagName("reference"):
+                if item.getAttribute("type").lower() == "cover":
+                    coverimg = item.getAttribute("href")
+                    base, ext = os.path.splitext(coverimg)
+                    if ext in self.image_exts:
+                        break
+                    # If it doesn't end with an image type, we can't use it
+                    coverimg = None
+
+        if not coverimg:
+            return None, None
+
+        infp = None
+        base = os.path.basename(coverimg)
+
+        # If we get here, we think we have the name of the cover image file.
+        # Unfortunately, it's not necessarily a full path.
+        # We may need to search for it in the zip.
+        try:
+            infp = self.zip.open(coverimg)
+        except KeyError:
+            for f in self.zip.namelist():
+                if os.path.basename(f) == base:
+                    infp = self.zip.open(f)
+        if not infp:
+            print "Couldn't find", coverimg, "in zip archive"
+            return None, None
+
+        outfilename = os.path.join(outdir, base)
+        outfp = open(outfilename, 'w')
+        outfp.write(infp.read())
+        infp.close()
+        outfp.close()
+        return outfilename, coverimg
 
     def extract_images(self, outdir=''):
         '''Extract all images in the book.
@@ -414,6 +537,8 @@ Options:
             book = EpubBook()
             book.open(f)
 
+            book.parse_contents()
+
             if imagedir != None:
                 if extract_images == "cover":
                     coverfile, zipname = book.extract_cover_image(imagedir)
@@ -423,8 +548,6 @@ Options:
                     book.extract_images(imagedir)
                 book.close()
                 continue
-
-            book.parse_contents()
 
             if new_title:
                 book.set_title(new_title)
