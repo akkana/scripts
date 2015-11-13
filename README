@@ -104,7 +104,7 @@ fincompare.py:
     Can also take data from a local spreadsheet or other source.
 
 fixbookcover:
-    Fix a book whose cover doesn't include the title, like many
+    Fix books whose cover doesn't include the title, like many
     Project Gutenberg books.
 
 fontasia:
@@ -113,6 +113,10 @@ fontasia:
 fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
+
+imageviewer.py:
+    A generic image viewer widget and image viewer window that can
+    be imported into other python programs.
 
 langgrep:
     Search (grep) for patterns only within scripts written in a
