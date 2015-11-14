@@ -29,9 +29,13 @@ class ImageViewer(gtk.DrawingArea):
 
             x, y, w, h = self.get_allocation()
             if w != self.width or h != self.height:
-                self.width = w
-                self.height = h
-            print "Created gc, size is %d x %d" % (self.width, self.height)
+                # get_allocation() gives a number that's too large,
+                # and if we later try to draw_rectangle() with these
+                # dimensions, we'll only get half the rectangle horizontally.
+                # I have no idea why this is happening, but subtracting a
+                # few pixels from get_allocation() is temporary workaround.
+                self.width = w-5
+                self.height = h-5
 
             # Have we had load_image called, but we weren't ready for it?
             # Now, theoretically, we are ... so call it again.
@@ -50,7 +54,13 @@ class ImageViewer(gtk.DrawingArea):
     def load_image(self, img):
         self.cur_img = img
         if self.width and self.height:
-            self.prepare_image()
+            if self.cur_img:
+                self.prepare_image()
+            else:
+                self.pixbuf = None
+                self.clear()
+
+        self.label_text = None
 
     def prepare_image(self):
         '''Load the image passed in, and show it.
@@ -145,24 +155,26 @@ class ImageViewer(gtk.DrawingArea):
         self.clear()
 
         if self.pixbuf:
+            # Center it:
             x = (self.width - self.pixbuf.get_width()) / 2
             y = (self.height - self.pixbuf.get_height()) / 2
             self.window.draw_pixbuf(self.xgc_bg, self.pixbuf, 0, 0, x, y)
-        elif self.label_text:
+
+        if self.label_text:
             self.draw_text(self.label_text)
-        else:
+
+        if not self.pixbuf and not self.label_text:
             self.draw_text("No image")
 
     # def rotate(self, rot):
     #     self.cur_img.rot = (self.cur_img.rot + rot + 360) % 360
-
     #     # XXX we don't always need to reload: could make this more efficient.
     #     self.load_image(self.cur_img)
 
     def clear(self):
         if not self.xgc_bg:
-            print "clear: xgc not ready yet"
             return
+
         self.window.draw_rectangle(self.xgc_bg, True,
                                    0, 0, self.width, self.height)
 
@@ -170,7 +182,7 @@ class ImageViewer(gtk.DrawingArea):
         if not self.xgc_fg:
             print "draw_text: xgc not ready yet"
             return
-        self.pixbuf = None
+        # self.pixbuf = None
         self.label_text = label
         # It never fails to amaze me how baroque it is to draw text in pygtk:
         layout = self.create_pango_layout(label)
@@ -179,6 +191,11 @@ class ImageViewer(gtk.DrawingArea):
         layout.set_width(self.width * pango.SCALE)
         layout.set_wrap(pango.WRAP_WORD)
         label_width, label_height = layout.get_pixel_size()
+        offset = 3
+        self.window.draw_layout(self.xgc_bg,
+                                self.width - label_width + offset,
+                                self.height - label_height + offset,
+                                layout)
         self.window.draw_layout(self.xgc_fg,
                                 self.width - label_width,
                                 self.height - label_height,
@@ -229,7 +246,8 @@ class ImageViewerWindow(object):
         self.file_list = [ imgfile ]
         self.imgno = 0
         self.viewer.load_image(imgfile)
-        self.viewer.show_image()
+        if imgfile:
+            self.viewer.show_image()
 
     def next_image(self):
         self.imgno = (self.imgno + 1) % len(self.file_list)

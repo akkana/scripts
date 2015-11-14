@@ -57,7 +57,8 @@ class BookCoverFixer:
         # use convert -list font to find out what font names it understands.
         # It doesn't understand aliases like "Serif", alas.
         # Times-New-Roman-Bold is fairly safe.
-        subprocess.call(["convert", "-background", "none", "-fill", "black",
+        subprocess.call(["convert", "-background", "none",
+                         "-fill", "black", "-stroke", "red",
                          "-gravity", "center",
                          "-size", "%dx%d" % (width, height/2),
                          "-font", "Times-New-Roman-Bold",
@@ -117,6 +118,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
             newcover = self.fixer.add_title_to_cover()
             if newcover:
                 self.new_image(self.fixer.newcoverfile)
+                self.viewer.draw_text("%s (unsaved)" % self.fixer.book.get_title())
                 self.do_btn.set_label(self.save_changes_label)
 
     def quit(self):
@@ -132,16 +134,17 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
 
         self.fixer.extract_cover(self.booklist[self.bookindex])
 
+        if self.fixer.book:
+            title = self.fixer.book.get_title()
+        else:
+            title = self.booklist[self.bookindex]
+
         if self.fixer.extracted_ok():
             self.new_image(self.fixer.localcover)
+            self.viewer.draw_text("%s (unmodified)" % title)
             self.do_btn.set_sensitive(True)
         else:
-            print "Couldn't extract cover from", self.booklist[self.bookindex]
-            self.viewer.clear()
-            if self.fixer.book:
-                title = self.fixer.book.get_title()
-            else:
-                title = self.booklist[self.bookindex]
+            self.new_image(None)
             self.viewer.draw_text("No cover for %s" % title)
             self.do_btn.set_sensitive(False)
             return
