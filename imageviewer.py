@@ -33,9 +33,9 @@ class ImageViewer(gtk.DrawingArea):
                 # and if we later try to draw_rectangle() with these
                 # dimensions, we'll only get half the rectangle horizontally.
                 # I have no idea why this is happening, but subtracting a
-                # few pixels from get_allocation() is temporary workaround.
-                self.width = w-5
-                self.height = h-5
+                # few pixels from allocation width is a temporary workaround.
+                self.width = w    # -5
+                self.height = h
 
             # Have we had load_image called, but we weren't ready for it?
             # Now, theoretically, we are ... so call it again.
