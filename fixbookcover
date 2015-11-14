@@ -30,7 +30,7 @@ class BookCoverFixer:
         self.localcover, self.coverzipname \
             = self.book.extract_cover_image(self.imagedir)
         if not self.localcover:
-            print "Couldn't find a cover in", epubfile
+            # print "Couldn't find a cover in", epubfile
             self.localcover = None
             self.coverzipname = None
 
@@ -157,7 +157,9 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
 
     def key_press_event(self, widget, event, imagewin):
         '''Handle a key press event anywhere in the window'''
-        if event.string == " ":
+        # Don't use space here: space will activate the focused button
+        # rather than (or in addition to?) anything here.
+        if event.string == "n":
             self.next_book();
             return
         if event.string == "y":
