@@ -375,15 +375,28 @@ class EpubBook:
 
         # If we didn't find one in the manifest, try looking in guide:
         if not coverimg:
-            parent = self.dom.getElementsByTagName("guide")[0]
-            for item in parent.getElementsByTagName("reference"):
-                if item.getAttribute("type").lower() == "cover":
-                    coverimg = item.getAttribute("href")
-                    base, ext = os.path.splitext(coverimg)
-                    if ext in self.image_exts:
-                        break
-                    # If it doesn't end with an image type, we can't use it
-                    coverimg = None
+            guide = self.dom.getElementsByTagName("guide")
+            if guide:
+                parent = guide[0]
+                for item in parent.getElementsByTagName("reference"):
+                    if item.getAttribute("type").lower() == "cover":
+                        coverimg = item.getAttribute("href")
+                        base, ext = os.path.splitext(coverimg)
+                        if ext in self.image_exts:
+                            break
+                        # If it doesn't end with an image type, we can't use it
+                        coverimg = None
+
+        # If all else fails, go back to the manifest and look for
+        # anything named cover.jpg. This is the only recourse for
+        # many Project Gutenberg books.
+        if not coverimg:
+            parent = self.dom.getElementsByTagName("manifest")[0]
+            for item in parent.getElementsByTagName("item"):
+                href = item.getAttribute("href")
+                base, ext = os.path.splitext(os.path.basename(href))
+                if base.lower() == "cover":
+                    coverimg = href
 
         if not coverimg:
             return None, None
@@ -400,6 +413,7 @@ class EpubBook:
             for f in self.zip.namelist():
                 if os.path.basename(f) == base:
                     infp = self.zip.open(f)
+                    coverimg = f
         if not infp:
             print "Couldn't find", coverimg, "in zip archive"
             return None, None

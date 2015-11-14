@@ -7,74 +7,163 @@
 import epubtag
 import tempfile
 import subprocess
+import shutil
 import sys, os
 from PIL import Image
+import gtk
 
-def fix_book_cover(book, localcover, coverzipname):
-    # Get the image's size
-    im = Image.open(localcover)
-    width, height = im.size
-    im.close()
+import imageviewer
 
-    # New cover file should be in the same directory.
-    newcoverfile = os.path.join(os.path.dirname(localcover),
-                                "new%s" % os.path.basename(localcover))
+class BookCoverFixer:
+    def __init__(self):
+        self.book = None
+        self.localcover = None
+        self.coverzipname = None
+        self.imagedir = tempfile.mkdtemp()
+        self.newcoverfile = None
 
-    # XXX figure out how to do this with imagemagick python bindings.
-    # ImageMagick doesn't use the pretty font names with spaces in them;
-    # use convert -list font to find out what font names it understands.
-    # It doesn't understand aliases like "Serif", alas.
-    # Times-New-Roman-Bold is fairly safe.
-    subprocess.call(["convert", "-background", "none", "-fill", "black",
-                     "-gravity", "center", "-size", "%dx%d" % (width, height/2),
-                     "-font", "Times-New-Roman-Bold",
-                     'caption:%s by %s' % (', '.join(book.get_titles()),
-                                             ', '.join(book.get_authors())),
-                     localcover, "+swap", "-gravity", "center",
-                     "-composite", newcoverfile])
-    print "Wrote new cover to", newcoverfile
-    book.replace_file(coverzipname, newcoverfile)
-    book.save_changes()
-    book.close()
+    def extract_cover(self, epubfile):
+        self.book = epubtag.EpubBook()
+        self.book.open(epubfile)
+        self.book.parse_contents()
 
-def extract_cover(epubfile, imagedir):
-    book = epubtag.EpubBook()
-    book.open(epubfile)
-    book.parse_contents()
+        self.localcover, self.coverzipname \
+            = self.book.extract_cover_image(self.imagedir)
+        if not self.localcover:
+            print "Couldn't find a cover in", epubfile
+            self.localcover = None
+            self.coverzipname = None
 
-    localcover, coverzipname = book.extract_cover_image(imagedir)
-    if not localcover:
-        print "Couldn't find a cover in", epubfile
-        return None, None, None
+    def extracted_ok(self):
+        return (self.book and self.localcover and self.coverzipname)
 
-    return book, localcover, coverzipname
+    def cleanup_tmp(self):
+        if self.imagedir and os.path.exists(self.imagedir):
+            shutil.rmtree(self.imagedir)
 
-def allcovers(dir, imagedir):
-    files = os.listdir(dir)
-    for f in files:
-        if not f.lower().endswith(".epub"):
-            continue
-        if dir != ".":
-            f = os.path.join(dir, f)
-        book, localcover, coverzipname = extract_cover(f, imagedir)
-        if book == None:
-            continue
+    def add_title_to_cover(self):
+        '''Actually do the fix'''
+        # Get the image's size
+        im = Image.open(self.localcover)
+        width, height = im.size
+        im.close()
 
-        # Change the next line if you use an image viewer other than pho.
-        subprocess.call(["pho", "-P", localcover])
-        ans = raw_input("Fix cover for %s? " % book.get_title())
-        if ans.lower() == 'y':
-            print "Fixing", book.get_title()
-            fix_book_cover(book, localcover, coverzipname)
+        # New cover file should be in the same directory.
+        self.newcoverfile = os.path.join(os.path.dirname(self.localcover),
+                                    "new%s" % os.path.basename(self.localcover))
+
+        # XXX figure out how to do this with imagemagick python bindings.
+        # ImageMagick doesn't use the pretty font names with spaces in them;
+        # use convert -list font to find out what font names it understands.
+        # It doesn't understand aliases like "Serif", alas.
+        # Times-New-Roman-Bold is fairly safe.
+        subprocess.call(["convert", "-background", "none", "-fill", "black",
+                         "-gravity", "center",
+                         "-size", "%dx%d" % (width, height/2),
+                         "-font", "Times-New-Roman-Bold",
+                         'caption:%s by %s' % \
+                             (', '.join(self.book.get_titles()),
+                              ', '.join(self.book.get_authors())),
+                         self.localcover, "+swap", "-gravity", "center",
+                         "-composite", self.newcoverfile])
+        print "Wrote new cover to", self.newcoverfile
+        return self.newcoverfile
+
+    def save_changes(self):
+        print "Saving changes, supposedly"
+        print "Replacing", self.coverzipname, self.newcoverfile
+        self.book.replace_file(self.coverzipname, self.newcoverfile)
+        self.book.save_changes()
+        self.book.close()
+
+# A GTK-based GUI window for doing this:
+class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
+    def __init__(self, booklist):
+        super(BookCoverFixerWindow, self).__init__(None, 300, 400)
+
+        self.fixer = BookCoverFixer()
+
+        self.booklist = booklist
+        self.bookindex = -1
+
+        self.add_title_label = "Add title"
+        self.save_changes_label = "Save changes"
+
+        hbox = gtk.HBox()
+        self.do_btn = gtk.Button(self.add_title_label);
+        hbox.pack_start(self.do_btn)
+        self.do_btn.connect("clicked", self.do_fix)
+        skip_btn = gtk.Button("Skip");
+        hbox.pack_start(skip_btn)
+        skip_btn.connect("clicked", self.next_book)
+        self.main_vbox.pack_start(hbox)
+
+        self.set_key_handler(self.key_press_event)
+
+        self.expose_id = self.win.connect("expose-event", self.expose_handler)
+
+    def do_fix(self, w=None):
+        if self.do_btn.get_label() == self.add_title_label:
+            self.add_title_to_cover()
+        elif self.do_btn.get_label() == self.save_changes_label:
+            self.fixer.save_changes()
+            self.do_btn.set_label(self.add_title_label)
+            self.next_book()
+
+    def add_title_to_cover(self):
+        if not self.fixer.extracted_ok():
+            print "Eek, book wasn't initialized!"
+        else:
+            newcover = self.fixer.add_title_to_cover()
+            if newcover:
+                self.new_image(self.fixer.newcoverfile)
+                self.do_btn.set_label(self.save_changes_label)
+
+    def quit(self):
+        self.fixer.cleanup_tmp()
+        super(BookCoverFixerWindow, self).quit()
+
+    def next_book(self, w=None):
+        self.bookindex += 1
+        if self.bookindex >= len(self.booklist):
+            self.quit()
+            return
+        self.do_btn.set_label(self.add_title_label)
+
+        self.fixer.extract_cover(self.booklist[self.bookindex])
+
+        if self.fixer.extracted_ok():
+            self.new_image(self.fixer.localcover)
+            self.do_btn.set_sensitive(True)
+        else:
+            print "Couldn't extract cover from", self.booklist[self.bookindex]
+            self.viewer.clear()
+            if self.fixer.book:
+                title = self.fixer.book.get_title()
+            else:
+                title = self.booklist[self.bookindex]
+            self.viewer.draw_text("No cover for %s" % title)
+            self.do_btn.set_sensitive(False)
+            return
+
+    def expose_handler(self, widget, event):
+        self.next_book()
+        # We only want it the first time. The realize handler doesn't work
+        # because it fires before the window actually exists.
+        self.win.disconnect(self.expose_id)
+
+    def key_press_event(self, widget, event, imagewin):
+        '''Handle a key press event anywhere in the window'''
+        if event.string == " ":
+            self.next_book();
+            return
+        if event.string == "y":
+            self.do_fix()
+            return
+        if event.string == "q":
+            self.quit()
+            return
 
 if __name__ == "__main__":
-    imagedir = tempfile.mkdtemp()
-
-    if len(sys.argv) <= 1:
-        allcovers(".", imagedir)
-        sys.exit(0)
-
-    for b in sys.argv[1:]:
-        book, localcover, coverzipname = extract_cover(b, imagedir)
-        fix_book_cover(book, localcover, coverzipname)
-
+    win = BookCoverFixerWindow(sys.argv[1:])
+    win.run()
