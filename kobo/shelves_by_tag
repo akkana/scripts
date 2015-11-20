@@ -29,21 +29,24 @@ shelves_wanted = [ "mystery", "science fiction", "science", "astronomy",
                    "dogs", "animals", "humor", "biography", "medicine",
                    "nonfiction", "poetry", "plays", "travel",
                    "war", "civil war", "historical fiction", "adventure",
-                   "juvenile", "fantasy" ]
+                   "juvenile", "fantasy", "heroine" ]
 
 booklist = {}
 
 # First, make a dictionary of all the books we want to index.
 # Iterate over dirs of epubs provided on the command line:
-if len(sys.argv) <= 1:
+if len(sys.argv) <= 1 or sys.argv[1][0] == '-':
     print "Usage: %s dir dir dir ..." % sys.argv[0]
     print "  where each dir will be searched recursively for epub books."
+    print "Will look for a mounted kobo at /kobo"
+    print "but will modify a database at ~/kobo/mykobo/KoboReader.sqlite"
+    print "rather than the real one on /kobo"
     sys.exit(1)
 
 for dir in sys.argv[1:]:
     for root, dirs, files in os.walk(dir):
         for f in files:
-            if f.endswith(".epub"):
+            if f.lower().endswith(".epub"):
                 filepath = os.path.join(root, f)
                 try:
                     book = epubtag.EpubBook()

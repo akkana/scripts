@@ -96,7 +96,10 @@ class KoboDB:
               % escape_quotes(id);
         # print sql
         self.cursor.execute(sql)
-        return self.cursor.fetchall()[0]
+        books = self.cursor.fetchall()
+        if not books:
+            return None
+        return books[0]
 
     def list_books(self):
         '''List all books in the database.
@@ -150,7 +153,11 @@ class KoboDB:
         for shelf in allshelves:
             print "\n===", shelf, "==="
             for id in allshelves[shelf]:
-                print "    %s (%s)" % self.get_book_by_id(id)
+                book = self.get_book_by_id(id)
+                if not book:
+                    print "Eek, book", id, "doesn't exist"
+                else:
+                    print "    %s (%s)" % book
 
     def has_shelf(self, shelfname):
         '''Does a given shelfname exist? Helpful when checking whether
@@ -191,9 +198,11 @@ class KoboDB:
         # type BOOL, and querying that table shows true and false there,
         # but absolutely everyone on the web says you have to use
         # 1 and 0 for sqlite3 and that there is no boolean type.
+        # XXX DATETIME('now') inserts something like "2015-11-20 16:36:34"
+        # but Kobo-created shelves look like "2015-08-21T01:47:15Z".
         query = '''INSERT INTO Shelf(CreationDate, Id, InternalName,
                   LastModified, Name, _IsDeleted, _IsVisible, _IsSynced)
-VALUES (DATETIME('now'), %s, '%s', DATETIME('now'), '%s', 0, 1, 1);
+VALUES (DATETIME('now'), '%s', '%s', DATETIME('now'), '%s', 0, 1, 1);
 ''' % (shelfname, shelfname, shelfname)
         print query
         self.cursor.execute(query)
