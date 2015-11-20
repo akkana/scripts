@@ -17,6 +17,7 @@ class EpubBook:
         self.filename = None
         self.zip = None
         self.dom = None
+        self.contentfile = None
 
     def open(self, filename):
         '''Open an epub file and set up handles to the zip archive
@@ -39,6 +40,9 @@ class EpubBook:
 
         for f in self.zip.namelist():
             if os.path.basename(f).endswith('.opf'):
+                if self.contentfile:
+                    raise RuntimeError("Multiple opf files in %s"
+                                       % self.filename)
                 self.contentfile = f
                 content = self.zip.open(f)
                 break
@@ -65,6 +69,9 @@ class EpubBook:
            If delete_tags is true, all such tags will be deleted
            along with any children.
         '''
+        if not self.dom:
+            self.parse_contents()
+
         elements = self.dom.getElementsByTagName(elname)
         parent = None
         matches = []
@@ -242,6 +249,10 @@ class EpubBook:
                 fp = open(self.replace_files[info.filename])
                 ozf.writestr(info, fp.read())
                 fp.close()
+            elif info.filename == "mimetype":
+                # The mimetype file must be written uncompressed.
+                ozf.writestr(info, self.zip.read(info.filename),
+                             zipfile.ZIP_STORED)
             elif info.filename.endswith('.opf'):
                 # dom.toprettyprintxml() returns unicode, which
                 # zipfile.writestr() can't write. If you pass in
