@@ -187,6 +187,8 @@ class EpubBook:
         '''
         tags, elements, parent = self.get_matches(self.subjectTag)
 
+        lowertags = [ s.lower() for s in tags ]
+
         # If we didn't see a dc:subject, we still need a parent,
         # the <metadata> tag.
         if not parent:
@@ -205,6 +207,12 @@ class EpubBook:
             last_tag_el = None
 
         for new_tag in new_tag_list:
+            # Don't add duplicate tags (case-insensitive).
+            new_tag_lower = new_tag.lower()
+            if new_tag_lower in lowertags:
+                print "Skipping duplicate tag", new_tag
+                continue
+
             # Make the new node:
             #newnode = tag.cloneNode(False)
             newnode = self.dom.createElement(self.subjectTag)
@@ -583,6 +591,7 @@ Options:
                 book.delete_tags()
 
             if tags:
+                print f, ": old tags:", book.get_tags()
                 book.add_tags(tags)
 
             if tags or delete_tags:
