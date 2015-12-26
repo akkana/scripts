@@ -27,7 +27,7 @@ KOBO_DB = os.path.expanduser('~/kobo/mykobo/KoboReader.sqlite')
 shelves_wanted = [ "mystery", "science fiction", "science", "astronomy",
                    "history", "short stories", "politics", "philosophy",
                    "dogs", "animals", "humor", "biography", "medicine",
-                   "nonfiction", "poetry", "plays", "travel",
+                   "nonfiction", "poetry", "plays", "travel", "writing",
                    "war", "civil war", "historical fiction", "adventure",
                    "juvenile", "fantasy", "heroine" ]
 
