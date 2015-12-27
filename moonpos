@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+
+# Predict when the moon (or another body) will be at a specified
+# altitude and azimuth during a specified time window
+# over the course of a year.
+# For instance: figure out when you can take a photo of the full
+# moon rising over Lick Observatory; or figure out when the full
+# moon shining in your skylight might keep you awake.
+
+# Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+
+import ephem
+
+DEGREES = 180. / ephem.pi
+
+def discont_range(start, end, max):
+    '''Return a discontinuous range.
+    Like range(start, end) except that if start > end, will "loop around"
+    e.g. discont_range(22, 2, 24) will return [22, 23, 0, 1].
+    '''
+    if start <= end:
+        return range(start, end)
+    return range(start, max) + range(0, end)
+
+def when_at_position(body, observer, targetalt, targetaz,
+                     starttime, endtime,
+                     slop=5., phase=None, phaseslop=15):
+    '''When will body be at the alt-az position during the time window,
+       in the year following the date of the observer passed in
+       (which defaults to today's date.)
+    Args:
+        body (ephem.Body)        -- The celestial body to be calculated.
+        observer(ephem.Observer) -- the observing position.
+        targetalt (float)        -- Altitude in decimal degrees.
+        targetaz (float)         -- Azimuth in decimal degrees.
+        starttime(int)           -- Earliest hour of day to check, GMT,
+                                    on 24-hour clock, e.g. 18 for 6pm.
+        endtime(int)             -- Latest hour of day to check, GMT.
+                                    Will be ignored if starttime is a string.
+        slop (Optional)          -- How much slop to allow in the alt/az
+                                    positions each way (float, decimal degrees).
+        phase (Optional, int)    -- What phase are we interested in (% illum)
+        phaseslop (Optional, int) -- How close does phase need to be?
+    Returns:
+        List of [[date, alt, az, phase], ...]
+    '''
+    '''
+    Examples:
+    When will the moon transit at altitude 45 degrees and phase at least half,
+    and be bright in my skylight during MST nighttime hours?
+        when_at_position(ephem.Moon(), observer, 45., 180., 5, 12, 5, 75, 25)
+
+    When will the full moon rise exactly due east?
+        when_rise_set_at_position(ephem.Moon(), observer, 90., "rise", 5,
+                                  100, 20)
+    '''
+
+    start_triple = observer.date.triple()
+    start_triple = (start_triple[0], start_triple[1], int(start_triple[2]))
+
+    results = []
+
+    observer.date = ephem.Date(start_triple + (starttime, 0, 0))
+    end_date = ephem.Date((start_triple[0]+1, start_triple[1], start_triple[2],
+                           starttime, 0, 0))
+
+    while observer.date <= end_date:
+        # At the beginning of each loop, observer.date is set to
+        # the starttime on a new day.
+        # We need to loop through to the endtime on the same day,
+        # then set observer.date to the starttime on the next day
+        # and continue.
+        daytriple = observer.date.triple()
+        for hour in discont_range(starttime, endtime+1, 24):
+            observer.date = ephem.Date(daytriple + (hour, 0, 0))
+            body.compute(observer)
+            alt = body.alt * DEGREES
+            az = body.az * DEGREES
+            if alt >= targetalt - slop and alt <= targetalt + slop \
+               and az >= targetaz - slop and az <= targetaz + slop:
+                if not phase or \
+                   (body.phase > phase-phaseslop and
+                    body.phase < phase+phaseslop):
+                    results.append([observer.date, alt, az, body.phase])
+
+    return results
+
+def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
+                              phase=None, phaseslop=15):
+    '''When will body rise at the target azimuth
+       in the year following the date of the observer passed in
+       (which defaults to today's date.)
+    Args:
+        body (ephem.Body)        -- The celestial body to be calculated.
+        observer(ephem.Observer) -- the observing position.
+        targetaz (float)         -- Azimuth in decimal degrees.
+        rise_set(string)         -- "rise" or "set"
+        slop (Optional)          -- How much slop to allow in the alt/az
+                                    positions each way (float, decimal degrees).
+        phase (Optional, int)    -- What phase are we interested in (% illum)
+        phaseslop (Optional, int) -- How close does phase need to be?
+    Returns:
+        List of [[date, alt, az, phase], ...]
+    '''
+    start_triple = observer.date.triple()
+    start_triple = (start_triple[0], start_triple[1], int(start_triple[2]))
+    observer.date = ephem.Date((start_triple[0], start_triple[1],
+                                start_triple[2], 0, 0, 0))
+    end_date = ephem.Date((start_triple[0]+1, start_triple[1], start_triple[2],
+                           0, 0, 0))
+
+    results = []
+
+    while observer.date <= end_date:
+        if rise_set == "rise":
+            observer.date = observer.next_rising(body)
+        else:
+            observer.date = observer.next_setting(body)
+
+        body.compute(observer)
+        az = body.az * DEGREES
+        if az >= targetaz - slop and az <= targetaz + slop:
+            if not phase or \
+               (body.phase > phase-phaseslop and body.phase < phase+phaseslop):
+                results.append([observer.date, observer.horizon*DEGREES, az,
+                                body.phase])
+
+        # Push the date forward a little bit to make sure we get the
+        # next rise/set, not this one again.
+        observer.date += ephem.hour
+
+    return results
+
+# Define your own observer parameters here:
+observer = ephem.Observer()
+observer.name = "White Rock"
+observer.lon = '-106.22'
+observer.lat = '35.82'
+observer.horizon = ephem.degrees(7.*ephem.pi/180.)
+observer.elevation = 1980  # meters, though the docs don't actually say
+
+# When will the moon transit at altitude 45 degrees and phase at least half,
+# and be bright in my skylight during MST nighttime hours?
+results = when_at_position(ephem.Moon(), observer, 45., 180., 5, 12, 5,
+                           75, 25)
+# When will the full moon rise exactly due east?
+# results = when_rise_set_at_position(ephem.Moon(), observer, 90., "rise", 5,
+#                                     100, 20)
+
+for r in results:
+    if len(r) > 3 and r[3]:
+        phase = "   Phase: %2d" % r[3]
+    else:
+        phase = 'x'
+    pargs = tuple(r[0:3] + [phase])
+    print "%20s:  %.2f, %.2f %s" % pargs
+
+
