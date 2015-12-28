@@ -10,6 +10,15 @@
 # Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
 import ephem
+import sys
+
+# Define your own observer parameters here:
+observer = ephem.Observer()
+observer.name = "White Rock"
+observer.lon = '-106.22'
+observer.lat = '35.82'
+observer.horizon = ephem.degrees(7.*ephem.pi/180.)
+observer.elevation = 1980  # meters, though the docs don't actually say
 
 DEGREES = 180. / ephem.pi
 
@@ -131,28 +140,73 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
 
     return results
 
-# Define your own observer parameters here:
-observer = ephem.Observer()
-observer.name = "White Rock"
-observer.lon = '-106.22'
-observer.lat = '35.82'
-observer.horizon = ephem.degrees(7.*ephem.pi/180.)
-observer.elevation = 1980  # meters, though the docs don't actually say
+def Usage():
+    print """Predict when the moon will rise, set or be at a specific position.
+Usage: %s [-f] alt az start_hour end_hour
+       %s [-f] [rise|set] azimuth
+If -f is specified, only full or nearly-full moons will be considered.
+Hours are specified in GMT.
+""" % (sys.argv[0], sys.argv[0])
+    sys.exit(0)
 
-# When will the moon transit at altitude 45 degrees and phase at least half,
-# and be bright in my skylight during MST nighttime hours?
-results = when_at_position(ephem.Moon(), observer, 45., 180., 5, 12, 5,
-                           75, 25)
-# When will the full moon rise exactly due east?
-# results = when_rise_set_at_position(ephem.Moon(), observer, 90., "rise", 5,
-#                                     100, 20)
-
-for r in results:
-    if len(r) > 3 and r[3]:
-        phase = "   Phase: %2d" % r[3]
+if __name__ == '__main__':
+    if len(sys.argv) < 3 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        Usage()
+    args = sys.argv[1:]
+    if args[0] == '-f':
+        args = args[1:]
+        phase = 100
+        phasestr = "full "
     else:
-        phase = 'x'
-    pargs = tuple(r[0:3] + [phase])
-    print "%20s:  %.2f, %.2f %s" % pargs
+        phase = None
+        phasestr = ""
+
+    if len(args) == 2:
+        if args[0] != "rise" and args[0] != "set":
+            Usage()
+        try:
+            az = float(args[1])
+        except ValueError:
+            print "Error: azimuth must be a number, not %s" % args[1]
+            print
+            Usage()
+        results = when_rise_set_at_position(ephem.Moon(), observer,
+                                            az, args[0], 5, phase)
+        print """The %smoon will %s at azimuth %.1f during the next year at these times:
+""" % (phasestr, args[0], az)
+
+    elif len(args) == 4:
+        try:
+            alt = float(args[0])
+            az = float(args[1])
+        except ValueError:
+            print "Error: alt/az must be numbers"
+            print
+            Usage()
+        try:
+            start_hour = int(args[2])
+            end_hour = int(args[3])
+        except ValueError:
+            print "Error: start/end times must be integers"
+            print
+            Usage()
+        results = when_at_position(ephem.Moon(), observer,
+                                   alt, az, start_hour, end_hour,
+                                   5, phase)
+        print """The %smoon will be at %.1f, %.1f between the hours of %d and %d 
+during the next year at these times:
+""" % (phasestr, alt, az, start_hour, end_hour)
+
+    else:
+        Usage()
+
+    print "%20s   %5s %5s    %s" % ("Date/time", "alt", "az", "phase")
+    for r in results:
+        if len(r) > 3 and r[3]:
+            phase = "Phase: %2d" % r[3]
+        else:
+            phase = 'x'
+        pargs = tuple(r[0:3] + [phase])
+        print "%20s:  %5.1f %5.1f    %s" % pargs
 
 
