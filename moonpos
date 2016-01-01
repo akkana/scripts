@@ -10,7 +10,8 @@
 # Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
 import ephem
-import sys
+import sys, os
+import datetime
 
 # Define your own observer parameters here:
 observer = ephem.Observer()
@@ -27,13 +28,15 @@ def discont_range(start, end, max):
     Like range(start, end) except that if start > end, will "loop around"
     e.g. discont_range(22, 2, 24) will return [22, 23, 0, 1].
     '''
+    start = start%max
+    end = end%max
     if start <= end:
         return range(start, end)
     return range(start, max) + range(0, end)
 
 def when_at_position(body, observer, targetalt, targetaz,
                      starttime, endtime,
-                     slop=5., phase=None, phaseslop=15):
+                     slop=5., minphase=0, maxphase=100):
     '''When will body be at the alt-az position during the time window,
        in the year following the date of the observer passed in
        (which defaults to today's date.)
@@ -48,8 +51,8 @@ def when_at_position(body, observer, targetalt, targetaz,
                                     Will be ignored if starttime is a string.
         slop (Optional)          -- How much slop to allow in the alt/az
                                     positions each way (float, decimal degrees).
-        phase (Optional, int)    -- What phase are we interested in (% illum)
-        phaseslop (Optional, int) -- How close does phase need to be?
+        minphase (Optional, int) -- What phase are we interested in (% illum)
+        maxphase (Optional, int) -- What phase are we interested in (% illum)
     Returns:
         List of [[date, alt, az, phase], ...]
     '''
@@ -79,23 +82,30 @@ def when_at_position(body, observer, targetalt, targetaz,
         # We need to loop through to the endtime on the same day,
         # then set observer.date to the starttime on the next day
         # and continue.
+
+        # First get the time zone offset. We'll assume the offset
+        # is the same all day. That might make us be off by an hour
+        # on start and end times for a few hours twice a year.
+        local_hour = ephem.localtime(observer.date).hour
+        gmt_hour = observer.date.tuple()[3]
+        tzoffset = (gmt_hour - local_hour) % 24
+        # print "tzoffset:", tzoffset, "=", gmt_hour, "-", local_hour
+
         daytriple = observer.date.triple()
-        for hour in discont_range(starttime, endtime+1, 24):
+        for hour in discont_range(starttime+tzoffset, endtime+tzoffset+1, 24):
             observer.date = ephem.Date(daytriple + (hour, 0, 0))
             body.compute(observer)
             alt = body.alt * DEGREES
             az = body.az * DEGREES
             if alt >= targetalt - slop and alt <= targetalt + slop \
                and az >= targetaz - slop and az <= targetaz + slop:
-                if not phase or \
-                   (body.phase > phase-phaseslop and
-                    body.phase < phase+phaseslop):
+                if (body.phase > minphase and body.phase < maxphase):
                     results.append([observer.date, alt, az, body.phase])
 
     return results
 
 def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
-                              phase=None, phaseslop=15):
+                              minphase=0, maxphase=100):
     '''When will body rise at the target azimuth
        in the year following the date of the observer passed in
        (which defaults to today's date.)
@@ -106,8 +116,8 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
         rise_set(string)         -- "rise" or "set"
         slop (Optional)          -- How much slop to allow in the alt/az
                                     positions each way (float, decimal degrees).
-        phase (Optional, int)    -- What phase are we interested in (% illum)
-        phaseslop (Optional, int) -- How close does phase need to be?
+        minphase (Optional, int) -- What phase are we interested in (% illum)
+        maxphase (Optional, int) -- What phase are we interested in (% illum)
     Returns:
         List of [[date, alt, az, phase], ...]
     '''
@@ -129,8 +139,7 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
         body.compute(observer)
         az = body.az * DEGREES
         if az >= targetaz - slop and az <= targetaz + slop:
-            if not phase or \
-               (body.phase > phase-phaseslop and body.phase < phase+phaseslop):
+            if (body.phase > minphase and body.phase < maxphase):
                 results.append([observer.date, observer.horizon*DEGREES, az,
                                 body.phase])
 
@@ -141,25 +150,51 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
     return results
 
 def Usage():
+    progname = os.path.basename(sys.argv[0])
     print """Predict when the moon will rise, set or be at a specific position.
 Usage: %s [-f] alt az start_hour end_hour
        %s [-f] [rise|set] azimuth
-If -f is specified, only full or nearly-full moons will be considered.
-Hours are specified in GMT.
-""" % (sys.argv[0], sys.argv[0])
+If -f is specified, only full or nearly-full moons will be considered;
+-p sets minimum percent illuminated, +p sets maximum.
+Hours are specified in local time.
+""" % (progname, progname)
     sys.exit(0)
 
 if __name__ == '__main__':
     if len(sys.argv) < 3 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
         Usage()
     args = sys.argv[1:]
-    if args[0] == '-f':
-        args = args[1:]
-        phase = 100
-        phasestr = "full "
-    else:
-        phase = None
-        phasestr = ""
+    minphase = 0
+    maxphase = 100
+    phasestr = "moon"
+    MIN_FULL = 90
+    while True:
+        if args[0] == '-f':
+            minphase = MIN_FULL
+            phasestr = "full moon"
+            args = args[1:]
+        elif args[0] == '-p':
+            minphase = int(args[1])
+            phasestr = "moon with at least %d%% illuminated" % minphase
+            args = args[2:]
+        elif args[0] == '+p':
+            maxphase = int(args[1])
+            phasestr = "moon with at most %d%% illuminated" % maxphase
+            args = args[2:]
+        else:
+            break
+
+    if minphase > 0:
+        if minphase == MIN_FULL:
+            phasestr = "full moon"
+        else:
+            if maxphase < 100:
+                phasestr = "moon between %d%% and %d%% illuminated" % (minphase,
+                                                                       maxphase)
+            else:
+                phasestr = "moon with at least %d%% illuminated" % minphase
+    elif maxphase < 100:
+        phasestr = "moon with at most %d%% illuminated" % maxphase
 
     if len(args) == 2:
         if args[0] != "rise" and args[0] != "set":
@@ -171,8 +206,8 @@ if __name__ == '__main__':
             print
             Usage()
         results = when_rise_set_at_position(ephem.Moon(), observer,
-                                            az, args[0], 5, phase)
-        print """The %smoon will %s at azimuth %.1f during the next year at these times:
+                                            az, args[0], 5, minphase, maxphase)
+        print """The %s will %s at azimuth %.1f during the next year at these times:
 """ % (phasestr, args[0], az)
 
     elif len(args) == 4:
@@ -192,21 +227,22 @@ if __name__ == '__main__':
             Usage()
         results = when_at_position(ephem.Moon(), observer,
                                    alt, az, start_hour, end_hour,
-                                   5, phase)
-        print """The %smoon will be at %.1f, %.1f between the hours of %d and %d 
-during the next year at these times:
+                                   5, minphase, maxphase)
+        print """The %s will be at %.1f, %.1f 
+between %dh and %dh during the next year at these times:
 """ % (phasestr, alt, az, start_hour, end_hour)
 
     else:
         Usage()
 
-    print "%20s   %5s %5s    %s" % ("Date/time", "alt", "az", "phase")
+    print "%26s  %5s  %5s    %s" % ("Date/time", "alt", "az", "phase")
     for r in results:
         if len(r) > 3 and r[3]:
-            phase = "Phase: %2d" % r[3]
+            phase = "Illuminated: %2d%%" % r[3]
         else:
             phase = 'x'
-        pargs = tuple(r[0:3] + [phase])
-        print "%20s:  %5.1f %5.1f    %s" % pargs
+        # pargs = tuple(r[0:3] + [phase])
+        pargs = (ephem.localtime(r[0]).ctime(), r[1], r[2], phase)
+        print "%26s  %5.1f  %5.1f    %s" % pargs
 
 
