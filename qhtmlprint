@@ -9,9 +9,19 @@
 # gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=multipage.pdf -dBATCH file*.pdf
 
 import sys, os
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4.QtWebKit import *
+# from PyQt4.QtCore import QObject, QSizeF, SIGNAL, QUrl, QSize
+# from PyQt4.QtGui import QApplication, QPrinter, QPageSize
+# from PyQt4.QtWebKit import QWebView
+# from PyQt5.QtCore import *
+# from PyQt5.QtGui import *
+# from PyQt5.QtWebKit import *
+
+from PyQt5.QtCore import QObject, QUrl, QSize, QSizeF
+from PyQt5.QtGui import QPageSize
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWebKitWidgets import QWebView
+from PyQt5.QtPrintSupport import QPrinter
+
 from pyPdf import PdfFileWriter, PdfFileReader
 
 # Parameters that should be specifiable on the commandline.
@@ -49,10 +59,27 @@ web.setZoomFactor(2.0)
 #web.show()
 
 printer = QPrinter(mode = QPrinter.ScreenResolution)
-printer.setPaperSize(QSizeF(x_res, 768), QPrinter.DevicePixel)
 printer.setOutputFormat(QPrinter.PdfFormat)
-printer.setPageMargins(0 , 0 , 0 , 0 , QPrinter.DevicePixel)
-printer.setFullPage(True)
+
+# It's not clear what this does:
+# printer.setFullPage(False)
+
+printer.setPageMargins(0, 0, 0, 0, QPrinter.DevicePixel)
+# printer.setPaperSize(QSizeF(x_res, 768), QPrinter.DevicePixel)
+
+# setPaperSize is apparently obsolete, but it's not clear that
+# setPageSize() can set custom page sizes.
+# Nobody has an example of how to call setPageSize to find out
+# what type it expects as its argument.
+# printer.setPageSize(QPageSize(QSize(x_res, 768),
+#                               QPrinter.DevicePixel))
+# printer.setPageSize(QPageSize(QSizeF(x_res, 768), QPrinter.DevicePixel, "XGA"))
+printer.setPageSize(QPageSize(QSizeF(x_res, 768), QPageSize.Millimeter, "XGA"))
+
+# printer.setPageSize(1366)
+
+# setPaperSize() no longer works in QPrinter. Try QPdfWriter instead.
+# QPdfWriter pdfWriter("all.pdf");
 
 def makeMultipage(outfile, inlist) :
     # Make a multi-page document from all the pages we've created:
@@ -74,9 +101,13 @@ def print_next() :
     global pagelist, pagelistindex, web, printer
 
     outputfile = os.path.join(outdir, "file%03d.pdf" % pagelistindex)
-    printer.setOutputFileName(outputfile)
     pdflist.append(outputfile)
+
+    printer.setOutputFileName(outputfile)
     web.print_(printer)
+
+    # pdfWriter.newPage();
+
     print "Generated", outputfile, "from", pagelist[pagelistindex]
 
     pagelistindex += 1
@@ -92,7 +123,8 @@ def print_next() :
     print "Loading", pagelist[pagelistindex]
     web.load(QUrl(pagelist[pagelistindex]))
 
-QObject.connect(web, SIGNAL("loadFinished(bool)"), print_next)
+web.loadFinished.connect(print_next)
+# QObject.connect(web, SIGNAL("loadFinished(bool)"), print_next)
 web.load(QUrl(pagelist[pagelistindex]))
 
 sys.exit(app.exec_())
