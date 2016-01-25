@@ -7,6 +7,12 @@ import urllib2
 from cookielib import CookieJar
 import StringIO
 import gzip
+import datetime
+
+# use threads:
+from multiprocessing.dummy import Pool as ThreadPool
+# or processes:
+# from multiprocessing import Pool as ThreadPool
 
 class UrlDownloader:
     # def __init__(self, url, localpath, **kwargs):
@@ -39,22 +45,38 @@ class UrlDownloader:
         self.encoding = None
 
     def __repr__(self):
-        s = "UrlDownloader(%s) to %s" % (self.orig_url, self.localpath)
-        if self.cururl:
-            s += "\n  Current URL: %s" % self.cururl
-        if self.final_url and self.final_url != self.cururl:
-            s += "\n  Final URL: %s" % self.final_url
-        s += "\n  Timeout: %d" % self.timeout
-        if self.user_agent:
-            s += "\n  User agent: %d" % self.user_agent
-        if self.referrer:
-            s += "\n  Timeout: %d" % self.timeout
-        if self.allow_cookies:
-            s += "\n  Cookies allowed"
-        else:
-            s += "\n  No cookies"
+        s = "UrlDownloader(%s -> %s)" % (self.orig_url, self.localpath)
+        # if self.cururl:
+        #     s += "\n  Current URL: %s" % self.cururl
+        # if self.final_url and self.final_url != self.cururl:
+        #     s += "\n  Final URL: %s" % self.final_url
+        # s += "\n  Timeout: %d" % self.timeout
+        # if self.user_agent:
+        #     s += "\n  User agent: %d" % self.user_agent
+        # if self.referrer:
+        #     s += "\n  Timeout: %d" % self.timeout
+        # if self.allow_cookies:
+        #     s += "\n  Cookies allowed"
+        # else:
+        #     s += "\n  No cookies"
 
         return s
+
+    def resolve_and_download(self):
+        # We must catch all errors, otherwise they'll go ignored
+        # since we're running inside a thread pool and the main
+        # thread won't catch our exceptions.
+        try:
+            print "resolve_and_download(%s)" % self.orig_url
+            self.resolve()
+            self.download()
+            print str(self) + " downloaded " + self.bytes_downloaded \
+                + " bytes: " \
+                + str(datetime.datetime.now())
+            return self.bytes_downloaded
+        except Exception, e:
+            print "Couldn't download", self, ":"
+            print e
 
     def resolve(self):
         request = urllib2.Request(self.orig_url)
@@ -91,11 +113,11 @@ class UrlDownloader:
         # It's not documented, but sometimes after urlopen
         # we can actually get a content type. If it's not
         # text/something, that's bad.
-        ctype = self.response.headers['content-type']
-        if ctype and ctype != '' and ctype[0:4] != 'text':
-            print >>sys.stderr, url, "isn't text -- skipping"
-            self.response.close()
-            raise ContentsNotTextError
+        # ctype = self.response.headers['content-type']
+        # if ctype and ctype != '' and ctype[0:4] != 'text':
+        #     print >>sys.stderr, url, "isn't text -- skipping"
+        #     self.response.close()
+        #     raise ContentsNotTextError
 
         # Were we redirected? geturl() will tell us that.
         self.cururl = self.response.geturl()
@@ -111,15 +133,11 @@ class UrlDownloader:
         # urllib2 unfortunately doesn't read unicode,
         # so try to figure out the current encoding:
         self.encoding = self.response.headers.getparam('charset')
-        #print >>sys.stderr, "getparam charset returned", self.encoding
         enctype = self.response.headers['content-type'].split('charset=')
         if len(enctype) > 1:
             self.encoding = enctype[-1]
-            print >>sys.stderr, "enctype gave", self.encoding
         else:
-            print >>sys.stderr, "Defaulting to utf-8"
             self.encoding = 'utf-8'
-        print >>sys.stderr, "encoding is", self.encoding
 
         self.final_url = self.response.geturl()
         if self.final_url != self.cururl:
@@ -186,8 +204,10 @@ class UrlDownloadQueue:
       user_agent
       allow_cookies  default False
     '''
-    def __init__(self):
+    def __init__(self, maxthreads=4):
         self.queue = []     # implemented as a list
+        self.pool = None
+        self.maxthreads = maxthreads
 
     def __len__(self) :
         return len(self.queue)
@@ -207,14 +227,39 @@ class UrlDownloadQueue:
             url = UrlDownloader(**kwargs)
         self.queue.insert(0, url)
 
-    def download(self):
+    def download(self, maxthreads=4):
+        '''Start or continue downloading.
+        If maxthreads==0, stay in the current thread and process
+        anything available, then return.
+        If maxthreads==1, start a subthread (if we don't already have one)
+        and process everything in that thread.
+        If maxthreads>1, use a separate thread for every download,
+        but no more than maxthreads at any given time.
+        '''
+        if not self.pool:
+            # Make the Pool of workers, maxthreads possible processes
+            print "Initializing pool with", self.maxthreads, "threads"
+            self.pool = ThreadPool(self.maxthreads)
+
         while len(self.queue):
-            item = self.queue[-1]
-            print "::::: Resolving", item
-            item.resolve()
-            print "::::: Downloading", item
-            item.download()
+            urldl = self.queue[-1]
+            print "Passing", urldl, "to pool"
+            res = self.pool.apply_async(UrlDownloader.resolve_and_download,
+                                        (urldl,),
+                                        callback=self.cb)
             self.queue.pop()
+
+        # close the pool and wait for the work to finish 
+        self.pool.close()
+        print "======== pool.join is:"
+        print self.pool.join()
+
+    def doit(self, urldl):
+        print "------ doing it to:", urldl
+        urldl.resolve_and_download()
+
+    def cb(self, res):
+        print "::::: Callback:", res
 
 if __name__ == "__main__":
     import os
@@ -236,9 +281,9 @@ if __name__ == "__main__":
         dlqueue.add(url=url, localpath=localpath,
                     timeout=5000, allow_cookies=True)
     
-    print "\nQueue now (len %d):" % len(dlqueue)
-    print dlqueue
-    print "================="
+    # print "\nQueue now (len %d):" % len(dlqueue)
+    # print dlqueue
+    # print "================="
 
-    dlqueue.download()
+    dlqueue.download(4)
 
