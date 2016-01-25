@@ -1,0 +1,244 @@
+#!/usr/bin/env python
+
+# A module for downloading a queue of URLs asynchronously to local files.
+
+import sys
+import urllib2
+from cookielib import CookieJar
+import StringIO
+import gzip
+
+class UrlDownloader:
+    # def __init__(self, url, localpath, **kwargs):
+    def __init__(self, url, localpath, timeout=100,
+                 user_agent=None, allow_cookies=False, referrer=None):
+        '''kwargs:
+            url: the original url to be downloaded
+            localpath: where to save it
+            timeout=100, referrer=None, user_agent=None, allow_cookies=False
+        '''
+        self.orig_url = url
+        self.localpath = localpath
+        self.timeout = timeout
+        self.user_agent = user_agent
+        self.allow_cookies = allow_cookies
+        self.referrer = referrer
+
+        # Things we will set during the download
+        self.cururl = None
+        self.bytes_downloaded = 0
+        self.done = False
+        # self.socket = None
+        self.is_gzip = False
+        self.response = None
+
+        # things we might want to query later:
+        self.final_url = None
+        self.host = None
+        self.prefix = None
+        self.encoding = None
+
+    def __repr__(self):
+        s = "UrlDownloader(%s) to %s" % (self.orig_url, self.localpath)
+        if self.cururl:
+            s += "\n  Current URL: %s" % self.cururl
+        if self.final_url and self.final_url != self.cururl:
+            s += "\n  Final URL: %s" % self.final_url
+        s += "\n  Timeout: %d" % self.timeout
+        if self.user_agent:
+            s += "\n  User agent: %d" % self.user_agent
+        if self.referrer:
+            s += "\n  Timeout: %d" % self.timeout
+        if self.allow_cookies:
+            s += "\n  Cookies allowed"
+        else:
+            s += "\n  No cookies"
+
+        return s
+
+    def resolve(self):
+        request = urllib2.Request(self.orig_url)
+
+        # If we're after the single-page URL, we may need a referrer
+        if self.referrer:
+            request.add_header('Referer', self.referrer)
+
+        if self.user_agent:
+            request.add_header('User-Agent', self.user_agent)
+
+        # A few sites, like http://nymag.com, gzip their http.
+        # Python doesn't handle that automatically: we have to ask for it.
+        request.add_header('Accept-encoding', 'gzip')
+
+        if self.allow_cookies:
+            # Allow for cookies in the request: some sites, notably nytimes.com,
+            # degrade to an infinite redirect loop if cookies aren't enabled.
+            cj = CookieJar()
+            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        else:
+            opener = urllib2.build_opener()
+
+        self.response = opener.open(request, timeout=self.timeout)
+        # Lots of ways this can fail.
+        # e.g. ValueError, "unknown url type"
+        # or BadStatusLine: ''
+
+        # At this point it would be lovely to check whether the
+        # mime type is HTML. Unfortunately, all we have is a
+        # httplib.HTTPMessage instance which is completely
+        # undocumented (see http://bugs.python.org/issue3428).
+
+        # It's not documented, but sometimes after urlopen
+        # we can actually get a content type. If it's not
+        # text/something, that's bad.
+        ctype = self.response.headers['content-type']
+        if ctype and ctype != '' and ctype[0:4] != 'text':
+            print >>sys.stderr, url, "isn't text -- skipping"
+            self.response.close()
+            raise ContentsNotTextError
+
+        # Were we redirected? geturl() will tell us that.
+        self.cururl = self.response.geturl()
+
+        # but sadly, that means we need another request object
+        # to parse out the host and prefix:
+        real_request = urllib2.Request(self.cururl)
+        real_request.add_header('User-Agent', self.user_agent)
+
+        self.host = real_request.get_host()
+        self.prefix = real_request.get_type() + '://' + self.host + '/'
+
+        # urllib2 unfortunately doesn't read unicode,
+        # so try to figure out the current encoding:
+        self.encoding = self.response.headers.getparam('charset')
+        #print >>sys.stderr, "getparam charset returned", self.encoding
+        enctype = self.response.headers['content-type'].split('charset=')
+        if len(enctype) > 1:
+            self.encoding = enctype[-1]
+            print >>sys.stderr, "enctype gave", self.encoding
+        else:
+            print >>sys.stderr, "Defaulting to utf-8"
+            self.encoding = 'utf-8'
+        print >>sys.stderr, "encoding is", self.encoding
+
+        self.final_url = self.response.geturl()
+        if self.final_url != self.cururl:
+            print >>sys.stderr, "cururl != final_url!"
+            print >>sys.stderr, self.cururl, "!=", self.final_url
+
+        # Is the URL gzipped? If so, we'll need to uncompress it.
+        self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
+
+    # XXX This is the part that needs to be parallelized.
+    def download(self):
+        # Read the content of the link:
+        # This can die with socket.error, "connection reset by peer"
+        # And it may not set html, so initialize it first:
+        html = None
+        try:
+            html = self.response.read()
+        # XXX Need to guard against IncompleteRead -- but what class owns it??
+        #except httplib.IncompleteRead, e:
+        #    print >>sys.stderr, "Ignoring IncompleteRead on", url
+        except Exception, e:
+            print >>sys.stderr, "Unknown error from self.response.read()", url
+
+        # html can be undefined here. If so, no point in doing anything else.
+        if not html:
+            print >>sys.stderr, "Didn't read anything from self.response.read()"
+            raise NoContentError
+
+        if self.is_gzip:
+            buf = StringIO.StringIO(html)
+            f = gzip.GzipFile(fileobj=buf)
+            html = f.read()
+
+        #print >>sys.stderr, "self.response.read() returned type", type(html)
+        # Want to end up with unicode. In case it's str, decode it:
+        if type(html) is str:
+            # But sometimes this raises errors anyway, even using
+            # the page's own encoding, so use 'replace':
+            html = html.decode(self.encoding, 'replace')
+
+        # No docs say I should close this. I can only assume.
+        self.response.close()
+
+        self.bytes_downloaded = len(html)
+        self.save_file(html)
+        print "Downloaded", self.bytes_downloaded, "to", self.localpath
+
+    def save_file(self, bytes):
+        fp = open(self.localpath, 'w')
+        fp.write(bytes)
+        fp.close()
+
+class UrlDownloadQueue:
+    '''Maintains a queue of UrlDownloaders and keeps them downloading
+    (eventually asynchronously).
+
+    Call download_queue.add(url, localfile=localfile)
+      or download_queue.add(UrlDownloader)
+    to add another url to be downloaded.
+    Optional arguments:
+      callback       to be notified when the download is ready
+      timeout        in milliseconds
+      referrer
+      user_agent
+      allow_cookies  default False
+    '''
+    def __init__(self):
+        self.queue = []     # implemented as a list
+
+    def __len__(self) :
+        return len(self.queue)
+
+    def __repr__(self):
+        return '\n'.join(map(str, self.queue))
+
+    def pop(this):
+        return self.queue.pop()
+
+    def add(self, url, **kwargs):
+        kwargs['url'] = url
+        if 'localpath' not in kwargs:
+            raise ValueError("UrlDownloadQueue.add needs localpath")
+
+        if not isinstance(url, UrlDownloader):
+            url = UrlDownloader(**kwargs)
+        self.queue.insert(0, url)
+
+    def download(self):
+        while len(self.queue):
+            item = self.queue[-1]
+            print "::::: Resolving", item
+            item.resolve()
+            print "::::: Downloading", item
+            item.download()
+            self.queue.pop()
+
+if __name__ == "__main__":
+    import os
+    import urlparse
+    import posixpath
+
+    dlqueue = UrlDownloadQueue()
+
+    for url in sys.argv[1:]:
+        parsed = urlparse.urlparse(url)
+        # self.scheme = parsed.scheme
+        host = parsed.netloc
+        rooturlpath = posixpath.normpath(parsed.path)
+        filename = os.path.basename(rooturlpath)
+        if not filename or filename == ".":
+            filename = "INDEX"
+        localpath = os.path.join("/tmp/urls", "%s-%s" % (host, filename))
+
+        dlqueue.add(url=url, localpath=localpath,
+                    timeout=5000, allow_cookies=True)
+    
+    print "\nQueue now (len %d):" % len(dlqueue)
+    print dlqueue
+    print "================="
+
+    dlqueue.download()
+
