@@ -49,17 +49,31 @@ web.setZoomFactor(2.0)
 #web.show()
 
 printer = QPrinter(mode = QPrinter.ScreenResolution)
-printer.setPaperSize(QSizeF(x_res, 768), QPrinter.DevicePixel)
 printer.setOutputFormat(QPrinter.PdfFormat)
-printer.setPageMargins(0 , 0 , 0 , 0 , QPrinter.DevicePixel)
-printer.setFullPage(True)
+printer.setPageMargins(0, 0, 0, 0, QPrinter.DevicePixel)
+# This makes no difference either way:
+# printer.setFullPage(False)
+# This does random, bizarre things if you set it higher:
+# printer.setResolution(100);
+# This, sadly, no longer works right.
+# It's not a no-op, but it looks like QPrinter takes the nearest
+# known paper size, or something idiotic like that.
+printer.setPaperSize(QSizeF(x_res, 768), QPrinter.DevicePixel)
+
+# printer.setPageSize(QPageSize(QSizeF(x_res, 768), QPageSize.Millimeter, "XGA"))
 
 def makeMultipage(outfile, inlist) :
     # Make a multi-page document from all the pages we've created:
     output = PdfFileWriter()
     for infile in inlist :
         inpdf = PdfFileReader(file(infile, "rb"))
-        output.addPage(inpdf.getPage(0))
+        page = inpdf.getPage(0)
+
+        # Attempt to crop: this does nothing.
+        # page.cropBox.lowerLeft=(0, 768)
+        # page.cropBox.upperRight=(1024, 0)
+
+        output.addPage(page)
 
     # finally, write "output" to document-output.pdf
     outputStream = file(outfile, "wb")
