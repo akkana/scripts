@@ -2,6 +2,15 @@
 
 # A module for downloading a queue of URLs asynchronously to local files.
 
+# TODO:
+# - Catch and save errors
+# - UrlDownloadQueue: keep track of what's new, in progress,
+#   successfully downloaded, and errored, and have queries for them.
+# - UrlDownloadQueue: handle different servers differently,
+#   not overloading any one server with two many downloads,
+#   looking for a new server if one is already being hit but
+#   we have a new thread pool available.
+
 import sys
 import urllib2
 from cookielib import CookieJar
@@ -9,16 +18,16 @@ import StringIO
 import gzip
 import datetime
 
-# use threads:
-from multiprocessing.dummy import Pool as ThreadPool
-# or processes:
+# Use processes:
 # from multiprocessing import Pool as ThreadPool
+# Use threads:
+from multiprocessing.dummy import Pool as ThreadPool
 
 class UrlDownloader:
     # def __init__(self, url, localpath, **kwargs):
     def __init__(self, url, localpath, timeout=100,
-                 user_agent=None, allow_cookies=False, referrer=None):
-        '''kwargs:
+                 user_agent=None, referrer=None, allow_cookies=False):
+        '''Arguments:
             url: the original url to be downloaded
             localpath: where to save it
             timeout=100, referrer=None, user_agent=None, allow_cookies=False
@@ -61,22 +70,6 @@ class UrlDownloader:
         #     s += "\n  No cookies"
 
         return s
-
-    def resolve_and_download(self):
-        # We must catch all errors, otherwise they'll go ignored
-        # since we're running inside a thread pool and the main
-        # thread won't catch our exceptions.
-        try:
-            print "resolve_and_download(%s)" % self.orig_url
-            self.resolve()
-            self.download()
-            print str(self) + " downloaded " + self.bytes_downloaded \
-                + " bytes: " \
-                + str(datetime.datetime.now())
-            return self.bytes_downloaded
-        except Exception, e:
-            print "Couldn't download", self, ":"
-            print e
 
     def resolve(self):
         request = urllib2.Request(self.orig_url)
@@ -187,8 +180,29 @@ class UrlDownloader:
 
     def save_file(self, bytes):
         fp = open(self.localpath, 'w')
-        fp.write(bytes)
+        if isinstance(bytes, unicode):
+            fp.write(bytes.encode('utf-8'))
+        else:
+            fp.write(bytes)
         fp.close()
+
+    def resolve_and_download(self):
+        '''Actually download the URL to the local file.
+           Return a 3-tuple: (successp, self, bytes_or_errstr)
+        '''
+        # We must catch all errors here, otherwise they'll go ignored
+        # since we're running inside a thread pool and the main
+        # thread won't catch our exceptions.
+        retstr = "booga booga "
+        try:
+            print "resolve_and_download(%s)" % self.orig_url
+            self.resolve()
+            self.download()
+        except Exception, e:
+            return (False, self,
+                    "Couldn't download %s:\n%s" % (str(self), str(e)))
+
+        return (True, self, self.bytes_downloaded)
 
 class UrlDownloadQueue:
     '''Maintains a queue of UrlDownloaders and keeps them downloading
@@ -206,6 +220,9 @@ class UrlDownloadQueue:
     '''
     def __init__(self, maxthreads=4):
         self.queue = []     # implemented as a list
+        self.succeeded = []
+        self.in_progress = []
+        self.failed = []
         self.pool = None
         self.maxthreads = maxthreads
 
@@ -247,7 +264,9 @@ class UrlDownloadQueue:
             res = self.pool.apply_async(UrlDownloader.resolve_and_download,
                                         (urldl,),
                                         callback=self.cb)
-            self.queue.pop()
+            self.in_progress.append(urldl)
+            #self.queue.pop()
+            self.queue.remove(urldl)
 
         # close the pool and wait for the work to finish 
         self.pool.close()
@@ -259,7 +278,28 @@ class UrlDownloadQueue:
         urldl.resolve_and_download()
 
     def cb(self, res):
-        print "::::: Callback:", res
+        '''res is a 3-tuple: (successp, UrlDownloader, string)
+        '''
+        if res[0]:
+            print "::::: Callback success! Downloaded %d bytes" % res[2]
+            self.succeeded.append(res[1])
+        else:
+            print "::::: Callback ERROR!", res[2]
+            self.failed.append((res[1], res[2]))
+        self.in_progress.remove(res[1])
+
+    def print_status(self):
+        print
+        print "===== Succeeded:"
+        for u in self.succeeded:
+            print u
+        print "===== Failed:"
+        for u in self.failed:
+            print u
+        if len(self.in_progress):
+            print "===== Still in progress:"
+            for u in self.in_progress:
+                print u
 
 if __name__ == "__main__":
     import os
@@ -286,4 +326,6 @@ if __name__ == "__main__":
     # print "================="
 
     dlqueue.download(4)
+
+    dlqueue.print_status()
 
