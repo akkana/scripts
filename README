@@ -85,6 +85,10 @@ diffiles.py:
     Find files that differ between two directories -- even if 
     they've been moved to different places in the directory structure.
 
+doc2html:
+    Run wvHtml on a .doc file, but then use BeautifulSoup to clean
+    up at least some of the mess wvHtml makes.
+
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
 

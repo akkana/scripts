@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+
+# Remove spurious tags added by wvHtml when converting a doc file to html.
+
+'''Sample tags that need to get removed:
+
+<div name="Normal" align="left" style="margin: 0.00mm 0.00mm 1.25mm 3.75mm;  
+padding: 0.00mm 0.00mm 0.00mm 0.00mm; ">
+
+<p style="text-indent: 0.00mm; text-align: left; line-height: 3.454861mm; color:
+ Black; background-color: White; ">
+
+<img alt="0x08 graphic" src="StrangeNoGraphicData"><br><img alt="0x08 graphic" s
+rc="StrangeNoGraphicData">
+
+<font color="Magenta"><b>VOTING AND ELECTION INFOR
+MATION</b></font><font color="Magenta"><b>-NM</b></font><font color="Magenta"><b
+></b></font>
+
+SO:
+
+Easy:
+- Remove any <div name="Normal" ...>
+- Remove style on every <p>
+- Remove any <img src="StrangeNoGraphicData" ...>
+
+Harder:
+- collapse adjacent tags, e.g. <font></font><font></font> if color is same.
+  (how to reorder intervening tags?)
+'''
+
+# http://www.crummy.com/software/BeautifulSoup/bs3/documentation.html
+
+import sys, os
+import re
+import subprocess
+from BeautifulSoup import BeautifulSoup, Tag
+
+def Usage():
+    print "Usage: %s infile [outfile]" % os.path.basename(sys.argv[0])
+    print "infile may be .doc or .html"
+    sys.exit(1)
+
+if len(sys.argv) < 2:
+    Usage()
+
+base, ext = os.path.splitext(sys.argv[1])
+ext = ext.lower()
+if ext == ".doc":
+    htmlfile = base + ".html"
+    subprocess.call(["wvHtml", sys.argv[1], htmlfile])
+elif lower == ".html":
+    htmlfile = sys.argv[1]
+else:
+    Usage()
+
+if not os.path.exists(htmlfile):
+    print "Can't open", htmlfile
+    sys.exit(2)
+
+if len(sys.argv) > 2:
+    outfile = sys.argv[2]
+else:
+    basename = os.path.splitext(sys.argv[1])[0]
+    outfile = basename + "-cleaned.html"
+if not outfile:
+    Usage()
+
+print "infile:", sys.argv[1]
+print "outfile:", outfile
+
+fp = open(htmlfile)
+soup = BeautifulSoup(fp)
+fp.close()
+
+# Remove any <div name="Normal" ...>
+tags = soup.findAll('div', {'name': "Normal"})
+for tag in tags:
+    # undocumented but essential function:
+    tag.replaceWithChildren()
+
+# Remove <p style="">
+tags = soup.findAll('p', {'style': re.compile("background-color: White")})
+for tag in tags:
+    tag.replaceWithChildren()
+
+# Remove style on every <p>
+# tags = soup.findAll('p')
+# for tag in tags:
+#     del tag["style"]
+
+# Remove any <img src="StrangeNoGraphicData" ...>
+tags = soup.findAll('img', {'src': "StrangeNoGraphicData"})
+for tag in tags:
+    tag.extract()
+
+# Don't allow <font color="White">
+# tags = soup.findAll('font', {'color': "White"})
+# for tag in tags:
+#     tag["color"] = "red"
+
+# Remove pointless <font color="Black">
+# XXX Alas, we can't do this because it adds whitespace.
+tags = soup.findAll('font', {'color': "Black"})
+for tag in tags:
+    tag.replaceWithChildren()
+
+# Remove empty containers:
+for tag in soup.findAll():
+    if not tag.text.strip():
+        tag.extract()
+
+# XXX If I can figure out how, consolidate adjacent tags like:
+#    <font color="Black">
+#    attend or watch candidate forum
+#   </font>
+#   <font color="Black">
+#    s
+
+fp = open(outfile, 'w')
+
+# Can't use prettify because strings that used to be in adjacent <font>
+# tags end up with extra whitespace. E.g.
+# <font color="Black">L</font><font color="Black">earn</font>
+# becomes L earn rather than Learn.
+# print >>fp, soup.prettify()
+
+# This seems like it ought to work, but somehow some of the whitespace
+# is still there afterward.
+# s = str(soup)
+# soup = None
+# soup = BeautifulSoup(s)
+# print >>fp, soup.prettify()
+
+print >>fp, str(soup)
+
+fp.close()
+
