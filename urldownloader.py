@@ -45,7 +45,7 @@ class UrlDownloader:
         self.referrer = referrer
 
         # Things we will set during the download
-        self.status = EMPTY
+        self.status = UrlDownloader.EMPTY
         self.errmsg = None
         self.cururl = None
         self.bytes_downloaded = 0
@@ -200,7 +200,13 @@ class UrlDownloader:
         # We must catch all errors here, otherwise they'll go ignored
         # since we're running inside a thread pool and the main
         # thread won't catch our exceptions.
-        retstr = "booga booga "
+        if self.status != UrlDownloader.EMPTY:
+            self.errmsg = "Eek: tried to download when status was %d" \
+                          % self.status
+            self.status = UrlDownloader.ERROR
+            return self
+
+        self.status = UrlDownloader.DOWNLOADING
         try:
             print "resolve_and_download(%s)" % self.orig_url
             self.resolve()
@@ -208,7 +214,7 @@ class UrlDownloader:
             self.status = UrlDownloader.SUCCESS
         except Exception, e:
             self.status = UrlDownloader.ERROR
-            self.errmsg = "Couldn't download %s:\n%s" % (str(self), str(e)))
+            self.errmsg = str(e)
 
         return self
 
@@ -292,21 +298,24 @@ class UrlDownloadQueue:
             print "::::: Callback success! Downloaded %d bytes" % res.bytes_downloaded
             self.succeeded.append(res)
         elif res.status == UrlDownloader.ERROR:
-        else:
             print "::::: Callback ERROR!", res.errmsg
+            self.failed.append(res)
+        else:
+            print "::::: Callback: status was", res.status
             self.failed.append(res)
         self.in_progress.remove(res)
 
     def print_status(self):
-        print
-        print "===== Succeeded:"
+        print "\n===== Succeeded:"
         for u in self.succeeded:
             print u
-        print "===== Failed:"
+
+        print "\n===== Failed:"
         for u in self.failed:
-            print u
+            print "%s:\n    %s" % (str(u), u.errmsg)
+
         if len(self.in_progress):
-            print "===== Still in progress:"
+            print "\n===== Still in progress:"
             for u in self.in_progress:
                 print u
 
