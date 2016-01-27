@@ -24,6 +24,9 @@ import datetime
 from multiprocessing.dummy import Pool as ThreadPool
 
 class UrlDownloader:
+    '''Manage downloading of a single URL (threadable).
+       Keep track of download success or failure.
+    '''
     # Status codes for self.status:
     SUCCESS = 0
     ERROR = -1
@@ -79,6 +82,9 @@ class UrlDownloader:
         return s
 
     def resolve(self):
+        '''Resolve the URL, follow any redirects, but don't
+           actually download the content.
+        '''
         request = urllib2.Request(self.orig_url)
 
         # If we're after the single-page URL, we may need a referrer
@@ -147,9 +153,9 @@ class UrlDownloader:
         # Is the URL gzipped? If so, we'll need to uncompress it.
         self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
 
-    # XXX This is the part that needs to be parallelized.
     def download(self):
-        # Read the content of the link:
+        '''Read the content of the link, already resolve()d.
+        '''
         # This can die with socket.error, "connection reset by peer"
         # And it may not set html, so initialize it first:
         html = None
@@ -183,19 +189,22 @@ class UrlDownloader:
 
         self.bytes_downloaded = len(html)
         self.save_file(html)
-        print "Downloaded", self.bytes_downloaded, "to", self.localpath
+        # print "Downloaded", self.bytes_downloaded, "to", self.localpath
 
-    def save_file(self, bytes):
+    def save_file(self, bytes, encoding="utf-8"):
+        '''Save the bytes we just downloaded to the local file path.
+        '''
         fp = open(self.localpath, 'w')
         if isinstance(bytes, unicode):
-            fp.write(bytes.encode('utf-8'))
+            fp.write(bytes.encode(encoding))
         else:
             fp.write(bytes)
         fp.close()
 
     def resolve_and_download(self):
-        '''Actually download the URL to the local file.
-           Return a 3-tuple: (successp, self, bytes_or_errstr)
+        '''Resolve the URL, following any redirects,
+           then actually download the URL to the local file.
+           Return self, which includes details like status code and errstring.
         '''
         # We must catch all errors here, otherwise they'll go ignored
         # since we're running inside a thread pool and the main
@@ -208,7 +217,6 @@ class UrlDownloader:
 
         self.status = UrlDownloader.DOWNLOADING
         try:
-            print "resolve_and_download(%s)" % self.orig_url
             self.resolve()
             self.download()
             self.status = UrlDownloader.SUCCESS
@@ -250,6 +258,8 @@ class UrlDownloadQueue:
         return self.queue.pop()
 
     def add(self, url, **kwargs):
+        '''Add a new URL to the queue to be downloaded.
+        '''
         kwargs['url'] = url
         if 'localpath' not in kwargs:
             raise ValueError("UrlDownloadQueue.add needs localpath")
@@ -262,19 +272,19 @@ class UrlDownloadQueue:
         '''Start or continue downloading.
         If maxthreads==0, stay in the current thread and process
         anything available, then return.
-        If maxthreads==1, start a subthread (if we don't already have one)
-        and process everything in that thread.
-        If maxthreads>1, use a separate thread for every download,
+        If maxthreads>0, use a separate thread for every download,
         but no more than maxthreads at any given time.
         '''
+        # XXX If maxthreads==1, would like to start a subthread
+        # (if we don't already have one)
+        # and process everything in that thread.
+
         if not self.pool:
             # Make the Pool of workers, maxthreads possible processes
-            print "Initializing pool with", self.maxthreads, "threads"
             self.pool = ThreadPool(self.maxthreads)
 
         while len(self.queue):
             urldl = self.queue[-1]
-            print "Passing", urldl, "to pool"
             res = self.pool.apply_async(UrlDownloader.resolve_and_download,
                                         (urldl,),
                                         callback=self.cb)
@@ -284,28 +294,26 @@ class UrlDownloadQueue:
 
         # close the pool and wait for the work to finish 
         self.pool.close()
-        print "======== pool.join is:"
-        print self.pool.join()
-
-    def doit(self, urldl):
-        print "------ doing it to:", urldl
-        urldl.resolve_and_download()
 
     def cb(self, res):
-        '''res is a UrlDownloader object
+        '''Callback that will be called for each UrlDownloader
+           when it's finished downloading (or has errored out).
+           res is a UrlDownloader object.
         '''
         if res.status == UrlDownloader.SUCCESS:
-            print "::::: Callback success! Downloaded %d bytes" % res.bytes_downloaded
+            # print "::::: Callback success! Downloaded %d bytes" % res.bytes_downloaded
             self.succeeded.append(res)
         elif res.status == UrlDownloader.ERROR:
-            print "::::: Callback ERROR!", res.errmsg
+            # print "::::: Callback ERROR!", res.errmsg
             self.failed.append(res)
         else:
-            print "::::: Callback: status was", res.status
+            # print "::::: Callback: status was", res.status
             self.failed.append(res)
         self.in_progress.remove(res)
 
     def print_status(self):
+        '''Print a summary of what we did and didn't download successfully.
+        '''
         print "\n===== Succeeded:"
         for u in self.succeeded:
             print u
@@ -319,10 +327,16 @@ class UrlDownloadQueue:
             for u in self.in_progress:
                 print u
 
+    def processing(self):
+        '''Do we still have URLs in our queues that haven't been processed?
+        '''
+        return (len(self.queue) + len(self.in_progress) > 0)
+
 if __name__ == "__main__":
     import os
     import urlparse
     import posixpath
+    import time
 
     dlqueue = UrlDownloadQueue()
 
@@ -344,6 +358,12 @@ if __name__ == "__main__":
     # print "================="
 
     dlqueue.download(4)
+
+    # Now things are downloading asynchronously.
+    # Loop until they're all done.
+    while dlqueue.processing():
+        print "processing ..."
+        time.sleep(.1)
 
     dlqueue.print_status()
 
