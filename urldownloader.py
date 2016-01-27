@@ -24,7 +24,12 @@ import datetime
 from multiprocessing.dummy import Pool as ThreadPool
 
 class UrlDownloader:
-    # def __init__(self, url, localpath, **kwargs):
+    # Status codes for self.status:
+    SUCCESS = 0
+    ERROR = -1
+    EMPTY = 1
+    DOWNLOADING = 2
+
     def __init__(self, url, localpath, timeout=100,
                  user_agent=None, referrer=None, allow_cookies=False):
         '''Arguments:
@@ -40,6 +45,8 @@ class UrlDownloader:
         self.referrer = referrer
 
         # Things we will set during the download
+        self.status = EMPTY
+        self.errmsg = None
         self.cururl = None
         self.bytes_downloaded = 0
         self.done = False
@@ -198,11 +205,12 @@ class UrlDownloader:
             print "resolve_and_download(%s)" % self.orig_url
             self.resolve()
             self.download()
+            self.status = UrlDownloader.SUCCESS
         except Exception, e:
-            return (False, self,
-                    "Couldn't download %s:\n%s" % (str(self), str(e)))
+            self.status = UrlDownloader.ERROR
+            self.errmsg = "Couldn't download %s:\n%s" % (str(self), str(e)))
 
-        return (True, self, self.bytes_downloaded)
+        return self
 
 class UrlDownloadQueue:
     '''Maintains a queue of UrlDownloaders and keeps them downloading
@@ -278,15 +286,16 @@ class UrlDownloadQueue:
         urldl.resolve_and_download()
 
     def cb(self, res):
-        '''res is a 3-tuple: (successp, UrlDownloader, string)
+        '''res is a UrlDownloader object
         '''
-        if res[0]:
-            print "::::: Callback success! Downloaded %d bytes" % res[2]
-            self.succeeded.append(res[1])
+        if res.status == UrlDownloader.SUCCESS:
+            print "::::: Callback success! Downloaded %d bytes" % res.bytes_downloaded
+            self.succeeded.append(res)
+        elif res.status == UrlDownloader.ERROR:
         else:
-            print "::::: Callback ERROR!", res[2]
-            self.failed.append((res[1], res[2]))
-        self.in_progress.remove(res[1])
+            print "::::: Callback ERROR!", res.errmsg
+            self.failed.append(res)
+        self.in_progress.remove(res)
 
     def print_status(self):
         print
