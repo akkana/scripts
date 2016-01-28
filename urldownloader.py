@@ -348,6 +348,9 @@ if __name__ == "__main__":
         filename = os.path.basename(rooturlpath)
         if not filename or filename == ".":
             filename = "INDEX"
+        if parsed.query:
+            filename += parsed.query
+        print "filename:", filename
         localpath = os.path.join("/tmp/urls", "%s-%s" % (host, filename))
 
         dlqueue.add(url=url, localpath=localpath,
