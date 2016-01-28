@@ -5,7 +5,7 @@
 # Share and enjoy under the GPLv2 or (at your option) any later version.
 
 __module_name__ = "chatsounds" 
-__module_version__ = "0.1" 
+__module_version__ = "0.2" 
 __module_description__ = "Plays sounds when it sees keywords"
 __module_author__ = "Akkana Peck <akkana@shallowsky.com>"
 
@@ -13,9 +13,17 @@ import xchat
 import sys, os, subprocess
 import time
 
+# Configuration: things you might want to change.
+NORMAL_SOUND = "pop.wav"
+SUBTLE_SOUND = "SingleClick.wav"
+SPECIAL_SOUND = "akk.wav"
+SILENCED_CHANNELS = [ '#twitter_akkakk' ]
+# End configuration.
+
 # The debugging log file.
 # If it's set, we might get debug messages written to it.
 Debug = None
+# Debug = sys.stderr
 
 class SoundPlayer :
     """
@@ -98,7 +106,7 @@ class XchatSoundHandler :
 
         self.sound_dir = os.path.expanduser("~/.xchat2/sounds/")
 
-        self.silenced_channels = []
+        self.silenced_channels = SILENCED_CHANNELS
 
         print "Loaded chatsounds.py"
 
@@ -141,9 +149,9 @@ class XchatSoundHandler :
                 print >>Debug, ">>> chatsounds", userdata, \
                     "network =", network, \
                     "channel =", channel,
-                print >>Debug, ">>>>> Contains my nick! akking", userdata, \
+                print >>Debug, ">>>>> Contains my nick!", userdata, \
                     ">>", line
-            self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             return xchat.EAT_NONE
 
         if userdata == "Channel Msg Hilight" or \
@@ -154,10 +162,10 @@ class XchatSoundHandler :
             # In fact, if we could just delete those tabs it would be great.
             if network != 'Bitlbee' :
                 if Debug :
-                    print >>Debug, ">>> chatsounds akking", userdata, \
+                    print >>Debug, ">>> chatsounds", userdata, \
                         "network =", network, \
                         "channel =", channel
-                self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+                self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             else:
                 if Debug :
                     print >>Debug, ">>> chatsounds skipping bitlbee", \
@@ -167,12 +175,16 @@ class XchatSoundHandler :
 
         # Private message:
         elif userdata.startswith("Private Message") :
-            if Debug :
-                print >>Debug, ">>> chatsounds private message! akking", \
-                    userdata, \
-                    "network =", network, \
-                    "channel =", channel,
-            self.player.play(os.path.join(self.sound_dir, "akk.wav"))
+            if channel == "root":
+                if Debug :
+                    print "Skipping channel==root"
+            else:
+                if Debug :
+                    print >>Debug, ">>> chatsounds private message!", \
+                        userdata, \
+                        "network =", network, \
+                        "channel =", channel
+                self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             return xchat.EAT_NONE
 
         # Now check whether we're silenced.
@@ -184,13 +196,13 @@ class XchatSoundHandler :
         # More subtle sound for bitlbee/twitter, since they're so numerous:
         if channel == "#twitter_" + mynick :
             # print ">>>>> Twitter channel!"
-            self.player.play(os.path.join(self.sound_dir, "SingleClick.wav"))
+            self.player.play(os.path.join(self.sound_dir, SUBTLE_SOUND))
 
         # if you want to be fairly noisy or don't have many active channels,
         # you might want an alert for every channel message:
         elif userdata.startswith("Channel M") or \
                 userdata.startswith("Channel Action") :
-            self.player.play(os.path.join(self.sound_dir, "pop.wav"))
+            self.player.play(os.path.join(self.sound_dir, NORMAL_SOUND))
 
         return xchat.EAT_NONE
 
