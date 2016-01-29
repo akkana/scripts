@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+
+# A dummy http server used for testing http download clients.
+
+# Base URL filename doesn't matter, bytes served will be semi-random.
+#
+# Queries this server handles (append to base url):
+#   ?bytes=N       (approximate # bytes to be served)
+#   ?timeout=N     (seconds delay in the middle of the page)
+#   ?delay=N       (milliseconds delay between bytes)
+
+import time
+import BaseHTTPServer
+import cgi
+import os
+
+HOST_NAME = os.uname()[1]
+PORT_NUMBER = 9000
+
+class SpeedTestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+    def do_HEAD(s):
+        s.send_response(200)
+        s.send_header("Content-type", "text/html")
+        s.end_headers()
+
+    def do_GET(s):
+        """Respond to a GET request."""
+        s.send_response(200)
+        s.send_header("Content-type", "text/html")
+        s.end_headers()
+
+        s.wfile.write("""<html>
+<head>
+<title>Web testing server</title>
+</head>""")
+        # If someone went to "http://something.somewhere.net/foo/bar/",
+        # then s.path equals "/foo/bar/".
+        s.wfile.write("<p>You accessed path: %s at %s</p>" % (s.path,
+                                                              time.asctime()))
+
+        nbytes = 1000
+        timeout = 0
+        delay = 0
+        # Parse any CGI-style parameters
+        if '?' in s.path:
+            qs = s.path.split('?')[1]
+            queries = cgi.parse_qs(qs)
+            if 'timeout' in queries:
+                timeout = int(queries['timeout'][0])
+                s.wfile.write("<br>Timeout: %s" % timeout)
+            if 'bytes' in queries:
+                nbytes = int(queries['bytes'][0])
+                s.wfile.write("<br>Bytes: %s" % nbytes)
+            if 'delay' in queries:
+                delay = int(queries['delay'][0])
+                s.wfile.write("<br>Delay: %s" % delay)
+
+        data = 'a' * (nbytes/2)
+
+        s.wfile.write("<p>\n")
+        SpeedTestHandler.send_at_speed(s, data, delay)
+        s.wfile.write("\n<p>%s</p><p>\n" % time.asctime())
+
+        if timeout > 0:
+            time.sleep(timeout)
+
+        SpeedTestHandler.send_at_speed(s, data, delay)
+        s.wfile.write("</p>")
+
+        s.wfile.write("<p>End download at %s</p>" %time.asctime())
+        s.wfile.write("</body></html>")
+
+    def send_at_speed(s, data, delay):
+        if not delay:
+            s.wfile.write(data)
+            return
+
+        for b in data:
+            s.wfile.write(b)
+            time.sleep(delay)
+
+if __name__ == '__main__':
+    server_class = BaseHTTPServer.HTTPServer
+    httpd = server_class((HOST_NAME, PORT_NUMBER), SpeedTestHandler)
+    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    httpd.server_close()
+    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)

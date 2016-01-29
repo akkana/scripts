@@ -223,6 +223,10 @@ sinkto:
     email folders etc. to a laptop when preparing for or returning
     from a trip, or just for keeping several machines in sync.
 
+speedtestserver:
+    A mini http server that can introduce delays or other glitches
+    that are useful for testing http download clients.
+
 termcolors:
     Display ANSI colors for the current terminal.
 
