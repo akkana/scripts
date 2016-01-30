@@ -41,14 +41,18 @@ def Usage():
     print "infile may be .doc or .html"
     sys.exit(1)
 
-if len(sys.argv) < 2:
+if len(sys.argv) < 3:
     Usage()
 
 base, ext = os.path.splitext(sys.argv[1])
 ext = ext.lower()
 if ext == ".doc":
     htmlfile = base + ".html"
-    subprocess.call(["wvHtml", sys.argv[1], htmlfile])
+    try:
+        subprocess.call(["wvHtml", sys.argv[1], htmlfile])
+    except:
+        print "Need wvHtml installed!"
+        sys.exit(1)
 elif lower == ".html":
     htmlfile = sys.argv[1]
 else:
