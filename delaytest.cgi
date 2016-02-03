@@ -25,7 +25,7 @@ Hello, world. Now we'll hang for a bit ...
 form = cgi.FieldStorage()
 # print "form:", form, "<p>\n"
 if 'delay' in form :
-    delay = int(form["delay"].value)
+    delay = float(form["delay"].value)
 else :
     delay = 60
 if 'count' in form :
@@ -36,4 +36,4 @@ print "Delay", delay, ", count", count, "<br>"
 
 for i in range(count) :
     time.sleep(delay)
-    print "<p>\nAnother line," i
+    print "<p>\nAnother line", i
