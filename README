@@ -77,6 +77,11 @@ decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
 
+delaytest.cgi:
+    A CGI script in Python that spits out some text slowly, with delays.
+    Use it on your webserver (or localhost) to test things like parallel
+    downloads.
+
 diff2rss:
     Diff two files and output RSS of the differences.
     A possible (though poor) solution for web pages that don't offer RSS feeds.
