@@ -80,7 +80,7 @@ decodemail.py:
 delaytest.cgi:
     A CGI script in Python that spits out some text slowly, with delays.
     Use it on your webserver (or localhost) to test things like parallel
-    downloads.
+    downloads to make sure they work with slow servers.
 
 diff2rss:
     Diff two files and output RSS of the differences.

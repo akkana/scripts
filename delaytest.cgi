@@ -36,4 +36,4 @@ print "Delay", delay, ", count", count, "<br>"
 
 for i in range(count) :
     time.sleep(delay)
-    print "<p>\nAnother line"
+    print "<p>\nAnother line," i
