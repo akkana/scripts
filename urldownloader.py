@@ -13,10 +13,12 @@
 
 import sys
 import urllib2
+import socket
 from cookielib import CookieJar
 import StringIO
 import gzip
 import datetime
+import traceback
 
 # Use processes:
 # from multiprocessing import Pool as ThreadPool
@@ -81,7 +83,7 @@ class UrlDownloader:
 
         return s
 
-    def resolve(self):
+    def resolve_headers(self):
         '''Resolve the URL, follow any redirects, but don't
            actually download the content.
         '''
@@ -107,9 +109,6 @@ class UrlDownloader:
             opener = urllib2.build_opener()
 
         self.response = opener.open(request, timeout=self.timeout)
-        # Lots of ways this can fail.
-        # e.g. ValueError, "unknown url type"
-        # or BadStatusLine: ''
 
         # At this point it would be lovely to check whether the
         # mime type is HTML. Unfortunately, all we have is a
@@ -153,19 +152,12 @@ class UrlDownloader:
         # Is the URL gzipped? If so, we'll need to uncompress it.
         self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
 
-    def download(self):
-        '''Read the content of the link, already resolve()d.
+    def download_body(self):
+        '''Read the content of the link, whose headers are already resolved,
+           and save the content to the local file path.
         '''
-        # This can die with socket.error, "connection reset by peer"
-        # And it may not set html, so initialize it first:
-        html = None
-        try:
-            html = self.response.read()
-        # XXX Need to guard against IncompleteRead -- but what class owns it??
-        #except httplib.IncompleteRead, e:
-        #    print >>sys.stderr, "Ignoring IncompleteRead on", url
-        except Exception, e:
-            print >>sys.stderr, "Unknown error from self.response.read()", url
+        # This can die in various ways -- caught in download()
+        html = self.response.read()
 
         # html can be undefined here. If so, no point in doing anything else.
         if not html:
@@ -188,22 +180,19 @@ class UrlDownloader:
         self.response.close()
 
         self.bytes_downloaded = len(html)
-        self.save_file(html)
-        # print "Downloaded", self.bytes_downloaded, "to", self.localpath
 
-    def save_file(self, bytes, encoding="utf-8"):
-        '''Save the bytes we just downloaded to the local file path.
-        '''
+        # Save the bytes we just downloaded to the local file path.
         fp = open(self.localpath, 'w')
-        if isinstance(bytes, unicode):
-            fp.write(bytes.encode(encoding))
+        if isinstance(html, unicode):
+            fp.write(html.encode(self.encoding))
         else:
-            fp.write(bytes)
+            fp.write(html)
         fp.close()
 
-    def resolve_and_download(self):
+    def download(self):
         '''Resolve the URL, following any redirects,
            then actually download the URL to the local file.
+           This is normally the function callers should use.
            Return self, which includes details like status code and errstring.
         '''
         # We must catch all errors here, otherwise they'll go ignored
@@ -217,12 +206,44 @@ class UrlDownloader:
 
         self.status = UrlDownloader.DOWNLOADING
         try:
-            self.resolve()
-            self.download()
+            self.resolve_headers()
+            self.download_body()
             self.status = UrlDownloader.SUCCESS
-        except Exception, e:
+
+        except KeyboardInterrupt as e:
+            print >>sys.stderr, "Keyboard interrupt"
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e)
+
+        except (urllib2.HTTPError, IOError, urllib2.HTTPError,
+                ValueError, socket.timeout, socket.error) as e:
+            # The various errors likely to happen:
+            # resolve_headers can fail with
+            # ValueError = "unknown url type" or BadStatusLine, ''.
+            # For download_body,
+            # urllib2 is supposed to throw a urllib2.URLError for
+            # "unknown url type", but in practice it throws ValueError.
+            # Timeouts can be either urllib2.URLError or socket.timeout.
+            # Other errors can include IOError urllib2.HTTPError.
+            # socket.error, "connection reset by peer"
+            # print >>sys.stderr, "Some sort of HTTP error"
+            self.status = UrlDownloader.ERROR
+            self.errmsg = str(e)
+
+        except httplib.IncompleteRead as e:
+            # print >>sys.stderr, "IncompleteRead on", url
+            self.status = UrlDownloader.ERROR
+            self.errmsg = str(e) + "\nIncompleteRead on" + url
+
+        except Exception as e:
+            # print >>sys.stderr, "Unknown error from self.response.read()", url
+            self.status = UrlDownloader.ERROR
+            self.errmsg = str(e)
+            # Add more details and a stack trace: it might be
+            # an error we need to be catching.
+            self.errmsg += str(sys.exc_info()[0]) + '\n'
+            self.errmsg += str(sys.exc_info()[1]) + '\n'
+            self.errmsg += str(traceback.format_exc(sys.exc_info()[2]))
 
         return self
 
@@ -268,7 +289,7 @@ class UrlDownloadQueue:
             url = UrlDownloader(**kwargs)
         self.queue.insert(0, url)
 
-    def download(self, maxthreads=4):
+    def download(self):
         '''Start or continue downloading.
         If maxthreads==0, stay in the current thread and process
         anything available, then return.
@@ -285,7 +306,7 @@ class UrlDownloadQueue:
 
         while len(self.queue):
             urldl = self.queue[-1]
-            res = self.pool.apply_async(UrlDownloader.resolve_and_download,
+            res = self.pool.apply_async(UrlDownloader.download,
                                         (urldl,),
                                         callback=self.cb)
             self.in_progress.append(urldl)
@@ -338,7 +359,9 @@ if __name__ == "__main__":
     import posixpath
     import time
 
-    dlqueue = UrlDownloadQueue()
+    DOWNLOAD_DIR = "/tmp/urls"
+
+    dlqueue = UrlDownloadQueue(maxthreads=4)
 
     for url in sys.argv[1:]:
         parsed = urlparse.urlparse(url)
@@ -351,16 +374,21 @@ if __name__ == "__main__":
         if parsed.query:
             filename += parsed.query
         print "filename:", filename
-        localpath = os.path.join("/tmp/urls", "%s-%s" % (host, filename))
+        localpath = os.path.join(DOWNLOAD_DIR, "%s-%s" % (host, filename))
 
         dlqueue.add(url=url, localpath=localpath,
                     timeout=5000, allow_cookies=True)
-    
+
+    if not os.path.exists(DOWNLOAD_DIR):
+        print "Creating", DOWNLOAD_DIR
+        os.mkdir(DOWNLOAD_DIR)
+
     # print "\nQueue now (len %d):" % len(dlqueue)
     # print dlqueue
     # print "================="
 
-    dlqueue.download(4)
+    # Start the download.
+    dlqueue.download()
 
     # Now things are downloading asynchronously.
     # Loop until they're all done.
