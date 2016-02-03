@@ -25,6 +25,8 @@ import traceback
 # Use threads:
 from multiprocessing.dummy import Pool as ThreadPool
 
+DEBUG=sys.stderr
+
 class UrlDownloader:
     '''Manage downloading of a single URL (threadable).
        Keep track of download success or failure.
@@ -35,7 +37,7 @@ class UrlDownloader:
     EMPTY = 1
     DOWNLOADING = 2
 
-    def __init__(self, url, localpath, timeout=100,
+    def __init__(self, url, localpath, timeout=10000,
                  user_agent=None, referrer=None, allow_cookies=False):
         '''Arguments:
             url: the original url to be downloaded
@@ -120,7 +122,8 @@ class UrlDownloader:
         # text/something, that's bad.
         # ctype = self.response.headers['content-type']
         # if ctype and ctype != '' and ctype[0:4] != 'text':
-        #     print >>sys.stderr, url, "isn't text -- skipping"
+        #     if DEBUG:
+        #         print >>DEBUG, url, "isn't text -- skipping"
         #     self.response.close()
         #     raise ContentsNotTextError
 
@@ -146,8 +149,9 @@ class UrlDownloader:
 
         self.final_url = self.response.geturl()
         if self.final_url != self.cururl:
-            print >>sys.stderr, "cururl != final_url!"
-            print >>sys.stderr, self.cururl, "!=", self.final_url
+            if DEBUG:
+                print >>DEBUG, "cururl != final_url!"
+                print >>DEBUG, self.cururl, "!=", self.final_url
 
         # Is the URL gzipped? If so, we'll need to uncompress it.
         self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
@@ -161,7 +165,8 @@ class UrlDownloader:
 
         # html can be undefined here. If so, no point in doing anything else.
         if not html:
-            print >>sys.stderr, "Didn't read anything from self.response.read()"
+            if DEBUG:
+                print >>DEBUG, "Didn't read anything from self.response.read()"
             raise NoContentError
 
         if self.is_gzip:
@@ -169,7 +174,8 @@ class UrlDownloader:
             f = gzip.GzipFile(fileobj=buf)
             html = f.read()
 
-        #print >>sys.stderr, "self.response.read() returned type", type(html)
+        #if DEBUG:
+        #    print >>DEBUG, "self.response.read() returned type", type(html)
         # Want to end up with unicode. In case it's str, decode it:
         if type(html) is str:
             # But sometimes this raises errors anyway, even using
@@ -195,6 +201,10 @@ class UrlDownloader:
            This is normally the function callers should use.
            Return self, which includes details like status code and errstring.
         '''
+        if DEBUG:
+            print >>DEBUG, "Start download", self.orig_url
+            DEBUG.flush()
+
         # We must catch all errors here, otherwise they'll go ignored
         # since we're running inside a thread pool and the main
         # thread won't catch our exceptions.
@@ -209,9 +219,14 @@ class UrlDownloader:
             self.resolve_headers()
             self.download_body()
             self.status = UrlDownloader.SUCCESS
+            if DEBUG:
+                print >>DEBUG, "end download", self.orig_url, \
+                    self.bytes_downloaded, "bytes"
+                DEBUG.flush()
 
         except KeyboardInterrupt as e:
-            print >>sys.stderr, "Keyboard interrupt"
+            if DEBUG:
+                print >>DEBUG, "Keyboard interrupt"
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e)
 
@@ -226,17 +241,20 @@ class UrlDownloader:
             # Timeouts can be either urllib2.URLError or socket.timeout.
             # Other errors can include IOError urllib2.HTTPError.
             # socket.error, "connection reset by peer"
-            # print >>sys.stderr, "Some sort of HTTP error"
+            # if DEBUG:
+            #     print >>DEBUG, "Some sort of HTTP error"
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e)
 
         except httplib.IncompleteRead as e:
-            # print >>sys.stderr, "IncompleteRead on", url
+            # if DEBUG:
+            #     print >>DEBUG, "IncompleteRead on", url
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e) + "\nIncompleteRead on" + url
 
         except Exception as e:
-            # print >>sys.stderr, "Unknown error from self.response.read()", url
+            # if DEBUG:
+            #     print >>DEBUG, "Unknown error from self.response.read()", url
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e)
             # Add more details and a stack trace: it might be
@@ -354,6 +372,10 @@ class UrlDownloadQueue:
         return (len(self.queue) + len(self.in_progress) > 0)
 
 if __name__ == "__main__":
+    '''One way to test this:
+    urldownloader.py 'http://localhost/delaytest/?delay=.9&count=10' 'http://localhost/delaytest/?delay=1&count=2' 'http://localhost/delaytest/?delay=2&count=4'
+       using delaytest.cgi for testing delays repeatably.
+    '''
     import os
     import urlparse
     import posixpath
@@ -361,7 +383,7 @@ if __name__ == "__main__":
 
     DOWNLOAD_DIR = "/tmp/urls"
 
-    dlqueue = UrlDownloadQueue(maxthreads=4)
+    dlqueue = UrlDownloadQueue(maxthreads=10)
 
     for url in sys.argv[1:]:
         parsed = urlparse.urlparse(url)
@@ -372,12 +394,12 @@ if __name__ == "__main__":
         if not filename or filename == ".":
             filename = "INDEX"
         if parsed.query:
-            filename += parsed.query
+            filename += '?' + parsed.query
         print "filename:", filename
         localpath = os.path.join(DOWNLOAD_DIR, "%s-%s" % (host, filename))
 
         dlqueue.add(url=url, localpath=localpath,
-                    timeout=5000, allow_cookies=True)
+                    timeout=50000, allow_cookies=True)
 
     if not os.path.exists(DOWNLOAD_DIR):
         print "Creating", DOWNLOAD_DIR
@@ -394,7 +416,7 @@ if __name__ == "__main__":
     # Loop until they're all done.
     while dlqueue.processing():
         print "processing ..."
-        time.sleep(.1)
+        time.sleep(1)
 
     dlqueue.print_status()
 
