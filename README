@@ -231,6 +231,9 @@ sinkto:
 speedtestserver:
     A mini http server that can introduce delays or other glitches
     that are useful for testing http download clients.
+    Unfortunately, it's only single-threaded which makes it
+    not very useful except as an illustration of how to make
+    a mini server in Python. Use delaytest.cgi for actual testing.
 
 termcolors:
     Display ANSI colors for the current terminal.
