@@ -3,7 +3,7 @@
 # Graph a bunch of financial assets (stocks or mutual funds)
 # specified on the commandline by ticker symbols.
 # (Downloads data from Yahoo finance.)
-# Usage: fincompare.py LDLAX SRCMX VFIAX FUSVX VSCGX IRCAX SCALX
+# Usage: fincompare.py fund fund ...
 
 # You can also specify modules that do custom loading,
 # in case you need to parse CSV or Excel files or any other local files.
@@ -31,7 +31,10 @@ import numpy
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.finance import quotes_historical_yahoo
+from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
+
+start = None
+initial = None
 
 #
 # Read the list of funds to plot.
@@ -42,7 +45,10 @@ from matplotlib.finance import quotes_historical_yahoo
 imported_modules = {}
 
 if len(sys.argv) < 2:
-    funds = ['VFIAX', 'FUSVX', 'LDLAX', 'VSCGX', 'IRCAX', 'SCALX', 'SRCMX']
+    print "Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % sys.argv[0]
+    print "No spaces between -i or -s and their values!"
+    print "e.g. fincompare -i200000 -s2008-1-1 FMAGX FIRPX"
+    sys.exit(1)
 else:
     funds = []
     for f in sys.argv[1:]:
@@ -58,6 +64,13 @@ else:
             except Exception, e:
                 print "Couldn't import", f
                 print e
+        elif f.startswith('-s'):
+            # Parse the start time:
+            start = datetime.datetime.strptime(f[2:], '%Y-%m-%d')
+        elif f.startswith('-i'):
+            print "Minus i!"
+            print "Trying initial from '%s'" % f[2:]
+            initial = int(f[2:])
         else:
             funds.append(f)
 
@@ -93,15 +106,15 @@ def plot_funds(tickerlist, initial, start, end):
     print '%9s %9s %9s %9s' % ('Ticker', 'daily', 'CC', 'abs')
 
     # For testing, use something like
-    # FUSVX = quotes_historical_yahoo('FUSVX', datetime.datetime(2012, 10, 1),
-    #                                 datetime.datetime(2013, 4, 1),
-    #                                 asobject=True)
+    # FUSVX = yahoo('FUSVX', datetime.datetime(2012, 10, 1),
+    #                        datetime.datetime(2013, 4, 1),
+    #                        asobject=True)
     for i, ticker in enumerate(tickerlist):
         # This gives a runtime warning for SCAL, and all the aclose vals
         # come out zero. Catching a RuntimeWarning isn't as simple as try;
         # http://stackoverflow.com/questions/10519237/python-how-to-avoid-runtimewarning-in-function-definition
         # http://stackoverflow.com/questions/9349434/how-do-i-check-for-numeric-overflow-without-getting-a-warning-in-python
-        fund_data = quotes_historical_yahoo(ticker, start, end, asobject=True)
+        fund_data = yahoo(ticker, start, end, asobject=True)
 
         # Guard against failures of quotes_historical_yahoo;
         # without this check you'll see more uncatchable RuntimeWarnings.
@@ -133,8 +146,9 @@ def plot_funds(tickerlist, initial, start, end):
         ax1.plot_date(x=fund_data['date'], y=fund_data['aclose'],
                       fmt=pick_color(i), label=ticker)
 
-initial = None
 for i, f in enumerate(imported_modules.keys()):
+    # XXX This will overwrite any -i and -s.
+    # Should instead normalize the value read to the -i value passed in.
     try:
         initial, start, end = imported_modules[f].plot_fund(color='k',
                                                 marker=markers[i%len(markers)])
@@ -144,8 +158,10 @@ for i, f in enumerate(imported_modules.keys()):
 
 if not initial:
     initial = 100000
+if not start:
     start = datetime.datetime(2011, 1, 1)
-    end = datetime.datetime.now()
+
+end = datetime.datetime.now()
 
 # Baseline at the initial investment:
 plt.axhline(y=initial, color='k')
