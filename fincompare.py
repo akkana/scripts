@@ -41,24 +41,24 @@ from matplotlib.finance import quotes_historical_yahoo
 #
 imported_modules = {}
 
-if len(sys.argv) < 2 :
+if len(sys.argv) < 2:
     funds = ['VFIAX', 'FUSVX', 'LDLAX', 'VSCGX', 'IRCAX', 'SCALX', 'SRCMX']
-else :
+else:
     funds = []
-    for f in sys.argv[1:] :
-        if f.endswith('.py') :
+    for f in sys.argv[1:]:
+        if f.endswith('.py'):
             # First split off any pathname included,
             # since python isn't smart about importing from a pathname.
             fpath, ffile = os.path.split(f)
-            if fpath :
+            if fpath:
                 sys.path.append(fpath)
 
-            try :
+            try:
                 imported_modules[f] = __import__(ffile[:-3])
-            except Exception, e :
+            except Exception, e:
                 print "Couldn't import", f
                 print e
-        else :
+        else:
             funds.append(f)
 
 # Set up the plots:
@@ -75,7 +75,7 @@ colors = [ 'b', 'r', 'g', 'c', 'y', 'k' ]
 styles = [ '-', '--', ':', '-.' ]
 markers = [ 'o', '*', 's', '^', 'p', '+', 'D', 'x', '|', 'h' ]
 
-def pick_color(i) :
+def pick_color(i):
     '''Pick a color that tries to be reasonably different
        from other colors so far picked.
     '''
@@ -83,7 +83,7 @@ def pick_color(i) :
         + styles[int(i / len(colors))]
 #        + markers[i%len(markers)]
 
-def plot_funds(tickerlist, initial, start, end) :
+def plot_funds(tickerlist, initial, start, end):
     '''Plot a fund by its ticker symbol,
        normalized to a given initial value.
     '''
@@ -96,7 +96,7 @@ def plot_funds(tickerlist, initial, start, end) :
     # FUSVX = quotes_historical_yahoo('FUSVX', datetime.datetime(2012, 10, 1),
     #                                 datetime.datetime(2013, 4, 1),
     #                                 asobject=True)
-    for i, ticker in enumerate(tickerlist) :
+    for i, ticker in enumerate(tickerlist):
         # This gives a runtime warning for SCAL, and all the aclose vals
         # come out zero. Catching a RuntimeWarning isn't as simple as try;
         # http://stackoverflow.com/questions/10519237/python-how-to-avoid-runtimewarning-in-function-definition
@@ -105,7 +105,7 @@ def plot_funds(tickerlist, initial, start, end) :
 
         # Guard against failures of quotes_historical_yahoo;
         # without this check you'll see more uncatchable RuntimeWarnings.
-        if fund_data['aclose'][0] == 0 :
+        if fund_data['aclose'][0] == 0:
             print ticker, ": First adjusted close is 0!"
             continue
 
@@ -134,15 +134,15 @@ def plot_funds(tickerlist, initial, start, end) :
                       fmt=pick_color(i), label=ticker)
 
 initial = None
-for i, f in enumerate(imported_modules.keys()) :
-    try :
+for i, f in enumerate(imported_modules.keys()):
+    try:
         initial, start, end = imported_modules[f].plot_fund(color='k',
                                                 marker=markers[i%len(markers)])
     except Exception, e:
         print "Couldn't plot", f
         print e
 
-if not initial :
+if not initial:
     initial = 100000
     start = datetime.datetime(2011, 1, 1)
     end = datetime.datetime.now()
