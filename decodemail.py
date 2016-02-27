@@ -16,8 +16,11 @@ Find a line matching the given header name (Subject:, From:, etc.)
 and decode it according to RFC 2047.
 Without a filemame, will read standard input.
 Adding -a will print all matches within the given file, not just the first.
+Multiple headers may be combined with |
 
-Example: %s -a Subject: /var/mail/yourname""" % (progname, progname)
+Example: %s -a Subject: /var/mail/yourname
+         %s -a 'Subject:|To:|From:' folder folder""" % (progname, progname,
+                                                        progname)
 
 def decode_piece(piece):
     ret = ''
@@ -41,46 +44,53 @@ def decode_file(filename, header_wanted) :
     else :
         fil = open(filename)
 
+    # header_wanted can be multiple headers, e.g. From:|To:
+    # so split them.
+    headers = header_wanted.split('|')
+
     output = ''
     found_something = False
     for line in fil :
         # If it matches the header we seek, or if we've already started
         # matching the header and we're looking for continuation lines,
         # build up our string:
-        if (not output and line.startswith(header_wanted)) \
-          or (output and (line.startswith(' ') or line.startswith('\t'))) :
-            # We have a match! But we may need to read multiple lines,
-            # since one header can be split over several lines.
-            found_something = True
+        for header_wanted in headers:
+            # print "=== looking for", header_wanted
+            if (not output and line.startswith(header_wanted)) \
+               or (output and (line.startswith(' ') or line.startswith('\t'))) :
+                # We have a match! But we may need to read multiple lines,
+                # since one header can be split over several lines.
+                found_something = True
 
-            # Strip output because we don't want the final newline.
-            # But add a space if this is a continuation.
-            if output:
-                output += ' '
-            output += decode_piece(line.strip())
+                # Strip output because we don't want the final newline.
+                # But add a space if this is a continuation.
+                if output:
+                    output += ' '
+                output += decode_piece(line.strip())
 
-        elif output :
-            # if we've already matched the header, and this isn't a
-            # continuation line, then we're done. Print and exit.
+            elif output :
+                # if we've already matched the header, and this isn't a
+                # continuation line, then we're done. Print and exit.
 
-            # If the header is an address, we have to split it into parts
-            # before we can decode it. If it's another header such as Subject,
-            # we can't do that.
-            if header_wanted.startswith("From") \
-                    or header_wanted.startswith("To") \
-                    or header_wanted.startswith("Cc") \
-                    or header_wanted.startswith("Bcc"):
-                pieces = email.utils.parseaddr(output)
-                if pieces[0] or pieces[1]:
-                    output = header_wanted + ' ' + \
-                             email.utils.formataddr(map(decode_piece, pieces))
-                else:
-                    output += line
-                    print "parseaddr failed on", line,
-
+                # If the header is an address, we have to split it into parts
+                # before we can decode it. If it's another header
+                # such as Subject, we can't do that.
+                if header_wanted.startswith("From") \
+                        or header_wanted.startswith("To") \
+                        or header_wanted.startswith("Cc") \
+                        or header_wanted.startswith("Bcc"):
+                    pieces = email.utils.parseaddr(output)
+                    if pieces[0] or pieces[1]:
+                        output = header_wanted + ' ' + \
+                                 email.utils.formataddr(map(decode_piece,
+                                                            pieces))
+                    else:
+                        output += line
+                        print "parseaddr failed on", line,
 
             #sys.stdout.write("<<" + part[0] + '>>')
-            print output.strip()
+            if output:
+                print output.strip()
             if all :
                 output = ''
             else :
@@ -109,10 +119,10 @@ header_wanted = sys.argv[1]
 try :
     if len(sys.argv) > 2 :
         for filename in sys.argv[2:] :
-            decode_file(filename, sys.argv[1])
+            decode_file(filename, header_wanted)
     else :
         fil = sys.stdin
-        decode_file('-', sys.argv[1])
+        decode_file('-', header_wanted)
 except KeyboardInterrupt :
     sys.exit(1)
 
