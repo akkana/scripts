@@ -9,6 +9,8 @@ import sys, os
 import email
 import email.utils
 
+Debug = False
+
 progname = os.path.basename(sys.argv[0])
 Usage = """Usage: %s [-a] headername [filename]
 
@@ -38,7 +40,7 @@ def decode_piece(piece):
 
     return ret
 
-def decode_file(filename, header_wanted):
+def decode_file(filename, header_wanted, all=False):
     if filename == '-':
         fil = sys.stdin
     else:
@@ -51,27 +53,31 @@ def decode_file(filename, header_wanted):
     output = ''
     found_something = False
     for line in fil:
-        print "line:", line
+        # if Debug:
+        #     print "line:", line
         # If it matches the header we seek, or if we've already started
         # matching the header and we're looking for continuation lines,
         # build up our string:
         for header_wanted in headers:
-            print "=== looking for", header_wanted
+            # if Debug:
+            #     print "=== looking for", header_wanted
             if (not output and line.startswith(header_wanted)) \
                or (output and (line.startswith(' ') or line.startswith('\t'))):
                 # We have a match! But we may need to read multiple lines,
                 # since one header can be split over several lines.
                 found_something = True
+                if Debug:
+                    print "\nFound something:", line
+                    print "  which decodes to:", decode_piece(line.strip())
 
                 # Strip output because we don't want the final newline.
                 # But add a space if this is a continuation.
                 if output:
                     output += ' '
-                output += decode_piece(line.strip())
 
-            elif output:
-                # if we've already matched the header, and this isn't a
-                # continuation line, then we're done. Print and exit.
+                thispiece = decode_piece(line.strip())
+                if Debug:
+                    print "decode_piece returned: '%s'" % thispiece
 
                 # If the header is an address, we have to split it into parts
                 # before we can decode it. If it's another header
@@ -80,23 +86,38 @@ def decode_file(filename, header_wanted):
                         or header_wanted.startswith("To") \
                         or header_wanted.startswith("Cc") \
                         or header_wanted.startswith("Bcc"):
-                    pieces = email.utils.parseaddr(output)
+                    pieces = email.utils.parseaddr(thispiece)
                     if pieces[0] or pieces[1]:
-                        output = header_wanted + ' ' + \
-                                 email.utils.formataddr(map(decode_piece,
-                                                            pieces))
+                        if Debug:
+                            print "formataddr says: '%s'" % \
+                                email.utils.formataddr(map(decode_piece, pieces)).strip()
+                        output += header_wanted + ' ' + \
+                                  email.utils.formataddr(map(decode_piece,
+                                                             pieces)).strip()
                     else:
-                        output += line
-                        print "parseaddr failed on", line,
+                        output += thispiece
+                        print "parseaddr failed on", thispiece,
 
-            #sys.stdout.write("<<" + part[0] + '>>')
-            if output:
+                else:
+                    output += thispiece
+                if Debug:
+                    print "Now output is ---%s---" % output
+
+            elif output:
+                # if we've already matched the header, and this isn't a
+                # continuation line, then we're done. Print and exit.
+                if Debug:
+                    print "output:", output
+                    print "stripped output:",
                 print output.strip()
-            if all:
-                output = ''
-            else:
-                print "exiting"
-                sys.exit(0)
+                if all:
+                    output = ''
+                else:
+                    sys.exit(0)
+    if output:
+        if Debug:
+            print "final output:",
+        print output.strip()
 
     # If we get here, we never matched a header,
     # or ended with a continuation line.
@@ -121,7 +142,7 @@ header_wanted = sys.argv[1]
 try:
     if len(sys.argv) > 2:
         for filename in sys.argv[2:]:
-            decode_file(filename, header_wanted)
+            decode_file(filename, header_wanted, all)
     else:
         fil = sys.stdin
         decode_file('-', header_wanted)
