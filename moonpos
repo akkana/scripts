@@ -34,8 +34,19 @@ def discont_range(start, end, max):
         return range(start, end)
     return range(start, max) + range(0, end)
 
+def time_zone_offset(ephemdate):
+    '''Get the timezone offset at a given ephem.date
+    '''
+    # First get the time zone offset. We'll assume the offset
+    # is the same all day. That might make us be off by an hour
+    # on start and end times for a few hours twice a year.
+    local_hour = ephem.localtime(ephemdate).hour
+    gmt_hour = ephemdate.tuple()[3]
+    return (gmt_hour - local_hour) % 24
+    # print "tzoffset:", tzoffset, "=", gmt_hour, "-", local_hour
+
 def when_at_position(body, observer, targetalt, targetaz,
-                     starttime, endtime,
+                     starttime, endtime, startdate=None, numdays=0,
                      slop=5., minphase=0, maxphase=100):
     '''When will body be at the alt-az position during the time window,
        in the year following the date of the observer passed in
@@ -49,6 +60,8 @@ def when_at_position(body, observer, targetalt, targetaz,
                                     on 24-hour clock, e.g. 18 for 6pm.
         endtime(int)             -- Latest hour of day to check, GMT.
                                     Will be ignored if starttime is a string.
+        startdate                -- start datetime (default today)
+        numdays                  -- # days to calculate (default 1 year)
         slop (Optional)          -- How much slop to allow in the alt/az
                                     positions each way (float, decimal degrees).
         minphase (Optional, int) -- What phase are we interested in (% illum)
@@ -67,14 +80,25 @@ def when_at_position(body, observer, targetalt, targetaz,
                                   100, 20)
     '''
 
-    start_triple = observer.date.triple()
+    # PyEphem triples are (year, month, day)
+    if not startdate:
+        start_triple = observer.date.triple()
+    else:
+        start_triple = (startdate.year, startdate.month, startdate.day)
     start_triple = (start_triple[0], start_triple[1], int(start_triple[2]))
+    # Can't just change st[2], it's a tuple, not a list
 
     results = []
 
     observer.date = ephem.Date(start_triple + (starttime, 0, 0))
-    end_date = ephem.Date((start_triple[0]+1, start_triple[1], start_triple[2],
-                           starttime, 0, 0))
+    if numdays:
+        end_date = ephem.Date((start_triple[0], start_triple[1],
+                               start_triple[2] + ephem.hour * numdays * 24,
+                               starttime, 0, 0))
+    else:
+        end_date = ephem.Date((start_triple[0]+1, start_triple[1],
+                               start_triple[2],
+                               starttime, 0, 0))
 
     while observer.date <= end_date:
         # At the beginning of each loop, observer.date is set to
@@ -83,13 +107,7 @@ def when_at_position(body, observer, targetalt, targetaz,
         # then set observer.date to the starttime on the next day
         # and continue.
 
-        # First get the time zone offset. We'll assume the offset
-        # is the same all day. That might make us be off by an hour
-        # on start and end times for a few hours twice a year.
-        local_hour = ephem.localtime(observer.date).hour
-        gmt_hour = observer.date.tuple()[3]
-        tzoffset = (gmt_hour - local_hour) % 24
-        # print "tzoffset:", tzoffset, "=", gmt_hour, "-", local_hour
+        tzoffset = time_zone_offset(observer.date)
 
         daytriple = observer.date.triple()
         for hour in discont_range(starttime+tzoffset, endtime+tzoffset+1, 24):
@@ -104,7 +122,8 @@ def when_at_position(body, observer, targetalt, targetaz,
 
     return results
 
-def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
+def when_rise_set_at_position(body, observer, targetaz, rise_set,
+                              startdate=None, slop=5.,
                               minphase=0, maxphase=100):
     '''When will body rise at the target azimuth
        in the year following the date of the observer passed in
@@ -116,17 +135,28 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set, slop=5.,
         rise_set(string)         -- "rise" or "set"
         slop (Optional)          -- How much slop to allow in the alt/az
                                     positions each way (float, decimal degrees).
+        startdate                -- start datetime (default: today)
+        numdays                  -- # days to calculate (default 1 year)
         minphase (Optional, int) -- What phase are we interested in (% illum)
         maxphase (Optional, int) -- What phase are we interested in (% illum)
     Returns:
         List of [[date, alt, az, phase], ...]
     '''
-    start_triple = observer.date.triple()
+    if not startdate:
+        start_triple = observer.date.triple()
+    else:
+        start_triple = (startdate.year, startdate.month, startdate.day)
     start_triple = (start_triple[0], start_triple[1], int(start_triple[2]))
     observer.date = ephem.Date((start_triple[0], start_triple[1],
                                 start_triple[2], 0, 0, 0))
-    end_date = ephem.Date((start_triple[0]+1, start_triple[1], start_triple[2],
-                           0, 0, 0))
+    if numdays:
+        end_date = ephem.Date((start_triple[0], start_triple[1],
+                               start_triple[2] + ephem.hour * numdays * 24,
+                               starttime, 0, 0))
+    else:
+        end_date = ephem.Date((start_triple[0]+1, start_triple[1],
+                               start_triple[2],
+                               starttime, 0, 0))
 
     results = []
 
@@ -154,10 +184,14 @@ def Usage():
     print """Predict when the moon will rise, set or be at a specific position.
 Usage: %s [-f] alt az start_hour end_hour
        %s [-f] [rise|set] azimuth
+       %s [date time]
 If -f is specified, only full or nearly-full moons will be considered;
 -p sets minimum percent illuminated, +p sets maximum.
+-s YYYY-MM-DD starts from another date, not now.
+-d days: number of days to calculate
+-m months: number of months to calculate
 Hours are specified in local time.
-""" % (progname, progname)
+""" % (progname, progname, progname)
     sys.exit(0)
 
 if __name__ == '__main__':
@@ -168,6 +202,8 @@ if __name__ == '__main__':
     maxphase = 100
     phasestr = "moon"
     MIN_FULL = 90
+    startdate = None
+    days = 0
     while True:
         if args[0] == '-f':
             minphase = MIN_FULL
@@ -180,6 +216,15 @@ if __name__ == '__main__':
         elif args[0] == '+p':
             maxphase = int(args[1])
             phasestr = "moon with at most %d%% illuminated" % maxphase
+            args = args[2:]
+        elif args[0] == '-s':
+            startdate = datetime.datetime.strptime(args[1], '%Y-%m-%d')
+            args = args[2:]
+        elif args[0] == '-d':
+            days = int(args[1])
+            args = args[2:]
+        elif args[0] == '-m':
+            days = int(args[1]) * 31
             args = args[2:]
         else:
             break
@@ -197,18 +242,41 @@ if __name__ == '__main__':
         phasestr = "moon with at most %d%% illuminated" % maxphase
 
     if len(args) == 2:
-        if args[0] != "rise" and args[0] != "set":
-            Usage()
-        try:
-            az = float(args[1])
-        except ValueError:
-            print "Error: azimuth must be a number, not %s" % args[1]
-            print
-            Usage()
-        results = when_rise_set_at_position(ephem.Moon(), observer,
-                                            az, args[0], 5, minphase, maxphase)
-        print """The %s will %s at azimuth %.1f during the next year at these times:
+        if args[0] == "rise" or args[0] == "set":
+            try:
+                az = float(args[1])
+            except ValueError:
+                print "Error: azimuth must be a number, not %s" % args[1]
+                print
+                Usage()
+            results = when_rise_set_at_position(ephem.Moon(), observer,
+                                                az, args[0], startdate, days,
+                                                5, minphase, maxphase)
+            print """The %s will %s at azimuth %.1f during the next year at these times:
 """ % (phasestr, args[0], az)
+            sys.exit(0)
+        else:
+            try:
+                # set observer.date so that the date passed in is
+                # the correct localtime. For that we need the timezone.
+                day = ephem.Date(datetime.datetime.strptime(args[0],
+                                                            "%Y-%m-%d"))
+                tzoffset = time_zone_offset(day)
+                hour, minute = map(float, args[1].split(':'))
+                trip = day.triple()
+                observer.date = (trip[0], trip[1], trip[2],
+                                 hour+tzoffset, minute, 0)
+
+                body = ephem.Moon()
+                body.compute(observer)
+                az = body.az * DEGREES
+                print "The %s is at %.1f alt, %.1f az at phase %.1f at %s" % \
+                    (body.name, body.alt * DEGREES, body.az * DEGREES,
+                     body.phase,
+                     ephem.localtime(observer.date).strftime("%Y-%m-%d %H:%M"))
+                sys.exit(0)
+            except SystemError:
+                Usage()
 
     elif len(args) == 4:
         try:
@@ -227,6 +295,7 @@ if __name__ == '__main__':
             Usage()
         results = when_at_position(ephem.Moon(), observer,
                                    alt, az, start_hour, end_hour,
+                                   startdate, days,
                                    5, minphase, maxphase)
         print """The %s will be at %.1f, %.1f 
 between %dh and %dh during the next year at these times:
