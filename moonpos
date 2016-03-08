@@ -90,7 +90,13 @@ def when_at_position(body, observer, targetalt, targetaz,
 
     results = []
 
-    observer.date = ephem.Date(start_triple + (starttime, 0, 0))
+    # Fix the observer's starting date:
+    if startdate:
+        observer.date = ephem.Date(start_triple + (starttime, 0, 0))
+    else:
+        observer.date = ephem.Date
+
+    # Find the end date, which is an ephem.date.
     if numdays:
         end_date = ephem.Date((start_triple[0], start_triple[1],
                                start_triple[2] + ephem.hour * numdays * 24,
@@ -100,25 +106,69 @@ def when_at_position(body, observer, targetalt, targetaz,
                                start_triple[2],
                                starttime, 0, 0))
 
+    def in_window(body, observer):
+        body.compute(observer)
+        alt = body.alt * DEGREES
+        az = body.az * DEGREES
+        if alt >= targetalt - slop and alt <= targetalt + slop \
+           and az >= targetaz - slop and az <= targetaz + slop:
+            if (body.phase > minphase and body.phase < maxphase):
+                # print "In window at", observer.date
+                return True
+            # else:
+            #     print "In window but not in phase at", observer.date
+        # else:
+        #     print "NOT in window at", observer.date
+        return False
+
+    # How many ephem.date ticks long is the window of time we're considering?
+    if starttime < endtime:
+        window_hours = endtime - starttime
+    else:
+        window_hours = starttime + 24 - endtime
+    window_hours *= ephem.hour
+
+    # For now, loop by half-hour chunks
+    granularity = ephem.hour / 2
+
     while observer.date <= end_date:
         # At the beginning of each loop, observer.date is set to
-        # the starttime on a new day.
+        # the start hour on a new day -- except that it's start hour
+        # in GMT, not localtime, so we have to correct for that.
         # We need to loop through to the endtime on the same day,
         # then set observer.date to the starttime on the next day
         # and continue.
+        # print "Day loop:", observer.date
+        start_date_today = observer.date
 
+        # tzoffset is dependent on date, so get ot for this day.
+        # XXX We might be off by a day in when we apply the tzoffset, though.
         tzoffset = time_zone_offset(observer.date)
+        observer.date += ephem.hour * tzoffset
 
-        daytriple = observer.date.triple()
-        for hour in discont_range(starttime+tzoffset, endtime+tzoffset+1, 24):
-            observer.date = ephem.Date(daytriple + (hour, 0, 0))
-            body.compute(observer)
-            alt = body.alt * DEGREES
-            az = body.az * DEGREES
-            if alt >= targetalt - slop and alt <= targetalt + slop \
-               and az >= targetaz - slop and az <= targetaz + slop:
-                if (body.phase > minphase and body.phase < maxphase):
-                    results.append([observer.date, alt, az, body.phase])
+        appearance = None
+        disappearance = None
+
+        # When will we stop this loop?
+        time_window_end = observer.date + window_hours
+        while observer.date < time_window_end:
+            # print "Inner loop:", observer.date
+            if not appearance and in_window(body, observer):
+                appearance = observer.date
+            elif appearance and not disappearance and not in_window(body,
+                                                                    observer):
+                disappearance = observer.date
+                break    # out of the inner loop
+            observer.date += granularity
+
+        if appearance:              # it appeared sometime during the window
+            if not disappearance:   # it was still visible at window's end
+                disappearance = end_date
+
+            results.append([appearance, disappearance, alt, az, body.phase])
+
+        # Set to start time in GMT on the following day
+        observer.date = start_date_today + (ephem.hour * 24)
 
     return results
 
@@ -178,6 +228,14 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set,
         observer.date += ephem.hour
 
     return results
+
+def timerange_str(ephemdate1, ephemdate2):
+    '''Print a pretty time range in localtime for two ephem.date objects
+    '''
+    # Convert to localtime datetime objects
+    lt1 = ephem.localtime(ephemdate1)
+    lt2 = ephem.localtime(ephemdate2)
+    return "%s - %s" % (lt1.strftime("%Y-%m-%d %H:%M"), lt2.strftime("%H:%M"))
 
 def Usage():
     progname = os.path.basename(sys.argv[0])
@@ -242,6 +300,9 @@ if __name__ == '__main__':
         phasestr = "moon with at most %d%% illuminated" % maxphase
 
     if len(args) == 2:
+        #
+        # Predict rise/set times:
+        #
         if args[0] == "rise" or args[0] == "set":
             try:
                 az = float(args[1])
@@ -255,7 +316,11 @@ if __name__ == '__main__':
             print """The %s will %s at azimuth %.1f during the next year at these times:
 """ % (phasestr, args[0], az)
             sys.exit(0)
+
         else:
+            #
+            # Predict the moon's position at a single given time:
+            #
             try:
                 # set observer.date so that the date passed in is
                 # the correct localtime. For that we need the timezone.
@@ -279,6 +344,9 @@ if __name__ == '__main__':
                 Usage()
 
     elif len(args) == 4:
+        #
+        # Predict when the moon will be in a specific alt/az window:
+        #
         try:
             alt = float(args[0])
             az = float(args[1])
@@ -301,17 +369,16 @@ if __name__ == '__main__':
 between %dh and %dh during the next year at these times:
 """ % (phasestr, alt, az, start_hour, end_hour)
 
+        print "%26s  %5s  %5s    %s" % ("Date/time", "alt", "az", "phase")
+        for r in results:
+            if len(r) > 4 and r[4]:
+                phase = "Illuminated: %2d%%" % r[3]
+            else:
+                phase = 'x'
+
+            # pargs = tuple(r[0:3] + [phase])
+            print "%26s   %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
+                                               r[2], r[3], phase)
+
     else:
         Usage()
-
-    print "%26s  %5s  %5s    %s" % ("Date/time", "alt", "az", "phase")
-    for r in results:
-        if len(r) > 3 and r[3]:
-            phase = "Illuminated: %2d%%" % r[3]
-        else:
-            phase = 'x'
-        # pargs = tuple(r[0:3] + [phase])
-        pargs = (ephem.localtime(r[0]).ctime(), r[1], r[2], phase)
-        print "%26s  %5.1f  %5.1f    %s" % pargs
-
-
