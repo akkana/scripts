@@ -129,7 +129,14 @@ def when_at_position(body, observer, targetalt, targetaz,
     window_hours *= ephem.hour
 
     # For now, loop by half-hour chunks
-    granularity = ephem.hour / 2
+    # Half an hour will tell us whether the moon is appearing at all:
+    LARGE_GRANULARITY = ephem.hour / 2
+    # but once we find an appearance, we'd like to know the times
+    # with more precision:
+    SMALL_GRANULARITY = ephem.minute * 5
+
+    # For the main loop, start with the less precise times.
+    granularity = LARGE_GRANULARITY
 
     while observer.date <= end_date:
         # At the beginning of each loop, observer.date is set to
@@ -149,15 +156,22 @@ def when_at_position(body, observer, targetalt, targetaz,
         appearance = None
         disappearance = None
 
-        # When will we stop this loop?
+        # When will we stop the inner loop?
         time_window_end = observer.date + window_hours
         while observer.date < time_window_end:
             # print "Inner loop:", observer.date
             if not appearance and in_window(body, observer):
-                appearance = observer.date
+                # It appeared! But if we're still using large granularity,
+                # switch to small for a more precise prediction:
+                if granularity == LARGE_GRANULARITY:
+                    observer.date -= granularity
+                    granularity = SMALL_GRANULARITY
+                else:
+                    appearance = observer.date
             elif appearance and not disappearance and not in_window(body,
                                                                     observer):
                 disappearance = observer.date
+                granularity = LARGE_GRANULARITY
                 break    # out of the inner loop
             observer.date += granularity
 
@@ -365,19 +379,23 @@ if __name__ == '__main__':
                                    alt, az, start_hour, end_hour,
                                    startdate, days,
                                    5, minphase, maxphase)
-        print """The %s will be at %.1f, %.1f 
-between %dh and %dh during the next year at these times:
-""" % (phasestr, alt, az, start_hour, end_hour)
+        if days:
+            timerange = "%d days" % days
+        else:
+            timerange = "year"
+        print """The %s will be near %.1f, %.1f 
+between %dh and %dh during the next %s at these times:
+""" % (phasestr, alt, az, start_hour, end_hour, timerange)
 
-        print "%26s  %5s  %5s    %s" % ("Date/time", "alt", "az", "phase")
+        print "%26s  %5s  %5s  %s" % ("Date/time range", "Alt", "Az", "Phase")
         for r in results:
             if len(r) > 4 and r[4]:
-                phase = "Illuminated: %2d%%" % r[3]
+                phase = "%2d%% illuminated" % r[4]
             else:
                 phase = 'x'
 
             # pargs = tuple(r[0:3] + [phase])
-            print "%26s   %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
+            print "%26s  %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
                                                r[2], r[3], phase)
 
     else:
