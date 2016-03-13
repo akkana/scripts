@@ -64,8 +64,10 @@ if __name__ == "__main__":
 
     if sys.argv[1][0] == '-':
         b = cur_brightness - float(sys.argv[1][1:])
+        if b < 0: b = 0
     elif sys.argv[1][0] == '+':
         b = cur_brightness + float(sys.argv[1][1:])
+        if b > 1: b = 1
     else:
         b = float(sys.argv[1])
 
