@@ -114,7 +114,11 @@ def plot_funds(tickerlist, initial, start, end):
         # come out zero. Catching a RuntimeWarning isn't as simple as try;
         # http://stackoverflow.com/questions/10519237/python-how-to-avoid-runtimewarning-in-function-definition
         # http://stackoverflow.com/questions/9349434/how-do-i-check-for-numeric-overflow-without-getting-a-warning-in-python
-        fund_data = yahoo(ticker, start, end, asobject=True)
+        try:
+            fund_data = yahoo(ticker, start, end, asobject=True)
+        except:
+            print "Couldn't get data for", ticker
+            continue
 
         # Guard against failures of quotes_historical_yahoo;
         # without this check you'll see more uncatchable RuntimeWarnings.
