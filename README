@@ -291,6 +291,9 @@ wordview:
     Convert a doc or docx file to html, and call a new firefox window on it.
     Predecessor to (and simpler than) viewmailattachments.
 
+xbright:
+    Adjust brightness of an X11 display up or down using xrandr.
+
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
     the xlrd package to parse the spreadsheet.
