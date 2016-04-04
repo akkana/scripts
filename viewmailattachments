@@ -234,7 +234,7 @@ def view_message_attachments(fp, tmpdir):
             fp = open(htmlfile, 'wb')
             htmlsrc = part.get_payload(decode=True)
 
-            soup = BeautifulSoup(htmlsrc)
+            soup = BeautifulSoup(htmlsrc, "lxml")
 
             # Substitute filenames for CIDs:
             for tag in soup.body.find_all("img", src=True):
