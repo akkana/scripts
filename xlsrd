@@ -5,10 +5,10 @@
 
 import sys, xlrd
 
-def print_sheet(sheetname, sh) :
+def print_sheet(sheetname, sh):
     # Gnumeric makes null sheets, with 0 rows and 0 columns.
     # Guard against division by zero in gnumeric spreadsheets:
-    if not sh or sh.ncols <= 0 :
+    if not sh or sh.ncols <= 0:
         print "Null sheet", sheetname
         return
 
@@ -21,32 +21,32 @@ def print_sheet(sheetname, sh) :
 
     # Get max len for each col
     maxstr = [1] * sh.ncols
-    for rownum in range(sh.nrows) :
-        for colnum in range(sh.ncols) :
+    for rownum in range(sh.nrows):
+        for colnum in range(sh.ncols):
             # Figure out how many characters this cell needs.
             # This would be easy except for Python's 
             val = sh.cell(rownum, colnum).value
 
             # This gets lots of null strings, so filter them out:
-            if not val :
+            if not val:
                 continue
 
             #print "type:", type(val), val
             slen = len(unicode(val))
-            #if slen > maxlen : slen = maxlen
-            if slen > maxstr[colnum] :
+            #if slen > maxlen: slen = maxlen
+            if slen > maxstr[colnum]:
                 maxstr[colnum] = slen
 
     fmt = ""
-    for colnum in range(sh.ncols) :
+    for colnum in range(sh.ncols):
         fmt += "%%-%ds" % (maxstr[colnum] + 1)
 
-    for rownum in range(sh.nrows) :
+    for rownum in range(sh.nrows):
         print fmt % tuple(map(unicode, sh.row_values(rownum)))
 
-for filename in sys.argv[1:] :
+for filename in sys.argv[1:]:
     wb = xlrd.open_workbook(filename)
     #sh = wb.sheet_by_index(0)
-    for sheetname in wb.sheet_names() :
+    for sheetname in wb.sheet_names():
         print_sheet(sheetname, wb.sheet_by_name(sheetname))
 
