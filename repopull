@@ -1,0 +1,109 @@
+#!/usr/bin/env python
+
+# Update a git repo so that it uses ssh for the pushurl
+# but http for pulling, so you don't need a password to pull.
+# Unfortunately git uses lots of different syntaxes for the same thing.
+# Examples:
+#   pushurl = ssh://git.gnome.org/git/gimp
+#   url = git://git.gnome.org/gimp
+# OR
+#   pushurl = git@github.com:akkana/scripts.git
+#   url = https://github.com/akkana/scripts.git
+# OR
+#   pushurl = github.com:akkana/hexchat.git
+#   url = https://github.com/akkana/hexchat.git
+#
+# Provide the repo name; the lines are in reponame/.git/config
+#
+# Share and enjoy under the GPL v2 or later.
+
+import sys, os
+import re
+
+def repopull(repoloc):
+    configfile = os.path.join(repoloc, ".git", "config")
+    if not os.path.exists(configfile):
+        print configfile, "doesn't exist"
+        return
+
+    fp = open(configfile)
+    pushurl = None
+    urlline = None
+    for line in fp:
+        # print "Line:", line,
+        if re.match('^\s*pushurl\s*=\s*(\S*)\s$', line):
+            print repoloc, "already has a pushurl! Bailing."
+            return
+        m = re.match('^(\s*)url\s*=\s*(\S*)\s$', line)
+        if m:
+            if pushurl:
+                print "More than one url = line in %s! Bailing." % repoloc
+                return
+            whitespace = m.group(1)
+            pushurl = m.group(2)
+            urlline = line
+    fp.close()
+    if not pushurl or not urlline:
+        print "Couldn't find a url = line in", repoloc
+        return
+
+    # Now we have a single url = line, and there was no pushurl = line.
+    # pushurl is just the original url (presumably the push one).
+    # Parse it. The two syntaxes I know are:
+    # url = ssh://git.gnome.org/git/reponame
+    # url = [git@]github.com:user/reponame.git
+    print "Found push url:", pushurl
+    if pushurl.startswith("http"):
+        print "url is not a push url.", pushurl
+        return
+    if pushurl.startswith("ssh://"):
+        # The only example I have of this is gimp/gnome,
+        # where   ssh://git.gnome.org/git/gimp
+        # maps to git://git.gnome.org/gimp
+        # Hope this is standard?
+        print "Using gnome syntax for", repoloc
+        parts = pushurl[6:].split('/')
+        parts.remove('git')
+        pullurl = 'git://' + '/'.join(parts)
+
+    else:
+        # Hope it's github syntax, [git@]github.com:user/reponame.git
+        # map to https://github.com/user/reponame.git
+        if ':' not in pushurl:
+            print "Can't parse", pushurl
+            return
+        host, path = pushurl.split(':')
+        if '@' in host:
+            host = host.split('@')[1]
+        pullurl = 'https://%s/%s' % (host, path)
+
+    print "pushurl:", pushurl
+    print "pullurl:", pullurl
+
+    # Supposedly we have all we need now.
+    configbak = configfile + ".bak"
+    os.rename(configfile, configbak)
+
+    fp = open(configbak)
+    ofp = open(configfile, "w")
+    for line in fp:
+        if line != urlline:
+            ofp.write(line)
+            continue
+
+        # It is the url line. Preserve the initial whitespace:
+        ofp.write(whitespace + "# " + line[len(whitespace):])
+        ofp.write(whitespace + "url = " + pullurl + '\n')
+        ofp.write(whitespace + "pushurl = " + pushurl + '\n')
+
+    ofp.close()
+    fp.close()
+    print "Wrote", configfile
+
+    # pushurl=$( egrep '^\s*url\s*=' $configfile | sed -e 's/^\s*url\s*=\s*//' )
+    # This should be something like git@github.com:akkana/hexchat.git
+    
+if __name__ == '__main__':
+    for repo in sys.argv[1:]:
+        repopull(repo)
+
