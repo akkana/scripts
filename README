@@ -209,6 +209,10 @@ readkey.py:
     Read a key press from the keyboard without waiting for a newline.
     For CLI programs: doesn't need X, tkintr, pygame or similar libs.
 
+repo-pullpush:
+    Modify a git repository, taking the existing URL, making that
+    the pushurl and adding a passwordless pull URL alongside it.
+
 serio:
     A proof-of-concept serial terminal app in Python.
     Don't take this seriously; it's not meant as a real app (yet?)
