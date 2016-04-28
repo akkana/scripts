@@ -30,11 +30,16 @@ from bs4 import BeautifulSoup
 USE_WVHTML_FOR_DOC = False
 CONVERT_PDF_TO_HTML = False
 
+# What browser to use:
+BROWSER = "firefox"
+# Browser argument to precede each new tab:
+BROWSER_NEWTAB_ARG = "-private-window"
+
 # Temporary for debugging:
 class mysubprocess:
     @staticmethod
     def call(arr):
-        # print "\n\n=================================\n=== Calling:", arr
+        print "\n\n=================================\n=== Calling:", arr
         subprocess.call(arr)
 
 def view_message_attachments(fp, tmpdir):
@@ -134,7 +139,7 @@ def view_message_attachments(fp, tmpdir):
     # for sf in subfiles:
     #     print sf
 
-    # Call up the firefox window right away,
+    # Call up the browser window right away,
     # so the user can see something is happening.
     # Firefox, alas, has no way from the commandline of calling up
     # a new private window with content, then replacing that content.
@@ -157,8 +162,12 @@ def view_message_attachments(fp, tmpdir):
     redirect_timeout = 3
     pleasewait_file = tmpdir + "/index.html"
     write_to_index(pleasewait_file, "Please wait ...", redirect_timeout, None)
-    mysubprocess.call(["firefox", "-private-window",
-                       "file://" + pleasewait_file])
+    if BROWSER_NEWTAB_ARG:
+        mysubprocess.call([BROWSER, BROWSER_NEWTAB_ARG,
+                           "file://" + pleasewait_file])
+    else:
+        mysubprocess.call([BROWSER, "file://" + pleasewait_file])
+
                        # "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."
                        # Use JS if we can figure out how to close or replace
                        # the "please wait" tab once we have content to show.
@@ -280,30 +289,26 @@ def view_message_attachments(fp, tmpdir):
             partfile = save_tmp_file(part)
             htmlfiles.append(partfile)
 
-    # Done processing attachments. Call firefox on everything.
+    # Done processing attachments. Call the browser for everything.
     if htmlfiles:
         # For the first URL, just put a redirect in
         write_to_index(pleasewait_file,
                        "Redirecting to file://" + htmlfiles[0],
                        0, "file://" + htmlfiles[0])
 
-        # It may take the whole timeout before firefox actually redirects
-        # to the new page, so wait it out:
-        # XXX Actually we may not need this, we can probably start
-        # loading the other tabs right away.
-        # time.sleep(redirect_timeout)
-
-        # mysubprocess.call(["firefox", htmlfiles[0]])
-        # mysubprocess.call(["firefox", "-private-window", htmlfiles[0]])
         for f in htmlfiles[1:]:
             # If we don't wait for the new window to pop up before
             # calling new-tab, bad things will happen: the document
             # may load in a new tab in the old window and THEN pop up
             # an unwanted third window. Go firefox.
+            # Not clear whether this is true for all browsers.
             time.sleep(1)
-            mysubprocess.call(["firefox", "-private-window", "file://" + f])
+            if BROWSER_NEWTAB_ARG:
+                mysubprocess.call([BROWSER, BROWSER_NEWTAB_ARG, "file://" + f])
+            else:
+                mysubprocess.call([BROWSER, "file://" + f])
 
-    # Wait a while to make sure firefox has loads the imgaes, then clean up.
+    # Wait a while to make sure the browser has loads the imgaes, then clean up.
     # time.sleep(6)
     # shutil.rmtree(tmpdir)
 
