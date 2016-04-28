@@ -15,6 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+# This is adapted from /usr/share/doc/python-webkit/examples/browser.py
+
 # TODO:
 #
 # * fix tab relabelling
@@ -24,7 +26,7 @@
 
 from gettext import gettext as _
 
-import sys
+import sys, os
 import gobject
 import gtk
 import pango
@@ -323,29 +325,29 @@ class WebToolbar(gtk.Toolbar):
 
 class WebBrowser(gtk.Window):
 
-    def __init__(self, url=None):
+    def __init__(self):
         gtk.Window.__init__(self)
 
         toolbar = WebToolbar()
-        content_tabs = ContentPane()
-        content_tabs.connect("focus-view-title-changed", self._title_changed_cb, toolbar)
-        content_tabs.connect("new-window-requested", self._new_window_requested_cb)
-        toolbar.connect("load-requested", load_requested_cb, content_tabs)
-        toolbar.connect("new-tab-requested", new_tab_requested_cb, content_tabs)
-        toolbar.connect("view-source-mode-requested", view_source_mode_requested_cb, content_tabs)
+        self.content_tabs = ContentPane()
+        self.content_tabs.connect("focus-view-title-changed", self._title_changed_cb, toolbar)
+        self.content_tabs.connect("new-window-requested", self._new_window_requested_cb)
+        toolbar.connect("load-requested", load_requested_cb, self.content_tabs)
+        toolbar.connect("new-tab-requested", new_tab_requested_cb, self.content_tabs)
+        toolbar.connect("view-source-mode-requested", view_source_mode_requested_cb, self.content_tabs)
 
         vbox = gtk.VBox(spacing=1)
         vbox.pack_start(toolbar, expand=False, fill=False)
-        vbox.pack_start(content_tabs)
+        vbox.pack_start(self.content_tabs)
 
         self.add(vbox)
         self.set_default_size(1024, 768)
-        self.connect('destroy', destroy_cb, content_tabs)
+        self.connect('destroy', destroy_cb, self.content_tabs)
 
         self.show_all()
 
-        print "Loading a new tab with", url
-        content_tabs.new_tab(url)
+    def new_tab(self, url):
+        self.content_tabs.new_tab(url)
 
     def _new_window_requested_cb (self, content_pane, view):
         features = view.get_window_features()
@@ -456,11 +458,21 @@ def get_from_clipboard(which=gtk.gdk.SELECTION_PRIMARY):
     return clip.wait_for_text()
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 2:
-        url = sys.argv[1]
-    else:
+    # Return control to the shell:
+    rc = os.fork()
+    if rc:
+        sys.exit(0)
+
+    webbrowser = WebBrowser()
+
+    if len(sys.argv) < 2:
         url = get_from_clipboard(gtk.gdk.SELECTION_PRIMARY)
         if not url:
             url = get_from_clipboard(gtk.gdk.SELECTION_CLIPBOARD)
-    webbrowser = WebBrowser(url)
+        webbrowser.new_tab(url)
+
+    else:
+        for url in sys.argv[1:]:
+            webbrowser.new_tab(url)
+
     gtk.main()
