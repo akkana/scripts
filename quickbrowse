@@ -32,12 +32,17 @@ import gtk
 import pango
 import webkit
 # from inspector import Inspector
+import signal
 
 ABOUT_PAGE = """
 <html><head><title>Hello, world</title></head><body>
 <h1>Hello, world!</h1>
 </body></html>
 """
+
+# The file used to remotely trigger the browser to open more tabs.
+# The %d will be the process ID of the running browser.
+URL_FILE = "/tmp/quickbrowse-urls-%d"
 
 class BrowserPage(webkit.WebView):
 
@@ -202,7 +207,6 @@ class ContentPane (gtk.Notebook):
 
         # load the content
         self._hovered_uri = None
-        print "Loading", url
         if url:
             web_view.load_uri(url)
         else:
@@ -330,11 +334,16 @@ class WebBrowser(gtk.Window):
 
         toolbar = WebToolbar()
         self.content_tabs = ContentPane()
-        self.content_tabs.connect("focus-view-title-changed", self._title_changed_cb, toolbar)
-        self.content_tabs.connect("new-window-requested", self._new_window_requested_cb)
-        toolbar.connect("load-requested", load_requested_cb, self.content_tabs)
-        toolbar.connect("new-tab-requested", new_tab_requested_cb, self.content_tabs)
-        toolbar.connect("view-source-mode-requested", view_source_mode_requested_cb, self.content_tabs)
+        self.content_tabs.connect("focus-view-title-changed",
+                                  self._title_changed_cb, toolbar)
+        self.content_tabs.connect("new-window-requested",
+                                  self._new_window_requested_cb)
+        toolbar.connect("load-requested", load_requested_cb,
+                        self.content_tabs)
+        toolbar.connect("new-tab-requested", new_tab_requested_cb,
+                        self.content_tabs)
+        toolbar.connect("view-source-mode-requested",
+                        view_source_mode_requested_cb, self.content_tabs)
 
         vbox = gtk.VBox(spacing=1)
         vbox.pack_start(toolbar, expand=False, fill=False)
@@ -348,6 +357,11 @@ class WebBrowser(gtk.Window):
 
     def new_tab(self, url):
         self.content_tabs.new_tab(url)
+
+    def signal_handler(self, signal, frame):
+        with open(URL_FILE % os.getpid()) as url_fp:
+            for url in url_fp:
+                self.new_tab(url.strip())
 
     def _new_window_requested_cb (self, content_pane, view):
         features = view.get_window_features()
@@ -373,7 +387,7 @@ class WebBrowser(gtk.Window):
     def _title_changed_cb (self, tabbed_pane, frame, title, toolbar):
         if not title:
            title = frame.get_uri()
-        self.set_title(_("PyWebKitGtk - %s") % title)
+        self.set_title(_("quickbrowse - %s") % title)
         load_committed_cb(tabbed_pane, frame, toolbar)
 
 # event handlers
@@ -457,22 +471,86 @@ def get_from_clipboard(which=gtk.gdk.SELECTION_PRIMARY):
         return None
     return clip.wait_for_text()
 
-if __name__ == "__main__":
-    # Return control to the shell:
-    rc = os.fork()
-    if rc:
-        sys.exit(0)
+def get_procname(procargs):
+    '''Return the program name: either the first commandline argument,
+       or, if that argument is some variant of "python", the second.
+    '''
+    basearg = os.path.basename(procargs[0])
+    if basearg == 'python' or basearg == 'python2' \
+       or basearg.startswith('python2.'):
+        basearg = os.path.basename(procargs[1])
+    return basearg
 
-    webbrowser = WebBrowser()
+def find_proc_by_name(name):
+    """Looks for a process with the given basename, ignoring a possible
+       "python" prefix in case it's another Python script.
+       Will ignore the current running process.
+       Returns the pid, or None.
+    """
+    PROCDIR = '/proc'
+    for proc in os.listdir(PROCDIR):
+        if not proc[0].isdigit():
+            continue
+        # Race condition: processes can come and go, so we may not be
+        # able to open something just because it was there when we
+        # did the listdir.
+        try:
+            with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
+                procargs = procfp.read().split('\0')
+                basearg = get_procname(procargs)
+                if basearg == name and int(proc) != os.getpid():
+                    return int(proc)
+        except Exception, e:
+            print "exception", e
+            pass
+    print "Didn't find a %s process" % name
+    return None
+
+if __name__ == "__main__":
+    SIGNAL = signal.SIGUSR1
+    args = sys.argv[1:]
 
     if len(sys.argv) < 2:
         url = get_from_clipboard(gtk.gdk.SELECTION_PRIMARY)
         if not url:
             url = get_from_clipboard(gtk.gdk.SELECTION_CLIPBOARD)
-        webbrowser.new_tab(url)
+
+        if url:
+            urls = [ url ]
+        else:
+            urls = []
 
     else:
-        for url in sys.argv[1:]:
+        urls = sys.argv[1:]
+
+    if args and args[0] == "--new-tab":
+        # Try to use an existing instance of quickbrowse
+        # instead of creating a new window.
+        urls = args[1:]
+        progname = get_procname(sys.argv)
+        pid = find_proc_by_name(progname)
+        if not pid:
+            sys.exit(1)
+
+        # Create the file of URLs:
+        with open(URL_FILE % pid, 'w') as url_fp:
+            for url in urls:
+                print >>url_fp, url
+
+        os.kill(int(pid), SIGNAL)
+
+    else:
+        # Return control to the shell before creating the window:
+        rc = os.fork()
+        if rc:
+            sys.exit(0)
+
+        webbrowser = WebBrowser()
+
+        for url in urls:
             webbrowser.new_tab(url)
 
-    gtk.main()
+        # Handle SIGUSR1 signal so we can be signalled to open other tabs:
+        signal.signal(SIGNAL, webbrowser.signal_handler)
+
+        gtk.main()

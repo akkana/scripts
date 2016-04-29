@@ -31,9 +31,11 @@ USE_WVHTML_FOR_DOC = False
 CONVERT_PDF_TO_HTML = False
 
 # What browser to use:
-BROWSER = "firefox"
-# Browser argument to precede each new tab:
-BROWSER_NEWTAB_ARG = "-private-window"
+# BROWSER = "firefox"
+BROWSER = "quickbrowse"
+# Browser argument to precede new tabs:
+# BROWSER_NEWTAB_ARG = "-private-window"
+BROWSER_NEWTAB_ARG = "--new-tab"
 
 # Temporary for debugging:
 class mysubprocess:
