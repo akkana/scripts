@@ -108,7 +108,7 @@ class XchatSoundHandler :
 
         self.silenced_channels = SILENCED_CHANNELS
 
-        print "Loaded chatsounds.py"
+        print("Loaded chatsounds.py")
 
     def handle_message(self, word, word_eol, userdata):
         '''
@@ -139,18 +139,20 @@ class XchatSoundHandler :
         # For debugging. But this goes to the channel and makes things
         # hard to follow. Would be better to debug to a log file.
         if Debug :
-            print >>Debug, "Channel", channel, ", network", network, ":", line
+            print("Channel %s, network %s: %s" % (str(channel), str(network),
+                                                  str(line)), file=Debug)
 
         # Now, customize the rest as desired. Here are some examples:
 
         # Anyone addressing or mentioning my nick:
         if line.find(mynick) > 0 and word[0] != 'NickServ' :
             if Debug :
-                print >>Debug, ">>> chatsounds", userdata, \
-                    "network =", network, \
-                    "channel =", channel,
-                print >>Debug, ">>>>> Contains my nick!", userdata, \
-                    ">>", line
+                print(">>> chatsounds", userdata,
+                      "network =", network,
+                      "channel =", channel,
+                      ">>>>> Contains my nick!", userdata,
+                      line,
+                      file=Debug)
             self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             return xchat.EAT_NONE
 
@@ -162,28 +164,31 @@ class XchatSoundHandler :
             # In fact, if we could just delete those tabs it would be great.
             if network != 'Bitlbee' :
                 if Debug :
-                    print >>Debug, ">>> chatsounds", userdata, \
-                        "network =", network, \
-                        "channel =", channel
+                    print(">>> chatsounds", userdata,
+                          "network =", network,
+                          "channel =", channel,
+                          file=Debug)
                 self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             else:
                 if Debug :
-                    print >>Debug, ">>> chatsounds skipping bitlbee", \
-                        userdata, "network =", network, \
-                        "channel =", channel
+                    print(">>> chatsounds skipping bitlbee",
+                          userdata, "network =", network,
+                          "channel =", channel,
+                          file=Debug)
             return xchat.EAT_NONE
 
         # Private message:
         elif userdata.startswith("Private Message") :
             if channel == "root":
                 if Debug :
-                    print "Skipping channel==root"
+                    print("Skipping channel==root")
             else:
                 if Debug :
-                    print >>Debug, ">>> chatsounds private message!", \
-                        userdata, \
-                        "network =", network, \
-                        "channel =", channel
+                    print(">>> chatsounds private message!",
+                          userdata,
+                          "network =", network,
+                          "channel =", channel,
+                          file=Debug)
                 self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             return xchat.EAT_NONE
 
@@ -214,11 +219,11 @@ class XchatSoundHandler :
         if word[1] == 'silence' :
             if channel not in self.silenced_channels :
                 self.silenced_channels.append(channel)
-            print "chatsounds: silenced", channel, self.silenced_channels
+            print("chatsounds: silenced", channel, self.silenced_channels)
         elif word[1] == 'unsilence' :
             if channel in self.silenced_channels :
                 self.silenced_channels.remove(channel)
-            print "chatsounds: unsilenced", channel, self.silenced_channels
+            print("chatsounds: unsilenced", channel, self.silenced_channels)
 
         return xchat.EAT_ALL
 
