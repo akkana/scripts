@@ -42,7 +42,13 @@ def print_sheet(sheetname, sh):
         fmt += "%%-%ds" % (maxstr[colnum] + 1)
 
     for rownum in range(sh.nrows):
-        print fmt % tuple(map(unicode, sh.row_values(rownum)))
+        # Should get the charset from the environment, but it's not clear
+        # even that is enough. In practice, this works to stdout without
+        # needing the encode, but to pipe through grep or redirect to a
+        # file it needs the encode.
+        print (fmt % tuple(map(unicode,
+                   sh.row_values(rownum)))).encode(sys.getdefaultencoding(),
+                                                   'backslashreplace')
 
 for filename in sys.argv[1:]:
     wb = xlrd.open_workbook(filename)
