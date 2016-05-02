@@ -117,7 +117,7 @@ def view_html_message(tmpdir):
     print "Calling firefox for file://" + htmlfile
     os.system("firefox -new-window file://" + htmlfile)
 
-    # Wait a while to make sure firefox has loads the imgaes, then clean up.
+    # Wait a while to make sure firefox has loaded the images, then clean up.
     time.sleep(6)
     shutil.rmtree(tmpdir)
 
