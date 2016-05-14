@@ -7,8 +7,6 @@ from bs4 import BeautifulSoup
 import csv
 import sys, os
 
-# wiki = "https://en.wikipedia.org/wiki/United_States_counties_by_per_capita_income"
-
 def parse_table(inurl, outfile):
     # Read the Wikipedia URL:
     page = urllib2.urlopen(inurl)
