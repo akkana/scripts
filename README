@@ -298,6 +298,9 @@ weborphans:
     Check a web site (perhaps localhost) against a local mirror,
     checking for broken links and orphaned files.
 
+wikitable.py:
+    Parse a data table from a wikipedia page, outputting CSV.
+
 wordview:
     Convert a doc or docx file to html, and call a new firefox window on it.
     Predecessor to (and simpler than) viewmailattachments.
