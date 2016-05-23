@@ -94,7 +94,8 @@ def when_at_position(body, observer, targetalt, targetaz,
     if startdate:
         observer.date = ephem.Date(start_triple + (starttime, 0, 0))
     else:
-        observer.date = ephem.Date
+        # If no date was specified, start a week ago:
+        observer.date = ephem.now() - (ephem.hour * 24 * 7)
 
     # Find the end date, which is an ephem.date.
     if numdays:
@@ -114,7 +115,7 @@ def when_at_position(body, observer, targetalt, targetaz,
            and az >= targetaz - slop and az <= targetaz + slop:
             if (body.phase > minphase and body.phase < maxphase):
                 # print "In window at", observer.date
-                return True
+                return (alt, az)
             # else:
             #     print "In window but not in phase at", observer.date
         # else:
@@ -138,6 +139,11 @@ def when_at_position(body, observer, targetalt, targetaz,
     # For the main loop, start with the less precise times.
     granularity = LARGE_GRANULARITY
 
+    minalt = 91
+    maxalt = -1
+    minaz = 361
+    maxaz = -1
+
     while observer.date <= end_date:
         # At the beginning of each loop, observer.date is set to
         # the start hour on a new day -- except that it's start hour
@@ -159,8 +165,15 @@ def when_at_position(body, observer, targetalt, targetaz,
         # When will we stop the inner loop?
         time_window_end = observer.date + window_hours
         while observer.date < time_window_end:
+            altaz = in_window(body, observer)
+            if altaz:
+                alt, az = altaz
+                if alt < minalt: minalt = alt
+                if alt > maxalt: maxalt = alt
+                if az < minaz: minaz = az
+                if az > maxaz: maxaz = az
             # print "Inner loop:", observer.date
-            if not appearance and in_window(body, observer):
+            if not appearance and altaz:
                 # It appeared! But if we're still using large granularity,
                 # switch to small for a more precise prediction:
                 if granularity == LARGE_GRANULARITY:
@@ -168,8 +181,7 @@ def when_at_position(body, observer, targetalt, targetaz,
                     granularity = SMALL_GRANULARITY
                 else:
                     appearance = observer.date
-            elif appearance and not disappearance and not in_window(body,
-                                                                    observer):
+            elif appearance and not disappearance and not altaz:
                 disappearance = observer.date
                 granularity = LARGE_GRANULARITY
                 break    # out of the inner loop
@@ -179,7 +191,12 @@ def when_at_position(body, observer, targetalt, targetaz,
             if not disappearance:   # it was still visible at window's end
                 disappearance = end_date
 
-            results.append([appearance, disappearance, alt, az, body.phase])
+            # XXX Would be better to show results with the min-max span
+            # rather than just the average of min and max alt and az.
+            # print minalt, maxalt, minaz, maxaz
+            results.append([appearance, disappearance,
+                            (minalt + maxalt)/2., (minaz + maxaz)/2.,
+                            body.phase])
 
         # Set to start time in GMT on the following day
         observer.date = start_date_today + (ephem.hour * 24)
