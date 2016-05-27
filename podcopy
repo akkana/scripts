@@ -3,12 +3,15 @@
 import sys, os
 import datetime
 import shutil
+import androidfiles
 
 # Copy podcasts from podget to an mp3 device (or other directory).
 def copy_pods(indir, outdir, playlist=None):
 
     illegal_chars = '?=&;:"\''
     today = datetime.datetime.now().strftime('%y-%m-%d-')
+
+    is_android = androidfiles.is_android(outdir)
 
     # podget runs are stored in .m3u files.
     # We need the one with the most recent last-modified date,
@@ -32,12 +35,20 @@ def copy_pods(indir, outdir, playlist=None):
 
     # Get a list of the files already in the output dir.
     # We'll compare names and sizes to try to avoid duplicate copies.
-    existing_files = os.listdir(outdir)
+    if is_android:
+        ls_out = androidfiles.listdir(outdir, sizes=True)
+        existing_files = []
+        existing_sizes = []
+        for e in ls_out:
+            existing_files.append(e[0])
+            existing_sizes.append(e[1])
+    else:
+        existing_files = os.listdir(outdir)
 
-    existing_sizes = []
-    for f in existing_files:
-        statbuf = os.stat(os.path.join(outdir, f))
-        existing_sizes.append(statbuf.st_size)
+        existing_sizes = []
+        for f in existing_files:
+            statbuf = os.stat(os.path.join(outdir, f))
+            existing_sizes.append(statbuf.st_size)
 
     files_in_playlist = []
 
@@ -74,7 +85,7 @@ def copy_pods(indir, outdir, playlist=None):
             # first bad character.
             base = base[0:first_bad]
 
-        # Split off the local dir path, e.g. Science/filename.mp3
+        # Split off the local dir path, e.g. in Science/filename.mp3
         base = os.path.split(base)[-1]
 
         # Is the file already there?
@@ -82,6 +93,7 @@ def copy_pods(indir, outdir, playlist=None):
         # out there several times on different dates and with
         # similar but different filenames.
         # E.g. npr_378885682.mp3 and npr_378885682?orgId=1&amp;e=378885682&amp;d=257&amp;ft=pod&amp;f=344098539.mp3
+        # So look for something with the exact same byte size.
         src_size = os.stat(f).st_size
         try:
             i = existing_sizes.index(src_size)
@@ -96,17 +108,22 @@ def copy_pods(indir, outdir, playlist=None):
         # add today's date.
         base = today + base
 
-        while os.path.exists(os.path.join(outdir, base + ext)):
+        while base + ext in existing_files:
             # Otherwise, we have a name collision. Add an X.
             base += 'X'
 
         if base:
             print "cp '" + f + "'", os.path.join(outdir, base + ext)
-            shutil.copyfile(f, os.path.join(outdir, base + ext))
+            if is_android:
+                androidfiles.copyto(f, outdir, base+ext)
+            else:
+                shutil.copyfile(f, os.path.join(outdir, base + ext))
 
-if len(sys.argv) > 3:
-    playlist = sys.argv[3]
-else:
-    playlist = None
-copy_pods(sys.argv[1], sys.argv[2], playlist)
+if __name__ == '__main__':
+    if len(sys.argv) > 3:
+        playlist = sys.argv[3]
+    else:
+        playlist = None
+
+    copy_pods(sys.argv[1], sys.argv[2], playlist)
 
