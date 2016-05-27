@@ -39,6 +39,11 @@ Scripts in this directory:
 analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
+androidfiles.py:
+    A tiny Python module to make it easier to list files on an
+    Android device using adb, and copy individual files to the device.
+    Used by podcopy.
+
 animate.js:
     Simple code for animating a series of images in javascript.
 
@@ -167,7 +172,8 @@ pisoothe:
     to the next sample.
 
 podcopy:
-    Copy podcasts (fetched with podget) to a mounted mp3 player or directory.
+    Copy podcasts (fetched with podget) to a mounted mp3 player or directory,
+    or to an Android device via adb.
     Remove characters in filenames that would cause problems on vfat
     filesystems, and ensure filenames are unique and files aren't dups.
 
