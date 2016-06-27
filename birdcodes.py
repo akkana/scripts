@@ -39,6 +39,8 @@ class BirdCodes:
         return matches
 
     # Start with LIST15.DBF from http://www.birdpop.org/
+    # (now http://www.birdpop.org/docs/misc/Alpha_codes_eng.pdf
+    #  and http://www.birdpop.org/docs/misc/Alpha_codes_tax.pdf)
     # Then use dbview to read the obsolete dbaseIII format:
     # echo ',,4code,,,name,,sci_name,6code,,' >birdpopcodes.csv
     # dbview -b -d , LIST15.DBF | sed 's/ *,/,/g' >>birdpopcodes.csv
