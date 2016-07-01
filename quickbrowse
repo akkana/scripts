@@ -205,12 +205,22 @@ class ContentPane (gtk.Notebook):
         self.show_all()
         self.set_current_page(new_tab_number)
 
+        # Make sure it has a scheme -- add http:// if none already.
+        url = self.urlify(url)
+
         # load the content
         self._hovered_uri = None
         if url:
             web_view.load_uri(url)
         else:
             web_view.load_string(ABOUT_PAGE, "text/html", "iso-8859-15", "about")
+
+    def urlify(self, url):
+        if ':' in url:
+            return url
+        if url.startswith('/'):
+            return 'file://' + url
+        return 'http://' + url
 
     def _populate_page_popup_cb(self, view, menu):
         # misc
