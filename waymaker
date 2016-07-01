@@ -16,7 +16,7 @@ import time
 # from googlemaps import GoogleMaps
 import urllib, json, csv
 
-def write_gpx_file(entries, filename):
+def write_gpx_file(entries, filename, omit_address=True):
     '''Write the list of entries -- each entry is [lat, long, desc] --
        to a GPX file as separate waypoints.
     '''
@@ -51,8 +51,11 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
 
     for ent in entries:
         print >>fp, '<wpt lat="%f" lon="%f">' % (ent[0], ent[1])
-        print >>fp, '<name>%s</name>' % ent[2]
-        print >>fp, '<sym>Flag, Blue</sym>'
+        if omit_address:
+            addy = '\n'.join(ent[2].split('\n')[2:])
+        else:
+            addy = ent[2]
+        print >>fp, '<name>%s</name>' % addy
         print >>fp, '</wpt>'
 
     fp.write('</gpx>\n')
