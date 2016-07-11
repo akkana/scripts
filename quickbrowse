@@ -412,12 +412,6 @@ class WebToolbar(gtk.Toolbar):
         window.show_all()
         window.present()
 
-    def get_from_clipboard(self,  which=gtk.gdk.SELECTION_PRIMARY):
-        clip = gtk.clipboard_get(which)
-        if not clip.wait_is_text_available():
-            return None
-        return clip.wait_for_text()
-
     def get_procname(procargs):
         '''Return the program name: either the first commandline argument,
            or, if that argument is some variant of "python", the second.
@@ -560,14 +554,21 @@ class WebUtils:
             return 'file://' + url
         return 'http://' + url
 
+    @staticmethod
+    def get_from_clipboard(self,  which=gtk.gdk.SELECTION_PRIMARY):
+        clip = gtk.clipboard_get(which)
+        if not clip.wait_is_text_available():
+            return None
+        return clip.wait_for_text()
+
 if __name__ == "__main__":
     SIGNAL = signal.SIGUSR1
     args = sys.argv[1:]
 
     if len(sys.argv) < 2:
-        url = get_from_clipboard(gtk.gdk.SELECTION_PRIMARY)
+        url = WebUtils.get_from_clipboard(gtk.gdk.SELECTION_PRIMARY)
         if not url:
-            url = get_from_clipboard(gtk.gdk.SELECTION_CLIPBOARD)
+            url = WebUtils.get_from_clipboard(gtk.gdk.SELECTION_CLIPBOARD)
 
         if url:
             urls = [ url ]
