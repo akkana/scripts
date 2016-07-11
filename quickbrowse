@@ -21,7 +21,6 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 # TODO:
-# - middleclick on links to open a new tab
 # - fix entering of URLs in the urlbar, which often does nothing.
 
 from gettext import gettext as _
@@ -45,9 +44,12 @@ ABOUT_PAGE = """
 URL_FILE = "/tmp/quickbrowse-urls-%d"
 
 class BrowserPage(webkit.WebView):
+    '''A WebView in a single tab.
+    '''
 
-    def __init__(self):
+    def __init__(self, contentPane):
         webkit.WebView.__init__(self)
+        self.contentPaneParent = contentPane
         settings = self.get_settings()
         settings.set_property("enable-developer-extras", True)
 
@@ -57,6 +59,9 @@ class BrowserPage(webkit.WebView):
         # make sure the items will be added in the end
         # hence the reason for the connect_after
         self.connect_after("populate-popup", self.populate_popup)
+
+        self.connect('navigation-policy-decision-requested',
+                     self.navigation_policy_decision)
 
     def populate_popup(self, view, menu):
         # zoom buttons
@@ -88,6 +93,27 @@ class BrowserPage(webkit.WebView):
 
         menu.show_all()
         return False
+
+    def navigation_policy_decision(self, wv, fr, req, action, decision):
+        # https://webkitgtk.org/reference/webkitgtk/stable/webkitgtk-webkitwebview.html#WebKitWebView-navigation-policy-decision-requested
+        # wv:       BrowserPage object (WebKitWebView
+        # fr:       webkit.WebFrame object (WebKitWebFrame
+        # req:      webkit.NetworkRequest object (WebKitNetworkRequest
+        # action:   webkit.WebNavigationAction object(WebKitWebNavigationAction
+        # decision: webkit.WebPolicyDecision object (WebKitWebPolicyDecision
+        #
+        # Some documentation: help(webkit.WebNavigationAction),
+        #                     help(webkit.NetworkRequest)
+
+        # print "action.get_button():", action.get_button()
+        # print "action.get_modifier_state():", action.get_modifier_state()
+
+        if action.get_button() == 2:
+            # https://webkitgtk.org/reference/webkitgtk/stable/WebKitWebNavigationAction.html
+            decision.ignore()
+            self.contentPaneParent.new_tab(action.get_original_uri())
+        else:
+            decision.use()
 
 class TabLabel (gtk.HBox):
     """A class for Tab labels"""
@@ -138,7 +164,6 @@ def tab_label_style_set_cb (tab_label, style):
                                pango.PIXELS(metrics.get_ascent() +
     metrics.get_descent()) + 8)
 
-
 class ContentPane (gtk.Notebook):
 
     __gsignals__ = {
@@ -173,7 +198,7 @@ class ContentPane (gtk.Notebook):
     def new_tab (self, url=None):
         """creates a new page in a new tab"""
         # create the tab content
-        browser = BrowserPage()
+        browser = BrowserPage(self)
         self._construct_tab_view(browser, url)
 
     def _construct_tab_view (self, web_view, url=None):
@@ -183,6 +208,8 @@ class ContentPane (gtk.Notebook):
         web_view.connect("create-web-view", self._new_web_view_request_cb)
         web_view.connect("title-changed", self._title_changed_cb)
         # inspector = Inspector(web_view.get_web_inspector())
+
+        # web_view.connect("button-press", self.button_press_cb)
 
         scrolled_window = gtk.ScrolledWindow()
         scrolled_window.props.hscrollbar_policy = gtk.POLICY_AUTOMATIC
@@ -222,6 +249,11 @@ class ContentPane (gtk.Notebook):
             return 'file://' + url
         return 'http://' + url
 
+    def button_press_cb(self, thing):
+        print "Button pressed"
+        print type(thing)
+        print thing
+
     def _populate_page_popup_cb(self, view, menu):
         # misc
         if self._hovered_uri:
@@ -248,6 +280,8 @@ class ContentPane (gtk.Notebook):
         self.emit("focus-view-title-changed", frame, frame.props.title)
 
     def _hovering_over_link_cb (self, view, title, uri):
+        # if uri:
+        #     print "hovering over", uri
         self._hovered_uri = uri
 
     def _title_changed_cb (self, view, frame, title):
@@ -269,7 +303,7 @@ class ContentPane (gtk.Notebook):
         scrolled_window = gtk.ScrolledWindow()
         scrolled_window.props.hscrollbar_policy = gtk.POLICY_AUTOMATIC
         scrolled_window.props.vscrollbar_policy = gtk.POLICY_AUTOMATIC
-        view = BrowserPage()
+        view = BrowserPage(self)
         scrolled_window.add(view)
         scrolled_window.show_all()
 
@@ -363,7 +397,15 @@ class WebBrowser(gtk.Window):
         self.set_default_size(1024, 768)
         self.connect('destroy', destroy_cb, self.content_tabs)
 
+        self.connect("key-press-event", self.key_press_event)
+
         self.show_all()
+
+    def key_press_event(self, widget, event):
+        if event.keyval == gtk.keysyms.q and \
+                 event.state == gtk.gdk.CONTROL_MASK :
+            gtk.main_quit()
+        return False     # False means we haven't handled, pass event on
 
     def new_tab(self, url):
         self.content_tabs.new_tab(url)
