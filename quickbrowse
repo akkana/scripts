@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# quickbrowse: a minimal browser in python-webkit-gtk.
+# quickbrowse: a fast, minimal, anonymous browser in python-webkit-gtk.
 
 # Copyright (C) 2016 by Akkana Peck.
 # Originally based on /usr/share/doc/python-webkit/examples/browser.py
@@ -19,9 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-# TODO:
-# - fix entering of URLs in the urlbar, which often does nothing.
 
 from gettext import gettext as _
 
@@ -238,21 +235,15 @@ class ContentPane (gtk.Notebook):
         self.set_current_page(new_tab_number)
 
         # Make sure it has a scheme -- add http:// if none already.
-        url = self.urlify(url)
+        url = WebUtils.urlify(url)
 
         # load the content
         self._hovered_uri = None
         if url:
             web_view.load_uri(url)
         else:
-            web_view.load_string(ABOUT_PAGE, "text/html", "iso-8859-15", "about")
-
-    def urlify(self, url):
-        if ':' in url:
-            return url
-        if url.startswith('/'):
-            return 'file://' + url
-        return 'http://' + url
+            web_view.load_string(ABOUT_PAGE, "text/html", "iso-8859-15",
+                                 "about")
 
     def button_press_cb(self, thing):
         print "Button pressed"
@@ -368,7 +359,7 @@ class WebToolbar(gtk.Toolbar):
         self._entry.set_text(text)
 
     def _entry_activate_cb(self, entry):
-        self.emit("load-requested", entry.props.text)
+        self.emit("load-requested", WebUtils.urlify(entry.props.text))
 
     def _add_tab_cb(self, button):
         self.emit("new-tab-requested")
@@ -395,7 +386,8 @@ class WebToolbar(gtk.Toolbar):
 
     def print_cb(self, menu_item, web_view):
         mainframe = web_view.get_main_frame()
-        mainframe.print_full(gtk.PrintOperation(), gtk.PRINT_OPERATION_ACTION_PRINT_DIALOG);
+        mainframe.print_full(gtk.PrintOperation(),
+                             gtk.PRINT_OPERATION_ACTION_PRINT_DIALOG);
 
     def page_properties_cb(self, menu_item, web_view):
         mainframe = web_view.get_main_frame()
@@ -558,6 +550,15 @@ class WebBrowser(gtk.Window):
         childView = currentTab.get_child()
         childView.set_view_source_mode(is_active)
         childView.reload()
+
+class WebUtils:
+    @staticmethod
+    def urlify(url):
+        if ':' in url:
+            return url
+        if url.startswith('/'):
+            return 'file://' + url
+        return 'http://' + url
 
 if __name__ == "__main__":
     SIGNAL = signal.SIGUSR1
