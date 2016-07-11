@@ -66,30 +66,30 @@ class BrowserPage(webkit.WebView):
     def populate_popup(self, view, menu):
         # zoom buttons
         zoom_in = gtk.ImageMenuItem(gtk.STOCK_ZOOM_IN)
-        zoom_in.connect('activate', zoom_in_cb, view)
+        zoom_in.connect('activate', self.zoom_in_cb, view)
         menu.append(zoom_in)
 
         zoom_out = gtk.ImageMenuItem(gtk.STOCK_ZOOM_OUT)
-        zoom_out.connect('activate', zoom_out_cb, view)
+        zoom_out.connect('activate', self.zoom_out_cb, view)
         menu.append(zoom_out)
 
         zoom_hundred = gtk.ImageMenuItem(gtk.STOCK_ZOOM_100)
-        zoom_hundred.connect('activate', zoom_hundred_cb, view)
+        zoom_hundred.connect('activate', self.zoom_hundred_cb, view)
         menu.append(zoom_hundred)
 
         printitem = gtk.ImageMenuItem(gtk.STOCK_PRINT)
         menu.append(printitem)
-        printitem.connect('activate', print_cb, view)
+        printitem.connect('activate', self.print_cb, view)
 
         page_properties = gtk.ImageMenuItem(gtk.STOCK_PROPERTIES)
         menu.append(page_properties)
-        page_properties.connect('activate', page_properties_cb, view)
+        page_properties.connect('activate', self.page_properties_cb, view)
 
         menu.append(gtk.SeparatorMenuItem())
 
         aboutitem = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu.append(aboutitem)
-        aboutitem.connect('activate', about_pywebkitgtk_cb, view)
+        aboutitem.connect('activate', self.about_pywebkitgtk_cb, view)
 
         menu.show_all()
         return False
@@ -134,8 +134,10 @@ class TabLabel (gtk.HBox):
         self.label.set_ellipsize(pango.ELLIPSIZE_MIDDLE)
         self.label.set_alignment(0.0, 0.5)
 
-        icon = gtk.image_new_from_stock(gtk.STOCK_ORIENTATION_PORTRAIT, gtk.ICON_SIZE_BUTTON)
-        close_image = gtk.image_new_from_stock(gtk.STOCK_CLOSE, gtk.ICON_SIZE_MENU)
+        icon = gtk.image_new_from_stock(gtk.STOCK_ORIENTATION_PORTRAIT,
+                                        gtk.ICON_SIZE_BUTTON)
+        close_image = gtk.image_new_from_stock(gtk.STOCK_CLOSE,
+                                               gtk.ICON_SIZE_MENU)
         close_button = gtk.Button()
         close_button.set_relief(gtk.RELIEF_NONE)
         close_button.connect("clicked", self._close_tab, child)
@@ -146,7 +148,7 @@ class TabLabel (gtk.HBox):
 
         self.set_data("label", self.label)
         self.set_data("close-button", close_button)
-        self.connect("style-set", tab_label_style_set_cb)
+        self.connect("style-set", self.tab_label_style_set_cb)
 
     def set_label (self, text):
         """sets the text of this label"""
@@ -155,21 +157,23 @@ class TabLabel (gtk.HBox):
     def _close_tab (self, widget, child):
         self.emit("close", child)
 
-def tab_label_style_set_cb (tab_label, style):
-    context = tab_label.get_pango_context()
-    metrics = context.get_metrics(tab_label.style.font_desc, context.get_language())
-    char_width = metrics.get_approximate_digit_width()
-    (width, height) = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
-    tab_label.set_size_request(20 * pango.PIXELS(char_width) + 2 * width,
-                               pango.PIXELS(metrics.get_ascent() +
-    metrics.get_descent()) + 8)
+    def tab_label_style_set_cb (self, tab_label, style):
+        context = tab_label.get_pango_context()
+        metrics = context.get_metrics(tab_label.style.font_desc,
+                                      context.get_language())
+        char_width = metrics.get_approximate_digit_width()
+        (width, height) = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
+        tab_label.set_size_request(20 * pango.PIXELS(char_width) + 2 * width,
+                                   pango.PIXELS(metrics.get_ascent() +
+                                                metrics.get_descent()) + 8)
 
 class ContentPane (gtk.Notebook):
 
     __gsignals__ = {
         "focus-view-title-changed": (gobject.SIGNAL_RUN_FIRST,
                                      gobject.TYPE_NONE,
-                                     (gobject.TYPE_OBJECT, gobject.TYPE_STRING,)),
+                                     (gobject.TYPE_OBJECT,
+                                      gobject.TYPE_STRING,)),
         "new-window-requested": (gobject.SIGNAL_RUN_FIRST,
                                  gobject.TYPE_NONE,
                                  (gobject.TYPE_OBJECT,))
@@ -223,7 +227,8 @@ class ContentPane (gtk.Notebook):
         label.show_all()
 
         new_tab_number = self.append_page(scrolled_window, label)
-        self.set_tab_label_packing(scrolled_window, False, False, gtk.PACK_START)
+        self.set_tab_label_packing(scrolled_window, False, False,
+                                   gtk.PACK_START)
         self.set_tab_label(scrolled_window, label)
 
         # hide the tab if there's only one
@@ -371,6 +376,91 @@ class WebToolbar(gtk.Toolbar):
     def _view_source_mode_cb(self, button):
         self.emit("view-source-mode-requested", button.get_active())
 
+    # context menu item callbacks
+    def about_pywebkitgtk_cb(self, menu_item, web_view):
+        web_view.open("http://live.gnome.org/PyWebKitGtk")
+
+    def zoom_in_cb(self, menu_item, web_view):
+        """Zoom into the page"""
+        web_view.zoom_in()
+
+    def zoom_out_cb(self, menu_item, web_view):
+        """Zoom out of the page"""
+        web_view.zoom_out()
+
+    def zoom_hundred_cb(self, menu_item, web_view):
+        """Zoom 100%"""
+        if not (web_view.get_zoom_level() == 1.0):
+            web_view.set_zoom_level(1.0)
+
+    def print_cb(self, menu_item, web_view):
+        mainframe = web_view.get_main_frame()
+        mainframe.print_full(gtk.PrintOperation(), gtk.PRINT_OPERATION_ACTION_PRINT_DIALOG);
+
+    def page_properties_cb(self, menu_item, web_view):
+        mainframe = web_view.get_main_frame()
+        datasource = mainframe.get_data_source()
+        main_resource = datasource.get_main_resource()
+        window = gtk.Window()
+        window.set_default_size(100, 60)
+        vbox = gtk.VBox()
+        hbox = gtk.HBox()
+        hbox.pack_start(gtk.Label("MIME Type :"), False, False)
+        hbox.pack_end(gtk.Label(main_resource.get_mime_type()), False, False)
+        vbox.pack_start(hbox, False, False)
+        hbox2 = gtk.HBox()
+        hbox2.pack_start(gtk.Label("URI : "), False, False)
+        hbox2.pack_end(gtk.Label(main_resource.get_uri()), False, False)
+        vbox.pack_start(hbox2, False, False)
+        hbox3 = gtk.HBox()
+        hbox3.pack_start(gtk.Label("Encoding : "), False, False)
+        hbox3.pack_end(gtk.Label(main_resource.get_encoding()), False, False)
+        vbox.pack_start(hbox3, False, False)
+        window.add(vbox)
+        window.show_all()
+        window.present()
+
+    def get_from_clipboard(self,  which=gtk.gdk.SELECTION_PRIMARY):
+        clip = gtk.clipboard_get(which)
+        if not clip.wait_is_text_available():
+            return None
+        return clip.wait_for_text()
+
+    def get_procname(procargs):
+        '''Return the program name: either the first commandline argument,
+           or, if that argument is some variant of "python", the second.
+        '''
+        basearg = os.path.basename(procargs[0])
+        if basearg == 'python' or basearg == 'python2' \
+           or basearg.startswith('python2.'):
+            basearg = os.path.basename(procargs[1])
+        return basearg
+
+    def find_proc_by_name(name):
+        """Looks for a process with the given basename, ignoring a possible
+           "python" prefix in case it's another Python script.
+           Will ignore the current running process.
+           Returns the pid, or None.
+        """
+        PROCDIR = '/proc'
+        for proc in os.listdir(PROCDIR):
+            if not proc[0].isdigit():
+                continue
+            # Race condition: processes can come and go, so we may not be
+            # able to open something just because it was there when we
+            # did the listdir.
+            try:
+                with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
+                    procargs = procfp.read().split('\0')
+                    basearg = get_procname(procargs)
+                    if basearg == name and int(proc) != os.getpid():
+                        return int(proc)
+            except Exception, e:
+                print "exception", e
+                pass
+        print "Didn't find a %s process" % name
+        return None
+
 class WebBrowser(gtk.Window):
 
     def __init__(self):
@@ -382,12 +472,12 @@ class WebBrowser(gtk.Window):
                                   self._title_changed_cb, toolbar)
         self.content_tabs.connect("new-window-requested",
                                   self._new_window_requested_cb)
-        toolbar.connect("load-requested", load_requested_cb,
+        toolbar.connect("load-requested", self.load_requested_cb,
                         self.content_tabs)
-        toolbar.connect("new-tab-requested", new_tab_requested_cb,
+        toolbar.connect("new-tab-requested", self.new_tab_requested_cb,
                         self.content_tabs)
         toolbar.connect("view-source-mode-requested",
-                        view_source_mode_requested_cb, self.content_tabs)
+                        self.view_source_mode_requested_cb, self.content_tabs)
 
         vbox = gtk.VBox(spacing=1)
         vbox.pack_start(toolbar, expand=False, fill=False)
@@ -395,11 +485,22 @@ class WebBrowser(gtk.Window):
 
         self.add(vbox)
         self.set_default_size(1024, 768)
-        self.connect('destroy', destroy_cb, self.content_tabs)
+        self.connect('destroy', self.destroy_cb, self.content_tabs)
 
         self.connect("key-press-event", self.key_press_event)
 
         self.show_all()
+
+    def destroy_cb(self, window, content_pane):
+        """destroy window resources"""
+        num_pages = content_pane.get_n_pages()
+        while num_pages != -1:
+            child = content_pane.get_nth_page(num_pages)
+            if child:
+                view = child.get_child()
+            num_pages = num_pages - 1
+        window.destroy()
+        gtk.main_quit()
 
     def key_press_event(self, widget, event):
         if event.keyval == gtk.keysyms.q and \
@@ -414,6 +515,9 @@ class WebBrowser(gtk.Window):
         with open(URL_FILE % os.getpid()) as url_fp:
             for url in url_fp:
                 self.new_tab(url.strip())
+
+    def new_tab_requested_cb (self, toolbar, content_pane):
+        content_pane.new_tab("about:blank")
 
     def _new_window_requested_cb (self, content_pane, view):
         features = view.get_window_features()
@@ -440,123 +544,20 @@ class WebBrowser(gtk.Window):
         if not title:
            title = frame.get_uri()
         self.set_title(_("quickbrowse - %s") % title)
-        load_committed_cb(tabbed_pane, frame, toolbar)
+        uri = frame.get_uri()
+        if uri:
+            toolbar.location_set_text(uri)
 
-# event handlers
-def new_tab_requested_cb (toolbar, content_pane):
-    content_pane.new_tab("about:blank")
+    def load_requested_cb (self, widget, text, content_pane):
+        if not text:
+            return
+        content_pane.load(text)
 
-def load_requested_cb (widget, text, content_pane):
-    if not text:
-        return
-    content_pane.load(text)
-
-def load_committed_cb (tabbed_pane, frame, toolbar):
-    uri = frame.get_uri()
-    if uri:
-        toolbar.location_set_text(uri)
-
-def destroy_cb(window, content_pane):
-    """destroy window resources"""
-    num_pages = content_pane.get_n_pages()
-    while num_pages != -1:
-        child = content_pane.get_nth_page(num_pages)
-        if child:
-            view = child.get_child()
-        num_pages = num_pages - 1
-    window.destroy()
-    gtk.main_quit()
-
-# context menu item callbacks
-def about_pywebkitgtk_cb(menu_item, web_view):
-    web_view.open("http://live.gnome.org/PyWebKitGtk")
-
-def zoom_in_cb(menu_item, web_view):
-    """Zoom into the page"""
-    web_view.zoom_in()
-
-def zoom_out_cb(menu_item, web_view):
-    """Zoom out of the page"""
-    web_view.zoom_out()
-
-def zoom_hundred_cb(menu_item, web_view):
-    """Zoom 100%"""
-    if not (web_view.get_zoom_level() == 1.0):
-        web_view.set_zoom_level(1.0)
-
-def print_cb(menu_item, web_view):
-    mainframe = web_view.get_main_frame()
-    mainframe.print_full(gtk.PrintOperation(), gtk.PRINT_OPERATION_ACTION_PRINT_DIALOG);
-
-def page_properties_cb(menu_item, web_view):
-    mainframe = web_view.get_main_frame()
-    datasource = mainframe.get_data_source()
-    main_resource = datasource.get_main_resource()
-    window = gtk.Window()
-    window.set_default_size(100, 60)
-    vbox = gtk.VBox()
-    hbox = gtk.HBox()
-    hbox.pack_start(gtk.Label("MIME Type :"), False, False)
-    hbox.pack_end(gtk.Label(main_resource.get_mime_type()), False, False)
-    vbox.pack_start(hbox, False, False)
-    hbox2 = gtk.HBox()
-    hbox2.pack_start(gtk.Label("URI : "), False, False)
-    hbox2.pack_end(gtk.Label(main_resource.get_uri()), False, False)
-    vbox.pack_start(hbox2, False, False)
-    hbox3 = gtk.HBox()
-    hbox3.pack_start(gtk.Label("Encoding : "), False, False)
-    hbox3.pack_end(gtk.Label(main_resource.get_encoding()), False, False)
-    vbox.pack_start(hbox3, False, False)
-    window.add(vbox)
-    window.show_all()
-    window.present()
-
-def view_source_mode_requested_cb(widget, is_active, content_pane):
-    currentTab = content_pane.get_nth_page(content_pane.get_current_page())
-    childView = currentTab.get_child()
-    childView.set_view_source_mode(is_active)
-    childView.reload()
-
-def get_from_clipboard(which=gtk.gdk.SELECTION_PRIMARY):
-    clip = gtk.clipboard_get(which)
-    if not clip.wait_is_text_available():
-        return None
-    return clip.wait_for_text()
-
-def get_procname(procargs):
-    '''Return the program name: either the first commandline argument,
-       or, if that argument is some variant of "python", the second.
-    '''
-    basearg = os.path.basename(procargs[0])
-    if basearg == 'python' or basearg == 'python2' \
-       or basearg.startswith('python2.'):
-        basearg = os.path.basename(procargs[1])
-    return basearg
-
-def find_proc_by_name(name):
-    """Looks for a process with the given basename, ignoring a possible
-       "python" prefix in case it's another Python script.
-       Will ignore the current running process.
-       Returns the pid, or None.
-    """
-    PROCDIR = '/proc'
-    for proc in os.listdir(PROCDIR):
-        if not proc[0].isdigit():
-            continue
-        # Race condition: processes can come and go, so we may not be
-        # able to open something just because it was there when we
-        # did the listdir.
-        try:
-            with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
-                procargs = procfp.read().split('\0')
-                basearg = get_procname(procargs)
-                if basearg == name and int(proc) != os.getpid():
-                    return int(proc)
-        except Exception, e:
-            print "exception", e
-            pass
-    print "Didn't find a %s process" % name
-    return None
+    def view_source_mode_requested_cb(self, widget, is_active, content_pane):
+        currentTab = content_pane.get_nth_page(content_pane.get_current_page())
+        childView = currentTab.get_child()
+        childView.set_view_source_mode(is_active)
+        childView.reload()
 
 if __name__ == "__main__":
     SIGNAL = signal.SIGUSR1
