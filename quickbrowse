@@ -40,7 +40,7 @@ ABOUT_PAGE = """
 # The %d will be the process ID of the running browser.
 URL_FILE = "/tmp/quickbrowse-urls-%d"
 
-class BrowserPage(webkit.WebView):
+class BrowserView(webkit.WebView):
     '''A WebView in a single tab.
     '''
 
@@ -49,6 +49,8 @@ class BrowserPage(webkit.WebView):
         self.contentPaneParent = contentPane
         settings = self.get_settings()
         settings.set_property("enable-developer-extras", True)
+
+        self.verbose = False
 
         # scale other content besides from text as well
         self.set_full_content_zoom(True)
@@ -59,6 +61,28 @@ class BrowserPage(webkit.WebView):
 
         self.connect('navigation-policy-decision-requested',
                      self.navigation_policy_decision)
+        self.connect("key-press-event", self.key_press_event)
+        # Block the rediculously chatty stream of console messages.
+        # Alas, it doesn't block "Vector smash protection is enabled."
+        self.connect("console-message", self.console_message_handler)
+
+    def key_press_event(self, widget, event):
+        if event.keyval == gtk.keysyms.q and \
+                 event.state == gtk.gdk.CONTROL_MASK :
+            gtk.main_quit()
+        if (event.keyval == gtk.keysyms.Left and \
+                 event.state & gtk.gdk.MOD1_MASK) :
+            self.go_back();
+            return True
+        return False     # False means we haven't handled, pass event on
+
+    def console_message_handler(self, view, message, line, sourceid):
+        if self.verbose:
+            if sourceid:
+                print message, "sourceid:", sourceid
+            else:
+                print message
+        return True
 
     def populate_popup(self, view, menu):
         # zoom buttons
@@ -93,7 +117,7 @@ class BrowserPage(webkit.WebView):
 
     def navigation_policy_decision(self, wv, fr, req, action, decision):
         # https://webkitgtk.org/reference/webkitgtk/stable/webkitgtk-webkitwebview.html#WebKitWebView-navigation-policy-decision-requested
-        # wv:       BrowserPage object (WebKitWebView
+        # wv:       BrowserView object (WebKitWebView
         # fr:       webkit.WebFrame object (WebKitWebFrame
         # req:      webkit.NetworkRequest object (WebKitNetworkRequest
         # action:   webkit.WebNavigationAction object(WebKitWebNavigationAction
@@ -199,7 +223,7 @@ class ContentPane (gtk.Notebook):
     def new_tab (self, url=None):
         """creates a new page in a new tab"""
         # create the tab content
-        browser = BrowserPage(self)
+        browser = BrowserView(self)
         self._construct_tab_view(browser, url)
 
     def _construct_tab_view (self, web_view, url=None):
@@ -299,7 +323,7 @@ class ContentPane (gtk.Notebook):
         scrolled_window = gtk.ScrolledWindow()
         scrolled_window.props.hscrollbar_policy = gtk.POLICY_AUTOMATIC
         scrolled_window.props.vscrollbar_policy = gtk.POLICY_AUTOMATIC
-        view = BrowserPage(self)
+        view = BrowserView(self)
         scrolled_window.add(view)
         scrolled_window.show_all()
 
@@ -412,43 +436,9 @@ class WebToolbar(gtk.Toolbar):
         window.show_all()
         window.present()
 
-    def get_procname(procargs):
-        '''Return the program name: either the first commandline argument,
-           or, if that argument is some variant of "python", the second.
-        '''
-        basearg = os.path.basename(procargs[0])
-        if basearg == 'python' or basearg == 'python2' \
-           or basearg.startswith('python2.'):
-            basearg = os.path.basename(procargs[1])
-        return basearg
-
-    def find_proc_by_name(name):
-        """Looks for a process with the given basename, ignoring a possible
-           "python" prefix in case it's another Python script.
-           Will ignore the current running process.
-           Returns the pid, or None.
-        """
-        PROCDIR = '/proc'
-        for proc in os.listdir(PROCDIR):
-            if not proc[0].isdigit():
-                continue
-            # Race condition: processes can come and go, so we may not be
-            # able to open something just because it was there when we
-            # did the listdir.
-            try:
-                with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
-                    procargs = procfp.read().split('\0')
-                    basearg = get_procname(procargs)
-                    if basearg == name and int(proc) != os.getpid():
-                        return int(proc)
-            except Exception, e:
-                print "exception", e
-                pass
-        print "Didn't find a %s process" % name
-        return None
-
-class WebBrowser(gtk.Window):
-
+class WebBrowserWindow(gtk.Window):
+    '''The winddow containing the browser.
+    '''
     def __init__(self):
         gtk.Window.__init__(self)
 
@@ -473,8 +463,6 @@ class WebBrowser(gtk.Window):
         self.set_default_size(1024, 768)
         self.connect('destroy', self.destroy_cb, self.content_tabs)
 
-        self.connect("key-press-event", self.key_press_event)
-
         self.show_all()
 
     def destroy_cb(self, window, content_pane):
@@ -487,12 +475,6 @@ class WebBrowser(gtk.Window):
             num_pages = num_pages - 1
         window.destroy()
         gtk.main_quit()
-
-    def key_press_event(self, widget, event):
-        if event.keyval == gtk.keysyms.q and \
-                 event.state == gtk.gdk.CONTROL_MASK :
-            gtk.main_quit()
-        return False     # False means we haven't handled, pass event on
 
     def new_tab(self, url):
         self.content_tabs.new_tab(url)
@@ -561,6 +543,42 @@ class WebUtils:
             return None
         return clip.wait_for_text()
 
+    @staticmethod
+    def get_procname(procargs):
+        '''Return the program name: either the first commandline argument,
+           or, if that argument is some variant of "python", the second.
+        '''
+        basearg = os.path.basename(procargs[0])
+        if basearg == 'python' or basearg == 'python2' \
+           or basearg.startswith('python2.'):
+            basearg = os.path.basename(procargs[1])
+        return basearg
+
+    @staticmethod
+    def find_proc_by_name(name):
+        """Looks for a process with the given basename, ignoring a possible
+           "python" prefix in case it's another Python script.
+           Will ignore the current running process.
+           Returns the pid, or None.
+        """
+        PROCDIR = '/proc'
+        for proc in os.listdir(PROCDIR):
+            if not proc[0].isdigit():
+                continue
+            # Race condition: processes can come and go, so we may not be
+            # able to open something just because it was there when we
+            # did the listdir.
+            try:
+                with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
+                    procargs = procfp.read().split('\0')
+                    basearg = WebUtils.get_procname(procargs)
+                    if basearg == name and int(proc) != os.getpid():
+                        return int(proc)
+            except Exception, e:
+                print "exception", e
+                pass
+        return None
+
 if __name__ == "__main__":
     SIGNAL = signal.SIGUSR1
     args = sys.argv[1:]
@@ -582,30 +600,29 @@ if __name__ == "__main__":
         # Try to use an existing instance of quickbrowse
         # instead of creating a new window.
         urls = args[1:]
-        progname = get_procname(sys.argv)
-        pid = find_proc_by_name(progname)
-        if not pid:
-            sys.exit(1)
+        progname = WebUtils.get_procname(sys.argv)
+        pid = WebUtils.find_proc_by_name(progname)
+        if pid:
+            # Create the file of URLs:
+            with open(URL_FILE % pid, 'w') as url_fp:
+                for url in urls:
+                    print >>url_fp, url
 
-        # Create the file of URLs:
-        with open(URL_FILE % pid, 'w') as url_fp:
-            for url in urls:
-                print >>url_fp, url
-
-        os.kill(int(pid), SIGNAL)
-
-    else:
-        # Return control to the shell before creating the window:
-        rc = os.fork()
-        if rc:
+            os.kill(int(pid), SIGNAL)
             sys.exit(0)
+        print "No existing %s process: starting a new one." % progname
 
-        webbrowser = WebBrowser()
+    # Return control to the shell before creating the window:
+    rc = os.fork()
+    if rc:
+        sys.exit(0)
 
-        for url in urls:
-            webbrowser.new_tab(url)
+    webbrowser = WebBrowserWindow()
 
-        # Handle SIGUSR1 signal so we can be signalled to open other tabs:
-        signal.signal(SIGNAL, webbrowser.signal_handler)
+    for url in urls:
+        webbrowser.new_tab(url)
 
-        gtk.main()
+    # Handle SIGUSR1 signal so we can be signalled to open other tabs:
+    signal.signal(SIGNAL, webbrowser.signal_handler)
+
+    gtk.main()
