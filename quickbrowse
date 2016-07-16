@@ -116,19 +116,6 @@ class BrowserView(webkit.WebView):
         return False
 
     def navigation_policy_decision(self, wv, fr, req, action, decision):
-        # https://webkitgtk.org/reference/webkitgtk/stable/webkitgtk-webkitwebview.html#WebKitWebView-navigation-policy-decision-requested
-        # wv:       BrowserView object (WebKitWebView
-        # fr:       webkit.WebFrame object (WebKitWebFrame
-        # req:      webkit.NetworkRequest object (WebKitNetworkRequest
-        # action:   webkit.WebNavigationAction object(WebKitWebNavigationAction
-        # decision: webkit.WebPolicyDecision object (WebKitWebPolicyDecision
-        #
-        # Some documentation: help(webkit.WebNavigationAction),
-        #                     help(webkit.NetworkRequest)
-
-        # print "action.get_button():", action.get_button()
-        # print "action.get_modifier_state():", action.get_modifier_state()
-
         if action.get_button() == 2:
             # https://webkitgtk.org/reference/webkitgtk/stable/WebKitWebNavigationAction.html
             decision.ignore()
