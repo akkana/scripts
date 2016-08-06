@@ -201,7 +201,7 @@ class ContentPane (gtk.Notebook):
         self.show_all()
         self._hovered_uri = None
 
-    def currect_view(self):
+    def current_view(self):
         '''Returns the BrowserView for the current tab'''
         return self.get_nth_page(self.get_current_page()).get_child()
 
@@ -539,10 +539,10 @@ class WebBrowserWindow(gtk.Window):
         content_pane.load(text)
 
     def go_back_requested_cb (self, widget, content_pane):
-        content_pane.currect_view().go_back()
+        content_pane.current_view().go_back()
 
     def go_forward_requested_cb (self, widget, content_pane):
-        content_pane.currect_view().go_forward()
+        content_pane.current_view().go_forward()
 
     def view_source_mode_requested_cb(self, widget, is_active, content_pane):
         currentTab = content_pane.get_nth_page(content_pane.get_current_page())
