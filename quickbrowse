@@ -74,6 +74,10 @@ class BrowserView(webkit.WebView):
                  event.state & gtk.gdk.MOD1_MASK) :
             self.go_back();
             return True
+        elif (event.keyval == gtk.keysyms.Right and \
+                 event.state & gtk.gdk.MOD1_MASK) :
+            self.go_forward();
+            return True
         return False     # False means we haven't handled, pass event on
 
     def console_message_handler(self, view, message, line, sourceid):
@@ -197,6 +201,10 @@ class ContentPane (gtk.Notebook):
         self.show_all()
         self._hovered_uri = None
 
+    def currect_view(self):
+        '''Returns the BrowserView for the current tab'''
+        return self.get_nth_page(self.get_current_page()).get_child()
+
     def load (self, text):
         """load the given uri in the current web view"""
         child = self.get_nth_page(self.get_current_page())
@@ -257,7 +265,6 @@ class ContentPane (gtk.Notebook):
                                  "about")
 
     def button_press_cb(self, thing):
-        print "Button pressed"
         print type(thing)
         print thing
 
@@ -332,6 +339,10 @@ class WebToolbar(gtk.Toolbar):
         "load-requested": (gobject.SIGNAL_RUN_FIRST,
                            gobject.TYPE_NONE,
                            (gobject.TYPE_STRING,)),
+        "go-back-requested": (gobject.SIGNAL_RUN_FIRST,
+                              gobject.TYPE_NONE, ()),
+        "go-forward-requested": (gobject.SIGNAL_RUN_FIRST,
+                              gobject.TYPE_NONE, ()),
         "new-tab-requested": (gobject.SIGNAL_RUN_FIRST,
                               gobject.TYPE_NONE, ()),
         "view-source-mode-requested": (gobject.SIGNAL_RUN_FIRST,
@@ -341,6 +352,15 @@ class WebToolbar(gtk.Toolbar):
 
     def __init__(self, location_enabled=True, toolbar_enabled=True):
         gtk.Toolbar.__init__(self)
+
+        backButton = gtk.ToolButton(gtk.STOCK_GO_BACK)
+        backButton.connect("clicked", self.back_cb)
+        self.insert(backButton, -1)
+        backButton.show()
+        forwardButton = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
+        forwardButton.connect("clicked", self.forward_cb)
+        self.insert(forwardButton, -1)
+        forwardButton.show()
 
         # location entry
         if location_enabled:
@@ -365,6 +385,12 @@ class WebToolbar(gtk.Toolbar):
             viewSourceItem.connect('toggled', self._view_source_mode_cb)
             self.insert(viewSourceItem, -1)
             viewSourceItem.show()
+
+    def back_cb(self, w):
+        self.emit("go-back-requested")
+
+    def forward_cb(self, w):
+        self.emit("go-forward-requested")
 
     def location_set_text (self, text):
         self._entry.set_text(text)
@@ -437,6 +463,10 @@ class WebBrowserWindow(gtk.Window):
                                   self._new_window_requested_cb)
         toolbar.connect("load-requested", self.load_requested_cb,
                         self.content_tabs)
+        toolbar.connect("go-back-requested", self.go_back_requested_cb,
+                        self.content_tabs)
+        toolbar.connect("go-forward-requested", self.go_forward_requested_cb,
+                        self.content_tabs)
         toolbar.connect("new-tab-requested", self.new_tab_requested_cb,
                         self.content_tabs)
         toolbar.connect("view-source-mode-requested",
@@ -507,6 +537,12 @@ class WebBrowserWindow(gtk.Window):
         if not text:
             return
         content_pane.load(text)
+
+    def go_back_requested_cb (self, widget, content_pane):
+        content_pane.currect_view().go_back()
+
+    def go_forward_requested_cb (self, widget, content_pane):
+        content_pane.currect_view().go_forward()
 
     def view_source_mode_requested_cb(self, widget, is_active, content_pane):
         currentTab = content_pane.get_nth_page(content_pane.get_current_page())
