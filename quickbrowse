@@ -67,9 +67,8 @@ class BrowserView(webkit.WebView):
         self.connect("console-message", self.console_message_handler)
 
     def key_press_event(self, widget, event):
-        if event.keyval == gtk.keysyms.q and \
-                 event.state == gtk.gdk.CONTROL_MASK :
-            gtk.main_quit()
+        # Can't trap ctrl-q to quit here -- it never comes through.
+        # That has to be in a separate key_press_handler on the Window.
         if (event.keyval == gtk.keysyms.Left and \
                  event.state & gtk.gdk.MOD1_MASK) :
             self.go_back();
@@ -480,7 +479,17 @@ class WebBrowserWindow(gtk.Window):
         self.set_default_size(1024, 768)
         self.connect('destroy', self.destroy_cb, self.content_tabs)
 
+        # Key events independent of any tab, like ctrl-q to quit,
+        # have to happen on the window or they won't be seen.
+        self.connect("key-press-event", self.key_press_event)
+
         self.show_all()
+
+    def key_press_event(self, widget, event):
+        if (event.keyval == gtk.keysyms.q):
+            gtk.main_quit()
+
+        return False     # False means we haven't handled, pass event on
 
     def destroy_cb(self, window, content_pane):
         """destroy window resources"""
