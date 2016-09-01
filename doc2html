@@ -37,7 +37,7 @@ import subprocess
 from BeautifulSoup import BeautifulSoup, Tag
 
 def Usage():
-    print "Usage: %s infile [outfile]" % os.path.basename(sys.argv[0])
+    print "Usage: %s infile outfile" % os.path.basename(sys.argv[0])
     print "infile may be .doc or .html"
     sys.exit(1)
 
