@@ -10,7 +10,7 @@ import gtk, gobject
 import webkit
 
 class PresoViewer(gtk.Window):
-    def __init__(self, url):
+    def __init__(self, url, zoom=1.0, show_notes=True):
 
         # Are we making screenshots? TODO: make this a command-line param.
         self.make_screenshots = False
@@ -20,17 +20,30 @@ class PresoViewer(gtk.Window):
         self.displaywidth = 1024
         self.displayheight = 768
         # Size of the window we'll actually display:
-        self.fullwidth = 1366
+        if show_notes:
+            self.fullwidth = 1366
+        else:
+            self.fullwidth = 1024
         self.fullheight = 768
+
+        if zoom != 1.0 :
+            self.displaywidth = int(self.displaywidth * zoom)
+            self.displayheight = int(self.displayheight * zoom)
+            self.fullwidth = int(self.fullwidth * zoom)
+            self.fullheight = int(self.fullheight * zoom)
+            print "Display size: %d x %d" % (self.displaywidth,
+                                             self.displayheight)
+            print "Full size: %d x %d" % (self.fullwidth,
+                                          self.fullheight)
 
         gtk.Window.__init__(self)
 
-        # set the size to the size of my laptop:
+        # set the window to the right size:
         self.set_default_size(self.fullwidth, self.fullheight)
 
         # If the physical display is bigger than displaywidth,
         # then it's better not to run fullscreen.
-        if gtk.gdk.screen_height() <= self.displayheight :
+        if gtk.gdk.screen_height() <= self.displayheight and zoom == 1.0 :
             self.fullscreen()
 
         self.browser = webkit.WebView()
@@ -127,6 +140,6 @@ if __name__ == "__main__":
             url = 'file://' + os.getcwd() + '/' + url
 
     gobject.threads_init()
-    webbrowser = PresoViewer(url)
+    webbrowser = PresoViewer(url, zoom=0.5, show_notes=False)
     gtk.main()
 
