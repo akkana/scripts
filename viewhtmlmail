@@ -25,13 +25,17 @@ import shutil
 import email, mimetypes
 import tempfile
 
-def view_html_message(tmpdir):
-
-    msg = email.message_from_string(sys.stdin.read())
+def view_html_message(f, tmpdir):
+    if f:
+        with open(f) as fp:
+            msg = email.message_from_string(fp.read())
+    else:
+        msg = email.message_from_string(sys.stdin.read())
 
     html_part = None
     counter = 1
     subfiles = []
+    filenames = set()
     for part in msg.walk():
 
         # print ""
@@ -54,6 +58,7 @@ def view_html_message(tmpdir):
         # Save it to a file in the temp dir.
         filename = part.get_filename()
         if not filename:
+            print "No filename; making one up"
             ext = mimetypes.guess_extension(part.get_content_type())
             if not ext:
                 # Use a generic bag-of-bits extension
@@ -67,6 +72,17 @@ def view_html_message(tmpdir):
             print "Eek! Possible security problem in filename", filename
             continue
 
+        # Some mailers, apparently including gmail, will attach multiple
+        # images to the same mail all with the same name, like "image.png".
+        # So check whether we have to uniquify the names.
+
+        if filename in filenames:
+            orig_basename, orig_ext = os.path.splitext(filename)
+            counter = 0
+            while filename in filenames:
+                counter += 1
+                filename = "%s-%d%s" % (orig_basename, counter, orig_ext)
+        filenames.add(filename)
         filename = os.path.join(tmpdir, filename)
 
         # print "%10s %5s %s" % (part.get_content_type(), ext, filename)
@@ -113,14 +129,16 @@ def view_html_message(tmpdir):
     fp.write(htmlsrc)
     fp.close()
 
-    # Now we have the file. Call firefox on it.
-    print "Calling firefox for file://" + htmlfile
-    os.system("firefox -new-window file://" + htmlfile)
+    # Now we have the file. Call a browser on it.
+    print "Calling browser for file://" + htmlfile
+    # os.system("firefox -new-window file://" + htmlfile)
+    os.system("quickbrowse file://" + htmlfile)
 
     # Wait a while to make sure firefox has loaded the images, then clean up.
-    time.sleep(6)
-    shutil.rmtree(tmpdir)
+    # time.sleep(6)
+    # shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
-    view_html_message(tmpdir)
+    for f in sys.argv[1:]:
+        view_html_message(f, tmpdir)
