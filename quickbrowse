@@ -88,6 +88,10 @@ class BrowserView(webkit.WebView):
         return True
 
     def populate_popup(self, view, menu):
+        # These don't work, because they call callbacks that are
+        # members of a different class, WebToolbar.
+        # Need to add all the elaborate "emit" structure
+        # before any of these will work.
         # zoom buttons
         zoom_in = gtk.ImageMenuItem(gtk.STOCK_ZOOM_IN)
         zoom_in.connect('activate', self.zoom_in_cb, view)
@@ -486,7 +490,8 @@ class WebBrowserWindow(gtk.Window):
         self.show_all()
 
     def key_press_event(self, widget, event):
-        if (event.keyval == gtk.keysyms.q):
+        if (event.keyval == gtk.keysyms.q and
+            event.state & gtk.gdk.CONTROL_MASK) :
             gtk.main_quit()
 
         return False     # False means we haven't handled, pass event on
