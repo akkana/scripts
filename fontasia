@@ -1,23 +1,23 @@
 #!/usr/bin/python
 
-# fontasia v. 0.5:
+# fontasia 0.6:
 # List all fonts on the system and let the user group them into categories.
 
 #
-# Contributors: Akkana Peck, Mikael Magnusson
+# Contributors: Akkana Peck, Mikael Magnusson, Michael Schumacher
 #
 # More info on fontasia: http://shallowsky.com/software/fontasia
 
-# This program is free software: you can redistribute it and/or modify it 
-# under the terms of the GNU General Public License version 3, as published 
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 3, as published
 # by the Free Software Foundation.
 #
-# This program is distributed in the hope that it will be useful, but 
-# WITHOUT ANY WARRANTY; without even the implied warranties of 
-# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranties of
+# MERCHANTABILITY, SATISFACTORY QUALITY, or FITNESS FOR A PARTICULAR
 # PURPOSE.  See the GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License along 
+# You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Thanks to jan bodnar's ZetCode.com PyGTK/Pango tutorial.
@@ -127,7 +127,7 @@ class FontApp(gtk.Window) :
         self.sw = gtk.ScrolledWindow()
         self.sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        
+
         context = self.create_pango_context()
         self.all_families = context.list_families()
         self.store = gtk.ListStore(str)
@@ -166,7 +166,7 @@ class FontApp(gtk.Window) :
         # Font size
         label = gtk.Label("Size:")
         hbox.pack_start(label, expand=False)
-        
+
         adj = gtk.Adjustment(self.fontsize, 1, 1000, 1)
         self.sizespin = gtk.SpinButton(adj)
         self.sizespin.set_numeric(True)
@@ -418,7 +418,14 @@ class FontApp(gtk.Window) :
     # catname: font, font, font ...
     #
     def read_category_file(self) :
-        self.cat_file_name = os.path.join(os.getenv("HOME"), ".fontasia")
+        try:
+            from win32com.shell import shellcon, shell
+            homedir = shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
+        except ImportError:
+            homedir = os.getenv("HOME")
+
+        self.cat_file_name = os.path.join(homedir, ".fontasia")
+
         filename = self.cat_file_name
         if not os.access(filename, os.R_OK) :
             filename = "/etc/xdg/fontasia/defaults"
@@ -563,8 +570,7 @@ class FontApp(gtk.Window) :
 
     #
     # Callback for the main toggle buttons down the right half of the window.
-    # Toggle whether XXX
-    # 
+    #
     #def category_toggle(self, widget, catname) :
     #    self.update_font_list()
 
