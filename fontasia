@@ -1,7 +1,10 @@
 #!/usr/bin/python
 
-# fontasia 0.6:
+# fontasia 0.7:
 # List all fonts on the system and let the user group them into categories.
+#
+# Can be run as a standalone script, or as a GIMP plug-in font chooser
+# (where it shows up as Windows->Fontasia).
 
 #
 # Contributors: Akkana Peck, Mikael Magnusson, Michael Schumacher
@@ -31,42 +34,47 @@ import os, re
 # May want to experiment with several different layouts.
 
 # The base buttonbox class is a simple vbox:
-class Buttonbox() :
-    def __init__(self) :
+class Buttonbox():
+    def __init__(self):
         self.widget = gtk.VBox(spacing=8)
-    def addButton(self, btn) :
+    def addButton(self, btn):
         self.widget.pack_start(btn, expand=False)
 
 # Attempt at different-sized buttons that wrap:
 # this doesn't work yet, gtk doesn't offer any straightforward way.
-class ButtonboxWrap(Buttonbox) :
-    def __init__(self) :
+class ButtonboxWrap(Buttonbox):
+    def __init__(self):
         self.widget = gtk.HBox(spacing=8)
 
-    def addButton(self, btn) :
+    def addButton(self, btn):
         self.widget.pack_start(btn, expand=False)
 
 # A 2-dimensional table:
-class ButtonboxTable(Buttonbox) :
-    def __init__(self) :
+class ButtonboxTable(Buttonbox):
+    def __init__(self):
         self.rows = 8
         self.widget = gtk.Table(homogeneous=False)
         self.cur_row = 0
         self.cur_col = 0
 
-    def addButton(self, btn) :
+    def addButton(self, btn):
         self.widget.attach(btn, self.cur_col, self.cur_col+1,
                            self.cur_row, self.cur_row+1,
                            xpadding=3, ypadding=2)
         # fill vertically first
         self.cur_row += 1
-        if self.cur_row >= self.rows :
+        if self.cur_row >= self.rows:
             self.cur_row = 0
             self.cur_col += 1
 
-class FontApp(gtk.Window) :
-    def __init__(self) :
+class FontApp(gtk.Window):
+    def __init__(self):
         super(FontApp, self).__init__()
+
+        # When the quit button is pressed we'll set the quit flag,
+        # but won't actually quit -- the caller has to do that
+        # after checking the selected font.
+        self.quit = False
 
         # No categories to start with
         self.category_fontlists = []
@@ -249,21 +257,22 @@ class FontApp(gtk.Window) :
         #self.sw.set_size_request(self.list_width, 1)
         #self.preview.set_size_request(-1, -1)
 
-    def save_and_quit(self, widget=None) :
+    def save_and_quit(self, widget=None):
         self.write_category_file()
-        gtk.main_quit()
+        self.quit = True
+        # gtk.main_quit()
 
-    def toggle_fancy_list_cb(self, widget) :
+    def toggle_fancy_list_cb(self, widget):
         self.fancy_list = widget.get_active()
         self.toggle_fancy_list(self.fancy_list)
         #self.update_font_list()
 
-    def toggle_fancy_list(self, yesno) :
+    def toggle_fancy_list(self, yesno):
         column = self.treeView.get_column(0)
         rendererText = column.get_cell_renderers()[0]
-        if self.fancy_list :
+        if self.fancy_list:
             column.set_cell_data_func(rendererText, self.set_list_font)
-        else :
+        else:
             column.set_cell_data_func(rendererText, None)
             rendererText.set_property('font', None)
 
@@ -285,14 +294,14 @@ class FontApp(gtk.Window) :
         rendererText = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Font name", rendererText, text=0)
         column.set_sort_column_id(0)
-        if self.fancy_list :
+        if self.fancy_list:
             column.set_cell_data_func(rendererText, self.set_list_font)
         treeView.set_search_column(0)
         treeView.append_column(column)
 
-    def is_font_in_category(self, fontname, catname) :
-        for i in range(0, len(self.category_buttons)) :
-            if self.category_buttons[i].get_name() == catname :
+    def is_font_in_category(self, fontname, catname):
+        for i in range(0, len(self.category_buttons)):
+            if self.category_buttons[i].get_name() == catname:
                 return ( fontname in self.category_fontlists[i] )
         return False
 
@@ -300,12 +309,12 @@ class FontApp(gtk.Window) :
     # If the font is already in the category, this will remove it;
     # else add it.
     #
-    def toggle_font_in_category(self, fontname, catname) :
-        for i in range(0, len(self.category_buttons)) :
-            if self.category_buttons[i].get_name() == catname :
-                if fontname in self.category_fontlists[i] :
+    def toggle_font_in_category(self, fontname, catname):
+        for i in range(0, len(self.category_buttons)):
+            if self.category_buttons[i].get_name() == catname:
+                if fontname in self.category_fontlists[i]:
                     self.category_fontlists[i].remove(fontname)
-                else :
+                else:
                     self.category_fontlists[i].append(fontname)
                 return
 
@@ -313,12 +322,12 @@ class FontApp(gtk.Window) :
     # This is the callback from the font category togglebuttons.
     # It calls toggle_font_in_category.
     #
-    def toggle_cur_font_in_cat(self, widget, catname) :
+    def toggle_cur_font_in_cat(self, widget, catname):
         selection = self.treeView.get_selection()
         model, item = selection.get_selected_rows()
 
         # Read all the selected fonts, not just the first one:
-        for x in item :
+        for x in item:
             fontname = model[x[0]][0]
             #print "Adding", fontname, "to", catname
             self.toggle_font_in_category(fontname, catname)
@@ -326,8 +335,8 @@ class FontApp(gtk.Window) :
         self.treeView.grab_focus()
 
     # Update the View Categories combobox:
-    def update_cats_menu(self) :
-        if self.combo_connect_id :
+    def update_cats_menu(self):
+        if self.combo_connect_id:
             self.view_cat_combo.handler_block(self.combo_connect_id)
 
         self.view_cat_combo.get_model().clear()
@@ -335,44 +344,44 @@ class FontApp(gtk.Window) :
         self.view_cat_combo.append_text("All in categories")
         self.view_cat_combo.append_text("All uncategorized")
 
-        for btn in self.category_buttons :
+        for btn in self.category_buttons:
             catname = btn.get_name()
             item = gtk.MenuItem(catname)
             self.view_cat_combo.append_text(catname)
 
         self.view_cat_combo.set_active(0)
 
-        if self.combo_connect_id :
+        if self.combo_connect_id:
             self.view_cat_combo.handler_unblock(self.combo_connect_id)
 
     # How to get the active text from a combobox:
-    def cur_category(self) :
+    def cur_category(self):
         model = self.view_cat_combo.get_model()
         active = self.view_cat_combo.get_active()
         if active < 0:
             return None
         return model[active][0]
 
-    def combochanged(self, widget) :
+    def combochanged(self, widget):
         curcat = self.cur_category()
-        if curcat :
+        if curcat:
             self.update_font_list(curcat)
 
-    def update_font_list(self, catname = "All fonts") :
+    def update_font_list(self, catname = "All fonts"):
         # figure out which buttons are toggled:
         # categories = []
-        # for btn in self.category_buttons :
-        #     if btn.get_active() :
+        # for btn in self.category_buttons:
+        #     if btn.get_active():
         #         categories.append(btn.get_name())
         # show_all = (len(categories) == 0)
 
         special = (catname[0:3] == "All")
-        if special :
+        if special:
             show_all = (catname == "All fonts")
             show_all_in_cats = (catname == "All in categories")
             show_all_not_in_cats = (catname == "All uncategorized")
-        # if show_all or show_all_in_cats :
-        #     for catbtn in self.category_buttons :
+        # if show_all or show_all_in_cats:
+        #     for catbtn in self.category_buttons:
         #         catbtn.set_active(show_all_in_cats)
 
         # Create or clear the list store:
@@ -382,35 +391,35 @@ class FontApp(gtk.Window) :
             fname = ff.get_name()
 
             # Else not a special case. Just check for cat membership:
-            if not special :
-                if self.is_font_in_category(fname, catname) :
+            if not special:
+                if self.is_font_in_category(fname, catname):
                     self.store.append([fname])
                 continue
 
-            if show_all :
+            if show_all:
                 self.store.append([fname])
                 continue
 
             if show_all_in_cats:
-                for catbtn in self.category_buttons :
-                    if self.is_font_in_category(fname, catbtn.get_name()) :
+                for catbtn in self.category_buttons:
+                    if self.is_font_in_category(fname, catbtn.get_name()):
                         self.store.append([fname])
                         break
 
-            if show_all_not_in_cats :
+            if show_all_not_in_cats:
                 is_in_cat = False
-                for catbtn in self.category_buttons :
-                    if self.is_font_in_category(fname, catbtn.get_name()) :
+                for catbtn in self.category_buttons:
+                    if self.is_font_in_category(fname, catbtn.get_name()):
                         is_in_cat = True
                         break
-                if not is_in_cat :
+                if not is_in_cat:
                     self.store.append([fname])
                 continue
 
         # Reset all the button colors, since nothing is selected now
         # (eventually might be nice to retain the old selection,
         # if it's still in the list):
-        for btn in self.category_buttons :
+        for btn in self.category_buttons:
             self.change_button_color(btn, False)
 
     #
@@ -427,66 +436,66 @@ class FontApp(gtk.Window) :
         self.cat_file_name = os.path.join(homedir, ".fontasia")
 
         filename = self.cat_file_name
-        if not os.access(filename, os.R_OK) :
+        if not os.access(filename, os.R_OK):
             filename = "/etc/xdg/fontasia/defaults"
-        try :
+        try:
             catfp = open(filename, "r")
-            while 1 :
+            while 1:
                 line = catfp.readline()
-                if not line : break
+                if not line: break
                 line = line.strip()
-                if line[0] == '#' :     # Skip comments
+                if line[0] == '#':     # Skip comments
                     continue
 
-                if line[0:4] == "set " :
+                if line[0:4] == "set ":
                     varval = line[4:].strip().split("=")
-                    if varval[0] == "string" :
+                    if varval[0] == "string":
                         self.preview.set_text(varval[1].strip())
                         continue
-                    if varval[0] == "fontsize" :
+                    if varval[0] == "fontsize":
                         self.fontsize = int(varval[1])
                         self.sizespin.set_value(self.fontsize)
                         continue
-                    if varval[0] == "fancy_list" :
+                    if varval[0] == "fancy_list":
                         self.fancy_list = (varval[1] == "True")
                         self.fancy_btn.set_active(self.fancy_list)
                         self.toggle_fancy_list(self.fancy_list)
                         continue
-                    if varval[0] == "win_width" :
+                    if varval[0] == "win_width":
                         self.win_width = int(varval[1])
                         continue
-                    if varval[0] == "win_height" :
+                    if varval[0] == "win_height":
                         self.win_height = int(varval[1])
                         continue
-                    if varval[0] == "preview_height" :
+                    if varval[0] == "preview_height":
                         self.preview_height = int(varval[1])
                         continue
-                    if varval[0] == "list_width" :
+                    if varval[0] == "list_width":
                         self.list_width = int(varval[1])
                         continue
 
                     # Arguably should save any other values
                     # for writing back to the file even though
                     # we don't understand any others
-                    else :
+                    else:
                         print "Skipping unknown setting", varval[0]
                         continue
 
                 colon = line.find(":")
-                if colon < 0 :
+                if colon < 0:
                     print "Didn't understand line", line,
                     continue
                 catname = line[0:colon].strip()
                 self.add_category(catname)
                 line = line[colon+1:].strip()
                 fonts = line.split(",")
-                for font in fonts :
+                for font in fonts:
                     font = font.strip()
                     self.toggle_font_in_category(font, catname)
             catfp.close()
             self.update_cats_menu()
 
-        except IOError :
+        except IOError:
             print "No .fontasia file yet -- Welcome to fontasia!"
 
             # Set up a couple of default categories with likely fonts
@@ -503,17 +512,17 @@ class FontApp(gtk.Window) :
 
             return
 
-    def write_category_file(self) :
+    def write_category_file(self):
         catfp = open(self.cat_file_name, "w")
         txt = self.preview.get_text()
-        if txt != self.DEFAULT_TEXT :
-            try :
+        if txt != self.DEFAULT_TEXT:
+            try:
                 print >>catfp, "set string=" + txt
-            except :
+            except:
                 print "Problem saving the string -- reverting to default string"
 
         fontsize = self.sizespin.get_value()
-        if fontsize != self.DEFAULT_FONT_SIZE :
+        if fontsize != self.DEFAULT_FONT_SIZE:
             print >>catfp, "set fontsize=" + str(int(fontsize))
 
         # Get the current sizes for the list and the preview
@@ -525,30 +534,30 @@ class FontApp(gtk.Window) :
         alloc = self.preview.get_allocation()
         print >>catfp, "set preview_height=" + str(alloc.height)
 
-        if not self.fancy_list :
+        if not self.fancy_list:
             print >>catfp, "set fancy_list=False"
 
-        for i in range(0, len(self.category_buttons)) :
+        for i in range(0, len(self.category_buttons)):
             catname = self.category_buttons[i].get_name()
             print >>catfp, catname + ":", ', '.join(self.category_fontlists[i])
         catfp.close()
         print "Saved to", self.cat_file_name
 
-    def new_cat_entry_changed(self, entry, btn) :
+    def new_cat_entry_changed(self, entry, btn):
         btn.set_sensitive(entry.get_text_length() > 0)
 
-    def category_exists(self, catname) :
-        for btn in self.category_buttons :
-            if btn.get_name() == catname :
+    def category_exists(self, catname):
+        for btn in self.category_buttons:
+            if btn.get_name() == catname:
                 return True
         return False
 
-    def add_category(self, newcat, entry=None) :
-        if entry :
+    def add_category(self, newcat, entry=None):
+        if entry:
             newcat = entry.get_text()
 
         # Make sure we don't already have this category:
-        if (self.category_exists(newcat)) :
+        if (self.category_exists(newcat)):
             return
 
         btn = gtk.Button(newcat)  # was togglebutton
@@ -565,26 +574,26 @@ class FontApp(gtk.Window) :
         # added to the new category.
         self.toggle_cur_font_in_cat(None, newcat)
 
-        if (entry) :
+        if (entry):
             entry.set_text("")
 
     #
     # Callback for the main toggle buttons down the right half of the window.
     #
-    #def category_toggle(self, widget, catname) :
+    #def category_toggle(self, widget, catname):
     #    self.update_font_list()
 
-    def change_button_color(self, btn, yesno) :
-        if self.oldcolors == None :
+    def change_button_color(self, btn, yesno):
+        if self.oldcolors == None:
             self.oldcolors = btn.get_modifier_style().bg
-        if self.highlightcolor == None :
+        if self.highlightcolor == None:
             self.highlightcolor = gtk.gdk.Color(0, 65535, 0)
-        if yesno :
+        if yesno:
             btn.modify_bg(gtk.STATE_NORMAL, self.highlightcolor)
             btn.modify_bg(gtk.STATE_ACTIVE, self.highlightcolor)
             btn.modify_bg(gtk.STATE_PRELIGHT, self.highlightcolor)
             btn.modify_bg(gtk.STATE_SELECTED, self.highlightcolor)
-        else :
+        else:
             btn.modify_bg(gtk.STATE_NORMAL, self.oldcolors[gtk.STATE_NORMAL])
             btn.modify_bg(gtk.STATE_ACTIVE, self.oldcolors[gtk.STATE_ACTIVE])
             btn.modify_bg(gtk.STATE_PRELIGHT,
@@ -592,46 +601,47 @@ class FontApp(gtk.Window) :
             btn.modify_bg(gtk.STATE_SELECTED,
                           self.oldcolors[gtk.STATE_SELECTED])
 
-    def update_category_buttons(self, fontname) :
-        for i in range(0, len(self.category_buttons)) :
-            if fontname in self.category_fontlists[i] :
+    def update_category_buttons(self, fontname):
+        for i in range(0, len(self.category_buttons)):
+            if fontname in self.category_fontlists[i]:
                 self.change_button_color(self.category_buttons[i], True)
                 # Can't call set_active because that invokes the
                 # callback which recursively calls this function.
                 #self.category_buttons[i].set_active(True)
-            else :
+            else:
                 self.change_button_color(self.category_buttons[i], False)
                 #self.category_buttons[i].set_active(False)
 
-    def render_font(self, widget) :
+    def current_font(self):
+        selection = self.treeView.get_selection()
+        model, item = selection.get_selected_rows()
+        if not item:
+            return None
+        # Only render the first font.
+        return model[item[0][0]][0]
+
+    def render_font(self, widget):
         # Heroic efforts to keep font changes in the Entry from
         # making the whole window resize every time.
         # GTK offers no way to say "make the damn entry stay the same size."
         #self.allow_grow = False
         #self.set_property("allow-grow", False)
         alloc = self.preview.get_allocation()
-        if alloc.width > 1 and alloc.height > 1 :
+        if alloc.width > 1 and alloc.height > 1:
             self.preview.set_size_request(alloc.width, alloc.height)
 
-        selection = self.treeView.get_selection()
-        model, item = selection.get_selected_rows()
-        if not item :
-            return
-
+        fontname = self.current_font()
         size = int(self.sizespin.get_value()) * pango.SCALE
-
-        # Only render the first font.
-        fontname = model[item[0][0]][0]
 
         fontdesc = pango.FontDescription(fontname)
         fontdesc.set_size(size)
-        if self.bold_btn.get_active() :
+        if self.bold_btn.get_active():
             fontdesc.set_weight(pango.WEIGHT_BOLD)
-        else :
+        else:
             fontdesc.set_weight(pango.WEIGHT_NORMAL)
-        if self.italic_btn.get_active() :
+        if self.italic_btn.get_active():
             fontdesc.set_style(pango.STYLE_ITALIC)
-        else :
+        else:
             fontdesc.set_style(pango.STYLE_NORMAL)
 
         self.preview.modify_font(fontdesc)
@@ -644,10 +654,51 @@ class FontApp(gtk.Window) :
         # So for now, live with the user not being able to resize smaller.
         #self.preview.set_size_request(-1, -1)
 
-    def show_all_categories(self, widget) :
-        for btn in self.category_buttons :
+    def show_all_categories(self, widget):
+        for btn in self.category_buttons:
             btn.set_active(False)
         self.update_font_list()
 
-FontApp()
-gtk.main()
+def python_fu_fontasia():
+    fontwin = FontApp()
+
+    # fontwin.connect("destroy", gtk.main_quit)
+    # gtk.main()
+
+    while not fontwin.quit:
+        gtk.main_iteration()
+
+    pdb.gimp_context_set_font(fontwin.current_font())
+
+if __name__ == '__main__':
+    import sys
+    # Are we being run as a GIMP plug-in?
+    if sys.argv[0].endswith("gimp"):
+        from gimpfu import *
+
+        register(
+            "python_fu_fontasia",
+            "An alternate font chooser.",
+            "An alternate font chooser.",
+            "Akkana Peck",
+            "Akkana Peck",
+            "2016",
+            "Fontasia...",
+            "",
+            [
+                # No arguments
+            ],
+            [],
+            python_fu_fontasia,
+            menu = "<Image>/Windows/"
+        )
+
+        # Call GIMP's main loop, which will call python_fu_fontasia
+        # and handle cleaning up afterward.
+        main()
+    else:
+        fontwin = FontApp()
+        while not fontwin.quit:
+            gtk.main_iteration()
+        # Trust that the FontApp has already saved new categories, etc.
+        sys.exit(0)

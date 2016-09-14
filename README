@@ -123,6 +123,7 @@ fixbookcover:
 
 fontasia:
     A Linux font chooser and categorizer.
+    Also works as a GIMP plug-in font chooser.
 
 fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
