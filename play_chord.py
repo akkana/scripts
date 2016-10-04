@@ -36,6 +36,42 @@ def second_harmonic(hz):
     "Compute a wave with a strong second harmonic."
     return sine_array(hz, 16384) + sine_array(hz * 2, 16384)
 
+def make_chord(hz, ratios):
+    """Make a chord based on a list of frequency ratios."""
+    sampling = 4096    # or 16384
+    chord = sine_array(hz, sampling)
+    for r in ratios[1:]:
+        chord = sum([chord, sine_array(hz * r / ratios[0], sampling)])
+    return chord
+
+# Some popular chords and their frequency ratios:
+def fundamental(hz):
+    return make_chord(hz, [1])
+
+def third(hz):
+    return make_chord(hz, [4, 5])
+
+def fifth(hz):
+    return make_chord(hz, [2, 3])
+
+def major(hz):
+    return make_chord(hz, [4, 5, 6])
+
+def minor(hz):
+    return make_chord(hz, [10, 12, 15])
+
+def diminished(hz):
+    return make_chord(hz, [160, 192, 231])
+
+def seventh(hz):
+    return make_chord(hz, [20, 25, 30, 36])
+
+def minor_seventh(hz):
+    return make_chord(hz, [10, 12, 15, 18])
+
+def major_seventh(hz):
+    return make_chord(hz, [8, 10, 12, 15])
+
 def brass(hz):
     "Compute a sound with some odd harmonics. Doesn't really sound brassy."
     return sum([sine_array(hz, 4096),
@@ -50,11 +86,25 @@ def play_for(sample_array, ms):
     sound.stop()
 
 def main():
+    length = 1000
     pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
     pygame.init()
-    # play_for(sine_array(440, 4096), 500)
-    play_for(second_harmonic(440), 500)
-    # play_for(brass(440), 500)
+
+    # play_for(sine_array(440, 4096), length)
+    # play_for(second_harmonic(440), length)
+    # play_for(sine_array(440, 4096) + sine_array(440 * 5/4, 4096), length)
+    play_for(brass(440), length)
+
+    play_for(fundamental(440), length)
+    play_for(third(440), length)
+    play_for(fifth(440), length)
+
+    play_for(major(440), length)
+    play_for(minor(440), length)
+    play_for(diminished(440), length)
+    play_for(seventh(440), length)
+    play_for(minor_seventh(440), length)
+    play_for(major_seventh(440), length)
 
 if __name__ == '__main__':
     main()
