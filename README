@@ -172,6 +172,9 @@ pisoothe:
     in a loop, reacting to key events for volume control or to skip
     to the next sample.
 
+play_chord.py:
+    Example of how to generate and play chords using Python and NumPy.
+
 podcopy:
     Copy podcasts (fetched with podget) to a mounted mp3 player or directory,
     or to an Android device via adb.
