@@ -78,6 +78,31 @@ def brass(hz):
                 sine_array(hz * 3, 4096),
                 sine_array(hz * 5, 4096)])
 
+# https://mail.python.org/pipermail/tutor/2009-January/066173.html
+def waves(*chord):
+    # Compute the harmonic series for a vector of frequencies
+    # Create square-like waves by adding odd-numbered overtones for each
+    # fundamental tone in the chord.
+    # The amplitudes of the overtones are inverse to their frequencies.
+    h=9
+    ot=3
+    harmonic=sine_array(chord[0],4096)
+    while (ot<h):
+        if (ot*chord[0])<(sample_rate/2):
+	    harmonic=harmonic+(sine_array(chord[0]*ot, 4096/(2*ot)))
+        else:
+	    harmonic=harmonic+0
+            ot+=2
+    for i in range(1,len(chord)):
+        harmonic+=(sine_array(chord[i], 4096))
+
+        if (ot*chord[i])<(sample_rate/2):
+            harmonic=harmonic+(sine_array(chord[i]*ot, 4096/(2*ot)))
+        else:
+            harmonic=harmonic+0
+        ot+=2
+    return harmonic
+
 def play_for(sample_array, ms):
     "Play given samples, as a sound, for N ms."
     sound = pygame.sndarray.make_sound(sample_array)
@@ -105,6 +130,10 @@ def main():
     play_for(seventh(440), length)
     play_for(minor_seventh(440), length)
     play_for(major_seventh(440), length)
+
+    pygame.time.delay(300)
+
+    play_for(waves(440,550,660,770,880), length)
 
 if __name__ == '__main__':
     main()
