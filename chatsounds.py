@@ -1,11 +1,11 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2
 
 # xchat script to play different sounds in different circumstances.
 # Copyright 2012 by Akkana Peck, http://shallowsky.com.
 # Share and enjoy under the GPLv2 or (at your option) any later version.
 
-__module_name__ = "chatsounds" 
-__module_version__ = "0.2" 
+__module_name__ = "chatsounds"
+__module_version__ = "0.3"
 __module_description__ = "Plays sounds when it sees keywords"
 __module_author__ = "Akkana Peck <akkana@shallowsky.com>"
 
@@ -24,6 +24,14 @@ SILENCED_CHANNELS = [ '#twitter_akkakk' ]
 # If it's set, we might get debug messages written to it.
 Debug = None
 # Debug = sys.stderr
+
+def debugprint(*args, **kwargs):
+    if 'file' not in kwargs:
+        return
+    outfile = kwargs['file']
+
+    # Can't seem to pass just *args to print in python 2
+    print >>outfile, ' '.join(map(str, args))
 
 class SoundPlayer :
     """
@@ -108,7 +116,7 @@ class XchatSoundHandler :
 
         self.silenced_channels = SILENCED_CHANNELS
 
-        print("Loaded chatsounds.py")
+        debugprint("Loaded chatsounds.py")
 
     def handle_message(self, word, word_eol, userdata):
         '''
@@ -139,7 +147,7 @@ class XchatSoundHandler :
         # For debugging. But this goes to the channel and makes things
         # hard to follow. Would be better to debug to a log file.
         if Debug :
-            print("Channel %s, network %s: %s" % (str(channel), str(network),
+            debugprint("Channel %s, network %s: %s" % (str(channel), str(network),
                                                   str(line)), file=Debug)
 
         # Now, customize the rest as desired. Here are some examples:
@@ -147,7 +155,7 @@ class XchatSoundHandler :
         # Anyone addressing or mentioning my nick:
         if line.find(mynick) > 0 and word[0] != 'NickServ' :
             if Debug :
-                print(">>> chatsounds", userdata,
+                debugprint(">>> chatsounds", userdata,
                       "network =", network,
                       "channel =", channel,
                       ">>>>> Contains my nick!", userdata,
@@ -164,14 +172,14 @@ class XchatSoundHandler :
             # In fact, if we could just delete those tabs it would be great.
             if network != 'Bitlbee' :
                 if Debug :
-                    print(">>> chatsounds", userdata,
+                    debugprint(">>> chatsounds", userdata,
                           "network =", network,
                           "channel =", channel,
                           file=Debug)
                 self.player.play(os.path.join(self.sound_dir, SPECIAL_SOUND))
             else:
                 if Debug :
-                    print(">>> chatsounds skipping bitlbee",
+                    debugprint(">>> chatsounds skipping bitlbee",
                           userdata, "network =", network,
                           "channel =", channel,
                           file=Debug)
@@ -181,10 +189,10 @@ class XchatSoundHandler :
         elif userdata.startswith("Private Message") :
             if channel == "root":
                 if Debug :
-                    print("Skipping channel==root")
+                    debugprint("Skipping channel==root")
             else:
                 if Debug :
-                    print(">>> chatsounds private message!",
+                    debugprint(">>> chatsounds private message!",
                           userdata,
                           "network =", network,
                           "channel =", channel,
@@ -219,11 +227,11 @@ class XchatSoundHandler :
         if word[1] == 'silence' :
             if channel not in self.silenced_channels :
                 self.silenced_channels.append(channel)
-            print("chatsounds: silenced", channel, self.silenced_channels)
+            debugprint("chatsounds: silenced", channel, self.silenced_channels)
         elif word[1] == 'unsilence' :
             if channel in self.silenced_channels :
                 self.silenced_channels.remove(channel)
-            print("chatsounds: unsilenced", channel, self.silenced_channels)
+            debugprint("chatsounds: unsilenced", channel, self.silenced_channels)
 
         return xchat.EAT_ALL
 
