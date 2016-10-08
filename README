@@ -160,6 +160,7 @@ mouseevent.py:
 
 musicplayer.py:
     A little toy music player in Python, illustrating how to play audio.
+    Actually more than a toy now -- I use it as my main music player.
 
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
