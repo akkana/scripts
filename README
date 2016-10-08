@@ -129,6 +129,9 @@ fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
 
+htmlmail.py:
+    Compose and send HTML mail, including image attachments.
+
 imageviewer.py:
     A generic image viewer widget and image viewer window that can
     be imported into other python programs.
