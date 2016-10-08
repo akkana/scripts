@@ -147,6 +147,10 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+moonpos:
+    Predict when the moon (or another body) will be at a specified
+    altitude and azimuth during a specified time window
+
 mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
