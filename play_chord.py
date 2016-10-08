@@ -54,7 +54,9 @@ def sawtooth_wave(hz, peak, rising_ramp_width=1, n_samples=sample_rate):
     return (peak * 4 * wave.astype(numpy.int16))
 
 def make_chord(hz, ratios, waveform=None):
-    """Make a chord based on a list of frequency ratios."""
+    """Make a chord based on a list of frequency ratios.
+       using a given waveform (defaults to a sine wave).
+    """
     sampling = 4096    # or 16384
     if not waveform:
         waveform = sine_wave
