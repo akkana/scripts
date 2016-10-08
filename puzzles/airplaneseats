@@ -1,0 +1,66 @@
+#! /usr/bin/env python
+
+# Cartalk puzzler on airplane seats
+
+import random
+
+random.seed()
+
+def simulate(numseats):
+    '''Return True if you got your seat, False otherwise'''
+
+    # Each passenger in line has an assigned seat
+    passenger_assigned_seats = [ i for i in range(numseats) ]
+    random.shuffle(passenger_assigned_seats)
+    print "Assigned seats:", passenger_assigned_seats
+
+    # The seats still available, not occupied.
+    available_seats = set([ i for i in range(numseats) ])
+
+    for i in range(numseats):
+        # The passenger 0 lost his boarding pass,
+        # and always picks a random seat.
+        # Everybody else chooses a random seat only if his assigned
+        # seat is already occupied.
+        if i > 0 and passenger_assigned_seats[i] in available_seats:
+            seat = passenger_assigned_seats[i]
+            print "Passenger", i, "got their assigned seat,", seat
+            available_seats.remove(seat)
+            continue
+
+        seat = random.sample(available_seats, 1)[0]
+        print "Passenger", i, "picked", seat,
+        if passenger_assigned_seats[i] == seat:
+            print " -- which is correct!"
+            available_seats.remove(seat)
+            continue
+        # If the passenger picked your seat, then you're definitely hosed.
+        elif seat == passenger_assigned_seats[-1]:
+            print "-- that's your seat! Bailing."
+            return False
+        else:
+            print "-- it belonged to passenger", \
+                passenger_assigned_seats.index(seat)
+            print "Trying to remove seat", seat, "from", available_seats
+            available_seats.remove(seat)
+
+    # We just did you, the last passenger. Did you get your seat?
+    print "We're at the end. i is", i, ", seat is", seat, ", your assigned seat was", passenger_assigned_seats[-1]
+    if seat == passenger_assigned_seats[-1]:
+        print "You got your seat!"
+        return True
+    print "You didn't get your seat"
+    return False
+
+if __name__ == '__main__':
+    runs = 1000
+    seats = 100
+    success = 0
+    for i in range(runs):
+        print "================="
+        if simulate(seats):
+            success += 1
+
+    print "You got your seat in %d of %d runs or %.0f%%" % (success, runs,
+                                                            success*100./runs)
+
