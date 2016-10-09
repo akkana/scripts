@@ -13,25 +13,80 @@ from email.mime.text import MIMEText
 from email.MIMEImage import MIMEImage
 import smtplib
 
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 
-def compose_email_msg(recipient, sender, subject, text, html):
-    """Compose an HTML email message which may include attached images."""
-    # Create message container - the correct MIME type is multipart/alternative.
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = sender
-    msg['To'] = recipient
+def compose_email_msg(recipient, sender, html, text=None):
+    """Compose an HTML email message which may include attached images.
+       @param recipient Email address of the recipient
+       @param sender Email address of the sender
+       @param html The HTML desired for the body.
+                   The first <title> or <h1> tag will be used as the subject.
+       @param text Optional text part:
+                   If False or None, no text part will be sent.
+                   If True, we'll try to generate plaintext from the HTML.
+                   Otherwise pass in the desired plain text (str or unicode).
+       @return A MIME message object.
+    """
+    soup = BeautifulSoup(html, "lxml")
 
     # Attach MIME-encoded parts into message container.
     # According to RFC 2046, the last part of a multipart message,
     # in this case the HTML message, is best and preferred.
-    msg.attach(MIMEText(text, 'plain'))
+
+    # Special case: text=True will ask BeautifulSoup to convert
+    # the HTML into text. Otherwise, pass in a text part if you want it.
+    # If text is None, no text part will be attached.
+    if (text == True):
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(soup.get_text(), 'plain'))
+    elif (text):
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(text, 'plain'))
+    else:
+        # No text part, so we don't need multipart/alternative.
+        # However, we may still want to attach images, so we still
+        # need multipart/related.
+        msg = MIMEMultipart('related')
+
+    # XXX Note that we might want multipart/mixed if we ever add
+    # other types of file attachments besides images embedded in HTML.
+    # Basically, we eventually want structure like:
+    # mixed
+    #     alternative
+    #         text
+    #         related
+    #             html
+    #             inline image
+    #             inline image
+    #     attachment
+    #     attachment
+
+    # Now the container is created, so we can add sender and recipient.
+    msg['From'] = sender
+    msg['To'] = recipient
+
+    # See if the HTML message already has a subject,
+    # either in <title> or <h1>. If not, use a default.
+    title = soup.find("title")
+    if title:
+        subject = title.string.strip()
+    else:
+        title = soup.find("h1")
+        if title:
+            subject = title.text.strip()
+        else:
+            subject = "An HTML message"
+
+    print "Subject is", subject
+    msg['Subject'] = subject
+
+    # Attach the HTML part.
     msg.attach(MIMEText(html, 'html'))
 
-    # Now handle images embedded in the HTML.
+    # Now handle any images embedded in the HTML.
+    # XXX We might want to get the findAll img list first,
+    # because if there are no images, we can use MIME non-multipart.
     imgnames = set()
-    soup = BeautifulSoup(html)
     for tag in soup.findAll('img'):
         src = tag.get("src")
         if src.startswith("file://"):
@@ -70,7 +125,6 @@ def send_msg(recipient, sender, msg, smtp_server,
 
     server.sendmail(sender, recipient, msg.as_string())
     server.quit()
-    print "Sent to", recipient
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
@@ -80,12 +134,7 @@ if __name__ == "__main__":
 
     recipient, sender, htmlfile, smtp_server, smtp_user, smtp_passwd = sys.argv[1:]
 
-    # Create the body of the message (a plain-text and an HTML version).
-    text = """Here is some lame alternate plaintext."""
-    subject = "HTML mail with images"
-    fp = open(htmlfile)
-    html = fp.read()
-    fp.close()
-
-    msg = compose_email_msg(recipient, sender, subject, text, html)
+    with open(htmlfile) as fp:
+        html = fp.read()
+    msg = compose_email_msg(recipient, sender, html)
     send_msg(recipient, sender, msg, smtp_server, smtp_user, smtp_passwd, 587)
