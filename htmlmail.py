@@ -32,25 +32,7 @@ def compose_email_msg(recipient, sender, html, text=None):
     # Attach MIME-encoded parts into message container.
     # According to RFC 2046, the last part of a multipart message,
     # in this case the HTML message, is best and preferred.
-
-    # Special case: text=True will ask BeautifulSoup to convert
-    # the HTML into text. Otherwise, pass in a text part if you want it.
-    # If text is None, no text part will be attached.
-    if (text == True):
-        msg = MIMEMultipart('alternative')
-        msg.attach(MIMEText(soup.get_text(), 'plain'))
-    elif (text):
-        msg = MIMEMultipart('alternative')
-        msg.attach(MIMEText(text, 'plain'))
-    else:
-        # No text part, so we don't need multipart/alternative.
-        # However, we may still want to attach images, so we still
-        # need multipart/related.
-        msg = MIMEMultipart('related')
-
-    # XXX Note that we might want multipart/mixed if we ever add
-    # other types of file attachments besides images embedded in HTML.
-    # Basically, we eventually want structure like:
+    # In the general case, the structure looks like:
     # mixed
     #     alternative
     #         text
@@ -60,6 +42,32 @@ def compose_email_msg(recipient, sender, html, text=None):
     #             inline image
     #     attachment
     #     attachment
+    # For now we don't handle attachments other than embedded images
+    # so we don't need mixed.
+
+    # Are there any embedded images? We aren't ready to use them now,
+    # but we need to know whether to use MIME multipart/related.
+    embedded_images = soup.findAll('img')
+    if embedded_images:
+        html_part = MIMEMultipart('related')
+        html_part.attach(MIMEText(html, 'html'))
+    else:
+        html_part = MIMEText(html, 'html')
+
+    # Attach the text and HTML parts.
+    # Special case: text=True will ask BeautifulSoup to convert
+    # the HTML into text. Otherwise, pass in a text part if you want it.
+    # If text is None, no text part will be attached.
+    if not text:
+        msg = html_part
+    elif text == True:
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(soup.get_text(), 'plain'))
+        msg.attach(html_part)
+    else:
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(text, 'plain'))
+        msg.attach(html_part)
 
     # Now the container is created, so we can add sender and recipient.
     msg['From'] = sender
@@ -80,14 +88,11 @@ def compose_email_msg(recipient, sender, html, text=None):
     print "Subject is", subject
     msg['Subject'] = subject
 
-    # Attach the HTML part.
-    msg.attach(MIMEText(html, 'html'))
-
     # Now handle any images embedded in the HTML.
     # XXX We might want to get the findAll img list first,
     # because if there are no images, we can use MIME non-multipart.
     imgnames = set()
-    for tag in soup.findAll('img'):
+    for tag in embedded_images:
         src = tag.get("src")
         if src.startswith("file://"):
             src = src[7:]
@@ -104,7 +109,7 @@ def compose_email_msg(recipient, sender, html, text=None):
         print "Attaching %s as <%s>" % (src, imgname)
         msgImage.add_header('Content-ID', '<%s>' % imgname)
         imgnames.add(imgname)
-        msg.attach(msgImage)
+        html_part.attach(msgImage)
 
     return msg
 
@@ -136,5 +141,5 @@ if __name__ == "__main__":
 
     with open(htmlfile) as fp:
         html = fp.read()
-    msg = compose_email_msg(recipient, sender, html)
+    msg = compose_email_msg(recipient, sender, html, True)
     send_msg(recipient, sender, msg, smtp_server, smtp_user, smtp_passwd, 587)
