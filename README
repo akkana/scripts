@@ -264,6 +264,10 @@ termsize:
     Set stty size to the size of the current terminal window
     (e.g. when logged in to an embedded Posix device over a serial line).
 
+turtlefrac.py:
+    Draw fractals (specifically a Sierpinski triangle)
+    as an example of how to use Python turtle graphics.
+
 tweet:
     Play birdsong from a specific bird. Requires ripped tracks from a
     bird song CD: for example, the Stokes, Cornell or Peterson collections.
