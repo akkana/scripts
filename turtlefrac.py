@@ -7,6 +7,8 @@ import sys
 whichcolor = 0
 colors = [ "black", "white" ]
 
+screen = turtle.Screen()
+
 def triangle(side):
     """Draw an equilateral triangle with the point on the current point,
        the base in the direction of the current heading.
@@ -64,10 +66,21 @@ turtle.fill(True)
 triangle(500)
 turtle.fill(False)
 
+def end_program():
+    print "Ouch!"
+    screen.bye()
+
+screen.onkey(end_program, "q")
+screen.listen()
+
 if len(sys.argv) <= 1:
     steps = 5
 else:
     steps = int(sys.argv[1])
-Sierpinski(250, steps)
 
-turtle.mainloop()
+try:
+    Sierpinski(250, steps)
+
+    turtle.mainloop()
+except turtle.Terminator:
+    print "Turtle Terminator"
