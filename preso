@@ -56,6 +56,10 @@ class PresoViewer(gtk.Window):
         self.browser.open(url)    # throw err if url isn't defined
         self.show_all()
 
+        # Try to prevent the window from resizing if content unexpectedly grows:
+        self.resize(self.fullwidth, self.fullheight)
+        self.set_size_request(self.fullwidth, self.fullheight)
+
     # An attempt to print to PDF. None of this works.
     # Nobody seems to know how to do it from Python, though
     # there's a C++ webkit printing example that's said to work:
@@ -140,6 +144,6 @@ if __name__ == "__main__":
             url = 'file://' + os.getcwd() + '/' + url
 
     gobject.threads_init()
-    webbrowser = PresoViewer(url, zoom=0.5, show_notes=False)
+    webbrowser = PresoViewer(url, zoom=1, show_notes=True)
     gtk.main()
 
