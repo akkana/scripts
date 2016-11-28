@@ -133,13 +133,20 @@ def send_msg(recipient, sender, msg, smtp_server,
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
-        print "Usage: %s to_address from_address htmlfile smtp_server [smtp_user smtp_password]" \
+        print """Usage: %s [-t] to_address from_address htmlfile smtp_server [smtp_user smtp_password]
+    -t:    add a text part""" \
               % os.path.basename(sys.argv[0])
         sys.exit(1)
 
-    recipient, sender, htmlfile, smtp_server, smtp_user, smtp_passwd = sys.argv[1:]
+    args = sys.argv[1:]
+    if args[0] == "-t":
+        text_part = True
+        args = args[1:]
+    else:
+        text_part = False
+    recipient, sender, htmlfile, smtp_server, smtp_user, smtp_passwd = args
 
     with open(htmlfile) as fp:
         html = fp.read()
-    msg = compose_email_msg(recipient, sender, html, True)
+    msg = compose_email_msg(recipient, sender, html, text_part)
     send_msg(recipient, sender, msg, smtp_server, smtp_user, smtp_passwd, 587)
