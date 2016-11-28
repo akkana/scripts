@@ -92,7 +92,7 @@ diff2rss:
     A possible (though poor) solution for web pages that don't offer RSS feeds.
 
 diffiles.py:
-    Find files that differ between two directories -- even if 
+    Find files that differ between two directories -- even if
     they've been moved to different places in the directory structure.
 
 doc2html:
