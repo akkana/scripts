@@ -34,7 +34,7 @@ Harder:
 import sys, os
 import re
 import subprocess
-from BeautifulSoup import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Tag
 
 def Usage():
     print "Usage: %s infile outfile" % os.path.basename(sys.argv[0])
@@ -53,7 +53,7 @@ if ext == ".doc":
     except:
         print "Need wvHtml installed!"
         sys.exit(1)
-elif lower == ".html":
+elif ext == ".html":
     htmlfile = sys.argv[1]
 else:
     Usage()
@@ -74,7 +74,7 @@ print "infile:", sys.argv[1]
 print "outfile:", outfile
 
 fp = open(htmlfile)
-soup = BeautifulSoup(fp)
+soup = BeautifulSoup(fp, "lxml")
 fp.close()
 
 # Remove any <div name="Normal" ...>
@@ -84,14 +84,19 @@ for tag in tags:
     tag.replaceWithChildren()
 
 # Remove <p style="">
-tags = soup.findAll('p', {'style': re.compile("background-color: White")})
-for tag in tags:
+# tags = soup.findAll('p', {'style': re.compile("background-color: White")})
+# for tag in tags:
+#     tag.replaceWithChildren()
+
+# Remove all div name="Body" (but keep children)
+for tag in soup.findAll('div', {'name': "Body"}):
     tag.replaceWithChildren()
 
-# Remove style on every <p>
-# tags = soup.findAll('p')
-# for tag in tags:
-#     del tag["style"]
+# Remove style on every <p> and <div>
+for tag in soup.findAll('p'):
+    del tag["style"]
+for tag in soup.findAll('div'):
+    del tag["style"]
 
 # Remove any <img src="StrangeNoGraphicData" ...>
 tags = soup.findAll('img', {'src': "StrangeNoGraphicData"})
@@ -113,6 +118,12 @@ for tag in tags:
 for tag in soup.findAll():
     if not tag.text.strip():
         tag.extract()
+
+# Remove any tags (usually color ones) from <body>:
+for tag in soup.findAll("body"):
+    attrs = list(tag.attrs)
+    for attr in attrs:
+        del tag[attr]
 
 # XXX If I can figure out how, consolidate adjacent tags like:
 #    <font color="Black">
@@ -136,7 +147,7 @@ fp = open(outfile, 'w')
 # soup = BeautifulSoup(s)
 # print >>fp, soup.prettify()
 
-print >>fp, str(soup)
+print >>fp, soup.prettify()
 
 fp.close()
 
