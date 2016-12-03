@@ -99,6 +99,10 @@ doc2html:
     Run wvHtml on a .doc file, but then use BeautifulSoup to clean
     up at least some of the mess wvHtml makes.
 
+docx2html:
+    Run mammoth on a .docx file to convert to HTML, then prettyprint
+    it with BeautifulSoup.
+
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
 
