@@ -58,8 +58,14 @@ args = sys.argv[2:patindex]
 # the file list, if any, is sys.argv[patindex+1:]
 # If no file list, use ~/bin/*
 if patindex >= len(sys.argv):
-    os.chdir(os.path.join(os.getenv("HOME"), "bin"))
-    files = os.listdir(".")
+    # Look in ~/bin
+    bindir = os.path.join(os.getenv("HOME"), "bin")
+    files = map(lambda f: os.path.join(bindir, f), os.listdir(bindir))
+
+    # If language is python, also look in ~/bin/pythonpath
+    pypathdir = os.path.join(bindir, "pythonpath")
+    if lang == "python" and os.path.exists(pypathdir):
+        files += map(lambda f: os.path.join(bindir, f), os.listdir(pypathdir))
 else :
     files = sys.argv[patindex:]
 
