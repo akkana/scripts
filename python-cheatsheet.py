@@ -20,6 +20,28 @@ def walkfiles(rootdir):
             print f
 
 #
+# Parse a date in RFC 2822 format.
+#
+# email.utils.parsedate returns a tuple.
+t = time.mktime(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
+(y, m, d, h, m, s, weekday, yearday, isdst) = t
+# the last three items of the tuple aren't very useful: typically 0, 1, -1.
+# -1 means "unknown" for the dst flag.
+secs_since_epoch = time.mktime(t)
+
+t2 = time.mktime_tz(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
+(y, m, d, h, m, s, weekday, yearday, isdst, offset_from_utc) = t2
+secs_since_epoch = email.utils.mktime_tz(t2)
+
+#
+# Parse a date in unknown format into a datetime.datetime object
+#
+import dateutil.parser
+d = dateutil.parser.parse("2012-08-16 14:25:05.265739")
+d = dateutil.parser.parse("10/31/2016 14:25")
+d = dateutil.parser.parse("6/15/2016 14:25 MDT")
+
+#
 # map + lambda example
 #
 def helloall(names):
