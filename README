@@ -168,6 +168,7 @@ musicplayer.py:
 
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
+    Linux-specific.
 
 nokeywords:
     Find directories beneath the present one that don't contain a
