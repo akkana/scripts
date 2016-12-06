@@ -17,7 +17,8 @@ import time
 NORMAL_SOUND = "pop.wav"
 SUBTLE_SOUND = "SingleClick.wav"
 SPECIAL_SOUND = "akk.wav"
-SILENCED_CHANNELS = [ '#twitter_akkakk' ]
+# Channels silenced by default, because they're too active:
+SILENCED_CHANNELS = [ '#twitter_akkakk', '#python' ]
 # End configuration.
 
 # The debugging log file.
