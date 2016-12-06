@@ -63,7 +63,7 @@ class EpubBook:
         self.filename = None
         self.zip = None
         self.dom = None
- 
+
     def get_matches(self, elname, delete_tags=False):
         '''Find matching tags in the OPF DOM.
            If delete_tags is true, all such tags will be deleted
