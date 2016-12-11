@@ -11,6 +11,7 @@ import sys, os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.MIMEImage import MIMEImage
+from email.header import Header
 import smtplib
 
 from bs4 import BeautifulSoup
@@ -28,6 +29,19 @@ def compose_email_msg(recipient, sender, html, text=None):
        @return A MIME message object.
     """
     soup = BeautifulSoup(html, "lxml")
+
+    # Do we need to UTF-encode anything in the message?
+    # This clause would make sense if input was unicode,
+    # but it's actually bytes read in with fp.read().
+    # if contains_non_ascii_characters(html):
+    #     print "Encoded:", html.encode('utf-8')
+    #     print "."
+    #     html_mime = MIMEText(html.encode('utf-8'), 'html','utf-8')
+    # else:
+    #     html_mime = MIMEText(html, 'html')
+    # So for now, let's assume the bytes read in are always UTF-8
+    # and send them with that encoding:
+    html_mime = MIMEText(html, 'html','utf-8')
 
     # Attach MIME-encoded parts into message container.
     # According to RFC 2046, the last part of a multipart message,
@@ -50,9 +64,9 @@ def compose_email_msg(recipient, sender, html, text=None):
     embedded_images = soup.findAll('img')
     if embedded_images:
         html_part = MIMEMultipart('related')
-        html_part.attach(MIMEText(html, 'html'))
+        html_part.attach(html_mime)
     else:
-        html_part = MIMEText(html, 'html')
+        html_part = html_mime
 
     # Attach the text and HTML parts.
     # Special case: text=True will ask BeautifulSoup to convert
@@ -70,8 +84,8 @@ def compose_email_msg(recipient, sender, html, text=None):
         msg.attach(html_part)
 
     # Now the container is created, so we can add sender and recipient.
-    msg['From'] = sender
-    msg['To'] = recipient
+    msg['From'] = encode_header(sender)
+    msg['To'] = encode_header(recipient)
 
     # See if the HTML message already has a subject,
     # either in <title> or <h1>. If not, use a default.
@@ -86,7 +100,7 @@ def compose_email_msg(recipient, sender, html, text=None):
             subject = "An HTML message"
 
     print "Subject is", subject
-    msg['Subject'] = subject
+    msg['Subject'] = encode_header(subject)
 
     # Now handle any images embedded in the HTML.
     # XXX We might want to get the findAll img list first,
@@ -112,6 +126,15 @@ def compose_email_msg(recipient, sender, html, text=None):
         html_part.attach(msgImage)
 
     return msg
+
+def contains_non_ascii_characters(s):
+    return not all(ord(c) < 128 for c in s)
+
+def encode_header(header_txt):
+    if contains_non_ascii_characters(header_txt):
+        return Header(header_txt, 'utf-8')
+    else:
+        return header_txt
 
 def send_msg(recipient, sender, msg, smtp_server,
              smtp_user=None, smtp_passwd=None, smtp_port=587):
