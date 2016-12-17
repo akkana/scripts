@@ -91,3 +91,35 @@ if __name__ == "__main__":
     import os
     print "This is file:   ", __file__
     print "which is really:", os.path.realpath(__file__)
+
+#
+# Enum values in PyGTK. I'm forever running up against dialogs that
+# return some random undocumented negative number from run(),
+# and there's no way to find out which gtk.RESPONSE_FOO
+# the negative number corresponds to.
+#
+def enumval(e):
+    for i in range(-1000, 1000):
+        if e == i:
+            return i
+    return None
+
+# This is also a useful hint for how to look up an arbitrary string
+# in the environment.
+# list from http://www.pygtk.org/pygtk2reference/gtk-constants.html#gtk-response-type-constants
+for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "YES", "NO", "APPLY", "HELP"):
+    print s, eval("enumval(gtk.RESPONSE_" + s + ")")
+# As of Dec 2016, this gives:
+# NONE -1
+# REJECT -2
+# ACCEPT -3
+# DELETE_EVENT -4
+# OK -5
+# CANCEL -6
+# CLOSE -7
+# YES -8
+# NO -9
+# APPLY -10
+# HELP -11
+
+
