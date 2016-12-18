@@ -13,17 +13,9 @@ import cgitb
 cgitb.enable()
 
 class BirdCodes:
-    def match_code(self, matchcode):
-        match = self.match_codes([matchcode])
-        if not match:
-            return None
-        if len(match) == 1:
-            return match[0]
-        return match
+    def __init__(self):
+        self.allbirds = {}
 
-    def match_codes(self, matchcodes):
-        matchcodes = map(str.upper, matchcodes)
-        matches = {}
         # fp = StringIO.StringIO(BirdCodes.birdpopcodes_csv)
         fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
         reader = csv.reader(fp)
@@ -38,47 +30,40 @@ class BirdCodes:
             sciname = None
 
         for fields in reader:
-            code = fields[code4]
-            if code in matchcodes:
-                if sciname:
-                    matches[code] = (fields[name], fields[sciname])
-                else:
-                    matches[code] = (fields[name], '')
-            # else:
-            #     print code, "NOT in", matchcodes
+            if sciname:
+                self.allbirds[fields[code4]] = (fields[name], fields[sciname])
+            else:
+                self.allbirds[fields[code4]] = (fields[name], '')
 
-        for code in matchcodes:
-            if code not in matches.keys():
-                matches[code] = ("Couldn't find " + code, "")
+    @staticmethod
+    def makedic(code, name, sciname):
+        ret = { "code": code, "name": name }
+        if sciname:
+            ret["sciname"] = self.allbirds[b][1]
+        return ret
 
+    def match_code(self, matchcode):
+        matchcode = matchcode.upper()
+        if matchcode in self.allbirds:
+            return BirdCodes.makedic(matchcode,
+                                     self.allbirds[matchcode][0],
+                                     self.allbirds[matchcode][1])
+        return None
+
+    def match_codes(self, matchcodes):
+        matches = []
+        for code in matchcode:
+            matches.append(self.match_code(code))
         return matches
 
-    def match_names(self, matchnames):
-        matchnames = map(str.upper, matchnames)
-        print "Trying to match", matchnames
-        matches = {}
-        fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
-        reader = csv.reader(fp)
-
-        # Get the first line, and use it to figure out important fields
-        fields = reader.next()
-        code4 = fields.index('4code')
-        namefield = fields.index('name')
-        if 'sci_name' in fields:
-            sciname = fields.index('sci_name')
-        else:
-            sciname = None
-
-        for fields in reader:
-            name = fields[namefield]
-            if name in matchnames:
-                code = fields[code4]
-                if sciname:
-                    matches[code] = (name, fields[sciname])
-                else:
-                    matches[code] = (name, '')
-
-        return matches
+    def match_name(self, matchname, fuzzy=False):
+        matchname = matchname.upper()
+        for b in self.allbirds:
+            if self.allbirds[b][0] == matchname:
+                return BirdCodes.makedic(b,
+                                         self.allbirds[b][0],
+                                         self.allbirds[b][1])
+        return None
 
     # More comprehensive (but no sci names) list than birdpop.org's at
     # http://infohost.nmt.edu/~shipman/z/nom/bblcodes
@@ -3365,10 +3350,10 @@ What codes do you want to look up? (Comma or space separated.)
 def print_bird_form():
     print bird_form % (os.environ['HTTP_HOST'], os.environ['SCRIPT_NAME'])
 
-def bird_string(code, common, sci):
-    if sci:
-        return '%s: %s (%s)' % (code, common, sci)
-    return '%s: %s' % (code, common)
+def bird_string(dic):
+    if 'sciname' in dic:
+        return '%s: %s (%s)' % (dic["code"], dic["name"], dic["sciname"])
+    return '%s: %s' % (dic["code"], dic["name"])
 
 if __name__ == '__main__':
     birdcodes = BirdCodes()
@@ -3404,7 +3389,8 @@ if __name__ == '__main__':
 
     else:
         # Not a CGI, called from the commandline.
-        codes = sys.argv[1:]
-        matches = birdcodes.match_codes(codes)
-        for key in sorted(matches.keys()):
-            print bird_string(key, matches[key][0], matches[key][1])
+        for code in sys.argv[1:]:
+            if len(code) != 4:
+                print bird_string(birdcodes.match_name(code))
+            else:
+                print bird_string(birdcodes.match_code(code))
