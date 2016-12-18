@@ -6,6 +6,8 @@ import StringIO
 import sys, os
 import re
 
+from difflib import SequenceMatcher
+
 import cgi
 
 # CGI tracebacks:
@@ -56,14 +58,30 @@ class BirdCodes:
             matches.append(self.match_code(code))
         return matches
 
-    def match_name(self, matchname, fuzzy=False):
+    def match_name(self, matchname, fuzzy=True):
         matchname = matchname.upper()
         for b in self.allbirds:
             if self.allbirds[b][0] == matchname:
                 return BirdCodes.makedic(b,
                                          self.allbirds[b][0],
                                          self.allbirds[b][1])
-        return None
+
+        # If we get here, we didn't find an exact match.
+        # Should we try for a fuzzy match instead?
+        if not fuzzy:
+            return None
+
+        best_ratio = -1
+        best_match = None
+        for b in self.allbirds:
+            r = SequenceMatcher(None, matchname, self.allbirds[b][0]).ratio()
+            if r > best_ratio:
+                best_match = b
+                best_ratio = r
+
+        return BirdCodes.makedic(best_match,
+                                 self.allbirds[best_match][0],
+                                 self.allbirds[best_match][1])
 
     # More comprehensive (but no sci names) list than birdpop.org's at
     # http://infohost.nmt.edu/~shipman/z/nom/bblcodes

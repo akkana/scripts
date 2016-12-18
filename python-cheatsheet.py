@@ -61,6 +61,23 @@ def roundall(numbers):
     return map(int, map(round, numbers))
 
 #
+# Fuzzy string match.
+# SequenceMatcher's first argument is a function that returns true for
+# characters considered to be "junk". For instance, if blanks are junk,
+# lambda x: x == " "
+# To consider nothing as junk, pass None.
+#
+from difflib import SequenceMatcher
+
+best_ratio = -1
+best_match = None
+for b in string_list:
+    r = SequenceMatcher(None, matchname, b).ratio()
+    if r > best_ratio:
+        best_match = b
+        best_ratio = r
+
+#
 # sorting + lambda examples.
 #
 # The cmp function is obsolete.
