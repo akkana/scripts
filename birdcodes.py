@@ -13,6 +13,14 @@ import cgitb
 cgitb.enable()
 
 class BirdCodes:
+    def match_code(self, matchcode):
+        match = self.match_codes([matchcode])
+        if not match:
+            return None
+        if len(match) == 1:
+            return match[0]
+        return match
+
     def match_codes(self, matchcodes):
         matchcodes = map(str.upper, matchcodes)
         matches = {}
@@ -42,6 +50,33 @@ class BirdCodes:
         for code in matchcodes:
             if code not in matches.keys():
                 matches[code] = ("Couldn't find " + code, "")
+
+        return matches
+
+    def match_names(self, matchnames):
+        matchnames = map(str.upper, matchnames)
+        print "Trying to match", matchnames
+        matches = {}
+        fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
+        reader = csv.reader(fp)
+
+        # Get the first line, and use it to figure out important fields
+        fields = reader.next()
+        code4 = fields.index('4code')
+        namefield = fields.index('name')
+        if 'sci_name' in fields:
+            sciname = fields.index('sci_name')
+        else:
+            sciname = None
+
+        for fields in reader:
+            name = fields[namefield]
+            if name in matchnames:
+                code = fields[code4]
+                if sciname:
+                    matches[code] = (name, fields[sciname])
+                else:
+                    matches[code] = (name, '')
 
         return matches
 
