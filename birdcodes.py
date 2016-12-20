@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Decode the annoying and nonstandard 4-letter names that serious birders
+# insist on using.
+# Copyright 2015,2016 by Akkana Peck.
+# Please share and enjoy under the GPLv2 or later.
+
+# There is no official list of 4-letter bird codes.
+# For this program, I've combined two lists.
+# The list from http://www.birdpop.org/ has 2213 codes.
+# The list from http://infohost.nmt.edu/~shipman/z/nom/bblcodes has 1006.
+# When I combine them, I end up with 2400 unique codes.
+# I'm sure some are still missing.
+
 import csv
 import StringIO
 import sys, os
@@ -8,18 +20,12 @@ import re
 
 from difflib import SequenceMatcher
 
-import cgi
-
-# CGI tracebacks:
-import cgitb
-cgitb.enable()
-
 class BirdCodes:
     def __init__(self):
         self.allbirds = {}
 
-        # fp = StringIO.StringIO(BirdCodes.birdpopcodes_csv)
-        fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
+        # Start with the birds from birdpop.org:
+        fp = StringIO.StringIO(BirdCodes.birdpopcodes_csv)
         reader = csv.reader(fp)
 
         # Get the first line, and use it to figure out important fields
@@ -37,11 +43,35 @@ class BirdCodes:
             else:
                 self.allbirds[fields[code4]] = (fields[name], '')
 
+        fp.close()
+
+        # But that doesn't have everything, so add in the birds from NMT:
+        fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
+        reader = csv.reader(fp)
+
+        # Get the first line, and use it to figure out important fields
+        fields = reader.next()
+        code4 = fields.index('4code')
+        name = fields.index('name')
+        if 'sci_name' in fields:
+            sciname = fields.index('sci_name')
+        else:
+            sciname = None
+
+        for fields in reader:
+            if fields[code4] in self.allbirds:
+                continue
+            if sciname:
+                self.allbirds[fields[code4]] = (fields[name], fields[sciname])
+            else:
+                self.allbirds[fields[code4]] = (fields[name], '')
+        fp.close()
+
     @staticmethod
     def makedic(code, name, sciname):
         ret = { "code": code, "name": name }
         if sciname:
-            ret["sciname"] = self.allbirds[b][1]
+            ret["sciname"] = sciname
         return ret
 
     def match_code(self, matchcode):
@@ -61,7 +91,7 @@ class BirdCodes:
     def match_name(self, matchname, fuzzy=True):
         matchname = matchname.upper()
         for b in self.allbirds:
-            if self.allbirds[b][0] == matchname:
+            if self.allbirds[b][0].upper() == matchname:
                 return BirdCodes.makedic(b,
                                          self.allbirds[b][0],
                                          self.allbirds[b][1])
@@ -74,8 +104,10 @@ class BirdCodes:
         best_ratio = -1
         best_match = None
         for b in self.allbirds:
-            r = SequenceMatcher(None, matchname, self.allbirds[b][0]).ratio()
+            r = SequenceMatcher(None, matchname,
+                                self.allbirds[b][0].upper()).ratio()
             if r > best_ratio:
+                # print "a little better:", b, self.allbirds[b]
                 best_match = b
                 best_ratio = r
 
@@ -83,8 +115,10 @@ class BirdCodes:
                                  self.allbirds[best_match][0],
                                  self.allbirds[best_match][1])
 
-    # More comprehensive (but no sci names) list than birdpop.org's at
+    # Another list (but no sci names) list at
     # http://infohost.nmt.edu/~shipman/z/nom/bblcodes
+    # It has some birds that birdpop doesn't have, but misses some too.
+    # 1006 total.
     #
     # Some other PDFs that are more comprehensive than birdpop.org's:
     # http://www.wec.ufl.edu/birds/SurveyDocs/species_list.pdf
@@ -1107,8 +1141,7 @@ class BirdCodes:
     # echo ',,4code,,,name,,sci_name,6code,,' >birdpopcodes.csv
     # dbview -b -d , LIST15.DBF | sed 's/ *,/,/g' >>birdpopcodes.csv
     #
-    # XXX Eventually, I need to integrate these two lists
-    # to have the comprehensiveness of bblcodes plus the scientific names.
+    # This list has 2213 entries.
     birdpopcodes_csv = ''',,4code,,,name,,sci_name,6code,,
         ,,HITI,,,Highland Tinamou,,Nothocercus bonapartei,NOTBON,,
         ,,GRTI,,,Great Tinamou,,Tinamus major,TINMAJ,,
@@ -3369,16 +3402,24 @@ def print_bird_form():
     print bird_form % (os.environ['HTTP_HOST'], os.environ['SCRIPT_NAME'])
 
 def bird_string(dic):
+    if not dic:
+        return "Unknown"
     if 'sciname' in dic:
         return '%s: %s (%s)' % (dic["code"], dic["name"], dic["sciname"])
     return '%s: %s' % (dic["code"], dic["name"])
 
 if __name__ == '__main__':
+    import cgi
+
     birdcodes = BirdCodes()
 
     # See if we're being called as a CGI script:
     form = cgi.FieldStorage()
     if 'code' in form:
+        # CGI tracebacks:
+        import cgitb
+        cgitb.enable()
+
         print htmlhead
 
         codes = form['code'].value
