@@ -8,15 +8,120 @@ import ephem
 import sys, math
 
 class AnalemmaWindow:
-    def __init__(self):
+    def __init__(self, observer, year):
+        self.observer = observer
+        self.year = year
+
         self.drawing_area = None
         self.xgc = None
         self.bgc = None
         self.width = 0
         self.height = 0
-        self.observer = None
         self.sun = ephem.Sun()
         self.sinusoidal = False
+
+    def draw_sun_position(self, date):
+        if not self.drawing_area:
+            print "no drawing area"
+            return
+        if not self.xgc:
+            print "no GC"
+            return
+        observer.date = self.local_to_gmt(date, reverse=True)
+
+        self.sun.compute(self.observer)
+
+        # Y scale is 90 degrees (PI/2), horizon to zenith:
+        # y = self.height - int(float(self.sun.alt) * self.height / math.pi * 2)
+
+        # So make X scale 90 degrees too, centered around due south.
+        # Want az = PI to come out at x = width/2,
+        # az = PI/2 to be 0, 3*PI/2 = width.
+        # x = int(float(self.sun.az) * self.width / math.pi * 2 - self.width / 2) % self.width
+
+        self.project_and_draw(self.sun.az, self.sun.alt, 4)
+
+    def ephemdate_to_hours(self, edate):
+        if isinstance(edate, int):
+            return edate
+        etuple = edate.tuple()
+        return etuple[3] + etuple[4]/60. + etuple[5]/3600.
+
+    def calc_special_dates(self):
+        '''Earlist and latest rising and setting times,
+           and longest/shortest day.
+        '''
+        self.special_dates = {
+            'earliest sunrise': 24,
+            'latest sunrise'  :  0,
+            'earliest sunset' : 24,
+            'latest sunset'   :  0,
+            'longest day len' :  0,
+            'shortest day len': 24
+        }
+
+        # Start just after midnight on New Year's Day.
+        dt = self.local_to_gmt('%d/01/01 00:00:01' % (self.year))
+        while (dt.tuple()[0] == self.year):
+            self.observer.date = dt
+            risetime = self.observer.next_rising(ephem.Sun())
+            self.observer.date = risetime
+            settime = self.observer.next_setting(ephem.Sun())
+            self.observer.date = settime
+
+            # Now we're done setting observer time, so it's safe to
+            # convert to localtime.
+            risetime = self.local_mean_time(risetime)
+            settime = self.local_mean_time(settime)
+            risehours = self.ephemdate_to_hours(risetime)
+            sethours = self.ephemdate_to_hours(settime)
+
+            if risehours < self.ephemdate_to_hours(self.special_dates['earliest sunrise']):
+                self.special_dates['earliest sunrise'] = risetime
+            if risehours > self.ephemdate_to_hours(self.special_dates['latest sunrise']):
+                self.special_dates['latest sunrise'] = risetime
+            if sethours < self.ephemdate_to_hours(self.special_dates['earliest sunset']):
+                self.special_dates['earliest sunset'] = settime
+            if sethours > self.ephemdate_to_hours(self.special_dates['latest sunset']):
+                self.special_dates['latest sunset'] = settime
+
+            # calculate daylength in hours
+            daylength = (settime - risetime) * 24.
+            if daylength < self.special_dates['shortest day len']:
+                self.special_dates['shortest day'] = risetime
+                self.special_dates['shortest day len'] = daylength
+            if daylength > self.special_dates['longest day len']:
+                self.special_dates['longest day'] = risetime
+                self.special_dates['longest day len'] = daylength
+
+            dt = ephem.date(dt + ephem.hour * 24)
+
+    def special_dates_str(self):
+        s = "Shortest day: %d" % self.special_dates["shortest day len"]
+        s += " hours on " + str(self.special_dates["shortest day"]) + "\n"
+        s += "Longest day: %d" % self.special_dates["longest day len"]
+        s += " hours on " + str(self.special_dates["longest day"]) + "\n"
+        s += "Earliest sunrise: " + str(self.special_dates["earliest sunrise"]) + "\n"
+        s += "Latest sunrise: " + str(self.special_dates["latest sunrise"]) + "\n"
+        s += "Earliest sunset: " + str(self.special_dates["earliest sunset"]) + "\n"
+        s += "Latest sunset: " + str(self.special_dates["latest sunset"]) + "\n"
+        return s
+
+    def local_mean_time(self, d, reverse=False):
+        '''Adjust GMT to local time.
+           We don't know time zone, but we can adjust for actual
+           local noon since we know the Observer's longitude:
+        '''
+        return ephem.date(ephem.date(d) \
+                    + float(self.observer.lon) * 12 / math.pi * ephem.hour)
+
+    def local_to_gmt(self, d, reverse=False):
+        '''Adjust GMT to local time.
+           We don't know time zone, but we can adjust for actual
+           local noon since we know the Observer's longitude:
+        '''
+        return ephem.date(ephem.date(d) \
+                    - float(self.observer.lon) * 12 / math.pi * ephem.hour)
 
     def draw(self, gc, x, y, dotsize):
         if dotsize == 1:
@@ -87,32 +192,6 @@ class AnalemmaWindow:
         else:
             return self.project_rectangular(az, alt)
 
-    def draw_sun_position(self, date):
-        if not self.drawing_area:
-            print "no drawing area"
-            return
-        if not self.xgc:
-            print "no GC"
-            return
-
-        # We don't know time zone, but we can adjust for actual
-        # local noon since we know the Observer's longitude:
-        adjtime = ephem.date(ephem.date(date) \
-                        - float(self.observer.lon) * 12 / math.pi * ephem.hour)
-        observer.date = adjtime
-
-        self.sun.compute(self.observer)
-
-        # Y scale is 90 degrees (PI/2), horizon to zenith:
-        # y = self.height - int(float(self.sun.alt) * self.height / math.pi * 2)
-
-        # So make X scale 90 degrees too, centered around due south.
-        # Want az = PI to come out at x = width/2,
-        # az = PI/2 to be 0, 3*PI/2 = width.
-        # x = int(float(self.sun.az) * self.width / math.pi * 2 - self.width / 2) % self.width
-
-        self.project_and_draw(self.sun.az, self.sun.alt, 4)
-
     def expose_handler(self, widget, event):
         # print "Expose"
         if not self.xgc:
@@ -170,17 +249,16 @@ class AnalemmaWindow:
         # i.e. the observer's position within their timezone.
         for time in [ '8:00', '12:00', '16:00' ]:
             for m in range(1, 13):
-                self.draw_sun_position('2011/%d/1 %s' % (m, time))
-                self.draw_sun_position('2011/%d/10 %s' % (m, time))
-                self.draw_sun_position('2011/%d/20 %s' % (m, time))
+                self.draw_sun_position('%d/%d/1 %s' % (self.year, m, time))
+                self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
+                self.draw_sun_position('%d/%d/20 %s' % (self.year, m, time))
 
         layout = self.drawing_area.create_pango_layout("Observer: " +
                                                        self.observer.name)
         # layout.set_font_description(self.font_desc)
         self.drawing_area.window.draw_layout(self.xgc, 10, 10, layout)
 
-    def show_window(self, observer):
-        self.observer = observer
+    def show_window(self):
         win = gtk.Window()
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.connect("expose-event", self.expose_handler)
@@ -209,6 +287,8 @@ if __name__ == "__main__":
         observer.lat = '37:15.55'
         observer.elevation = 100
 
-    awin = AnalemmaWindow()
-    awin.show_window(observer)
+    awin = AnalemmaWindow(observer, 2016)
+    awin.calc_special_dates()
+    print awin.special_dates_str()
+    awin.show_window()
 
