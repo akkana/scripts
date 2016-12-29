@@ -5,16 +5,20 @@
 
 import gtk
 import ephem
-import sys, math
+import sys
+import os
+import math
 
 class AnalemmaWindow:
     def __init__(self, observer, year):
         self.observer = observer
         self.year = year
 
+        self.special_dates = None
         self.drawing_area = None
         self.xgc = None
         self.bgc = None
+        self.specialgc = None
         self.width = 0
         self.height = 0
         self.sun = ephem.Sun()
@@ -27,7 +31,7 @@ class AnalemmaWindow:
         if not self.xgc:
             print "no GC"
             return
-        observer.date = self.local_to_gmt(date, reverse=True)
+        self.observer.date = self.local_to_gmt(date, reverse=True)
 
         self.sun.compute(self.observer)
 
@@ -41,16 +45,14 @@ class AnalemmaWindow:
 
         self.project_and_draw(self.sun.az, self.sun.alt, 4)
 
-    def ephemdate_to_hours(self, edate):
-        if isinstance(edate, int):
-            return edate
-        etuple = edate.tuple()
-        return etuple[3] + etuple[4]/60. + etuple[5]/3600.
-
     def calc_special_dates(self):
         '''Earlist and latest rising and setting times,
            and longest/shortest day.
         '''
+        if self.special_dates:
+            # Already done, nothing more to do.
+            return
+
         self.special_dates = {
             'earliest sunrise': 24,
             'latest sunrise'  :  0,
@@ -96,15 +98,95 @@ class AnalemmaWindow:
 
             dt = ephem.date(dt + ephem.hour * 24)
 
+    def gmt_for_time_on_date(self, edate, timetuple):
+        '''Returns the ephem.date for the GMT corresponding to localtime
+           timetuple on the given ephem.date.
+        '''
+        tup = list(edate.tuple())
+        tup[3], tup[4], tup[5] = timetuple
+        return self.local_to_gmt(ephem.date(tuple(tup)), reverse=True)
+
+    def draw_special_dates(self, timestr):
+        # Make a tuple out from timestr
+        if ':' in timestr:
+            timetuple = map(int, timestr.split(':'))
+            while len(timetuple) < 3:
+                timetuple.append(0)
+        else:
+            timetuple = (int(timestr), 0, 0)
+
+        for key in self.special_dates:
+            d = self.special_dates[key]
+            if not isinstance(d, ephem.date):
+                continue
+
+            gmt = self.gmt_for_time_on_date(d, timetuple)
+            self.observer.date = self.gmt_for_time_on_date(d, timetuple)
+            self.sun.compute(self.observer)
+            x, y = self.project(self.sun.az, self.sun.alt)
+            self.draw_dot(self.specialgc, x, y, 7)
+
+            # Offsets to figure out where to draw the string.
+            # That's tough, because they're normally on top of each other.
+            # Latest sunrise is a little left of earliest sunset,
+            # and shortest day is in between and a little below both.
+            offsets = { "latest sunrise"   : (-1,  0),
+                        "earliest sunset"  : ( 1,  0),
+                        "shortest day"     : ( 0,  1),
+                        "latest sunset"    : (-1,  0),
+                        "earliest sunrise" : ( 1,  0),
+                        "longest day"      : ( 0, -1)
+            }
+            factor = 30
+            xoffset = int(offsets[key][0] * factor)
+            yoffset = int(offsets[key][1] * factor)
+            self.drawing_area.window.draw_line(self.specialgc, x, y,
+                                               x + xoffset, y + yoffset)
+            s = str(self.special_dates[key])
+            if key + " len" in self.special_dates:
+                # for longest/shortest days, split off the time part
+                s = s.split(' ')[0]
+                # and then add the day length
+                s += ", %.1f hrs" % self.special_dates[key + " len"]
+            self.draw_string(key + "\n" + s,
+                             x + xoffset, y + yoffset, self.specialgc,
+                             offsets=offsets[key])
+
+        # Draw the equinoxes too. Solstices are too crowded what with
+        # all the other special dates.
+
+        def draw_equinox(start, whicheq, offsets):
+            equinox = ephem.next_equinox(start)
+            self.observer.date = self.gmt_for_time_on_date(equinox, (12, 0, 0))
+            self.sun.compute(self.observer)
+            x, y = self.project(self.sun.az, self.sun.alt)
+            self.draw_dot(self.specialgc, x, y, 7)
+            x1 = x + offsets[0] * 20
+            self.drawing_area.window.draw_line(self.specialgc, x, y, x1, y)
+            eqstr = "%s equinox\n%s" % (whicheq, str(equinox).split(' ')[0])
+            self.draw_string(eqstr, x1, y, self.specialgc, offsets)
+
+        draw_equinox("%d/1/1" % self.year, "Vernal", (-1, 0))
+        draw_equinox(observer.date, "Autumnal", (1, 0))
+
     def special_dates_str(self):
-        s = "Shortest day: %d" % self.special_dates["shortest day len"]
-        s += " hours on " + str(self.special_dates["shortest day"]) + "\n"
-        s += "Longest day: %d" % self.special_dates["longest day len"]
-        s += " hours on " + str(self.special_dates["longest day"]) + "\n"
-        s += "Earliest sunrise: " + str(self.special_dates["earliest sunrise"]) + "\n"
-        s += "Latest sunrise: " + str(self.special_dates["latest sunrise"]) + "\n"
-        s += "Earliest sunset: " + str(self.special_dates["earliest sunset"]) + "\n"
-        s += "Latest sunset: " + str(self.special_dates["latest sunset"]) + "\n"
+        if not self.special_dates:
+            self.calc_special_dates()
+        s = '''
+Longest day: %d hours on %s
+Shortest day: %d hours on %s
+Earliest sunrise: %s
+Latest sunrise: %s
+Earliest sunset: %s
+Latest sunset: %s
+''' %      (self.special_dates["longest day len"],
+            str(self.special_dates["longest day"]),
+            self.special_dates["shortest day len"],
+            str(self.special_dates["shortest day"]),
+            str(self.special_dates["earliest sunrise"]),
+            str(self.special_dates["latest sunrise"]),
+            str(self.special_dates["earliest sunset"]),
+            str(self.special_dates["latest sunset"]))
         return s
 
     def local_mean_time(self, d, reverse=False):
@@ -123,7 +205,17 @@ class AnalemmaWindow:
         return ephem.date(ephem.date(d) \
                     - float(self.observer.lon) * 12 / math.pi * ephem.hour)
 
-    def draw(self, gc, x, y, dotsize):
+    def ephemdate_to_hours(self, edate):
+        if isinstance(edate, int):
+            return edate
+        etuple = edate.tuple()
+        return etuple[3] + etuple[4]/60. + etuple[5]/3600.
+
+    def draw_dot(self, gc, x, y, dotsize):
+        # Draw the dot centered, not hanging off to the lower right:
+        x = int(x - dotsize / 2)
+        y = int(y - dotsize / 2)
+
         if dotsize == 1:
             self.drawing_area.window.draw_points(gc, [(x, y)])
         elif dotsize <= 4:
@@ -132,6 +224,29 @@ class AnalemmaWindow:
         else:
             self.drawing_area.window.draw_arc(gc, True, x, y,
                                               dotsize, dotsize, 0, 23040)
+
+    def draw_string(self, label, x, y, gc=None, offsets=None):
+        '''Draw a string at the specified point.
+           offsets is an optional tuple specifying where the string will
+           be drawn relative to the coordinates passed in;
+           for instance, if offsets are (-1, -1) the string will be
+           drawn with the bottom right edge at the given x, y.
+        '''
+        layout = self.drawing_area.create_pango_layout(label)
+        # layout.set_font_description(self.font_desc)
+        if not gc:
+            gc = self.xgc
+        if offsets:
+            # pango draws text with the upper left corner at x, y.
+            # So that's an offset of (1, 1). Adjust if offsets are different.
+            width, height = layout.get_pixel_size()
+            if offsets[0] == 0:
+                x -= int(width/2)
+            elif offsets[0] != 1:
+                x += int(width * offsets[0])
+            if offsets[1] != 1:
+                y += int(height * offsets[1] - height/2)
+        self.drawing_area.window.draw_layout(gc, x, y, layout)
 
     def project_rectangular(self, az, alt):
         """Rectangular -- don't do any projection, just scaling"""
@@ -165,7 +280,7 @@ class AnalemmaWindow:
                  + self.width/2)
 
         if dotsize > 0:
-            self.draw(gc, x, y, dotsize)
+            self.draw_dot(gc, x, y, dotsize)
 
         #print int(lon*180/math.pi), int(lat*180/math.pi), x, y
 
@@ -184,7 +299,7 @@ class AnalemmaWindow:
         x, y = self.project(az, alt)
 
         if dotsize > 0:
-            self.draw(gc, x, y, dotsize)
+            self.draw_dot(gc, x, y, dotsize)
 
     def project(self, az, alt):
         if self.sinusoidal:
@@ -197,6 +312,7 @@ class AnalemmaWindow:
         if not self.xgc:
             self.xgc = widget.window.new_gc()
             self.bgc = widget.window.new_gc()
+            self.specialgc = widget.window.new_gc()
         self.width, self.height = self.drawing_area.window.get_size()
 
         # Draw a blue background. But if we're using a sinusoidal
@@ -218,31 +334,33 @@ class AnalemmaWindow:
             self.drawing_area.window.draw_rectangle(self.xgc, True, 0, 0,
                                                     self.width, self.height)
 
+        # "Special" gc to be used for showing special dates
+        self.specialgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 65535))
+
         # Draw some projected grid lines
         #self.xgc.set_rgb_fg_color(gtk.gdk.Color(16384, 16384, 16384))
         self.xgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 65535))
         for f in range(0, int(math.pi * 100), 5):
             theta = f/200.   # i is going from 0 to pi/2
-            # Draw the equator:
-            self.project_and_draw(theta + math.pi/2, 0., 1)
-            self.project_and_draw(theta + math.pi, 0., 1)
+            # Draw the equator: (doesn't actually show up)
+            # self.project_and_draw(theta + math.pi/2, 0., 1)
+            # self.project_and_draw(theta + math.pi, 0., 1)
 
             # Central meridian (180 dgrees)
             self.project_and_draw(math.pi, theta, 1)
 
-            # Draw the edges of the plot
-            self.project_and_draw(math.pi/2, theta, 1)
-            self.project_and_draw(math.pi*3/2, theta, 1)
-
             # and a few other lines
-            self.project_and_draw(math.pi * .75, theta, 1)
-            self.project_and_draw(math.pi*1.25, theta, 1)
+            # self.project_and_draw(math.pi * .75, theta, 1)
+            # self.project_and_draw(math.pi*1.25, theta, 1)
 
         # Then prepare to draw the sun in yellow:
         self.xgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 0))
 
         # the "backside" GC will have a different color
         self.bgc.set_rgb_fg_color(gtk.gdk.Color(65535, 32767, 0))
+
+        # Calculate earliest sunrise and suchlike.
+        self.calc_special_dates()
 
         # Draw three analemmas, showing the sun positions at 7:40 am,
         # noon, and 4:40 pm ... in each case adjusted for mean solar time,
@@ -253,10 +371,16 @@ class AnalemmaWindow:
                 self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
                 self.draw_sun_position('%d/%d/20 %s' % (self.year, m, time))
 
-        layout = self.drawing_area.create_pango_layout("Observer: " +
-                                                       self.observer.name)
-        # layout.set_font_description(self.font_desc)
-        self.drawing_area.window.draw_layout(self.xgc, 10, 10, layout)
+        # Mark special dates for mean solar noon.
+        self.draw_special_dates("12:00")
+
+        # Make a label
+        if observer.name == "custom":
+            obslabel = "Observer at %.1f N, %.1f E" % (observer.lat,
+                                                       observer.lon)
+        else:
+            obslabel = "Observer in " + self.observer.name
+        self.draw_string(obslabel, 10, 10)
 
     def show_window(self):
         win = gtk.Window()
@@ -270,7 +394,14 @@ class AnalemmaWindow:
         gtk.main()
 
 if __name__ == "__main__":
+    def Usage():
+        progname = os.path.basename(sys.argv[0])
+        print """Usage: %s [cityname]
+       %s [lat lon]""" % (progname, progname)
+        sys.exit(0)
     if len(sys.argv) == 2:
+        if sys.argv[1] == "-h" or sys.argv[1] == "--help":
+            Usage()
         observer = ephem.city(sys.argv[1])
     elif len(sys.argv) == 3:
         observer = ephem.Observer()
@@ -287,8 +418,7 @@ if __name__ == "__main__":
         observer.lat = '37:15.55'
         observer.elevation = 100
 
-    awin = AnalemmaWindow(observer, 2016)
-    awin.calc_special_dates()
+    awin = AnalemmaWindow(observer, ephem.now().triple()[0])
     print awin.special_dates_str()
     awin.show_window()
 
