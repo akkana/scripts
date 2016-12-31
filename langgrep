@@ -23,33 +23,35 @@ def Usage():
     print " e.g. langgrep python -w find *"
     sys.exit(0)
 
-def check_file_lang(filename, lang) :
-    if os.path.isdir(filename) or not os.path.exists(filename) :
+def check_file_lang(filename, lang):
+    if lang.startswith("python") and filename.endswith(".py"):
+        return True
+    if os.path.isdir(filename) or not os.path.exists(filename):
         return False
-    try :
+    try:
         f = open(filename)
         firstline = f.readline(80)
         f.close()
-    except IOError, e :
+    except IOError, e:
         print "IOError", e
         #print "exc_info is", sys.exc_info()
         sys.exit(1)
         return False
 
-    if firstline[0:2] == "#!" and string.find(firstline, lang) >= 0 :
+    if firstline[0:2] == "#!" and string.find(firstline, lang) >= 0:
         return True
     return False
 
 # main()
-if len(sys.argv) < 3 :
+if len(sys.argv) < 3:
     Usage()
 lang = sys.argv[1]
 
 # After the language, any flag argument plus the grep pattern
 # gets appended to args -- these will be the grep args.
 patindex = 0
-for i in range(2, len(sys.argv)) :
-    if sys.argv[i][0] != '-' :
+for i in range(2, len(sys.argv)):
+    if sys.argv[i][0] != '-':
         patindex = i+1
         break
 args = sys.argv[2:patindex]
@@ -58,20 +60,30 @@ args = sys.argv[2:patindex]
 # the file list, if any, is sys.argv[patindex+1:]
 # If no file list, use ~/bin/*
 if patindex >= len(sys.argv):
-    # Look in ~/bin
-    bindir = os.path.join(os.getenv("HOME"), "bin")
-    files = map(lambda f: os.path.join(bindir, f), os.listdir(bindir))
+    files = set()
 
-    # If language is python, also look in ~/bin/pythonpath
-    pypathdir = os.path.join(bindir, "pythonpath")
-    if lang == "python" and os.path.exists(pypathdir):
-        files += map(lambda f: os.path.join(bindir, f), os.listdir(pypathdir))
-else :
+    # Look nonrecursively at ~/bin/*
+    bindir = os.path.join(os.getenv("HOME"), "bin")
+    for f in os.listdir(bindir):
+        files.add(os.path.join(bindir, f))
+
+    # If language is python, also look in $PYTHONPATH, recursively.
+    if lang == "python":
+        pypathdir = os.path.join(bindir, "pythonpath")
+        if os.path.exists(pypathdir):
+            for root, dirs, fs in os.walk(pypathdir, followlinks=True):
+                for f in fs:
+                    if f.endswith(".py"):
+                        files.add(os.path.join(root, f))
+
+else:
     files = sys.argv[patindex:]
 
-try :
-    for fil in files :
-        if check_file_lang(fil, lang) :
+try:
+    filelist = list(files)
+    filelist.sort()
+    for fil in filelist:
+        if check_file_lang(fil, lang):
             #os.system("grep -H" + args + " " + fil)
             arglist = ['grep', '-H']
             arglist.extend(args)
@@ -80,6 +92,6 @@ try :
 
 # Try to catch ctrl-C and print a nicer message. This doesn't work, though:
 # subprocess.call just terminates the whole process.
-except KeyboardInterrupt, e :
+except KeyboardInterrupt, e:
     print "Interrupt!"
     sys.exit(1)
