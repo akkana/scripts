@@ -3,6 +3,18 @@
 # This is a file of reminders of various neat Python features
 # that I always forget how to use.
 
+# Split a long string over multiple lines in the source file
+url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
+         "bs3/documentation.html" )
+# Note no commas in the parenthesized one:
+# parentheses without a comma inside are just grouping, not a tuple.
+(42)    # is type int
+(42,)   # is a tuple with len 1
+
+# You can also use a backslash and no parentheses:
+url2 = "http://www.crummy.com/software/BeautifulSoup/" \
+       "bs3/documentation.html"
+
 #
 # Read a file of name=value pairs and return a dictionary.
 #
