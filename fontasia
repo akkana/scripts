@@ -87,7 +87,7 @@ class FontApp(gtk.Window):
         self.fontsize = self.DEFAULT_FONT_SIZE
         self.fancy_list = True
 
-        # Default sizes: these can be overridden in .fontasia
+        # Default sizes: can be overridden in .config/fontasia/fontasia.conf
         self.win_width = 760
         self.win_height = 400
         self.preview_height = 56
@@ -433,7 +433,8 @@ class FontApp(gtk.Window):
         except ImportError:
             homedir = os.getenv("HOME")
 
-        self.cat_file_name = os.path.join(homedir, ".fontasia")
+        self.cat_file_name = os.path.join(homedir, ".config", "fontasia",
+                                          "fontasia.conf")
 
         filename = self.cat_file_name
         if not os.access(filename, os.R_OK):
@@ -496,7 +497,7 @@ class FontApp(gtk.Window):
             self.update_cats_menu()
 
         except IOError:
-            print "No .fontasia file yet -- Welcome to fontasia!"
+            print "No fontasia conf file yet -- Welcome to fontasia!"
 
             # Set up a couple of default categories with likely fonts
             self.add_category('monospace')
@@ -513,6 +514,9 @@ class FontApp(gtk.Window):
             return
 
     def write_category_file(self):
+        catdir = os.path.dirname(self.cat_file_name)
+        if not os.path.exists(catdir):
+            os.mkdir(catdir)
         catfp = open(self.cat_file_name, "w")
         txt = self.preview.get_text()
         if txt != self.DEFAULT_TEXT:
