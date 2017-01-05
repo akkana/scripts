@@ -54,6 +54,27 @@ d = dateutil.parser.parse("10/31/2016 14:25")
 d = dateutil.parser.parse("6/15/2016 14:25 MDT")
 
 #
+# Add N months to a date: same day of month but next month.
+#
+import datetime
+from dateutil.relativedelta import relativedelta
+today = datetime.date.today()
+three_months_from_now = today + relativedelta(months=3)
+# Note that relativedelta can also take a month= as well as a months=.
+# month gives you the current dayofmonth in a specific month number;
+# months gives you how many months relative to the current one.
+# For differences of just days or weeks, datetime.timedelta works.
+
+#
+# Another way using calendar but not dateutils:
+#
+import datetime
+import calendar
+today = datetime.date.today()
+days_this_month = calendar.monthrange(today.year, today.month)[1]
+one_month_from_now = today + datetime.timedelta(days=days_this_month)
+
+#
 # map + lambda example
 #
 def helloall(names):
