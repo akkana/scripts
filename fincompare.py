@@ -31,7 +31,8 @@ import numpy
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
+# from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
+from mpl_finance import quotes_historical_yahoo_ohlc as yahoo
 
 start = None
 initial = None
