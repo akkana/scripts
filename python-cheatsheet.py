@@ -3,6 +3,9 @@
 # This is a file of reminders of various neat Python features
 # that I always forget how to use.
 
+# Show methods in an object
+dir(obj)
+
 # Split a long string over multiple lines in the source file
 url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
          "bs3/documentation.html" )
