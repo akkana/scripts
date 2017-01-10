@@ -291,6 +291,9 @@ quickbrowse:
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
 
+vcalparse:
+    Parse and print an icalendar/vcalendar/ICS file using python-vobject.
+
 viewhtmlmail:
      Take an mbox HTML message (e.g. from mutt), split it using munpack,
      and rewrite it so it can be viewed in an external browser.
