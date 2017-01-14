@@ -14,6 +14,9 @@ kobo:
 mapping:
     Scripts related to mapping / GIS.
 
+mapping/election2016:
+    Map blue-red-purple US presidential election results by county.
+
 mailtests:
     Messages with attachments for testing viewmailattachments.
 
