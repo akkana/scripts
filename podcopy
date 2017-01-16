@@ -30,7 +30,7 @@ def copy_pods(indir, outdir, playlist=None):
                 playlist = fpath
 
     if not playlist:
-        print "No m3u files in", indir
+        print("No m3u files in %s" % indir)
         return
 
     # Get a list of the files already in the output dir.
@@ -62,10 +62,10 @@ def copy_pods(indir, outdir, playlist=None):
     # mounted the /mp3 device yet. However, it might be handy to
     # know what we *would* copy there if it was mounted ...
     if len(existing_files) == 0:
-        print outdir, "is empty (probably not mounted)"
-        print "\nWould copy:"
+        print("%s is empty (probably not mounted)" % outdir)
+        print("\nWould copy:")
         for f in files_in_playlist:
-            print f
+            print(f)
         sys.exit(1)
 
     for f in files_in_playlist:
@@ -97,8 +97,8 @@ def copy_pods(indir, outdir, playlist=None):
         src_size = os.stat(f).st_size
         try:
             i = existing_sizes.index(src_size)
-            print "\n**** Duplicate!", existing_files[i], \
-                "is the same size as", f
+            print("\n**** Duplicate! %s is the same size as %s"
+                  % (existing_files[i], f))
             # Skip this file. XXX Should probably check for similar filenames.
             continue
 
@@ -113,7 +113,7 @@ def copy_pods(indir, outdir, playlist=None):
             base += 'X'
 
         if base:
-            print "cp '" + f + "'", os.path.join(outdir, base + ext)
+            print("cp '%s %s'" % (f, os.path.join(outdir, base + ext)))
             if is_android:
                 androidfiles.copyto(f, outdir, base+ext)
             else:

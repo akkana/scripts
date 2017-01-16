@@ -14,7 +14,7 @@ import gtk
 import alsaaudio
 
 def Usage() :
-    print "Usage:", os.path.basename(sys.argv[0]), "[-v|-h]"
+    print("Usage: %s [-v|-h]" % os.path.basename(sys.argv[0]))
     sys.exit(0)
 
 # First find a mixer. Use the first one.

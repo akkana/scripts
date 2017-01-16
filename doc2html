@@ -4,8 +4,8 @@
 
 '''Sample tags that need to get removed:
 
-<div name="Normal" align="left" style="margin: 0.00mm 0.00mm 1.25mm 3.75mm;  
-padding: 0.00mm 0.00mm 0.00mm 0.00mm; ">
+<div name="Normal" align="left" style="margin: 0.00mm 0.00mm 1.25mm 3.75mm;
+ padding: 0.00mm 0.00mm 0.00mm 0.00mm; ">
 
 <p style="text-indent: 0.00mm; text-align: left; line-height: 3.454861mm; color:
  Black; background-color: White; ">
@@ -29,16 +29,17 @@ Harder:
   (how to reorder intervening tags?)
 '''
 
-# http://www.crummy.com/software/BeautifulSoup/bs3/documentation.html
+from __future__ import print_function
 
 import sys, os
 import re
 import subprocess
+# http://www.crummy.com/software/BeautifulSoup/bs3/documentation.html
 from bs4 import BeautifulSoup, Tag
 
 def Usage():
-    print "Usage: %s infile outfile" % os.path.basename(sys.argv[0])
-    print "infile may be .doc or .html"
+    print("Usage: %s infile outfile" % os.path.basename(sys.argv[0]))
+    print("infile may be .doc or .html")
     sys.exit(1)
 
 if len(sys.argv) < 3:
@@ -51,7 +52,7 @@ if ext == ".doc":
     try:
         subprocess.call(["wvHtml", sys.argv[1], htmlfile])
     except:
-        print "Need wvHtml installed!"
+        print("Need wvHtml installed!")
         sys.exit(1)
 elif ext == ".html":
     htmlfile = sys.argv[1]
@@ -59,7 +60,7 @@ else:
     Usage()
 
 if not os.path.exists(htmlfile):
-    print "Can't open", htmlfile
+    print("Can't open", htmlfile)
     sys.exit(2)
 
 if len(sys.argv) > 2:
@@ -70,8 +71,8 @@ else:
 if not outfile:
     Usage()
 
-print "infile:", sys.argv[1]
-print "outfile:", outfile
+print("infile:", sys.argv[1])
+print("outfile:", outfile)
 
 fp = open(htmlfile)
 soup = BeautifulSoup(fp, "lxml")
@@ -147,7 +148,7 @@ fp = open(outfile, 'w')
 # soup = BeautifulSoup(s)
 # print >>fp, soup.prettify()
 
-print >>fp, soup.prettify()
+print(soup.prettify(), file=fp)
 
 fp.close()
 

@@ -21,10 +21,10 @@ def check_balance(filename):
             elif c == '}':
                 bracelevel -= 1
 
-    print filename + ":"
-    print "  parenlevel:", parenlevel
-    print "  bracketlevel:", bracketlevel
-    print "  bracelevel:", bracelevel
+    print(filename + ":")
+    print("  parenlevel: %d" % parenlevel)
+    print("  bracketlevel: %d" % bracketlevel)
+    print("  bracelevel:%d " % bracelevel)
 
 if __name__ == '__main__':
     for f in sys.argv[1:]:

@@ -126,7 +126,7 @@ def sonogram(wav_file, startsecs=None, endsecs=None):
         secs = endsecs - startsecs
     else:
         startsecs = 0.0
-    print secs, "seconds"
+    print(secs, "seconds")
 
     t = arange(startsecs, startsecs + secs, 1.0 / frame_rate / chans)
 
@@ -149,8 +149,8 @@ if __name__ == '__main__':
     end = None
     if len(sys.argv) > 2:
         start = float(sys.argv[2])
-        print "Starting at", start
+        print("Starting at", start)
     if len(sys.argv) > 3:
         end = float(sys.argv[3])
-        print "ending at", end
+        print("ending at", end)
     sonogram(filename, start, end)

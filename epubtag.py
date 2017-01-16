@@ -4,6 +4,8 @@
 #
 # Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
+from __future__ import print_function
+
 import os, sys
 import zipfile
 import xml.dom.minidom
@@ -53,8 +55,8 @@ class EpubBook:
         # Now content is a file handle on the content.opf XML file
         try:
             self.dom = xml.dom.minidom.parse(content)
-        except IOError, e:
-            raise IOError, filename + ': ' + str(e)
+        except IOError as e:
+            raise IOError(filename + ': ' + str(e))
 
         content.close()
 
@@ -84,9 +86,9 @@ class EpubBook:
 
             if delete_tags:
                 if el.childNodes:
-                    print "Deleting:", el.childNodes[0].wholeText
+                    print("Deleting:", el.childNodes[0].wholeText)
                 else:
-                    print "Deleting empty", elname, "tag"
+                    print("Deleting empty", elname, "tag")
                 el.parentNode.removeChild(el)
 
             elif el.childNodes:
@@ -102,7 +104,7 @@ class EpubBook:
                 matches.append(el.childNodes[0].wholeText.encode('utf-8',
                                                         'backslashreplace'))
             else:
-                print "Empty", elname, "tag"
+                print("Empty", elname, "tag")
 
         return matches, elements, parent
 
@@ -124,7 +126,7 @@ class EpubBook:
             if el.firstChild.nodeType == el.TEXT_NODE:
                 el.firstChild.replaceWholeText(newtitle)
             else:
-                print "Error: dc:title contains something other than text"
+                print("Error: dc:title contains something other than text")
 
     def get_authors(self):
         '''Get the list of authors (perhaps only one of them).
@@ -192,7 +194,7 @@ class EpubBook:
         # If we didn't see a dc:subject, we still need a parent,
         # the <metadata> tag.
         if not parent:
-            print "Warning: didn't see any subject tags previously"
+            print("Warning: didn't see any subject tags previously")
             parent = self.dom.getElementsByTagName("metadata")[0]
 
             # If there's no metadata tag, maybe we should add one,
@@ -210,7 +212,7 @@ class EpubBook:
             # Don't add duplicate tags (case-insensitive).
             new_tag_lower = new_tag.lower()
             if new_tag_lower in lowertags:
-                print "Skipping duplicate tag", new_tag
+                print("Skipping duplicate tag", new_tag)
                 continue
 
             # Make the new node:
@@ -234,7 +236,7 @@ class EpubBook:
                 parent.appendChild(newnode)
                 parent.appendChild(textnode)
 
-            print "Adding:", new_tag
+            print("Adding:", new_tag)
 
     def replace_file(self, oldfilename, newfile):
         '''When we save_changes, replace the contents of oldfilename
@@ -287,7 +289,7 @@ class EpubBook:
         bakfile = self.filename + ".bak"
         os.rename(self.filename, bakfile)
         os.rename(new_epub_file, self.filename)
-        print "Wrote", self.filename
+        print("Wrote", self.filename)
         os.remove(bakfile)
 
     def extract_cover_image(self, outdir=''):
@@ -434,7 +436,7 @@ class EpubBook:
                     infp = self.zip.open(f)
                     coverimg = f
         if not infp:
-            print "Couldn't find", coverimg, "in zip archive"
+            print("Couldn't find", coverimg, "in zip archive")
             return None, None
 
         outfilename = os.path.join(outdir, base)
@@ -447,11 +449,11 @@ class EpubBook:
     def extract_images(self, outdir=''):
         '''Extract all images in the book.
         '''
-        print "Extracting images from", self.filename,
+        print("Extracting images from", self.filename, end=' ')
         if outdir:
-            print "to", outdir
+            print("to", outdir)
         else:
-            print
+            print()
 
         for f in self.zip.namelist():
             ext = os.path.splitext(f)[-1].lower()
@@ -460,12 +462,12 @@ class EpubBook:
                 outfilename = os.path.join(outdir, os.path.basename(f))
                 i = 1
                 while os.path.exists(outfilename):
-                    print os.path.basename(outfilename), "already exists"
+                    print(os.path.basename(outfilename), "already exists")
                     se = os.path.splitext(outfilename)
                     outfilename = se[0] + '-' + str(i) + se[1]
                 outfp = open(outfilename, 'w')
                 outfp.write(infp.read())
-                print "Extracted", f, "to", outfilename
+                print("Extracted", f, "to", outfilename)
                 infp.close()
                 outfp.close()
 
@@ -473,7 +475,7 @@ class EpubBook:
 if __name__ == "__main__":
     def Usage():
         progname = os.path.basename(sys.argv[0])
-        print """Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]
+        print("""Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]
        %s -T "New title" file.epub [file.epub...]
        %s -i [imagedir] file.epub [file.epub...]
 Display, add or remove tags in epub ebooks,
@@ -486,7 +488,7 @@ Options:
     -d: delete existing tags before adding new ones
     -b: print only one line for each book (useful with grep)
     -i [dir]: extract images into given directory (default .)""" \
-            % (progname, progname, progname)
+            % (progname, progname, progname))
         sys.exit(0)
 
     # optparse can't handle multiple arguments of the same type
@@ -538,7 +540,7 @@ Options:
             Usage()
 
         if change_title and not new_title:
-            print "Must specify a new title with -T\n"
+            print("Must specify a new title with -T\n")
             Usage()
 
         # If we're here, the argument doesn't start with '-'.
@@ -548,14 +550,14 @@ Options:
                 imagedir = arg
                 continue
             elif not arg.endswith('.epub') :
-                print "Argument after -i should be a directory if it's not an EPUB book\n"
+                print("Argument after -i should be a directory if it's not an EPUB book\n")
                 Usage()
 
         if not add_tags :    # still adding files
             if os.access(arg, os.R_OK):
                 epubfiles.append(arg)
             else:
-                print "Can't read", arg, "-- skipping"
+                print("Can't read", arg, "-- skipping")
         else :               # done adding files, adding tags now
             tags.append(arg)
 
@@ -565,7 +567,7 @@ Options:
     for f in epubfiles:
         try:
             if not brief:
-                print "======="
+                print("=======")
 
             book = EpubBook()
             book.open(f)
@@ -576,7 +578,7 @@ Options:
                 if extract_images == "cover":
                     coverfile, zipname = book.extract_cover_image(imagedir)
                     if coverfile:
-                        print "extracted cover to", coverfile
+                        print("extracted cover to", coverfile)
                 else:
                     book.extract_images(imagedir)
                 book.close()
@@ -584,21 +586,21 @@ Options:
 
             if new_title:
                 book.set_title(new_title)
-                print "Set title to", new_title, "in", f
+                print("Set title to", new_title, "in", f)
                 book.save_changes()
 
             if delete_tags:
                 book.delete_tags()
 
             if tags:
-                print f, ": old tags:", book.get_tags()
+                print(f, ": old tags:", book.get_tags())
                 book.add_tags(tags)
 
             if tags or delete_tags:
                 book.save_changes()
 
-            print book.info_string(brief)
+            print(book.info_string(brief))
 
             book.close()
-        except RuntimeError, e:
-            print e
+        except RuntimeError as e:
+            print(e)

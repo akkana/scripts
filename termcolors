@@ -3,30 +3,36 @@
 import sys
 
 # Display the colors available in a terminal.
-
-# This was documented as 16-color mode, but actually anything over 8 fails.
-colornames = [ "black", "red", "green", "yellow",
-               "blue", "magenta", "cyan", "white" ]
-print "16-color mode (actually only 8):"
-print "    %14ss %14s %14ss" % ('normal', 'inverse', 'bright')
-for color in range(0, 8) :
-    # Print the color in normal and inverse video:
-    for prefix in [3, 4] :
-        print "\033[0;%s%dm%2d%2d%2d %-8s\033[m" % (prefix, color,
-                                                  color, color, color,
-                                                  colornames[color]),
-    # Also print the "bright" version of the color:
-    for prefix in [3] :
-        print "\033[0;%s%d;1m%2d%2d%2d %-8s\033[m" % (prefix, color,
-                                                    color, color, color,
-                                                    colornames[color]),
-    print
-
-sys.exit(0)
+#  given any argument, it'll display 256-color mode as well as 16-color mode.
 
 # Programs like ls and vim use the first 16 colors of the 256-color palette.
-print "256-color mode:"
-for color in range(0, 256) :
-    for i in range(0, 3) :
-        print "\033[38;5;%sm%03s\033[m" % (str(color), str(color)),
-    print
+# This was documented as 16-color mode, but actually anything over 8 fails.
+if len(sys.argv) > 1:
+    print("256-color mode:")
+    for color in range(0, 256) :
+        line = ""
+        for i in range(0, 3) :
+            line += "\033[38;5;%sm%03s\033[m" % (str(color), str(color))
+        print(line)
+    print()
+    print("16-color mode (actually only 8):")
+else:
+    print("16-color mode (actually only 8): use -256 to usee more colors.")
+
+colornames = [ "black", "red", "green", "yellow",
+               "blue", "magenta", "cyan", "white" ]
+print("    %14ss %14s %14ss" % ('normal', 'inverse', 'bright'))
+for color in range(0, 8) :
+    line = ""
+
+    # Print the color in normal and inverse video:
+    for prefix in [3, 4] :
+        line += "\033[0;%s%dm%2d%2d%2d %-8s\033[m " % (prefix, color,
+                                                       color, color, color,
+                                                       colornames[color])
+    # Also print the "bright" version of the color:
+    for prefix in [3] :
+        line += "\033[0;%s%d;1m%2d%2d%2d %-8s\033[m " % (prefix, color,
+                                                         color, color, color,
+                                                         colornames[color])
+    print(line)

@@ -15,5 +15,5 @@ if re.search('(www\.)*linkedin.com/', s, flags=re.IGNORECASE):
     s = s.replace("&amp;", "&") + "&count=1000&paginationToken="
 
 # eliminate newlines, and any spaces immediately following a newline:
-print re.sub(r'[\r\n]+ *', '', s)
+print(re.sub(r'[\r\n]+ *', '', s))
 

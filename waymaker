@@ -14,7 +14,7 @@ import time
 
 # import googlemaps   # need this for exceptions
 # from googlemaps import GoogleMaps
-import urllib, json, csv
+import urllib.request, urllib.parse, urllib.error, json, csv
 
 def write_gpx_file(entries, filename, omit_address=True):
     '''Write the list of entries -- each entry is [lat, long, desc] --
@@ -50,13 +50,13 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
                  % (minlat, minlon, maxlat, maxlon))
 
     for ent in entries:
-        print >>fp, '<wpt lat="%f" lon="%f">' % (ent[0], ent[1])
+        print('<wpt lat="%f" lon="%f">' % (ent[0], ent[1]), file=fp)
         if omit_address:
             addy = '\n'.join(ent[2].split('\n')[2:])
         else:
             addy = ent[2]
-        print >>fp, '<name>%s</name>' % addy
-        print >>fp, '</wpt>'
+        print('<name>%s</name>' % addy, file=fp)
+        print('</wpt>', file=fp)
 
     fp.write('</gpx>\n')
 
@@ -82,29 +82,29 @@ def geocode(addr):
         # for 1/10 second we should hopefully stay under the rate limit.
         # https://developers.google.com/maps/documentation/business/faq#usage_limits
 
-    url = "http://maps.googleapis.com/maps/api/geocode/json?address=%s&sensor=false" %   (urllib.quote(addr.replace(' ', '+')))
+    url = "http://maps.googleapis.com/maps/api/geocode/json?address=%s&sensor=false" %   (urllib.parse.quote(addr.replace(' ', '+')))
     try:
-        data = urllib.urlopen(url).read()
+        data = urllib.request.urlopen(url).read()
         loaded = json.loads(data)
-        if loaded['status'] == u'OVER_QUERY_LIMIT':
-            print "Hit the Google Maps query limit; sleeping for 2 seconds between queries"
+        if loaded['status'] == 'OVER_QUERY_LIMIT':
+            print("Hit the Google Maps query limit; sleeping for 2 seconds between queries")
             over_query_limit = True
             time.sleep(2.5)
-            data = urllib.urlopen(url).read()
+            data = urllib.request.urlopen(url).read()
             loaded = json.loads(data)
 
         # If we've already waited the 2 seconds and Google still says
         # we're over limit, then we've hit the (unspecified) daily limit
         # and need to give up.
-        if over_query_limit and loaded['status'] == u'OVER_QUERY_LIMIT':
-            print "Hit Google's daily quota; giving up"
+        if over_query_limit and loaded['status'] == 'OVER_QUERY_LIMIT':
+            print("Hit Google's daily quota; giving up")
             sys.exit(1)
 
         location = loaded["results"][0]["geometry"]["location"]
 
-    except IndexError, e:
-        print "Error reading JSON for", addr
-        print loaded
+    except IndexError as e:
+        print("Error reading JSON for %s" % addr)
+        print(loaded)
         return None, None
 
     return location['lat'], location['lng']
@@ -176,9 +176,8 @@ def read_description_file(filename):
                         continue
                     match = re.search(statezip, line2)
                     if not match:
-                        print "Couldn't find coordinates OR address in '" + \
-                            line + "' or in '" + line2 + "'"
-                        print "Skipping this entry"
+                        print("Couldn't find coordinates OR address in '%s' or in '%s'" % (line, line2))
+                        print("Skipping this entry")
                         while True:
                             line = next(fp).strip()
                             if not line:
@@ -193,7 +192,7 @@ def read_description_file(filename):
                     # except closing the file.
                     # (montrose.txt is a good test case --
                     # or anything that ends with a blank line.)
-                    print "StopIteration"
+                    print("StopIteration")
                     fp.close()
                     return entries
 
@@ -202,7 +201,7 @@ def read_description_file(filename):
             addr = line
             if line2:
                 addr += ' ' + line2
-            print "Found an address!", addr
+            print("Found an address! %s" % addr)
 
             # Google Maps has shut off access to this API,
             # perhaps only temporarily:
@@ -219,8 +218,8 @@ def read_description_file(filename):
             # try:
             #     lat, lon = gmaps.address_to_latlng(addr)
             # except googlemaps.GoogleMapsError, e:
-            #     print "Oh, no! Couldn't geocode", addr
-            #     print e
+            #     print("Oh, no! Couldn't geocode for %s" % addr)
+            #     print(e)
 
             # So instead, use a local version:
             lat, lon = geocode(addr)
@@ -247,7 +246,7 @@ def read_description_file(filename):
         # But skip lines that have any long words that are likely
         # too long to wrap on a phone display (they're probably URLs).
         if re.search('\S{27,}', line):
-            print "Skipping long line:", line
+            print("Skipping long line: '%s'" % line)
             continue
         if cur_ent[2]:
             cur_ent[2] += '\n' + cgi.escape(line)
@@ -262,7 +261,7 @@ def read_description_file(filename):
     return entries
 
 def Usage():
-        print "Usage: %s infile.txt outfile.gpx" % os.path.basename(sys.argv[0])
+        print("Usage: %s infile.txt outfile.gpx" % os.path.basename(sys.argv[0]))
         sys.exit(1)
 
 if __name__ == "__main__" :
@@ -272,7 +271,7 @@ if __name__ == "__main__" :
     # It would be relatively easy to mess up with autocomplete and
     # run makeway foo.txt foo.txt. That would be bad.
     if not(sys.argv[2].endswith('.gpx')):
-        print "Output file %s doesn't end with .gpx" % sys.argv[2]
+        print("Output file %s doesn't end with .gpx" % sys.argv[2])
         Usage()
 
     entries = read_description_file(sys.argv[1])

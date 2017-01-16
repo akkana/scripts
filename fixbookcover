@@ -67,12 +67,12 @@ class BookCoverFixer:
                               ', '.join(self.book.get_authors())),
                          self.localcover, "+swap", "-gravity", "center",
                          "-composite", self.newcoverfile])
-        print "Wrote new cover to", self.newcoverfile
+        print("Wrote new cover to %s" % self.newcoverfile)
         return self.newcoverfile
 
     def save_changes(self):
-        print "Saving changes, supposedly"
-        print "Replacing", self.coverzipname, self.newcoverfile
+        print("Saving changes, supposedly")
+        print("Replacing %s with %s" % (self.coverzipname, self.newcoverfile))
         self.book.replace_file(self.coverzipname, self.newcoverfile)
         self.book.save_changes()
         self.book.close()
@@ -113,7 +113,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
 
     def add_title_to_cover(self):
         if not self.fixer.extracted_ok():
-            print "Eek, book wasn't initialized!"
+            print("Eek, book wasn't initialized!")
         else:
             newcover = self.fixer.add_title_to_cover()
             if newcover:

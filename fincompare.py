@@ -46,9 +46,9 @@ initial = None
 imported_modules = {}
 
 if len(sys.argv) < 2:
-    print "Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % sys.argv[0]
-    print "No spaces between -i or -s and their values!"
-    print "e.g. fincompare -i200000 -s2008-1-1 FMAGX FIRPX"
+    print("Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % sys.argv[0])
+    print("No spaces between -i or -s and their values!")
+    print("e.g. fincompare -i200000 -s2008-1-1 FMAGX FIRPX")
     sys.exit(1)
 else:
     funds = []
@@ -62,15 +62,15 @@ else:
 
             try:
                 imported_modules[f] = __import__(ffile[:-3])
-            except Exception, e:
-                print "Couldn't import", f
-                print e
+            except Exception as e:
+                print("Couldn't import", f)
+                print(e)
         elif f.startswith('-s'):
             # Parse the start time:
             start = datetime.datetime.strptime(f[2:], '%Y-%m-%d')
         elif f.startswith('-i'):
-            print "Minus i!"
-            print "Trying initial from '%s'" % f[2:]
+            print("Minus i!")
+            print("Trying initial from '%s'" % f[2:])
             initial = int(f[2:])
         else:
             funds.append(f)
@@ -104,7 +104,7 @@ def plot_funds(tickerlist, initial, start, end):
 
     numdays = (end - start).days
     daysinyear = 365.0
-    print '%9s %9s %9s %9s' % ('Ticker', 'daily', 'CC', 'abs')
+    print('%9s %9s %9s %9s' % ('Ticker', 'daily', 'CC', 'abs'))
 
     # For testing, use something like
     # FUSVX = yahoo('FUSVX', datetime.datetime(2012, 10, 1),
@@ -118,13 +118,13 @@ def plot_funds(tickerlist, initial, start, end):
         try:
             fund_data = yahoo(ticker, start, end, asobject=True)
         except:
-            print "Couldn't get data for", ticker
+            print("Couldn't get data for", ticker)
             continue
 
         # Guard against failures of quotes_historical_yahoo;
         # without this check you'll see more uncatchable RuntimeWarnings.
         if fund_data['aclose'][0] == 0:
-            print ticker, ": First adjusted close is 0!"
+            print(ticker, ": First adjusted close is 0!")
             continue
 
         # Calculate effective daily-compounded interest rate
@@ -141,8 +141,8 @@ def plot_funds(tickerlist, initial, start, end):
         #                                        - fund_data['aclose'][0])
         #                               /numdays) - 1)
 
-        print "%9s %9.2f %9.2f %9.2f" % (ticker,
-                                         Rdaily*100, Rcc*100, fixed_pct*100)
+        print("%9s %9.2f %9.2f %9.2f" % (ticker,
+                                         Rdaily*100, Rcc*100, fixed_pct*100))
 
         # Normalize to the initial investment:
         fund_data['aclose'] *= initial / fund_data['aclose'][0]
@@ -157,9 +157,9 @@ for i, f in enumerate(imported_modules.keys()):
     try:
         initial, start, end = imported_modules[f].plot_fund(color='k',
                                                 marker=markers[i%len(markers)])
-    except Exception, e:
-        print "Couldn't plot", f
-        print e
+    except Exception as e:
+        print("Couldn't plot", f)
+        print(e)
 
 if not initial:
     initial = 100000

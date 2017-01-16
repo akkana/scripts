@@ -31,8 +31,8 @@ def discont_range(start, end, max):
     start = start%max
     end = end%max
     if start <= end:
-        return range(start, end)
-    return range(start, max) + range(0, end)
+        return list(range(start, end))
+    return list(range(start, max)) + list(range(0, end))
 
 def time_zone_offset(ephemdate):
     '''Get the timezone offset at a given ephem.date
@@ -270,7 +270,7 @@ def timerange_str(ephemdate1, ephemdate2):
 
 def Usage():
     progname = os.path.basename(sys.argv[0])
-    print """Predict when the moon will rise, set or be at a specific position.
+    print("""Predict when the moon will rise, set or be at a specific position.
 Usage: %s [-f] alt az start_hour end_hour
        %s [-f] [rise|set] azimuth
        %s [date time]
@@ -280,7 +280,7 @@ If -f is specified, only full or nearly-full moons will be considered;
 -d days: number of days to calculate
 -m months: number of months to calculate
 Hours are specified in local time.
-""" % (progname, progname, progname)
+""" % (progname, progname, progname))
     sys.exit(0)
 
 if __name__ == '__main__':
@@ -338,14 +338,14 @@ if __name__ == '__main__':
             try:
                 az = float(args[1])
             except ValueError:
-                print "Error: azimuth must be a number, not %s" % args[1]
-                print
+                print("Error: azimuth must be a number, not %s" % args[1])
+                print()
                 Usage()
             results = when_rise_set_at_position(ephem.Moon(), observer,
                                                 az, args[0], startdate, days,
                                                 5, minphase, maxphase)
-            print """The %s will %s at azimuth %.1f during the next year at these times:
-""" % (phasestr, args[0], az)
+            print("""The %s will %s at azimuth %.1f during the next year at these times:
+""" % (phasestr, args[0], az))
             sys.exit(0)
 
         else:
@@ -358,7 +358,7 @@ if __name__ == '__main__':
                 day = ephem.Date(datetime.datetime.strptime(args[0],
                                                             "%Y-%m-%d"))
                 tzoffset = time_zone_offset(day)
-                hour, minute = map(float, args[1].split(':'))
+                hour, minute = list(map(float, args[1].split(':')))
                 trip = day.triple()
                 observer.date = (trip[0], trip[1], trip[2],
                                  hour+tzoffset, minute, 0)
@@ -366,10 +366,10 @@ if __name__ == '__main__':
                 body = ephem.Moon()
                 body.compute(observer)
                 az = body.az * DEGREES
-                print "The %s is at %.1f alt, %.1f az at phase %.1f at %s" % \
+                print("The %s is at %.1f alt, %.1f az at phase %.1f at %s" % \
                     (body.name, body.alt * DEGREES, body.az * DEGREES,
                      body.phase,
-                     ephem.localtime(observer.date).strftime("%Y-%m-%d %H:%M"))
+                     ephem.localtime(observer.date).strftime("%Y-%m-%d %H:%M")))
                 sys.exit(0)
             except SystemError:
                 Usage()
@@ -382,15 +382,15 @@ if __name__ == '__main__':
             alt = float(args[0])
             az = float(args[1])
         except ValueError:
-            print "Error: alt/az must be numbers"
-            print
+            print("Error: alt/az must be numbers")
+            print()
             Usage()
         try:
             start_hour = int(args[2])
             end_hour = int(args[3])
         except ValueError:
-            print "Error: start/end times must be integers"
-            print
+            print("Error: start/end times must be integers")
+            print()
             Usage()
         results = when_at_position(ephem.Moon(), observer,
                                    alt, az, start_hour, end_hour,
@@ -400,11 +400,11 @@ if __name__ == '__main__':
             timerange = "%d days" % days
         else:
             timerange = "year"
-        print """The %s will be near %.1f, %.1f 
+        print("""The %s will be near %.1f, %.1f 
 between %dh and %dh during the next %s at these times:
-""" % (phasestr, alt, az, start_hour, end_hour, timerange)
+""" % (phasestr, alt, az, start_hour, end_hour, timerange))
 
-        print "%26s  %5s  %5s  %s" % ("Date/time range", "Alt", "Az", "Phase")
+        print("%26s  %5s  %5s  %s" % ("Date/time range", "Alt", "Az", "Phase"))
         for r in results:
             if len(r) > 4 and r[4]:
                 phase = "%2d%% illuminated" % r[4]
@@ -412,8 +412,8 @@ between %dh and %dh during the next %s at these times:
                 phase = 'x'
 
             # pargs = tuple(r[0:3] + [phase])
-            print "%26s  %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
-                                               r[2], r[3], phase)
+            print("%26s  %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
+                                               r[2], r[3], phase))
 
     else:
         Usage()

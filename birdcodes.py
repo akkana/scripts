@@ -14,7 +14,7 @@
 # I'm sure some are still missing.
 
 import csv
-import StringIO
+import io
 import sys, os
 import re
 
@@ -25,11 +25,11 @@ class BirdCodes:
         self.allbirds = {}
 
         # Start with the birds from birdpop.org:
-        fp = StringIO.StringIO(BirdCodes.birdpopcodes_csv)
+        fp = io.StringIO(BirdCodes.birdpopcodes_csv)
         reader = csv.reader(fp)
 
         # Get the first line, and use it to figure out important fields
-        fields = reader.next()
+        fields = next(reader)
         code4 = fields.index('4code')
         name = fields.index('name')
         if 'sci_name' in fields:
@@ -46,11 +46,11 @@ class BirdCodes:
         fp.close()
 
         # But that doesn't have everything, so add in the birds from NMT:
-        fp = StringIO.StringIO(BirdCodes.bblcodes_csv)
+        fp = io.StringIO(BirdCodes.bblcodes_csv)
         reader = csv.reader(fp)
 
         # Get the first line, and use it to figure out important fields
-        fields = reader.next()
+        fields = next(reader)
         code4 = fields.index('4code')
         name = fields.index('name')
         if 'sci_name' in fields:
@@ -123,7 +123,7 @@ class BirdCodes:
     # Some other PDFs that are more comprehensive than birdpop.org's:
     # http://www.wec.ufl.edu/birds/SurveyDocs/species_list.pdf
     # http://bluebirdnut.com/PDF/Bird%20Name%20Alpha%20Codes.pdf
-    bblcodes_csv = '''id,4code,name
+    bblcodes_csv = u'''id,4code,name
 0010,WEGR,WESTERN GREBE
 0011,CLGR,CLARK'S GREBE
 0020,RNGR,RED-NECKED GREBE
@@ -1142,7 +1142,7 @@ class BirdCodes:
     # dbview -b -d , LIST15.DBF | sed 's/ *,/,/g' >>birdpopcodes.csv
     #
     # This list has 2213 entries.
-    birdpopcodes_csv = ''',,4code,,,name,,sci_name,6code,,
+    birdpopcodes_csv = u''',,4code,,,name,,sci_name,6code,,
         ,,HITI,,,Highland Tinamou,,Nothocercus bonapartei,NOTBON,,
         ,,GRTI,,,Great Tinamou,,Tinamus major,TINMAJ,,
         ,,LITI,,,Little Tinamou,,Crypturellus soui,CRYSOU,,
@@ -3399,7 +3399,7 @@ What codes do you want to look up? (Comma or space separated.)
 </form>'''
 
 def print_bird_form():
-    print bird_form % (os.environ['HTTP_HOST'], os.environ['SCRIPT_NAME'])
+    print(bird_form % (os.environ['HTTP_HOST'], os.environ['SCRIPT_NAME']))
 
 def bird_string(dic):
     if not dic:
@@ -3420,36 +3420,36 @@ if __name__ == '__main__':
         import cgitb
         cgitb.enable()
 
-        print htmlhead
+        print(htmlhead)
 
         codes = form['code'].value
         # Split on spaces, commas or both:
         codes = re.findall(r"[\w']+", codes)
 
         matches = birdcodes.match_codes(codes)
-        print "<p>"
+        print("<p>")
         for key in sorted(matches.keys()):
-            print bird_string(key, matches[key][0], matches[key][1])
-            print "<br>"
+            print(bird_string(key, matches[key][0], matches[key][1]))
+            print("<br>")
 
-        print "<hr>"
+        print("<hr>")
         print_bird_form()
-        print htmlfoot
+        print(htmlfoot)
 
     elif 'REQUEST_URI' in os.environ and \
          os.environ['REQUEST_URI'].endswith('.cgi'):
         # We're being called as a CGI, but without any bird codes.
         # Print a form instead.
-        print htmlhead
+        print(htmlhead)
         print_bird_form()
 
         # cgi.print_environ()
-        print htmlfoot
+        print(htmlfoot)
 
     else:
         # Not a CGI, called from the commandline.
         for code in sys.argv[1:]:
             if len(code) != 4:
-                print bird_string(birdcodes.match_name(code))
+                print(bird_string(birdcodes.match_name(code)))
             else:
-                print bird_string(birdcodes.match_code(code))
+                print(bird_string(birdcodes.match_code(code)))

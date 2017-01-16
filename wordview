@@ -33,7 +33,7 @@ def view_word_files(file_list):
                 magic_parser = magic.open(magic.MAGIC_MIME)
                 magic_parser.load()
             mimetype = magic_parser.file(filename)
-            print "mime type is", mimetype
+            print("mime type is", mimetype)
             if mimetype.startswith("application/msword"):
                 subprocess.call(["wvHtml", filename, outfilename])
                 outfiles.append(outfilename)

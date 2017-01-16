@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # Set the volume louder or softer, depending on program name.
 
+from __future__ import print_function
+
 import alsaaudio, sys, os
 
 increment = 4
@@ -18,4 +20,4 @@ if os.path.basename(sys.argv[0]).startswith("louder") :
 else :
     mixer.setvolume(cur - increment, alsaaudio.MIXER_CHANNEL_ALL)
 
-print "Volume from", cur, "to", mixer.getvolume()[0]
+print("Volume from", cur, "to", mixer.getvolume()[0])

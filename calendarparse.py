@@ -37,7 +37,7 @@ def tabular_string_to_calendar(calstr):
                 month = i + 1
                 break
         if month == None:
-            print "Couldn't parse month from", line
+            print("Couldn't parse month from '%s'" % line)
             continue
         day = int(monthday[1])
         # print parts[0], month, day, ":", parts[2]
@@ -84,7 +84,7 @@ def eventlist_as_html(entries):
     year = None
 
     for cal in entries:
-        print "cal['DTSTART'] =", cal['DTSTART']
+        print("cal['DTSTART'] = %s" % cal['DTSTART'])
         # cal['DTSTART'] might be a icalendar.prop.vDDDTypes object
         # or it might be a string. Handle either type:
         try:
@@ -118,7 +118,7 @@ def eventlist_as_html(entries):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        print ics_file_as_html(sys.argv[1])
+        print(ics_file_as_html(sys.argv[1]))
         sys.exit(0)
 
     # You can stuff your data into this calstr, or read it from a file
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     entries = tabular_string_to_calendar(test_calstr)
 
     for cal in entries:
-        print cal.to_ical()
+        print(cal.to_ical())
 
-    print eventlist_as_html(entries)
+    print(eventlist_as_html(entries))
 

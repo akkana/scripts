@@ -41,7 +41,7 @@ BROWSER_NEWTAB_ARG = "--new-tab"
 class mysubprocess:
     @staticmethod
     def call(arr):
-        print "\n\n=================================\n=== Calling:", arr
+        print("\n\n=============================\n=== Calling: %s" % str(arr))
         subprocess.call(arr)
 
 def view_message_attachments(fp, tmpdir):
@@ -64,7 +64,7 @@ def view_message_attachments(fp, tmpdir):
         # email message can't be used to overwrite important files.
         # As a first step, warn about ../
         if partfile and '../' in partfile:
-            print "Eek! Possible security problem in filename", partfile
+            print("Eek! Possible security problem in filename %s" % partfile)
             return None
 
         # Make a filename in the tmp dir:
@@ -114,7 +114,7 @@ def view_message_attachments(fp, tmpdir):
             # Mailers may use Content-Id or Content-ID (or, presumably,
             # other capitalizations). So we can't just look it up simply.
             content_id = None
-            for k in child.keys():
+            for k in list(child.keys()):
                 if k.lower() == 'content-id':
                     # Remove angle brackets, if present.
                     # child['Content-Id'] is unmutable: attempts to change it

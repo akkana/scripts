@@ -139,4 +139,4 @@ if __name__ == "__main__" :
                              time.strptime('Tue Aug 07 16:00:00 2012'),
                              1345074924.53)
 
-    print "All tests passed!"
+    print("All tests passed!")

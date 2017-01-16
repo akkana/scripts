@@ -10,14 +10,14 @@
 #   ?delay=N       (milliseconds delay between bytes)
 
 import time
-import BaseHTTPServer
+import http.server
 import cgi
 import os
 
 HOST_NAME = os.uname()[1]
 PORT_NUMBER = 9000
 
-class SpeedTestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class SpeedTestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(s):
         s.send_response(200)
         s.send_header("Content-type", "text/html")
@@ -80,12 +80,14 @@ class SpeedTestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             time.sleep(delay)
 
 if __name__ == '__main__':
-    server_class = BaseHTTPServer.HTTPServer
+    server_class = http.server.HTTPServer
     httpd = server_class((HOST_NAME, PORT_NUMBER), SpeedTestHandler)
-    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
+    print("%s: Server Starts - %s:%s" % (time.asctime(),
+                                         HOST_NAME, PORT_NUMBER))
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
     httpd.server_close()
-    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)
+    print("%s: Server Stops - %s:%s" % (time.asctime(),
+                                        HOST_NAME, PORT_NUMBER))

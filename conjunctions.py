@@ -4,6 +4,8 @@
 # and upcoming conjunctions between two or more planets.
 # Copyright 2014 Akkana Peck -- share and enjoy under the GPLv2 or later.
 
+from __future__ import print_function
+
 import ephem
 import math
 
@@ -141,13 +143,13 @@ class Conjunction:
                 s += " %s and %s will be closest on %s (%s)." % \
                      (m[2], m[3], datestr(m[0]), sepstr(m[1]))
             s += "\",,http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg/320px-Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg,240,169,\"<a href='http://commons.wikimedia.org/wiki/File:Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg'>starry moon on Wikimedia Commons</a>\""
-            print s
+            print(s)
         else:
-            print "Conjunction of", self.andjoin(self.bodies),
-            print "lasts from %s to %s." % (datestr(startdate), datestr(enddate))
+            print("Conjunction of", self.andjoin(self.bodies), end=' ')
+            print("lasts from %s to %s." % (datestr(startdate), datestr(enddate)))
             for m in minseps:
-                print "  %s and %s are closest on %s (%s)." % \
-                    (m[2], m[3], datestr(m[0]), sepstr(m[1]))
+                print("  %s and %s are closest on %s (%s)." % \
+                    (m[2], m[3], datestr(m[0]), sepstr(m[1])))
 
     def merge(self, conj):
         '''Merge in another Conjunction -- it must be that the two
@@ -217,7 +219,7 @@ def finish_planet(p, d):
     if not planets_up[p]:
         return
 
-    if p in descriptions.keys():
+    if p in list(descriptions.keys()):
         if output_csv:
             isvis = quotecsv(descriptions[p])
         else:
@@ -228,7 +230,7 @@ def finish_planet(p, d):
         isvis = p + " is visible."
 
     # How about crescent info?
-    if p in crescents.keys():
+    if p in list(crescents.keys()):
         if crescents[p][0]:
             isvis += " A telescope will show a crescent from " \
                      + datestr(crescents[p][0])
@@ -250,11 +252,11 @@ def finish_planet(p, d):
                 w = ""
                 h = ""
 
-            print "%s,%s,%s,,%s,,%s,%s,%s,%s" % \
+            print("%s,%s,%s,,%s,,%s,%s,%s,%s" % \
                 (p, datestr(planets_up[p]), datestr(d), isvis,
-                 img, w, h, cred)
+                 img, w, h, cred))
     else:
-        print datestr(planets_up[p]), "to", datestr(d), ":", isvis
+        print(datestr(planets_up[p]), "to", datestr(d), ":", isvis)
 
     planets_up[p] = None
 
@@ -268,10 +270,10 @@ def run(start, end, observer, toolate):
     conjunctions = ConjunctionList()
 
     if output_csv:
-        print 'name,start,end,time,longname,URL,image,image width,image height,image credit'
+        print('name,start,end,time,longname,URL,image,image width,image height,image credit')
     else:
-        print "Looking for planetary events between %s and %s:\n" % \
-            (datestr(d), datestr(end))
+        print("Looking for planetary events between %s and %s:\n" % \
+            (datestr(d), datestr(end)))
 
     def check_if_planet_up(planet, d):
         '''If the planet is currently up, do housekeeping to remember
@@ -286,7 +288,7 @@ def run(start, end, observer, toolate):
             planets_up[planet.name] = d;
         visible_planets.append(planet)
 
-        if planet.name not in crescents.keys():
+        if planet.name not in list(crescents.keys()):
             return True
 
         # Is it a crescent? Update its crescent dates.
@@ -400,5 +402,5 @@ if __name__ == '__main__':
     try:
         run(start, end, observer, midnight)
     except KeyboardInterrupt:
-        print "Interrupted"
+        print("Interrupted")
 

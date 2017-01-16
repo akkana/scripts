@@ -3,6 +3,10 @@
 # This is a file of reminders of various neat Python features
 # that I always forget how to use.
 
+# Migrate python2 to python3 in place, leaving a .bak:
+$ 2to3 -w file_or_directory
+# use -wn for no .bak
+
 # Show methods in an object
 dir(obj)
 

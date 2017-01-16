@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # copyto('/home/akkana/POD/Science/Story_Collider/249076872-the-story-collider-jonaki-bhattacharyya-losing-control.mp3', 'android:/mnt/extSdCard/Music/Podcasts', '16-05-99-so-special.mp3')
 
     if len(sys.argv) < 2:
-        print "Usage: %s path [path ...]" % os.path.basename(sys.argv[0])
+        print("Usage: %s path [path ...]" % os.path.basename(sys.argv[0]))
         sys.exit(1)
 
     sizes = True
@@ -59,9 +59,9 @@ if __name__ == "__main__":
     for path in (sys.argv[1:]):
         files = listdir(path, sizes=sizes)
         if sizes:
-            print "\n", path, ":"
+            print("%s:" % path)
             for f in files:
-                print "%d\t%s" % (f[1], f[0])
+                print("%d\t%s" % (int(f[1]/1000), f[0]))
         else:
-            print path, ":", ', '.join(files)
+            print("%s: %s" % (path, ', '.join(files)))
 

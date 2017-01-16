@@ -13,7 +13,7 @@ import epubtag
 
 def convert_file(filename, destdir):
     if not filename.lower().endswith(".epub"):
-        print filename, "Doesn't end with .epub"
+        print("%s Doesn't end with .epub" % filename)
         return
 
     if destdir:
@@ -30,9 +30,9 @@ def convert_file(filename, destdir):
 
     namelist = book.namelist()
     for name in namelist:
-        # print "name:", name
+        # print("name: %s" % name)
         if name.endswith('.html') or name.endswith('.xhtml'):
-            print "Converting", name
+            print("Converting %s" % name)
             fp = book.zip.open(name)
             soup = BeautifulSoup(fp)
             altertags(soup)
@@ -43,8 +43,8 @@ def convert_file(filename, destdir):
 
     book.close()
     ozf.close()
-    print "Converted", filename, "to", outbookname
-    
+    print("Converted %s to %s" % (filename, outbookname))
+
 def altertags(soup):
     counter = 1
     for tag in soup.body.find_all(re.compile("^(p|h[1-6])")):
@@ -56,8 +56,8 @@ def altertags(soup):
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
-        print "Usage: %s a.epub [b.epub c.epub ...] [destdir]" % \
-            os.path.basename(sys.argv[0])
+        print("Usage: %s a.epub [b.epub c.epub ...] [destdir]" % \
+            os.path.basename(sys.argv[0]))
         sys.exit(1)
 
     files = sys.argv[1:]
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     if os.path.isdir(files[-1]):
         destdir = files[-1]
         files = files[:-1]
-        print "Koboizing to directory", destdir
+        print("Koboizing to directory %s" % destdir)
 
     for arg in files:
         convert_file(arg, destdir)

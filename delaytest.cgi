@@ -11,7 +11,7 @@ import os, sys, string, random
 import time
 import cgi
 
-print """Content-Type: text/html
+print("""Content-Type: text/html
 
 <head>
 <title>Network request tester</title>
@@ -20,7 +20,7 @@ print """Content-Type: text/html
 <h1>Network request tester</h1>
 <p>
 Hello, world. Now we'll hang for a bit ...
-"""
+""")
 
 form = cgi.FieldStorage()
 # print "form:", form, "<p>\n"
@@ -32,8 +32,8 @@ if 'count' in form :
     count = int(form["count"].value)
 else :
     count = 300
-print "Delay", delay, ", count", count, "<br>"
+print("Delay %d, count %d<br>" % (delay, count)
 
 for i in range(count) :
     time.sleep(delay)
-    print "<p>\nAnother line", i
+    print("<p>\nAnother line %d" % i)

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import os
 import subprocess
 import datetime
@@ -32,20 +34,20 @@ class Gphoto :
                      "--list-config",
                      "capture=on"]
             config = subprocess.check_output(args)
-        except subprocess.CalledProcessError, e:
-            print "list-config exited with status", e.returncode
+        except subprocess.CalledProcessError as e:
+            print("list-config exited with status", e.returncode)
             config = e.output
-            print "output was: <START>",
-            print config
-            print "<END>"
+            print("output was: <START>", end=' ')
+            print(config)
+            print("<END>")
         for line in config.split('\n'):
             if line.startswith('/main/settings/capture'):
                 has_capture = True
                 break
-            else: print line, "isn't capture"
+            else: print(line, "isn't capture")
         if not has_capture:
             raise NotImplementedError
-        
+
     def take_still(self, outfile=None, zoom=None):
         if not outfile:
             now = datetime.datetime.now()
@@ -54,7 +56,7 @@ class Gphoto :
             # gphoto2 can handle date formatting, but in that case
             # we'd have no idea what the actual filename was
             # so we couldn't do anything with it later.
-        print "outfile is now", outfile
+        print("outfile is now", outfile)
 
         args = [ "/usr/bin/gphoto2", "--set-config", "syncdatetime=1",
                  "--set-config", "capturetarget=sdram" ]
@@ -68,7 +70,7 @@ class Gphoto :
         args.append(outfile)
 
         if self.verbose:
-            print "Calling:", args
+            print("Calling:", args)
 
         rv = subprocess.call(args)
 

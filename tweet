@@ -28,13 +28,13 @@ def prettify(filnam) :
     if parts[0].startswith(calldir) :
         return '%s (%s)' % (birdname, parts[0][calldirlen+1:])
     else :
-        print parts[0], "doesn't start with", calldir
+        print(parts[0], "doesn't start with", calldir)
     return birdname
 
 def getMatchingFiles(pats) :
     '''Find the list of birdcall files matching the list of terms.'''
     matches = []
-    birds = map(string.lower, pats)
+    birds = list(map(string.lower, pats))
     for root, dirs, files in os.walk(calldir) :
         for f in files :
             # Omit .aup files -- audacity sometimes leaves them
@@ -63,7 +63,7 @@ def play(fil) :
     os.system("play " + fil)
 
 def playList(lis) :
-    if type(lis) != types.ListType :
+    if type(lis) != list :
         return
     for b in lis :
         #print "(", b, ")"
@@ -78,13 +78,13 @@ def tweet(args):
             dot = string.rfind(matches[m], ".")
             if dot < 0 :
                 continue
-            print "%d. %s" % (m+1, prettify(matches[m][0:dot]))
-        print "%d. %s" % (len(matches)+1, "all")
+            print("%d. %s" % (m+1, prettify(matches[m][0:dot])))
+        print("%d. %s" % (len(matches)+1, "all"))
 
         try :
-            ans = raw_input("Which one? ")
-        except KeyboardInterrupt, e :
-            print
+            ans = input("Which one? ")
+        except KeyboardInterrupt as e :
+            print()
             return
         if (ans == "q") :
             return
@@ -101,7 +101,7 @@ def tweet(args):
                  return
             play(matches[answer-1])
             return
-        except ValueError, e:
+        except ValueError as e:
             # User typed something other than an int.
             # Try to match it in our current list of matches.
             newmatches = []

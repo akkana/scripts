@@ -17,20 +17,20 @@ def parse_vcal_file(f):
     with open(f) as fp:
         parsedCal = vobject.readOne(fp)
 
-    print "*** EVENT ***"
-    print "Summary:", parsedCal.vevent.summary.value
-    print "Organizer:", parsedCal.vevent.organizer.value
-    print "Start:", parsedCal.vevent.dtstart.value.strftime(TIME_FMT)
-    print "End:  ", parsedCal.vevent.dtend.value.strftime(TIME_FMT)
+    print("*** EVENT ***")
+    print("Summary:", parsedCal.vevent.summary.value)
+    print("Organizer:", parsedCal.vevent.organizer.value)
+    print("Start:", parsedCal.vevent.dtstart.value.strftime(TIME_FMT))
+    print("End:  ", parsedCal.vevent.dtend.value.strftime(TIME_FMT))
 
     # There are attendees, but there doesn't seem to be any way
     # to loop over them; you can get one of them with
     # parsedCal.vevent.attendee but how do you get the rest?
-    print "Attending:"
+    print("Attending:")
     for att in parsedCal.vevent.contents["attendee"]:
-        print "  ", att.value
-    print parsedCal.vevent.dtstart
-    print
+        print("  ", att.value)
+    print(parsedCal.vevent.dtstart)
+    print()
 
 if __name__ == "__main__":
     for f in sys.argv[1:]:

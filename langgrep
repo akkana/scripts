@@ -19,8 +19,8 @@ import subprocess
 import shlex
 
 def Usage():
-    print "langgrep lang [grepflags] pattern files"
-    print " e.g. langgrep python -w find *"
+    print("langgrep lang [grepflags] pattern files")
+    print(" e.g. langgrep python -w find *")
     sys.exit(0)
 
 def check_file_lang(filename, lang):
@@ -32,8 +32,8 @@ def check_file_lang(filename, lang):
         f = open(filename)
         firstline = f.readline(80)
         f.close()
-    except IOError, e:
-        print "IOError", e
+    except IOError as e:
+        print("IOError", e)
         #print "exc_info is", sys.exc_info()
         sys.exit(1)
         return False
@@ -105,10 +105,10 @@ try:
                     path = pathparts[-1]
                 else:
                     path = '/'.join(pathparts[-2:])
-                print "%s%s" % (path, line[colon:])
+                print("%s%s" % (path, line[colon:]))
 
 # Try to catch ctrl-C and print a nicer message. This doesn't work, though:
 # subprocess.call just terminates the whole process.
-except KeyboardInterrupt, e:
-    print "Interrupt!"
+except KeyboardInterrupt as e:
+    print("Interrupt!")
     sys.exit(1)

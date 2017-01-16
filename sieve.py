@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import curses
 import time
 import sys
@@ -31,7 +33,7 @@ def cleanup():
     curses.endwin()
 
     if errstr:
-        print "Errors:", errstr
+        print("Errors:", errstr)
     sys.exit(0)
 
 height, width = stdscr.getmaxyx()
@@ -45,7 +47,7 @@ maxnum = numsperline * height
 attributes = [0] * (maxnum+2)
 
 logf = open("/tmp/sieve.log", "w", buffering=1)
-print >>logf, "Maxnum is", maxnum
+print("Maxnum is", maxnum, file=logf)
 
 def redraw_screen(highlight=None):
     num = 0
@@ -57,8 +59,8 @@ def redraw_screen(highlight=None):
             return
 
         if x < numwidth:
-            print >>logf, ".\n"
-        print >>logf, "'%s' @ (%d, %d) " % (fmt % num, x, y),
+            print(".\n", file=logf)
+        print("'%s' @ (%d, %d) " % (fmt % num, x, y), end=' ', file=logf)
         #errstr += "'%s' @ (%d, %d) " % (fmt % num, x, y)
         #errstr += "\nstdscr.addstr(%d, %d, '%s')" % (y, x, fmt % num)
         if highlight == num:
@@ -67,7 +69,7 @@ def redraw_screen(highlight=None):
             stdscr.addstr(y, x, fmt % num, attributes[num])
 
     stdscr.refresh()
-    print >>logf, "Refreshed"
+    print("Refreshed", file=logf)
     return num
 
 try:
@@ -79,20 +81,20 @@ try:
         divisor += 1
         while attributes[divisor]:
             divisor += 1
-            print >>logf, "divisor++ to", divisor
-        print >>logf, divisor, "is prime"
+            print("divisor++ to", divisor, file=logf)
+        print(divisor, "is prime", file=logf)
 
-        for i in xrange(1, maxnum):
+        for i in range(1, maxnum):
             if i > divisor and i % divisor == 0:
-                print >>logf, "Setting attribute for", i
+                print("Setting attribute for", i, file=logf)
                 attributes[i] = colorpair
 
-        print >>logf, "Finished setting attributes for", divisor
+        print("Finished setting attributes for", divisor, file=logf)
 
         redraw_screen(highlight=divisor)
         key = stdscr.getch()
         
-except Exception, e:
+except Exception as e:
     errstr += "Exception: " + str(e)
 
 finally:

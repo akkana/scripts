@@ -7,6 +7,8 @@
 
 # Copyright 2009 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
+from __future__ import print_function
+
 import sys, os
 import curses.ascii
 
@@ -17,7 +19,7 @@ file_list = []
 multi_format = False
 
 def Usage() :
-    print "Usage:", os.path.basename(sys.argv[0]), "[-cxd] file ..."
+    print("Usage: %s [-cxd] file ..." % os.path.basename(sys.argv[0]))
     exit(1)
 
 def parse_opts() :
@@ -51,14 +53,14 @@ def parse_opts() :
 
 def bdump(filename, do_char, do_hex, do_dec) :
     if len(file_list) > 1 :
-        print filename + ":"
+        print(filename + ":")
 
     if filename :
         try :
             fp = open(filename, "r")
 
-        except IOError, e:
-            print "Can't open", filename, ":\n   ", e
+        except IOError as e:
+            print("Can't open %s:\n%s" % (filename, e))
             #sys.exit(e.errno)
             return
     else :
@@ -68,34 +70,34 @@ def bdump(filename, do_char, do_hex, do_dec) :
         while True :
             line = fp.read(16)
             if line == "" : break
-        
+
             if do_char :
                 for c in line :
                     if curses.ascii.isprint(c) :
-                        print "%4c" % (c),
+                        print("%4c" % (c), end=' ')
                     elif curses.ascii.iscntrl(c) :
-                        print "  ^" + chr(ord(c) + ord('A') - 1),
+                        print("  ^" + chr(ord(c) + ord('A') - 1), end=' ')
                     else :
-                        print '    ',
-                print
-        
+                        print('    ', end=' ')
+                print()
+
             if do_hex :
                 for c in line :
-                    print "%4x" % (ord(c)),
-                print
-        
+                    print("%4x" % (ord(c)), end=' ')
+                print()
+
             if do_dec :
                 for c in line :
-                    print "%4d" % (ord(c)),
-                print
-    
-            if multi_format :
-                print
+                    print("%4d" % (ord(c)), end=' ')
+                print()
 
-    except IOError, e :
+            if multi_format :
+                print()
+
+    except IOError as e :
         if e.errno == 32 :      # Broken pipe
             sys.exit(0)
-        print e
+        print(e)
         sys.exit(e)
 
     fp.close()

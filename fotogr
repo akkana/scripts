@@ -9,6 +9,8 @@
 # Wish list: Boolean logic. Currently this can search only for one
 # term/phrase at a time.
 
+from __future__ import print_function
+
 import sys, os, string
 
 def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
@@ -57,22 +59,22 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, separate,
                 fullpath = fullpath[2:]
             if not os.path.exists(fullpath):
                 continue
-            if fullpath not in filetags.keys():
+            if fullpath not in list(filetags.keys()):
                 filetags[fullpath] = tags
             else:
                 filetags[fullpath] += ', ' + tags
 
     # Now we have a list of tagged files in the directory, and their tags.
-    for imgfile in filetags.keys():
+    for imgfile in list(filetags.keys()):
         tags = filetags[imgfile]
 
         if has_match(tags, orpats, andpats, notpats):
             if results != None:
                 results.append(imgfile)
             elif separate:
-                print tags, ':', imgfile
+                print(tags, ':', imgfile)
             else:
-                print imgfile,
+                print(imgfile, end=' ')
 
 def has_match(tags, orpats, andpats, notpats):
     '''Do the tags contain any of the patterns in orpats,
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     # Sadly, we can't use argparse if we want to be able to use -term
     # to indicate "don't search for that term".
     def Usage():
-        print '''Usage: %s [-s] condition [condition ...]
+        print('''Usage: %s [-s] condition [condition ...]
 
 Search for files matching patterns in Tags or Keywords files.
 
@@ -109,7 +111,7 @@ Conditions can include three types of patterns:
 Optional arguments:
   -s, --separate  print separate lines from different tag files
 
-Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0])
+Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
     args = sys.argv[1:]
@@ -137,7 +139,7 @@ Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''
     r = list(s)
     r.sort()
     for f in r:
-        print f,
-    print
+        print(f, end=' ')
+    print()
 
 

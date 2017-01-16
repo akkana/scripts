@@ -22,7 +22,7 @@ class Colprinter():
 
     def add(self, lis):
         '''Add a row (a list of items)'''
-        self.thelist.append(map(str, lis))
+        self.thelist.append(list(map(str, lis)))
 
         for i, item in enumerate(lis):
             itemlen = len(item)
@@ -40,7 +40,7 @@ class Colprinter():
 
 def show_apt_matches(pat, cache, only_installed=False):
     colpr = Colprinter()
-    for pkgname in cache.keys():
+    for pkgname in list(cache.keys()):
         if pat in pkgname:
             pkg = cache[pkgname]
             instver = pkg.installed
@@ -51,7 +51,7 @@ def show_apt_matches(pat, cache, only_installed=False):
                 colpr.add((pkg.name, '(' + candidate.version + ')',
                            candidate.summary))
 
-    print colpr
+    print(colpr)
 
 if __name__ == '__main__':
     from optparse import OptionParser

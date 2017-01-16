@@ -9,10 +9,10 @@ def print_sheet(sheetname, sh):
     # Gnumeric makes null sheets, with 0 rows and 0 columns.
     # Guard against division by zero in gnumeric spreadsheets:
     if not sh or sh.ncols <= 0:
-        print "Null sheet", sheetname
+        print("Null sheet", sheetname)
         return
 
-    print "===== sheet", sheetname, ": rows", sh.nrows, "cols", sh.ncols
+    print("===== sheet", sheetname, ": rows", sh.nrows, "cols", sh.ncols)
 
     # set a maximum on any one column.
     # Ideally this would be smarter,
@@ -31,7 +31,7 @@ def print_sheet(sheetname, sh):
                 continue
 
             #print "type:", type(val), val
-            slen = len(unicode(val))
+            slen = len(str(val))
             #if slen > maxlen: slen = maxlen
             if slen > maxstr[colnum]:
                 maxstr[colnum] = slen
@@ -45,9 +45,9 @@ def print_sheet(sheetname, sh):
         # even that is enough. In practice, this works to stdout without
         # needing the encode, but to pipe through grep or redirect to a
         # file it needs the encode.
-        print (fmt % tuple(map(unicode,
+        print((fmt % tuple(map(str,
                    sh.row_values(rownum)))).encode(sys.getdefaultencoding(),
-                                                   'backslashreplace')
+                                                   'backslashreplace'))
 
 for filename in sys.argv[1:]:
     wb = xlrd.open_workbook(filename)

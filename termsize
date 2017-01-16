@@ -38,12 +38,12 @@ finally:
     termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
     fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
 
-rows, cols = map(int, re.findall(r'\d+', output))
+rows, cols = list(map(int, re.findall(r'\d+', output)))
 
 fcntl.ioctl(fd, termios.TIOCSWINSZ,
             struct.pack("HHHH", rows, cols, 0, 0))
 
-print "\nReset the terminal to", rows, "rows", cols, "cols"
+print("\nReset the terminal to %d rows, %d cols" % (rows, cols))
 
 
 

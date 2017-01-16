@@ -22,10 +22,10 @@ def recursive_read(rootdir):
 def set_random_bg(bgdir, arg):
     images = recursive_read(bgdir)
     if not images:
-        print "No images in", bgdir
+        print("No images in %s" % bgdir)
         sys.exit(1)
     img = random.choice(images)
-    print "Setting background to", img
+    print("Setting background to %s" % img)
     subprocess.call(['hsetroot', arg, img])
 
 # If the dir is specified explicitly, go ahead and do it.
@@ -43,7 +43,7 @@ while True:
         break
 fp.close()
 if not width or not height:
-    print "Couldn't find screen dimensions!"
+    print("Couldn't find screen dimensions!")
     sys.exit(1)
 
 basedir = os.path.expanduser("~/Images/Backgrounds")
@@ -51,13 +51,13 @@ bgdir = os.path.join(basedir, '%dx%d' % (width, height))
 
 # If the exact right directory exists, use it.
 if os.path.exists(bgdir):
-    print bgdir, "exists: using it"
+    print("%s exists: using it" % bgdir)
     set_random_bg(bgdir, '-fill')
     sys.exit(0)
 
 # We don't have images at exactly the right resolution.
 # Try to find the closest match:
-print "Looking for the closest match"
+print("Looking for the closest match")
 mindiff = 99999
 bgdir = None
 for d in os.listdir(basedir):

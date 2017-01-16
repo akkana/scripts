@@ -3,6 +3,8 @@
 '''Utilities for reading and writing a Kobo ebook reader's database.
 '''
 
+from __future__ import print_function
+
 import os, sys
 import sqlite3
 
@@ -31,7 +33,7 @@ class KoboDB:
         elif self.mountpath:
             self.dbpath = os.path.join(mountpath, ".kobo/KoboReader.sqlite")
         else:
-            print "No DB path specified"
+            print("No DB path specified")
             return
 
         self.conn = sqlite3.connect(self.dbpath)
@@ -75,7 +77,7 @@ class KoboDB:
 
         sql = "SELECT %s FROM %s%s%s;" % (selectors, tablename,
                                           modifiers, order)
-        print sql
+        print(sql)
         self.cursor.execute(sql)
         return self.cursor.fetchall()
 
@@ -89,7 +91,7 @@ class KoboDB:
         else:
             fields = self.get_field_names(tablename)
 
-        return [ dict(zip(fields, values)) for values in l ]
+        return [ dict(list(zip(fields, values))) for values in l ]
 
     def get_book_by_id(self, id):
         sql = "SELECT Title,Attribution FROM content WHERE ContentID='%s';" \
@@ -113,24 +115,24 @@ class KoboDB:
                                order="content.Title")
 
         for book in books:
-            print "%s (%s)" % (book["Title"], book["Attribution"])
-            print "  ContentID:", book["ContentID"]
+            print("%s (%s)" % (book["Title"], book["Attribution"]))
+            print("  ContentID: %s" % book["ContentID"])
             if book["NumShortcovers"]:
-                print "  Chapters:", book["NumShortcovers"]
-            print "  Encrypted?", book["IsEncrypted"],
-            print "   Downloaded?", book["IsDownloaded"],
+                print("  Chapters: %s" % book["NumShortcovers"])
+            print("  Encrypted? %s" % book["IsEncrypted"], end=' ')
+            print("   Downloaded? %s" % book["IsDownloaded"], end=' ')
             if book["adobe_location"]:
                 if book["adobe_location"] == book["ContentID"]:
-                    print "    adobe_location: Yes"
+                    print("    adobe_location: Yes")
                 else:
-                    print "\n  adobe_location:", book["adobe_location"]
+                    print("\n  adobe_location:", book["adobe_location"])
             else:
-                print
+                print()
 
             # Description is very long; make this optional.
             # print "  Description:", book["Description"]
 
-            print
+            print()
 
 
     def list_shelves(self, names=None):
@@ -151,13 +153,13 @@ class KoboDB:
                 allshelves[item["ShelfName"]].append(item["ContentId"])
 
         for shelf in allshelves:
-            print "\n===", shelf, "==="
+            print("\n===", shelf, "===")
             for id in allshelves[shelf]:
                 book = self.get_book_by_id(id)
                 if not book:
-                    print "Eek, book", id, "doesn't exist"
+                    print("Eek, book", id, "doesn't exist")
                 else:
-                    print "    %s (%s)" % book
+                    print("    %s (%s)" % book)
 
     def has_shelf(self, shelfname):
         '''Does a given shelfname exist? Helpful when checking whether
@@ -165,7 +167,7 @@ class KoboDB:
         '''
         shelves = self.get_dlist("Shelf", selectors=[ "Name" ],
                                  modifiers=[ "Name='%s'" % shelfname ])
-        print "Has shelf %s?" % shelfname, bool(shelves)
+        print("Has shelf %s?" % shelfname, bool(shelves))
         return bool(shelves)
 
     def print_table(self, tablename, **kwargs):
@@ -173,26 +175,26 @@ class KoboDB:
         '''
         if kwargs and 'selectors' in kwargs and kwargs['selectors']:
             fields = kwargs['selectors']
-            print "kwargs: fields =", fields
+            print("kwargs: fields =", fields)
         else:
             fields = self.get_field_names(tablename)
-            print "no kwargs: fields =", fields
+            print("no kwargs: fields =", fields)
 
         for row in self.get_list(tablename, **kwargs):
             for i, f in enumerate(fields):
                 # Must coerce row[i] to unicode before encoding,
                 # even though it should be unicode already,
                 # because it could be null.
-                print f.encode('UTF-8'), ":", unicode(row[i]).encode('UTF-8')
+                print(f.encode('UTF-8'), ":", str(row[i]).encode('UTF-8'))
 
     # Adding entries to shelves:
     def make_new_shelf(self, shelfname):
         '''Create a new shelf/collection.
         '''
-        print "=== Current shelves:"
+        print("=== Current shelves:")
         self.print_table("Shelf", selectors=[ "Name" ])
-        print "==="
-        print "Making a new shelf called", shelfname
+        print("===")
+        print("Making a new shelf called", shelfname)
         # Skip type since it's not clear what it is and it's never set.
         # For the final three, PRAGMA table_info(Shelf); says they're
         # type BOOL, and querying that table shows true and false there,
@@ -204,17 +206,17 @@ class KoboDB:
                   LastModified, Name, _IsDeleted, _IsVisible, _IsSynced)
 VALUES (DATETIME('now'), '%s', '%s', DATETIME('now'), '%s', 0, 1, 1);
 ''' % (shelfname, shelfname, shelfname)
-        print query
+        print(query)
         self.cursor.execute(query)
 
     def add_to_shelf(self, kobobook, shelfname):
-        print "==="
-        print "Adding", kobobook["Title"], "to shelf", shelfname
+        print("===")
+        print("Adding", kobobook["Title"], "to shelf", shelfname)
         query = '''INSERT INTO ShelfContent(ShelfName, ContentId, DateModified,
                          _IsDeleted, _IsSynced)
 VALUES ('%s', '%s', DATE('now'), 0, 0);''' % (shelfname,
                                               escape_quotes(kobobook['ContentID']))
-        print query
+        print(query)
         self.cursor.execute(query)
         self.conn.commit()
 
@@ -248,16 +250,16 @@ Default: $mountdir/.kobo/KoboReader.sqlite""")
     try:
         koboDB = KoboDB(args.mountdir)
         koboDB.connect(args.db)
-    except Exception, e:
-        print "Couldn't open database at %s for Kobo mounted at %s" % \
-            (args.db, args.mountdir)
-        print e
+    except Exception as e:
+        print("Couldn't open database at %s for Kobo mounted at %s" % \
+            (args.db, args.mountdir))
+        print(e)
         sys.exit(1)
 
     if args.shelfnames:
         shelves = koboDB.get_dlist("Shelf", selectors=[ "Name" ])
         for shelf in shelves:
-            print shelf["Name"]
+            print(shelf["Name"])
     elif args.shelves:
         koboDB.list_shelves()
     else:
