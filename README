@@ -248,6 +248,10 @@ shorturl:
     Can take input from the current X selection, and automatically
     select its output for pasting into a browser or Twitter window.
 
+shorturl-gi3:
+    shorturl ported to python3, GTK3 and GObject introspection (GI).
+    Most useful as an example of how to use GI-GTK3.
+
 sieve.py:
     Visualization of the Sieve of Eratosthenes, using Python curses.
     (Not very useful, but makes a good curses example.)
