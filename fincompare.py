@@ -188,8 +188,16 @@ plt.legend(loc='upper left')
 # http://stackoverflow.com/questions/8010549/subplots-with-dates-on-the-x-axis
 # There is apparently no way to do this through the subplot.
 # ax1.set_xticklabels(rotation=20)
-# fig = plt.figure(1)
 plt.xticks(rotation=30)
+
+# Exit on key q
+def press(event):
+    # print('press', event.key)
+    sys.stdout.flush()
+    if event.key == 'ctrl+q':
+        sys.exit(0)
+fig = plt.figure(1)
+fig.canvas.mpl_connect('key_press_event', press)
 
 ax1.set_title("Investment options")
 
