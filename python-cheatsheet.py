@@ -3,9 +3,18 @@
 # This is a file of reminders of various neat Python features
 # that I always forget how to use.
 
-# Migrate python2 to python3 in place, leaving a .bak:
-$ 2to3 -w file_or_directory
-# use -wn for no .bak
+# Migrate python2 to python3 in place (omit -n to leave a .bak):
+$ 2to3 -wn file_or_directory
+
+# Decode vs. Encode:
+# "string of bytes".decode('utf-8')  --> unicode
+# u"unicode string".encode('utf-8')  --> bytes
+# Either of these can take
+#   errors='replace', 'ignore', 'backslashreplace', 'xmlcharrefreplace'
+>>> u = u'piñon'
+>>> u
+u'pi\xf1on'
+# For Python3 skip to the end of this file.
 
 # Show methods in an object
 dir(obj)
@@ -179,4 +188,109 @@ for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "
 # APPLY -10
 # HELP -11
 
+######################################################
+# Decorators -- attempt at a useful example.
+######################################################
 
+#
+# Timer decorator without arguments:
+#
+import time
+
+def timing_function(fn):
+    """
+    Returns the time a function takes to execute.
+    """
+    def wrapper():
+        t1 = time.time()
+        fn()
+        t2 = time.time()
+        return "It took: %s" % str(t2 - t1)
+    return wrapper
+
+@timing_function
+def sumit():
+    bignum = 100000
+    tot = 0
+    for num in (range(0, bignum)):
+        tot += num
+    print("Sum (0-%d) = %d" % (bignum, tot))
+
+output = sumit()
+print("output = '%s'" % str(output))
+
+#
+# But adding an argument is counterintuitive.
+# If you give sumit an argument, sumit(bignum),
+# that's taken as being an argument for wrapper(), not for fn().
+# If you want sumit() to take an argument, you have to do it this way:
+#
+def timing_function(fn):
+    """
+    Returns the time a function takes to execute.
+    """
+    def wrapper(outer_arg):  # outer_arg is the arg passed to sumit
+        def wrapped(*args):
+            t1 = time.time()
+            fn(outer_arg)
+            t2 = time.time()
+            return "%d: It took: %s" % (outer_arg, str(t2 - t1))
+        return wrapped(fn)  # This is what gets returned when you call sumit(x)
+    return wrapper
+
+@timing_function
+def sumit(bignum):
+    tot = 0
+    for num in (range(0, bignum)):
+        tot += num
+    print("Sum (0-%d) = %d" % (bignum, tot))
+
+output = sumit(100000)
+print("output = '%s'" % str(output))
+
+#
+# What if you want the decorator to also take arguments?
+#
+def repeat_timing_function(numreps):
+    def wrap(fn):
+        def wrapped_f(*args):
+            # args are the args to the outside function (=bignum)
+            # arg1, arg2, arg3 are the decorator arguments (=numreps)
+            t1 = time.time()
+            for i in range(numreps):
+                fn(*args)
+            t2 = time.time()
+            return "%d: It took: %s" % (args[0], str(t2 - t1))
+        return wrapped_f
+    return wrap
+
+@repeat_timing_function(5)
+def summit(bignum):
+    tot = 0
+    for num in (range(0, bignum)):
+        tot += num
+    print("Sum (0-%d) = %d" % (bignum, tot))
+
+output = summit(100000)
+print("output = '%s'" % str(output))
+
+
+################################################################
+# Python3 differences
+################################################################
+
+# All strings in python3 are automatically unicode,
+# and you can just pass encoding as a second argument when you
+# coerce between str and byte, no need to remember encode/decode.
+
+# Encode/decode in PYTHON3:
+>>> str(b'string of bytes')
+'string of bytes'
+>>> str(b'string of bytes', 'utf-8')
+'string of bytes'
+>>> bytes('piñon', 'utf-8')
+b'pi\xc3\xb1on'
+>>> str(b'pi\xc3\xb1on')
+"b'pi\\xc3\\xb1on'"
+>>> str(b'pi\xc3\xb1on', 'utf-8')
+'piñon'
