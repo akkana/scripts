@@ -10,19 +10,29 @@ import ephem
 import math
 
 verbose = False
-output_csv = True
 
 # How low can a planet be at sunset or midnight before it's not interesting?
-min_alt = 10. * math.pi / 180.
+# We'll half it for the moon.
+min_alt = 10 * math.pi / 180.
 
 # How close do two bodies have to be to consider it a conjunction?
 max_sep = 3.5 * math.pi / 180.
 
-# How little percent illuminated do we need to consider something a crescent?
+# How close does a bright planet need to be from the moon to be mentioned?
+moon_sep = 25 * math.pi / 180.
+
+# How little % illuminated do we need to consider an inner planet a crescent?
 crescent_percent = 40
 
 # Start and end times for seeing a crescent phase:
 crescents = { "Mercury": [ None, None ], "Venus": [ None, None ] }
+
+# What hour GMT corresponds to midnight here?
+# Note: we're not smart about time zones. This will calculate
+# a time based on the time zone offset right now, whether we're
+# currently in DST or not.
+# And for now we don't even calculate it, just hardwire it.
+timezone = 7
 
 sun = ephem.Sun()
 
@@ -40,8 +50,16 @@ for planet in planets:
     planets_up[planet.name] = None
 
 def datestr(d):
-    tup = d.tuple()
-    return "%d/%d/%d" % (tup[0], tup[1], tup[2])
+    # The date may be wrong because of time zones. Convert to our timezone.
+    lt = ephem.localtime(d)
+    # return lt.strftime("%m/%d/%Y")
+    return lt.strftime("%Y-%m-%d")
+
+# For the web page, it's a little more friendly to say something like
+# "will be closest on Mar 3" vs. "will be closest on 2017-03-03".
+def friendlydate(d):
+    lt = ephem.localtime(d)
+    return lt.strftime("%b %d")
 
 def sepstr(sep):
     deg = float(sep) * 180. / math.pi
@@ -76,6 +94,9 @@ class Conjunction:
 
     def __contains__(self, body):
         return body in self.bodies
+
+    def __repr__(self):
+        return "Conjection: " + ', '.join(map(str, self.bodies))
 
     def add(self, body1, body2, date, sep):
         self.pairs.append(ConjunctionPair(body1, body2, date, sep))
@@ -135,21 +156,34 @@ class Conjunction:
                     minseps.append((closest_date, minsep, b1, b2))
         minseps.sort()
 
-        if output_csv:
+        if output_format == "csv":
             s = '"Conjunction of ' + self.andjoin(self.bodies) + '",'
             s += datestr(startdate) + "," + datestr(enddate) + ",,"
             s += "\""
             for m in minseps:
                 s += " %s and %s will be closest on %s (%s)." % \
-                     (m[2], m[3], datestr(m[0]), sepstr(m[1]))
-            s += "\",,http://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg/320px-Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg,240,169,\"<a href='http://commons.wikimedia.org/wiki/File:Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg'>starry moon on Wikimedia Commons</a>\""
+                     (m[2], m[3], friendlydate(m[0]), sepstr(m[1]))
+            s += "\",,astronomy/starry_moon.jpg,240,169,\"<a href='http://commons.wikimedia.org/wiki/File:Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg'>starry moon on Wikimedia Commons</a>\""
+            print(s)
+        elif output_format == "sql":
+            s = "('Conjunction of " + self.andjoin(self.bodies) + "', "
+            s += "'astronomy', 'naked eye', "
+            s += "'" + datestr(startdate) + "', '" + datestr(enddate) + "', "
+            s += "'"
+            for m in minseps:
+                s += " %s and %s will be closest on %s (%s)." % \
+                     (m[2], m[3], friendlydate(m[0]), sepstr(m[1]))
+            s += "', "
+            s += "'astronomy/starry_moon.jpg', "
+            s += "240, 169, "
+            s += "'<a href=\"http://commons.wikimedia.org/wiki/File:Sachin_Nigam_-_starry_moon_%28by-sa%29.jpg\">starry moon on Wikimedia Commons</a>' ),"
             print(s)
         else:
             print("Conjunction of", self.andjoin(self.bodies), end=' ')
             print("lasts from %s to %s." % (datestr(startdate), datestr(enddate)))
             for m in minseps:
                 print("  %s and %s are closest on %s (%s)." % \
-                    (m[2], m[3], datestr(m[0]), sepstr(m[1])))
+                    (m[2], m[3], friendlydate(m[0]), sepstr(m[1])))
 
     def merge(self, conj):
         '''Merge in another Conjunction -- it must be that the two
@@ -167,6 +201,12 @@ class ConjunctionList:
     '''
     def __init__(self):
         self.clist = []
+
+    def __repr__(self):
+        s = "ConjunctionList:"
+        for c in self.clist:
+            s += "\n    " + str(c)
+        return s
 
     def add(self, b1, b2, date, sep):
         for i, c in enumerate(self.clist):
@@ -196,12 +236,16 @@ class ConjunctionList:
 oneday = ephem.hour * 24
 
 web_image = {
-    "Moon" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Phase-088.jpg/240px-Phase-088.jpg", '''"<a href='http://commons.wikimedia.org/wiki/User:JayTanner/gallery'>Jay Tanner</a>"''', 240, 240),
-    "Mercury" : ("../resources/astronomy/mercury.jpg", "", 240, 182),
-    "Venus" : ("../resources/astronomy/venus.jpg", "", 240, 192),
-    "Mars" : ("http://imgsrc.hubblesite.org/hu/db/images/hs-2001-24-a-small_web.jpg,200,200", "Hubble Space Telescope", 200, 200),
-    "Jupiter" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Jupiter.jpg/240px-Jupiter.jpg", '"USGS, JPL and NASA"', 240, 240),
-    "Saturn" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Saturn_%28planet%29_large.jpg/384px-Saturn_%28planet%29_large.jpg", "Voyager 2", 192, 240)
+    # "Moon" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Phase-088.jpg/240px-Phase-088.jpg", '''"<a href='http://commons.wikimedia.org/wiki/User:JayTanner/gallery'>Jay Tanner</a>"''', 240, 240),
+    "Moon" : ("astronomy/Phase-088.jpg", '''"<a href='http://commons.wikimedia.org/wiki/User:JayTanner/gallery'>Jay Tanner</a>"''', 240, 240),
+    "Mercury" : ("astronomy/mercury.jpg", "", 240, 182),
+    "Venus" : ("astronomy/venus.jpg", "", 240, 192),
+    # "Mars" : ("http://imgsrc.hubblesite.org/hu/db/images/hs-2001-24-a-small_web.jpg", "Hubble Space Telescope", 200, 200),
+    "Mars" : ("astronomy/mars.jpg", "Hubble Space Telescope", 200, 200),
+    # "Jupiter" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Jupiter.jpg/240px-Jupiter.jpg", 'USGS, JPL and NASA', 240, 240),
+    "Jupiter" : ("astronomy/Jupiter.jpg", 'USGS, JPL and NASA', 240, 240),
+    # "Saturn" : ("http://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Saturn_%28planet%29_large.jpg/384px-Saturn_%28planet%29_large.jpg", "Voyager 2", 192, 240)
+    "Saturn" : ("astronomy/saturn.jpg", "Voyager 2", 182, 240)
 }
 
 descriptions = {
@@ -215,13 +259,18 @@ def quotecsv(s):
         return '"' + s.replace('"', '""') + '"'
     return s
 
-def finish_planet(p, d):
+def escape_singlequotes(s):
+    return s.replace("'", "\\'")
+
+def finish_planet(p, d, output_format):
     if not planets_up[p]:
         return
 
     if p in list(descriptions.keys()):
-        if output_csv:
+        if output_format == "csv":
             isvis = quotecsv(descriptions[p])
+        elif output_format == "sql":
+            isvis = escape_singlequotes(descriptions[p])
         else:
             isvis = descriptions[p]
     elif p == "Venus" or p == "Mercury":
@@ -233,13 +282,13 @@ def finish_planet(p, d):
     if p in list(crescents.keys()):
         if crescents[p][0]:
             isvis += " A telescope will show a crescent from " \
-                     + datestr(crescents[p][0])
+                     + friendlydate(crescents[p][0])
             if crescents[p][1]:
-                isvis += " to " + datestr(crescents[p][1])
+                isvis += " to " + friendlydate(crescents[p][1])
             isvis += '.'
         crescents[p] = [ None, None ]
 
-    if output_csv:
+    if output_format == "csv" or output_format == "sql":
         if p != 'Moon':
             if web_image[p]:
                 img = web_image[p][0]
@@ -252,15 +301,20 @@ def finish_planet(p, d):
                 w = ""
                 h = ""
 
-            print("%s,%s,%s,,%s,,%s,%s,%s,%s" % \
-                (p, datestr(planets_up[p]), datestr(d), isvis,
-                 img, w, h, cred))
+            if output_format == "csv":
+                print("%s,%s,%s,,%s,,%s,%s,%s,%s" % \
+                      (p, datestr(planets_up[p]), datestr(d), isvis,
+                       img, w, h, cred))
+            else:
+                print("('%s', 'astronomy', 'naked eye', '%s', '%s', '%s', '%s', %s, %s, '%s' )," % \
+                      (p, datestr(planets_up[p]), datestr(d), isvis,
+                       img, w, h, cred))
     else:
         print(datestr(planets_up[p]), "to", datestr(d), ":", isvis)
 
     planets_up[p] = None
 
-def run(start, end, observer, toolate):
+def run(start, end, observer, toolate, output_format):
     '''Find planetary visibility between dates start and end,
        for an observer whose location has been set,
        between sunset and "toolate" on each date, where toolate is a GMT hour,
@@ -269,21 +323,31 @@ def run(start, end, observer, toolate):
     d = start
     conjunctions = ConjunctionList()
 
-    if output_csv:
+    if output_format == "csv":
         print('name,start,end,time,longname,URL,image,image width,image height,image credit')
+    elif output_format == "sql":
+        print("INSERT INTO peecnatu_guides_dev.astronomy(common_name, guide_group, visibility, start, end, comments, image, image_width, image_height, image_credit) VALUES")
     else:
         print("Looking for planetary events between %s and %s:\n" % \
             (datestr(d), datestr(end)))
 
     def check_if_planet_up(planet, d):
-        '''If the planet is currently up, do housekeeping to remember
+        '''If the planet is up on the given date, do housekeeping to remember
            that status, then return True if it's up, False otherwise.
+           The date passed in is just a date; we will try different times
+           on that date, including the immediately preceding sunset
+           and a "toolate" hour of the night.
         '''
         global crescents, planets_up
 
-        if planet.alt < min_alt:    # planet is not up
+        # The moon is easy to see, so allow it half the alt of anything else.
+        if planet.name == "Moon":
+            if planet.alt < min_alt/2:   # moon isn't up
+                return False
+        elif planet.alt < min_alt:       # planet is not up
             return False
 
+        # Planet is up.
         if not planets_up[planet.name]:
             planets_up[planet.name] = d;
         visible_planets.append(planet)
@@ -301,14 +365,15 @@ def run(start, end, observer, toolate):
         return True
 
     while d < end:
-        observer.date = d
-        sunset = observer.previous_setting(sun)
         # sunrise = observer.next_rising(sun)
         # print  "Sunset:", sunset, "  Sunrise:", sunrise
 
-        midnight = list(observer.date.tuple())
-        midnight[3:6] = [toolate, 0, 0]
-        midnight = ephem.date(tuple(midnight))
+        latenight = list(d.tuple())
+        latenight[3:6] = [toolate, 0, 0]
+        latenight = ephem.date(tuple(latenight))
+
+        observer.date = latenight
+        sunset = observer.previous_setting(sun)
 
         # We have two lists of planets: planets_up and visible_planets.
         # planets_up is a dictionary of the time we first saw each planet
@@ -317,38 +382,45 @@ def run(start, end, observer, toolate):
         visible_planets = []
         for planet in planets:
             # A planet is observable this evening (not morning)
-            # if its altitude at sunset OR its altitude at midnight
-            # is greater than a threshold, which we'll set at 10 degrees.
+            # if its altitude at sunset OR its altitude at late-night
+            # is greater than a visible_threshold
             observer.date = sunset
             planet.compute(observer)
             # print planet.name, "alt at sunset:", planet.alt
             if not check_if_planet_up(planet, observer.date):
-                # If it's not up at sunset, try midnight
-                observer.date = midnight
+                # If it's not up at sunset, try latenight
+                observer.date = latenight
                 if observer.date < sunset:
                     observer.date += oneday
                 planet.compute(observer)
                 if not check_if_planet_up(planet, observer.date):
                     # Planet is not up. Was it up yesterday?
                     if planets_up[planet.name]:
-                        finish_planet(planet.name, observer.date)
+                        finish_planet(planet.name, observer.date, output_format)
 
-        # print datestr(d), "visible planets:", \
-        #     ' '.join([p.name for p in visible_planets])
-        # print "planets_up:", planets_up
+        # print()
+        # print(datestr(d), "visible planets:",
+        #       ' '.join([p.name for p in visible_planets]))
+        # print("planets_up:", planets_up)
 
         # Done with computing visible_planets.
         # Now look for conjunctions, anything closer than 5 degrees.
-        # Split the difference, use a time halfway between sunset and midnight.
+        # Split the difference, use a time halfway between sunset and latenight.
         saw_conjunction = False
-        observer.date = ephem.date((sunset + midnight)/2)
+        observer.date = ephem.date((sunset + latenight)/2)
+        moon = planets[0]
         if len(visible_planets) > 1:
             for p, planet in enumerate(visible_planets):
                 for planet2 in visible_planets[p+1:]:
                     sep = ephem.separation(planet, planet2)
+                    # print(observer.date, "moon -", planet2.name, sep)
                     if sep <= max_sep:
-                        # print datestr(observer.date), planet.name, \
-                        #     planet2.name, sepstr(sep)
+                        # print (datestr(observer.date), planet.name,
+                        #        planet2.name, sepstr(sep))
+                        conjunctions.add(planet.name, planet2.name,
+                                         observer.date, sep)
+                        saw_conjunction = True
+                    elif planet == moon and sep <= moon_sep:
                         conjunctions.add(planet.name, planet2.name,
                                          observer.date, sep)
                         saw_conjunction = True
@@ -358,17 +430,22 @@ def run(start, end, observer, toolate):
         # Add a day:
         d = ephem.date(d + oneday)
 
+    if saw_conjunction:
+        conjunctions.closeout()
     for p in visible_planets:
-        finish_planet(p.name, d)
+        finish_planet(p.name, d, output_format)
 
 if __name__ == '__main__':
     import sys
 
     if len(sys.argv) > 1 and sys.argv[1] == "-c":
-        output_csv = True
+        output_format = "csv"
+        sys.argv = sys.argv[1:]
+    elif len(sys.argv) > 1 and sys.argv[1] == "-s":
+        output_format = "sql"
         sys.argv = sys.argv[1:]
     else:
-        output_csv = False
+        output_format = "text"
 
     if len(sys.argv) > 1:
         start = ephem.date(sys.argv[1])
@@ -392,15 +469,8 @@ if __name__ == '__main__':
     observer.lat = '35.8911'
     observer.elevation = 2286  # meters, though the docs don't actually say
 
-    # What hour GMT corresponds to midnight here?
-    # Note: we're not smart about time zones. This will calculate
-    # a time based on the time zone offset right now, whether we're
-    # currently in DST or not.
-    # And for now we don't even calculate it, just hardwire it.
-    midnight = 7
-
     try:
-        run(start, end, observer, midnight)
+        run(start, end, observer, timezone, output_format)
     except KeyboardInterrupt:
         print("Interrupted")
 
