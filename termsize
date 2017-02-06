@@ -5,6 +5,9 @@
 # Useful when logged in over a serial line.
 # Copyright 2013 by Akkana Peck -- share and enjoy under the GPL v2 or later.
 
+# In the unlikely event you ever need to *set* the terminal size, check out:
+# https://github.com/zerorax/pyresize/blob/master/resize.py
+
 import os, sys
 import fcntl
 import posix
@@ -14,31 +17,37 @@ import re
 import termios
 import select
 
-tty = open('/dev/tty', 'r+')
-tty.write('\033[7\033[r\033[999;999H\033[6n')
-tty.flush()
-
 fd = sys.stdin.fileno()
 
-oldterm = termios.tcgetattr(fd)
-newattr = oldterm[:]
-newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
-termios.tcsetattr(fd, termios.TCSANOW, newattr)
+# python3 has get_terminal size. Yay!
+if hasattr(os, 'get_terminal_size'):
+    cols, rows = os.get_terminal_size()
 
-oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
-fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+# python2 does not.
+else:
+    tty = open('/dev/tty', 'r+')
+    tty.write('\033[7\033[r\033[999;999H\033[6n')
+    tty.flush()
 
-try:
-    while True:
-        r, w, e = select.select([fd], [], [])
-        if r:
-            output = sys.stdin.read()
-            break
-finally:
-    termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
-    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
+    oldterm = termios.tcgetattr(fd)
+    newattr = oldterm[:]
+    newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+    termios.tcsetattr(fd, termios.TCSANOW, newattr)
 
-rows, cols = list(map(int, re.findall(r'\d+', output)))
+    oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
+
+    try:
+        while True:
+            r, w, e = select.select([fd], [], [])
+            if r:
+                output = sys.stdin.read()
+                break
+    finally:
+        termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
+        fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
+
+    rows, cols = list(map(int, re.findall(r'\d+', output)))
 
 fcntl.ioctl(fd, termios.TIOCSWINSZ,
             struct.pack("HHHH", rows, cols, 0, 0))
