@@ -3,8 +3,35 @@
 # This is a file of reminders of various neat Python features
 # that I always forget how to use.
 
-# Migrate python2 to python3 in place (omit -n to leave a .bak):
-$ 2to3 -wn file_or_directory
+# On #python as of early 2017, recommended beginning Python books include
+# http://greenteapress.com/wp/think-python-2e/
+# https://automatetheboringstuff.com/
+# (the oft-recommended "Learn Python the Hard Way" is not well favored).
+# I can't vouch for these books myself.
+
+########################################################
+# What's available in objects and modules?
+########################################################
+
+# Show methods in an object
+dir(obj)
+
+# Does a function exist in a module?
+hasattr(os, 'get_terminal_size'):
+# You can also get with a default:
+getattr(os, 'get_terminal_size', "Doesn't exist")
+
+# Is something a particular type? (But of course duck-typing is better.)
+if type(s) is str:
+    print("It's a string")
+
+# More deprecated:
+if type(s) == types.StringType:
+    print "It's a string"
+
+########################################################
+# Stringy stuff
+########################################################
 
 # Decode vs. Encode:
 # "string of bytes".decode('utf-8')  --> unicode
@@ -15,9 +42,6 @@ $ 2to3 -wn file_or_directory
 >>> u
 u'pi\xf1on'
 # For Python3 skip to the end of this file.
-
-# Show methods in an object
-dir(obj)
 
 # Split a long string over multiple lines in the source file
 url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
@@ -30,6 +54,37 @@ url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
 # You can also use a backslash and no parentheses:
 url2 = "http://www.crummy.com/software/BeautifulSoup/" \
        "bs3/documentation.html"
+
+#
+# Fuzzy string match.
+# SequenceMatcher's first argument is a function that returns true for
+# characters considered to be "junk". For instance, if blanks are junk,
+# lambda x: x == " "
+# To consider nothing as junk, pass None.
+#
+from difflib import SequenceMatcher
+
+best_ratio = -1
+best_match = None
+for b in string_list:
+    r = SequenceMatcher(None, matchname, b).ratio()
+    if r > best_ratio:
+        best_match = b
+        best_ratio = r
+
+########################################################
+# iterator, list and dictionary helpers
+########################################################
+
+# Pairwise loops with zip():
+names = ["Eiffel Tower", "Empire State", "Sears Tower"]
+heights = [324, 381, 442]
+for name, height in zip(names, heights):
+    print "%s: %s meters" % (name, height)
+
+# Or make a dictionary from a zip():
+tall_buildings = dict(zip(names, heights))
+print max(tall_buildings.values())
 
 #
 # Read a file of name=value pairs and return a dictionary.
@@ -45,7 +100,11 @@ def file2dict(filename):
 def walkfiles(rootdir):
     for root, dirs, files in os.walk(rootdir):
         for f in files:
-            print f
+            print os.path.join(root, f)
+
+########################################################
+# Dates and times
+########################################################
 
 #
 # Parse a date in RFC 2822 format.
@@ -68,6 +127,8 @@ import dateutil.parser
 d = dateutil.parser.parse("2012-08-16 14:25:05.265739")
 d = dateutil.parser.parse("10/31/2016 14:25")
 d = dateutil.parser.parse("6/15/2016 14:25 MDT")
+# Also see the Arrow library, a Datetime replacement
+# that offers super-general date parsing like "an hour ago".
 
 #
 # Add N months to a date: same day of month but next month.
@@ -90,6 +151,11 @@ today = datetime.date.today()
 days_this_month = calendar.monthrange(today.year, today.month)[1]
 one_month_from_now = today + datetime.timedelta(days=days_this_month)
 
+
+########################################################
+# Lambda foo
+########################################################
+
 #
 # map + lambda example
 #
@@ -108,23 +174,6 @@ def only_even(numbers):
 #
 def roundall(numbers):
     return map(int, map(round, numbers))
-
-#
-# Fuzzy string match.
-# SequenceMatcher's first argument is a function that returns true for
-# characters considered to be "junk". For instance, if blanks are junk,
-# lambda x: x == " "
-# To consider nothing as junk, pass None.
-#
-from difflib import SequenceMatcher
-
-best_ratio = -1
-best_match = None
-for b in string_list:
-    r = SequenceMatcher(None, matchname, b).ratio()
-    if r > best_ratio:
-        best_match = b
-        best_ratio = r
 
 #
 # sorting + lambda examples.
@@ -278,6 +327,9 @@ print("output = '%s'" % str(output))
 ################################################################
 # Python3 differences
 ################################################################
+
+# Migrate python2 to python3 in place (omit -n to leave a .bak):
+$ 2to3 -wn file_or_directory
 
 # All strings in python3 are automatically unicode,
 # and you can just pass encoding as a second argument when you
