@@ -71,6 +71,10 @@ chatsounds.py:
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
 
+check-monitors
+    A trivial shell script to probe for connected monitors and
+    use xrandr to activate the right one.
+
 colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
 

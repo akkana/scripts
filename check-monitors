@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# Check monitors and use xrandr to turn on the appropriate one(s).
+
+# Ideally, this would be run from /etc/pm/sleep.d/check-monitors
+# upon resume from suspend., something like this:
+# case "${1}" in
+#     resume|thaw)
+#         check-monitors
+#         ;;
+# esac
+# Unfortunately, /etc/pm/sleep.d/check-monitors isn't called reliably
+# on resume, and neither is any other script. So it might be best
+# to bind this to a key so that if you dock your laptop then wake it up,
+# you can call it with a function key even if you can't see the screen
+# to put focus in a window.
+#
+# This leaves debugging info in /tmp/check-monitors
+# because if it fails, you won't be able to see any error output
+# but maybe you can shell in and read what happened.
+
+DEBUGFILE=/tmp/check-monitors
+
+date >>$DEBUGFILE
+
+# Check whether an HDMI monitor is connected: returns 0 on success
+xrandr | grep HDMI | grep " connected " >>$DEBUGFILE 2>&1
+if [ $? -eq 0 ]; then
+    echo "==== Choosing HDMI" >>$DEBUGFILE
+    xrandr --output VGA1 --off
+    xrandr --output LVDS1 --off
+    xrandr --output HDMI1 --auto
+else
+    xrandr | grep VGA | grep " connected " >>$DEBUGFILE
+    if [ $? -eq 0 ]; then
+        echo "==== Choosing VGA" >>$DEBUGFILE 2>&1
+        xrandr --output HDMI1 --off
+        xrandr --output LVDS1 --off
+        xrandr --output VGA1 --auto
+    else
+        # Fall back on the built-in laptop display, LVDS1
+        echo "==== Choosing built-in display" >>$DEBUGFILE
+        xrandr --output VGA1 --off
+        xrandr --output HDMI1 --off
+        xrandr --output LVDS1 --auto
+    fi
+fi
+
+xrandr >>$DEBUGFILE
+echo "=====" >>$DEBUGFILE
