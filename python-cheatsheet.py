@@ -72,6 +72,12 @@ for b in string_list:
         best_match = b
         best_ratio = r
 
+# raw string literals: r'' avoids any backslash escapes.
+# printf-style %x still works, e.g. r'abc %d' % 42
+r = r'abc\def'
+c = 'abc\\def'
+r == c    # True
+
 ########################################################
 # iterator, list and dictionary helpers
 ########################################################
