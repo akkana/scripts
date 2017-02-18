@@ -94,6 +94,9 @@ delaytest.cgi:
     Use it on your webserver (or localhost) to test things like parallel
     downloads to make sure they work with slow servers.
 
+domaincheck.py:
+    Check for expiring domains, using python-whois.
+
 diff2rss:
     Diff two files and output RSS of the differences.
     A possible (though poor) solution for web pages that don't offer RSS feeds.
