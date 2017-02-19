@@ -6,16 +6,14 @@ import whois
 import datetime
 from dateutil.relativedelta import relativedelta
 
-format="%25s %10s %8s"
+format="%25s   %10s %s"
 
 if __name__ == '__main__':
-    print(format % ("Domain", "Expires", ""))
-    two_months_from_now = datetime.datetime.today() + relativedelta(months=2)
-    two_months_from_now = two_months_from_now.date()
+    domainlist = []
     for name in sys.argv[1:]:
         domain = whois.whois(name)
         if not domain["expiration_date"]:
-            print "Can't get expiration date for", name
+            print("Can't get expiration date for %s" % name)
             continue
         elif hasattr(domain["expiration_date"], "__len__"):
             # Sometimes python-whois returns a list of dates,
@@ -24,12 +22,19 @@ if __name__ == '__main__':
             expdate = domain["expiration_date"][0].date()
             for e in domain["expiration_date"][1:]:
                 if e.date() != expdate:
-                    print "Yikes, %s != %s" % (str(e), str(expdate))
+                    print("Yikes, %s != %s" % (str(e), str(expdate)))
         else:
             expdate = domain["expiration_date"].date()
-        # print "expdate:", expdate
-        if expdate < two_months_from_now:
+        domainlist.append((name, expdate))
+
+    domainlist.sort(key = lambda a: a[1])
+
+    two_months_from_now = datetime.datetime.today() + relativedelta(months=2)
+    two_months_from_now = two_months_from_now.date()
+    print(format % ("Domain", "Expires", ""))
+    for d in domainlist:
+        if d[1] < two_months_from_now:
             alert = "***"
         else:
             alert = ""
-        print(format % (name, expdate.strftime('%Y-%m-%d'), alert))
+        print(format % (d[0], d[1].strftime('%Y-%m-%d'), alert))
