@@ -29,6 +29,15 @@ if type(s) is str:
 if type(s) == types.StringType:
     print "It's a string"
 
+# Is something list-like?
+if hasattr(l, "__getitem__"):
+    print "It's list-like"
+else:
+    print "It's more scalar-like"
+# Be cautious with this, though: strings are list-like,
+# and even if you iterate over them you never get down to a scalar char,
+# just unit-length strings.
+
 ########################################################
 # Stringy stuff
 ########################################################
