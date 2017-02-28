@@ -102,7 +102,12 @@ Blue: <input type=text name="b" size=4>
 <?php
   if ($hex != "" || ($r != "" && $g != "" && $b != "")) {
     print ("<p>\n<hr>\n<p>\n<h2>Matches in rgb.txt:</h2>\n<table>\n");
-    find_in_file ("/etc/X11/rgb.txt");
+    if (file_exists("rgb.txt")) {
+      find_in_file ("rgb.txt");
+    } elseif (file_exists("/etc/X11/rgb.txt")) {
+      find_in_file ("/etc/X11/rgb.txt");
+    } else
+      print("<tr><td colspan=3>No rgb.txt file</td></tr>");
     print("</table>\n");
 
     print("<h2>Matches in CSS color list:</h2><table>\n");
