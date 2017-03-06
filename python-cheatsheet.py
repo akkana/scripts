@@ -38,6 +38,10 @@ else:
 # and even if you iterate over them you never get down to a scalar char,
 # just unit-length strings.
 
+# Remove items from a list: I always forget how to do this.
+mylist.remove("item")    # Removes the first instance of "item"
+mylist.pop(i)            # Removes and returns list[i]
+
 ########################################################
 # Stringy stuff
 ########################################################
@@ -117,6 +121,42 @@ def walkfiles(rootdir):
         for f in files:
             print os.path.join(root, f)
 
+# os.walk is handy, but it doesn't allow any type of sorting.
+# So here's a rewritten os.walk that sorts alphabetically.
+def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
+    # We may not have read permission for top, in which case we can't
+    # get a list of the files the directory contains.  os.path.walk
+    # always suppressed the exception then, rather than blow up for a
+    # minor reason when (say) a thousand readable directories are still
+    # left to visit.  That logic is copied here.
+    try:
+        names = os.listdir(top)
+        if sortfn:
+            names.sort(sortfn)
+        else:
+            names.sort()
+    except os.error, err:
+        if onerror is not None:
+            onerror(err)
+        return
+
+    dirs, nondirs = [], []
+    for name in names:
+        if os.path.isdir(os.path.join(top, name)):
+            dirs.append(name)
+        else:
+            nondirs.append(name)
+
+    if topdown:
+        yield top, dirs, nondirs
+    for name in dirs:
+        path = os.path.join(top, name)
+        if followlinks or not os.path.islink(path):
+            for x in pathwalk(path, topdown, onerror, followlinks):
+                yield x
+    if not topdown:
+        yield top, dirs, nondirs
+
 ########################################################
 # Dates and times
 ########################################################
@@ -166,6 +206,7 @@ today = datetime.date.today()
 days_this_month = calendar.monthrange(today.year, today.month)[1]
 one_month_from_now = today + datetime.timedelta(days=days_this_month)
 
+# There's also isodate.parse_datetime which I haven't looked into yet.
 
 ########################################################
 # Lambda foo
