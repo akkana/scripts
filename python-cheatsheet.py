@@ -158,6 +158,11 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
         yield top, dirs, nondirs
 
 ########################################################
+# Argument parsing
+########################################################
+#python recommends click first, then argparse, over optparse.
+
+########################################################
 # Dates and times
 ########################################################
 
