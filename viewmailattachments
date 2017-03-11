@@ -26,23 +26,60 @@ import tempfile
 import subprocess
 from bs4 import BeautifulSoup
 
+################################################
 # Some prefs:
 USE_WVHTML_FOR_DOC = False
-CONVERT_PDF_TO_HTML = False
+BROWSER_ARGS = []
+
+# Does the browser need a one-time argument for bringing up an initial window,
+# like Firefox's -private-window -new-instance ?
+BROWSER_FIRST_ARG = []
 
 # What browser to use:
-# BROWSER = "firefox"
-BROWSER = "quickbrowse"
-# Browser argument to precede new tabs:
-# BROWSER_NEWTAB_ARG = "-private-window"
-BROWSER_NEWTAB_ARG = "--new-tab"
+USE_QUICKBROWSE = True
+
+if USE_QUICKBROWSE:
+    BROWSER = "quickbrowse"
+
+    # Browser argument to precede new tabs:
+    BROWSER_FIRST_ARGS = []
+    BROWSER_ARGS = [ "--new-tab" ]
+
+    # Will the browser block when first run until its window is closed?
+    # If so, we have to run it in the background.
+    BROWSER_BACKGROUND = False
+
+    # Should we convert PDF to HTML? Depends on BROWSER:
+    # Firefox has a built-in PDF viewer, but quickbrowse doesn't.
+    CONVERT_PDF_TO_HTML = True
+
+else:    # Firefox in private browsing mode
+    BROWSER = "firefox"
+
+    # Not clear what to do here: Firefox has a built-in PDF viewer,
+    # but for some mime types it can't figure out that it should use it.
+    BROWSER_FIRST_ARGS = [ "-P", "Default", "-private-window", "-new-instance" ]
+    BROWSER_ARGS = [ "-P", "Default", "-private-window" ]
+    # Firefox doesn't run in the background.
+    BROWSER_BACKGROUND = True
+
+    CONVERT_PDF_TO_HTML = False
+
+# End global prefs
+################################################
 
 # Temporary for debugging:
 class mysubprocess:
     @staticmethod
     def call(arr):
-        print("\n\n=============================\n=== Calling: %s" % str(arr))
+        print("\n\n================\n=== Calling: %s" % str(arr))
         subprocess.call(arr)
+
+    @staticmethod
+    def call_bg(arr):
+        print("\n\n================\n=== Calling in background: %s" % str(arr))
+        subprocess.Popen(arr, shell=False,
+                         stdin=None, stdout=None, stderr=None)
 
 def view_message_attachments(fp, tmpdir):
     '''View message attachments coming from the file-like object fp.
@@ -164,11 +201,17 @@ def view_message_attachments(fp, tmpdir):
     redirect_timeout = 3
     pleasewait_file = tmpdir + "/index.html"
     write_to_index(pleasewait_file, "Please wait ...", redirect_timeout, None)
-    if BROWSER_NEWTAB_ARG:
-        mysubprocess.call([BROWSER, BROWSER_NEWTAB_ARG,
-                           "file://" + pleasewait_file])
+
+    cmd = [ BROWSER ]
+    if BROWSER_FIRST_ARGS:
+        cmd += BROWSER_FIRST_ARGS
+
+    cmd.append("file://" + pleasewait_file)
+    print "Calling:", cmd
+    if BROWSER_BACKGROUND:
+        mysubprocess.call_bg(cmd)
     else:
-        mysubprocess.call([BROWSER, "file://" + pleasewait_file])
+        mysubprocess.call(cmd)
 
                        # "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."
                        # Use JS if we can figure out how to close or replace
@@ -305,8 +348,8 @@ def view_message_attachments(fp, tmpdir):
             # an unwanted third window. Go firefox.
             # Not clear whether this is true for all browsers.
             time.sleep(1)
-            if BROWSER_NEWTAB_ARG:
-                mysubprocess.call([BROWSER, BROWSER_NEWTAB_ARG, "file://" + f])
+            if BROWSER_ARGS:
+                mysubprocess.call([BROWSER] + BROWSER_ARGS + ["file://" + f])
             else:
                 mysubprocess.call([BROWSER, "file://" + f])
 
