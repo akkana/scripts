@@ -268,6 +268,7 @@ def play_notes(notestring, waveform=None):
         else:
             # If we didn't get any frequencies, then rest.
             pygame.time.delay(duration)
+        pygame.time.delay(80)
 
 def main():
     pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
@@ -291,6 +292,9 @@ def main():
     if sys.argv[1].lower() == "cmajor":
         # Play a simple C-major triad
         return play_notes("C,E,G")
+
+    if sys.argv[1].lower() == "chopsticks":
+        return play_notes("F,G:.5 F,G:.5 F,G:.5 F,G:.5 F,G:.5 F,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 D,B2:.5 D,B2:.5 D,B2:.5 D,B2:.5 D,A2:.5 D,B2:.5 C,C2:1.2")
 
     for s in sys.argv[1:]:
         play_notes(s)
