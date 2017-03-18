@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 """Demonstrate harmonic synthesis in Python using NumPy.
 
 Originally from:
