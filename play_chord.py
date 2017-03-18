@@ -277,7 +277,7 @@ def main():
         return play_some_chords()
 
     if sys.argv[1].lower() == "-h" or sys.argv[1].lower() == "--help":
-        print "Usage: %s [scale|imperial|note string]" % os.path.basename(sys.argv[0])
+        print "Usage: %s [scale|imperial|cmajor|other note string]" % os.path.basename(sys.argv[0])
         return
 
     if sys.argv[1].lower() == "scale":
@@ -287,6 +287,10 @@ def main():
     if sys.argv[1].lower() == "imperial":
         # Play the first line of the Imperial March
         return play_notes("G G G Eb:.75 Bb2:.25 G Eb:.75 Bb2:.25 G")
+
+    if sys.argv[1].lower() == "cmajor":
+        # Play a simple C-major triad
+        return play_notes("C,E,G")
 
     for s in sys.argv[1:]:
         play_notes(s)
