@@ -17,9 +17,39 @@ import pygame, pygame.sndarray
 import time, random
 import numpy
 import scipy.signal
-import sys
+import sys, os
 
 sample_rate = 44100
+sampling = 4096    # or 16384
+
+# Notes = { "Ab" : 415.3, "A" : 440.0, "A#" : 466.16,
+#           "Bb" : 466.16, "B" : 493.88,
+#                          "C" : 523.25, "C#" : 554.37,
+#           "Db" : 554.37, "D" : 587.33, "D#" : 622.25,
+#           "Eb" : 622.25, "E" : 659.25,
+#                          "F" : 698.46, "F#" : 739.99,
+#           "Gb" : 739.99, "G" : 783.99, "G#" : 830.61
+#         }
+
+Notes = {
+    "A" : 220.000000,
+    "A#" : 233.080000,
+    "Ab" : 207.650000,
+    "B" : 246.940000,
+    "Bb" : 233.080000,
+    "C" : 261.625000,
+    "C#" : 277.185000,
+    "D" : 293.665000,
+    "D#" : 311.125000,
+    "Db" : 277.185000,
+    "E" : 329.625000,
+    "Eb" : 311.125000,
+    "F" : 349.230000,
+    "F#" : 369.995000,
+    "G" : 391.995000,
+    "G#" : 415.305000,
+    "Gb" : 369.995000,
+}
 
 def sine_wave(hz, peak, n_samples=sample_rate):
     """Compute N samples of a sine wave with given frequency and peak amplitude.
@@ -57,7 +87,6 @@ def make_chord(hz, ratios, waveform=None):
     """Make a chord based on a list of frequency ratios.
        using a given waveform (defaults to a sine wave).
     """
-    sampling = 4096    # or 16384
     if not waveform:
         waveform = sine_wave
     chord = waveform(hz, sampling)
@@ -100,11 +129,9 @@ def play_for(sample_wave, ms):
     pygame.time.delay(ms)
     sound.stop()
 
-def main():
+def play_some_chords():
     length = 500
     wait = 1000
-    pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
-    pygame.init()
 
     print "Sine"
     play_for(sine_wave(440, 4096), length)
@@ -186,6 +213,83 @@ def main():
     pygame.time.delay(wait)
     print "Major seventh, sawtooth"
     play_for(major_seventh(440, sawtooth_wave), length)
+
+def parse_chord(ns):
+    '''Parse a single chord notation, like E4,G4:2.
+       Returns a list of frequencies (possibly empty) and a duration in ms.
+    '''
+    if ':' in ns:
+        ns, durationstr = ns.strip().split(':')
+        # everything after the colon is a duration
+        duration = float(durationstr.strip())
+    else:
+        duration = 1.
+    duration = int(duration * 600)
+
+    freqlist = []
+    indnotes = ns.strip().split(',')
+    chord = None
+    for ns in indnotes:
+        if ns[0] in Notes:
+            if len(ns) > 1 and (ns[1] == 'b' or ns[1] == '#'):
+                # It's a sharp or flat
+                freqlist.append(Notes[ns[:2]])
+                ns = ns[2:]
+            else:
+                # No sharp or flat
+                freqlist.append(Notes[ns[0]])
+                ns = ns[1:]
+            try:
+                octave = float(ns)    # which octave is it?
+                freqlist[-1] *= 2 ** (octave-1)
+                ns = ns[1:]
+            except:
+                pass
+    return freqlist, duration
+
+def play_notes(notestring, waveform=None):
+    '''notestring is a string with a format like this:
+    D4,F4 E4,G4:2 Bb3   note#octave,note#octave:duration
+    where either octave or duration can be omitted to use the default (1).
+    Duration can be a decimal.
+    # or b can follow a note letter.
+    Omit the note to indicate a rest, e.g. :1.
+    '''
+    if not waveform:
+        waveform = square_wave
+
+    for ns in notestring.split():
+        freqlist, duration = parse_chord(ns)
+        if freqlist:
+            chord = waveform(freqlist[0], sampling)
+            for freq in freqlist[1:]:
+                chord = sum([chord, waveform(freq, sampling)])
+            play_for(chord, duration)
+        else:
+            # If we didn't get any frequencies, then rest.
+            pygame.time.delay(duration)
+
+def main():
+    pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
+    pygame.init()
+
+    if len(sys.argv) <= 1:
+        return play_some_chords()
+
+    if sys.argv[1].lower() == "-h" or sys.argv[1].lower() == "--help":
+        print "Usage: %s [scale|imperial|note string]" % os.path.basename(sys.argv[0])
+        return
+
+    if sys.argv[1].lower() == "scale":
+        # Play a scale
+        return play_notes("C D E F G A2 B2 C2")
+
+    if sys.argv[1].lower() == "imperial":
+        # Play the first line of the Imperial March
+        return play_notes("G G G Eb:.75 Bb2:.25 G Eb:.75 Bb2:.25 G")
+
+    for s in sys.argv[1:]:
+        play_notes(s)
 
 if __name__ == '__main__':
     main()
