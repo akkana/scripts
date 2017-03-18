@@ -222,6 +222,9 @@ one_month_from_now = today + datetime.timedelta(days=days_this_month)
 #
 def helloall(names):
     return '\n'.join(map(lambda name: "Hello, " + name, names))
+# but in practice, you generally shouldn't need map+lambda, because
+# map(lambda x: <expr>, xs) can be rewritten as (<expr> for x in xs)
+# and the latter is much more readable.
 
 #
 # filter + lambda example
