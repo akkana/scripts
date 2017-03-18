@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Demonstrate harmonic synthesis in Python using NumPy.
 
 Originally from:
@@ -124,7 +125,9 @@ def major_seventh(hz, waveform=None):
 
 def play_for(sample_wave, ms):
     """Play given samples, as a sound, for ms milliseconds."""
-    sound = pygame.sndarray.make_sound(sample_wave)
+    # In pygame 1.9.1, we can pass sample_wave directly,
+    # but in 1.9.2 they changed the mixer to only accept ints.
+    sound = pygame.sndarray.make_sound(sample_wave.astype(int))
     sound.play(-1)
     pygame.time.delay(ms)
     sound.stop()
