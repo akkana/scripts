@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """Demonstrate harmonic synthesis in Python using NumPy.
 
 Originally from:
@@ -133,37 +133,37 @@ def play_some_chords():
     length = 500
     wait = 1000
 
-    print "Sine"
+    print("Sine")
     play_for(sine_wave(440, 4096), length)
     pygame.time.delay(wait)
 
-    print "Square"
+    print("Square")
     play_for(square_wave(440, 4096), length)
     pygame.time.delay(wait)
-    print "Higher Square"
+    print("Higher Square")
     play_for(square_wave(880, 4096), length)
 
     pygame.time.delay(wait)
-    print "Triangle"
+    print("Triangle")
     play_for(sawtooth_wave(440, 4096, .5), length)  # triangle wave
     pygame.time.delay(wait)
-    print "Sawtooth"
+    print("Sawtooth")
     play_for(sawtooth_wave(440, 4096, 1.), length)   # sawtooth wave
 
     pygame.time.delay(wait)
-    print "Fundamental (sine)"
+    print("Fundamental (sine)")
     play_for(fundamental(440), length)
     pygame.time.delay(wait)
-    print "Third"
+    print("Third")
     play_for(third(440), length)
     pygame.time.delay(wait)
-    print "Third, square"
+    print("Third, square")
     play_for(third(440, square_wave), length)
     pygame.time.delay(wait)
-    print "Third, sawtooth"
+    print("Third, sawtooth")
     play_for(third(440, sawtooth_wave), length)
     pygame.time.delay(wait)
-    print "Fifth"
+    print("Fifth")
     play_for(fifth(440), length)
 
     # Triads mostly don't work with sawtooth waves.
@@ -171,47 +171,47 @@ def play_some_chords():
     # making some of the overtones cancel out.
 
     pygame.time.delay(wait)
-    print "Major triad"
+    print("Major triad")
     play_for(major_triad(440), length)
     pygame.time.delay(wait)
-    print "Major triad, square"
+    print("Major triad, square")
     play_for(major_triad(440, square_wave), length)
     pygame.time.delay(wait)
-    print "Major triad, sawtooth"
+    print("Major triad, sawtooth")
     play_for(major_triad(440, sawtooth_wave), length)
     pygame.time.delay(wait)
-    print "Minor triad"
+    print("Minor triad")
     play_for(minor_triad(440), length)
     pygame.time.delay(wait)
-    print "Minor with square wave"
+    print("Minor with square wave")
     play_for(minor_triad(440, square_wave), length)
 
     pygame.time.delay(wait)
-    print "Diminished"
+    print("Diminished")
     play_for(diminished(440), length)
 
     pygame.time.delay(wait)
-    print "Seventh"
+    print("Seventh")
     play_for(seventh(440), length)
     pygame.time.delay(wait)
-    print "Minor seventh"
+    print("Minor seventh")
     play_for(minor_seventh(440), length)
 
     pygame.time.delay(wait)
-    print "Minor seventh, square"
+    print("Minor seventh, square")
     play_for(minor_seventh(440, square_wave), length)
     pygame.time.delay(wait)
-    print "Minor seventh, sawtooth"
+    print("Minor seventh, sawtooth")
     play_for(minor_seventh(440, sawtooth_wave), length)
 
     pygame.time.delay(wait)
-    print "Major seventh"
+    print("Major seventh")
     play_for(major_seventh(440), length)
     pygame.time.delay(wait)
-    print "Major seventh, square"
+    print("Major seventh, square")
     play_for(major_seventh(440, square_wave), length)
     pygame.time.delay(wait)
-    print "Major seventh, sawtooth"
+    print("Major seventh, sawtooth")
     play_for(major_seventh(440, sawtooth_wave), length)
 
 def parse_chord(ns):
@@ -278,14 +278,14 @@ def main():
         return play_some_chords()
 
     if sys.argv[1].lower() == "-h" or sys.argv[1].lower() == "--help":
-        print "Usage: %s [scale|imperial|cmajor|other note string]" % os.path.basename(sys.argv[0])
+        print("Usage: %s [scale|imperial|cmajor|other note string]") % os.path.basename(sys.argv[0])
         return
 
     if sys.argv[1].lower() == "scale":
         # Play a scale
         return play_notes("C D E F G A2 B2 C2")
 
-    if sys.argv[1].lower() == "imperial":
+    if sys.argv[1].lower() == "imperial" or sys.argv[1].lower() == "empire":
         # Play the first line of the Imperial March
         return play_notes("G G G Eb:.75 Bb2:.25 G Eb:.75 Bb2:.25 G")
 
