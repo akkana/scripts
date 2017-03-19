@@ -150,6 +150,10 @@ imageviewer.py:
     A generic image viewer widget and image viewer window that can
     be imported into other python programs.
 
+ipsearch:
+    Search for live hosts on the current net.
+    Useful for things like finding that Raspberry Pi you just booted.
+
 langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).

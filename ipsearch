@@ -1,0 +1,47 @@
+#! /usr/bin/env python
+
+# Search for IP clients on the current network.
+
+import sys, subprocess, socket, fcntl, struct
+
+def ping(host) :
+    """Ping a host by name or address.
+       return True if it answers, False otherwise.
+    """
+    rv = subprocess.call(["ping", "-q", "-c", "1", "-W", "1", host],
+                         stdout = subprocess.PIPE,
+                         stderr = subprocess.PIPE)
+    if rv == 0 :
+        return True
+    return False
+
+def ip_addr(iface) :
+    """Get the IP address of the interface (e.g. eth0)
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    info = fcntl.ioctl(s.fileno(),
+                       0x8915,  # SIOCGIFADDR
+                       struct.pack('256s', iface[:15]))
+    return socket.inet_ntoa(info[20:24])
+
+def search_from(network, start) :
+    for h in xrange(start, 256) :  # Yes, it should adjust based on net class
+        host = "%s.%d" % (network, h)
+        if ping(host) :
+            print host
+        #else :
+        #    print "No", host
+
+if __name__ == "__main__" :
+    ip = ip_addr("eth0")
+    print "My IP is", ip
+    network = '.'.join(ip.split('.')[0:3])
+    print "My network is", network
+    try:
+        if len(sys.argv) <= 1 :
+            search_from(network, 1)
+        else :
+            for num in sys.argv[1:] :
+                search_from(network, int(num))
+    except KeyboardInterrupt:
+        print "Interrupt"
