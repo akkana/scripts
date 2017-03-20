@@ -61,7 +61,7 @@ class PiCamera:
                 "Neither python-picamera nor raspistill is installed"
         if self.verbose:
             print "Taking photo with raspistill"
-        args = ['/usr/bin/raspistill', '-o', outfile]
+        args = ['/usr/bin/raspistill', '-n', '-o', outfile]
         if res:
             args.append('-w')
             args.append(str(res[0]))
