@@ -19,6 +19,7 @@ import time, random
 import numpy
 import scipy.signal
 import sys, os
+import termios, fcntl   # For non-blocking key reads
 
 sample_rate = 44100
 sampling = 4096    # or 16384
@@ -217,7 +218,7 @@ def play_some_chords():
     print("Major seventh, sawtooth")
     play_for(major_seventh(440, sawtooth_wave), length)
 
-def parse_chord(ns):
+def parse_chord(ns, default_duration=300):
     '''Parse a single chord notation, like E4,G4:2.
        Returns a list of frequencies (possibly empty) and a duration in ms.
     '''
@@ -227,7 +228,7 @@ def parse_chord(ns):
         duration = float(durationstr.strip())
     else:
         duration = 1.
-    duration = int(duration * 600)
+    duration = int(duration * default_duration)
 
     freqlist = []
     indnotes = ns.strip().split(',')
@@ -273,6 +274,89 @@ def play_notes(notestring, waveform=None):
             pygame.time.delay(duration)
         pygame.time.delay(80)
 
+class KeyReader :
+    '''
+    Read keypresses one at a time, without waiting for a newline.
+    Uses the technique from
+    http://docs.python.org/2/faq/library.html#how-do-i-get-a-single-keypress-at-a-time
+    '''
+    def __init__(self, echo=False, blocking=True):
+        '''Put the terminal into cbreak and noecho mode.'''
+        self.fd = sys.stdin.fileno()
+
+        self.oldterm = termios.tcgetattr(self.fd)
+        self.oldflags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+
+        # Sad hack: when the destructor __del__ is called,
+        # the fcntl module may already be unloaded, so we can no longer
+        # call fcntl.fcntl() to set the terminal back to normal.
+        # So just in case, store a reference to the fcntl module,
+        # and also to termios (though I haven't yet seen a case
+        # where termios was gone -- for some reason it's just fnctl).
+        # The idea of keeping references to the modules comes from
+        # http://bugs.python.org/issue5099
+        # though I don't know if it'll solve the problem completely.
+        self.fcntl = fcntl
+        self.termios = termios
+
+        newattr = termios.tcgetattr(self.fd)
+        self.cc_save = newattr[6]
+        newattr[3] = newattr[3] & ~termios.ICANON
+        if not echo:
+            newattr[3] = newattr[3] & ~termios.ECHO
+
+        if blocking:
+            cc = self.cc_save[:]   # Make a copy so we can modify VMIN and VTIME
+            cc[termios.VMIN] = 1
+            cc[termios.VTIME] = 0
+            newattr[6] = cc
+        else:
+            fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags | os.O_NONBLOCK)
+
+        termios.tcsetattr(self.fd, termios.TCSANOW, newattr)
+
+    def __del__(self):
+        '''Reset the terminal before exiting the program.'''
+        self.termios.tcsetattr(self.fd, self.termios.TCSAFLUSH, self.oldterm)
+        self.fcntl.fcntl(self.fd, self.fcntl.F_SETFL, self.oldflags)
+
+    def getch(self):
+        '''Read keyboard input, returning a string.
+           Note that one key may result in a string of more than one character,
+           e.g. arrow keys that send escape sequences.
+           There may also be multiple keystrokes queued up since the last read.
+
+           This function, sadly, cannot read special characters like VolumeUp.
+           They don't show up in ordinary CLI reads -- you have to be in
+           a window system like X to get those special keycodes.
+        '''
+        try:
+            return sys.stdin.read()
+        except IOError, e:
+            # print "IOError:", e
+            return None
+
+def play_from_keyboard():
+    keyreader = KeyReader(echo=False, blocking=False)
+    keyboard_keys = { 'a': 'A2', 's': 'B2', 'd': 'C2', 'f': 'D2', 'g' : 'E2',
+                      'h': 'F2', 'j': 'G2', 'k': 'A3', 'l' : 'B3',
+                      ';' : 'C3', '\'': 'D3',
+                      'z': 'A', 'x': 'B', 'c': 'C', 'v': 'D',
+                      'b': 'E', 'n': 'F', 'm': 'G',
+                      ',': 'A2', '.': 'B2', '/': 'C2'
+                    }
+    while True:
+        key = keyreader.getch()
+        if not key:
+            continue
+        if key == 'q':
+            keyreader = None
+            return
+        if key in keyboard_keys:
+            freqlist, duration = parse_chord(keyboard_keys[key], 200)
+            note = square_wave(freqlist[0], sampling)
+            play_for(note, duration)
+
 def main():
     pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
     pygame.init()
@@ -298,6 +382,9 @@ def main():
 
     if sys.argv[1].lower() == "chopsticks":
         return play_notes("F,G:.5 F,G:.5 F,G:.5 F,G:.5 F,G:.5 F,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 E,G:.5 D,B2:.5 D,B2:.5 D,B2:.5 D,B2:.5 D,A2:.5 D,B2:.5 C,C2:1.2")
+
+    if sys.argv[1] == "keyboard":
+        return play_from_keyboard()
 
     for s in sys.argv[1:]:
         play_notes(s)
