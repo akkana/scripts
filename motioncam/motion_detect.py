@@ -109,7 +109,7 @@ class MotionDetector:
                 self.test_borders = [ [[1,test_res[0]],[1,test_res[1]]] ]
             else:
                 self.test_borders = test_borders
-	else:
+        else:
             self.sensitivity = 0
             self.save_debug_image = False
 
@@ -129,14 +129,14 @@ class MotionDetector:
         if not cams or len(cams) < 1:
             print "No cameras available"
             sys.exit(0)
-        if args.verbose:
+        if self.verbose:
             print "Cameras available:"
             for cam in cams:
                 print ' ', str(cam.__class__)
 
         self.hicam = cams[0]
         self.locam = cams[-1]
-        if args.verbose:
+        if self.verbose:
             print "High-res camera:", str(self.hicam.__class__)
             if self.sensitivity:
                 print " Low-res camera:", str(self.locam.__class__)
@@ -237,7 +237,7 @@ class MotionDetector:
                 img_data = self.locam.take_still(outfile='-', res=test_res)
                 im = Image.open(img_data)
 
-            different = self.compare_images(im)
+            different, debugimg = self.compare_images(im)
             print "Different?", different
 
             if img_data:
@@ -351,9 +351,11 @@ class MotionDetector:
         return snappath
 
     def compare_images(self, new_image):
-        '''Compare an image with the previous one,
-           and return True if we think they differ enough.
-           new_image is a PIL.Image.
+        '''Compare a new image (a PIL.Image) with the previous one.
+           Return changed, debugimage
+           where changed is whether we think they differ enough,
+           and debugimage is a PIL.Image if self.save_debug_image is True,
+           otherwise None.
            We'll remember the pixel data from the previous image.
         '''
         bufnew = new_image.load()
@@ -378,7 +380,7 @@ class MotionDetector:
         # All we can do is copy it to prepare for the next time.
         if not self.bufold:
             self.bufold = bufnew
-            return False
+            return False, None
 
         changed_pixels = 0
         for piece in self.test_borders:
@@ -425,7 +427,7 @@ class MotionDetector:
             print changed_pixels, "pixels changed, not enough\t",
             print str(datetime.datetime.now())
 
-        return changed
+        return changed, debugimage
 
 # Sample usage:
 # motion_detect.py -v -s 250 -t 30 -r 320x240 -b 100x100+130+85 -c - /tmp ~pi/trade/snapshots/
@@ -441,7 +443,7 @@ Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument("-s", "--sensitivity", type=int,
-        help="""Sensitivity: How many pixels must change? 
+        help="""Sensitivity: How many pixels must change?
 If 0, we will use a motion sensor rather than image detection.""")
     parser.add_argument("-t", "--threshold", type=int,
         help="Threshold: How different does a pixel need to be?")
@@ -485,7 +487,7 @@ Assumes pins 23 for trigger, 24 for echo.""")
     parser.add_argument("localdir")
         # type=argparse.FileType('w')
     parser.add_argument("remotedir", nargs='?')
-    
+
     args = parser.parse_args()
     print args
     print
@@ -582,4 +584,3 @@ Assumes pins 23 for trigger, 24 for echo.""")
     except KeyboardInterrupt:
         print "Interrupt: exiting"
         md.cleanup()
-

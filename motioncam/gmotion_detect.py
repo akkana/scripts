@@ -22,9 +22,11 @@
 import gtk, gobject, glib
 import gc
 import os
+import sys
 from PIL import Image
 
-from piphoto import take_still
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+import pycamera
 
 from motion_detect import MotionDetector
 
@@ -86,6 +88,8 @@ class MotionDetectorViewer() :
         # which are infinitely simpler than the GTK garbage:
         self.md = MotionDetector(test_res=test_res, test_borders=test_borders,
                                  full_res=self.full_res,
+                                 sensitivity=400,
+                                 threshold=30,
                                  localdir=self.localdir,
                                  remotedir=self.localdir,
                                  verbose=2)
@@ -206,20 +210,23 @@ class MotionDetectorViewer() :
         if use_tmp_file:
             tmpfile = "/tmp/still.jpg"
             print "Snapping to", tmpfile
-            take_still(outfile=tmpfile, res=self.test_res, verbose=False)
+            self.md.locam.take_still(outfile=tmpfile, res=self.test_res)
             im = Image.open(tmpfile)
-        else:
+        else:   # keep it all in memory, no temp files
             print "Snapping to memory"
-            img_data = take_still(outfile='-', res=self.test_res, verbose=False)
+            img_data = self.md.locam.take_still(outfile='-', res=self.test_res)
             im = Image.open(img_data)
 
-        different, debugimage = self.md.compare_images(im)
-        if different:
-            print "They're different!"
+        changed, debugimage = self.md.compare_images(im)
 
-        # debugimage.load()
-        self.load_image(debugimage)
-        self.show_image()
+        if changed:
+            print "They're different!"
+            self.md.snap_full_res()
+
+        if debugimage:
+            # debugimage.load()
+            self.load_image(debugimage)
+            self.show_image()
 
         self.buf1 = self.buf2
 
@@ -228,11 +235,11 @@ class MotionDetectorViewer() :
 if __name__ == '__main__':
 
     res=[320, 240]
-    test_borders = [ [ [60, 200], [125, 190] ] ]
+    test_borders = [ [ [50, 270], [40, 200] ] ]
     localdir = os.path.expanduser('~/snapshots')
     remotedir = os.path.expanduser('~/moontrade/snapshots')
     #full_res = [3648, 2736]
-    full_res = None
+    full_res = [1024, 768]
 
     md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
                               full_res=full_res,
