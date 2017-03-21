@@ -154,6 +154,10 @@ ipsearch:
     Search for live hosts on the current net.
     Useful for things like finding that Raspberry Pi you just booted.
 
+keyreader.py
+    Read characters one at a time (cbreak mode),
+    with or without blocking, with or without echo.
+
 langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).
@@ -201,6 +205,7 @@ pisoothe:
 
 play_chord.py:
     Example of how to generate and play chords using Python and NumPy.
+    Can also play strings of notes, or can play notes from the keyboard.
 
 podcopy:
     Copy podcasts (fetched with podget) to a mounted mp3 player or directory,

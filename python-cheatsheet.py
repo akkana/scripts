@@ -214,6 +214,17 @@ one_month_from_now = today + datetime.timedelta(days=days_this_month)
 # There's also isodate.parse_datetime which I haven't looked into yet.
 
 ########################################################
+# OS-specific stuff
+########################################################
+
+# Read keys in cbreak mode.
+# Some info at:
+# http://docs.python.org/2/faq/library.html#how-do-i-get-a-single-keypress-at-a-time
+# but it's incomplete, so see keyreader.py for a better solution.
+#
+# Of course, you can also do this with curses.
+
+########################################################
 # Lambda foo
 ########################################################
 
