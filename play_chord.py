@@ -277,12 +277,14 @@ def play_notes(notestring, waveform=None):
 def play_from_keyboard():
     from keyreader import KeyReader
     keyreader = KeyReader(echo=False, block=True)
-    keyboard_keys = { 'a': 'A2', 's': 'B2', 'd': 'C2', 'f': 'D2', 'g' : 'E2',
-                      'h': 'F2', 'j': 'G2', 'k': 'A3', 'l' : 'B3',
-                      ';' : 'C3', '\'': 'D3',
-                      'z': 'A', 'x': 'B', 'c': 'C', 'v': 'D',
-                      'b': 'E', 'n': 'F', 'm': 'G',
-                      ',': 'A2', '.': 'B2', '/': 'C2'
+    keyboard_keys = {
+        # Middle row: black keys
+        'a': 'Ab', 's': 'A#',         'f': 'C#', 'g': 'D#',
+        'j': 'F#', 'k': 'G#', 'l': 'A#2', '\'': 'C2#',
+        # Bottom row:
+        'z': 'A', 'x': 'B', 'c': 'C', 'v': 'D',
+        'b': 'E', 'n': 'F', 'm': 'G',
+        ',': 'A2', '.': 'B2', '/': 'C2'
                     }
     while True:
         key = keyreader.getch()
