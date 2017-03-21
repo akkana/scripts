@@ -40,11 +40,14 @@ def decode_piece(piece):
 
     return ret
 
-def decode_file(filename, header_wanted, all=False):
+def decode_file(filename, header_wanted, all=False, casematch=False):
     if filename == '-':
         fil = sys.stdin
     else:
         fil = open(filename)
+
+    if not casematch:
+        header_wanted = header_wanted.lower()
 
     # header_wanted can be multiple headers, e.g. From:|To:
     # so split them.
@@ -53,6 +56,9 @@ def decode_file(filename, header_wanted, all=False):
     output = ''
     found_something = False
     for line in fil:
+        if not casematch:
+            testline = line.lower()
+
         # if Debug:
         #     print "line:", line
         # If it matches the header we seek, or if we've already started
@@ -61,8 +67,9 @@ def decode_file(filename, header_wanted, all=False):
         for header_wanted in headers:
             # if Debug:
             #     print "=== looking for", header_wanted
-            if (not output and line.startswith(header_wanted)) \
-               or (output and (line.startswith(' ') or line.startswith('\t'))):
+            if (not output and testline.startswith(header_wanted)) \
+               or (output and (testline.startswith(' ') \
+                               or testline.startswith('\t'))):
                 # We have a match! But we may need to read multiple lines,
                 # since one header can be split over several lines.
                 found_something = True
