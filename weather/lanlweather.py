@@ -172,17 +172,17 @@ class LANLWeatherPlots(LANLWeather):
 
         # Nothing in adjust() makes any difference.
         # (Also tried calling plt.subplots_adjust(), no change.)
-        self.fig.subplots_adjust(left=0.1, right=0.11, top=0.9, bottom=0.1,
-                                 hspace=0.1)
+        # self.fig.subplots_adjust(left=0.1, right=0.11, top=0.9, bottom=0.1,
+        #                          hspace=0.1)
 
-        # This also does nothing:
-        plt.axis('tight')
-        self.ax1.axis('tight')
-        self.ax3.axis('tight')
+        # This also does nothing, except interfere with earlier set_ylim calls.
+        # plt.axis('tight')
+        # self.ax1.axis('tight')
+        # self.ax3.axis('tight')
 
         # Nor does this:
-        self.ax1.set_adjustable('box-forced')
-        self.ax3.set_adjustable('box-forced')
+        # self.ax1.set_adjustable('box-forced')
+        # self.ax3.set_adjustable('box-forced')
 
         # This gets rid of the intra-plot whitespace:
         self.ax1.set_xlim([self.start, self.end])
@@ -215,7 +215,8 @@ class LANLWeatherPlots(LANLWeather):
         if not plot_range:
             plot_range = [0, 20, 1]
         plt.ylabel('Wind Speed (knots)', multialignment='center')
-        self.ax1.set_ylim(plot_range[0], plot_range[1], plot_range[2])
+        self.ax1.set_ylim([0, max(self.data[ws])])
+        # self.ax1.set_ylim(plot_range[0], plot_range[1], plot_range[2])
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
 
@@ -229,12 +230,13 @@ class LANLWeatherPlots(LANLWeather):
                           linewidth=0.5,
                           label='Wind Direction')
         plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
-        plt.ylim(0, 360)
+        axtwin.set_ylim([0, 360])
         # plt.yticks([45, 135, 225, 315], ['NE', 'SE', 'SW', 'NW'])
         plt.yticks([0, 90, 180, 270, 360], ['N', 'E', 'S', 'W', 'N'])
+
+        # Top label
         lns = ln1 + ln2
         labs = [l.get_label() for l in lns]
-        # plt.gca().xaxis.set_major_formatter(mpl.dates.DateFormatter('%d/%H UTC'))
         axtwin.legend(lns, labs, loc='upper center',
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
 
@@ -251,9 +253,12 @@ class LANLWeatherPlots(LANLWeather):
         plt.setp(self.ax3.get_xticklabels(), visible=True)
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
-        self.ax3.set_ylim(plot_range[0], plot_range[1], plot_range[2])
         plt.fill_between(self.dates, self.data[temp], plt.ylim()[0], color='g')
         plt.ylabel('Temperature', multialignment='center')
+
+        # set_ylim is ignored if you do it this early.
+        # It works if you call it later, just before plt.show().
+        self.ax3.set_ylim(plot_range[0], plot_range[1], plot_range[2])
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -261,7 +266,7 @@ class LANLWeatherPlots(LANLWeather):
 def main():
     lwp = LANLWeatherPlots([2017, 3, 1], datetime.datetime.now(),
                            ["spd1", "dir1", "temp0"],)
-    live = False
+    live = True
     if live:
         lwp.make_lanl_request('ta54')
     else:
