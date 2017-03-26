@@ -92,7 +92,6 @@ class LANLWeather(object):
 
         request_data['checkbox'] = ','.join(self.keys)
 
-        print request_data
         r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
 
         if not r.text:
@@ -229,9 +228,10 @@ class LANLWeatherPlots(LANLWeather):
                           '.k',
                           linewidth=0.5,
                           label='Wind Direction')
-        plt.ylabel('Wind\nDirection\n(degrees)', multialignment='center')
+        plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
         plt.ylim(0, 360)
-        plt.yticks(np.arange(45, 405, 90), ['NE', 'SE', 'SW', 'NW'])
+        # plt.yticks([45, 135, 225, 315], ['NE', 'SE', 'SW', 'NW'])
+        plt.yticks([0, 90, 180, 270, 360], ['N', 'E', 'S', 'W', 'N'])
         lns = ln1 + ln2
         labs = [l.get_label() for l in lns]
         # plt.gca().xaxis.set_major_formatter(mpl.dates.DateFormatter('%d/%H UTC'))
@@ -261,7 +261,7 @@ class LANLWeatherPlots(LANLWeather):
 def main():
     lwp = LANLWeatherPlots([2017, 3, 1], datetime.datetime.now(),
                            ["spd1", "dir1", "temp0"],)
-    live = True
+    live = False
     if live:
         lwp.make_lanl_request('ta54')
     else:
