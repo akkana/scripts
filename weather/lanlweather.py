@@ -26,6 +26,11 @@ class LANLWeather(object):
             self.end = datetime.datetime(*endt)
         else:
             self.end = end
+        # But the LANL weather machine barfs on requests with an end time
+        # more recent than 2 hours ago. So make sure it's earlier:
+        now = datetime.datetime.now()
+        if (now - self.end).seconds < 7200:
+            self.end = now - datetime.timedelta(seconds=7200)
 
         self.data = {}
 
@@ -56,14 +61,15 @@ class LANLWeather(object):
                'ncom',       # North Community
              ]
 
-    def make_lanl_request(self, tower, keys, starttime, endtime):
+    def make_lanl_request(self, tower):
         '''Make a data request to the LANL weather machine.
            tower is a string, like 'ta54'
            keys is a list of keys we're interested in (see request_keys).
            start and end times can be either datetimes or [y, m, d, [h, m, s]]
 
            The weather machine will only return 3 months worth of 15-minute data
-           at a time.
+           at a time, and it lags: if you request data for anything in the
+           last hour, it bails and returns an empty file.
         '''
         request_data = { 'tower': tower,
                          'format': 'tab',
@@ -71,28 +77,28 @@ class LANLWeather(object):
                          'access': 'extend',
                          'SUBMIT_SIGNALS': 'Download Data',
 
-                         'startyear': '%04d' % starttime.year,
-                         'startmonth': '%02d' % starttime.month,
-                         'startday': '%02d' % starttime.day,
+                         'startyear': '%04d' % self.start.year,
+                         'startmonth': '%02d' % self.start.month,
+                         'startday': '%02d' % self.start.day,
                          'starthour': '00',
                          'startminute': '00',
 
-                         'endyear': '%04d' % endtime.year,
-                         'endmonth': '%02d' % endtime.month,
-                         'endday': '%02d' % endtime.day,
-                         'endhour': '00',
+                         'endyear': '%04d' % self.end.year,
+                         'endmonth': '%02d' % self.end.month,
+                         'endday': '%02d' % self.end.day,
+                         'endhour':  '%02d' % self.end.hour,
                          'endminute': '00'
         }
 
-        request_data['checkbox'] = ','.join(keys)
+        request_data['checkbox'] = ','.join(self.keys)
 
-        print "Making a request for tower", tower, "data"
+        print request_data
         r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
 
         if not r.text:
-            raise RuntimeException, "Empty response!"
+            raise RuntimeError, "Empty response!"
 
-        # While testing, save it locally so we don't have to keep hammering LANL.
+        # While testing, save it locally so we don't keep hammering LANL.
         outfile = open("lanldata.csv", "w")
         outfile.write(r.text)
         outfile.close()
@@ -150,6 +156,10 @@ class LANLWeather(object):
                 else:
                     self.data[k].append(float(l[idx]))
 
+        # We'll scale to self.end, so in case we rounded down,
+        # reset self.end so we don't have extra whitespace on the plot.
+        self.end = self.dates[-1]
+
 class LANLWeatherPlots(LANLWeather):
     '''Plot (as well as fetch and parse) data from the LANL weather machine.
     '''
@@ -159,10 +169,27 @@ class LANLWeatherPlots(LANLWeather):
         self.fig = plt.figure(figsize=(15, 5))
 
     def show(self):
-        # Reducing hspace here doesn't seem to make any difference.
-        self.fig.subplots_adjust(hspace=0.5)
+        # Various desperate attempts to trim spurious whitespace:
 
-        # This gets rid of a lot of the extra whitespace.
+        # Nothing in adjust() makes any difference.
+        # (Also tried calling plt.subplots_adjust(), no change.)
+        self.fig.subplots_adjust(left=0.1, right=0.11, top=0.9, bottom=0.1,
+                                 hspace=0.1)
+
+        # This also does nothing:
+        plt.axis('tight')
+        self.ax1.axis('tight')
+        self.ax3.axis('tight')
+
+        # Nor does this:
+        self.ax1.set_adjustable('box-forced')
+        self.ax3.set_adjustable('box-forced')
+
+        # This gets rid of the intra-plot whitespace:
+        self.ax1.set_xlim([self.start, self.end])
+        self.ax3.set_xlim([self.start, self.end])
+
+        # This gets rid of some of the extra whitespace between/around plots.
         # pad controls padding at the top, bottom and sides;
         # w_pad does nothing I can see -- I think it's space between
         # plots horizontally if there are more than two columns;
@@ -186,7 +213,6 @@ class LANLWeatherPlots(LANLWeather):
         self.ax1 = self.fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
         ln1 = self.ax1.plot(self.dates, self.data[ws], label='Wind Speed')
         plt.fill_between(self.dates, self.data[ws], 0)
-        self.ax1.set_xlim(self.start, self.end)
         if not plot_range:
             plot_range = [0, 20, 1]
         plt.ylabel('Wind Speed (knots)', multialignment='center')
@@ -195,8 +221,10 @@ class LANLWeatherPlots(LANLWeather):
                  linestyle='--', linewidth=0.5)
 
         plt.setp(self.ax1.get_xticklabels(), visible=True)
+
+        # Now plot the wind directions.
         axtwin = self.ax1.twinx()
-        ln3 = axtwin.plot(self.dates,
+        ln2 = axtwin.plot(self.dates,
                           self.data[wd],
                           '.k',
                           linewidth=0.5,
@@ -204,17 +232,11 @@ class LANLWeatherPlots(LANLWeather):
         plt.ylabel('Wind\nDirection\n(degrees)', multialignment='center')
         plt.ylim(0, 360)
         plt.yticks(np.arange(45, 405, 90), ['NE', 'SE', 'SW', 'NW'])
-        # lns = ln1 + ln2 + ln3
-        lns = ln1 + ln3
+        lns = ln1 + ln2
         labs = [l.get_label() for l in lns]
         # plt.gca().xaxis.set_major_formatter(mpl.dates.DateFormatter('%d/%H UTC'))
         axtwin.legend(lns, labs, loc='upper center',
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
-
-        # Don't show all the extra whitespace matplotlib wants to add
-        # to the edges of the graph.
-        # This doesn't work.
-        self.ax1.set_xlim(self.start, self.end)
 
     def plot_temp(self, temp, plot_range=None):
         if not plot_range:
@@ -232,9 +254,9 @@ class LANLWeatherPlots(LANLWeather):
         self.ax3.set_ylim(plot_range[0], plot_range[1], plot_range[2])
         plt.fill_between(self.dates, self.data[temp], plt.ylim()[0], color='g')
         plt.ylabel('Temperature', multialignment='center')
-        # plt.gca().xaxis.set_major_formatter(mpl.dates.DateFormatter('%d/%H UTC'))
-        axtwin = self.ax3.twinx()
-        axtwin.set_ylim(plot_range[0], plot_range[1], plot_range[2])
+
+        # Add a horizontal line for freezing
+        plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
 def main():
     lwp = LANLWeatherPlots([2017, 3, 1], datetime.datetime.now(),
