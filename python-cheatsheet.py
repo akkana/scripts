@@ -167,6 +167,24 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
 ########################################################
 
 #
+# Add N months to a date: same day of month but next month.
+#
+import datetime
+from dateutil.relativedelta import relativedelta
+today = datetime.date.today()
+three_months_from_now = today + relativedelta(months=3)
+# Note that relativedelta can also take a month= as well as a months=.
+# month gives you the current dayofmonth in a specific month number;
+# months gives you how many months relative to the current one.
+# For differences of just days or weeks, datetime.timedelta works.
+
+# Subtracting datetimes gives a datetime.timedelta, and that's also
+# a good way to add or subtract time from a datetime.
+now = datetime.datetime.now()
+if (now - self.end).seconds < 7200:
+    self.end = now - datetime.timedelta(seconds=7200)
+
+#
 # Parse a date in RFC 2822 format.
 #
 # email.utils.parsedate returns a tuple.
@@ -191,19 +209,7 @@ d = dateutil.parser.parse("6/15/2016 14:25 MDT")
 # that offers super-general date parsing like "an hour ago".
 
 #
-# Add N months to a date: same day of month but next month.
-#
-import datetime
-from dateutil.relativedelta import relativedelta
-today = datetime.date.today()
-three_months_from_now = today + relativedelta(months=3)
-# Note that relativedelta can also take a month= as well as a months=.
-# month gives you the current dayofmonth in a specific month number;
-# months gives you how many months relative to the current one.
-# For differences of just days or weeks, datetime.timedelta works.
-
-#
-# Another way using calendar but not dateutils:
+# Another of parsing using calendar but not dateutils:
 #
 import datetime
 import calendar
@@ -398,6 +404,29 @@ def summit(bignum):
 output = summit(100000)
 print("output = '%s'" % str(output))
 
+
+################################################################
+# Matplotlib tips
+################################################################
+
+self.ax1 = self.fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
+
+# Trimming all the spurious whitespace:
+
+# Trim whitespace within each plot:
+ax.set_xlim([0, enddate])
+ax.set_ylim([0, data[-1]])
+
+# Trim whitespace between plots:
+# pad controls padding around the top, bottom and sides of the page;
+# w_pad controls space between plots horizontally (if columns > 1),
+# h_pad controls space between plots vertically (if rows > 1).
+plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
+
+# There are lots and lots of other things that are supposed to
+# eliminate whitespace; most of them don't work, and some of them,
+# like ax.axis('tight') or plt.axis('tight'), prevent set_?lib
+# and tight_layout from working.
 
 ################################################################
 # Python3 differences
