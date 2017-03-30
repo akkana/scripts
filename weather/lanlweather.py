@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 import sys
+import os
 
 import datetime
+from dateutil.relativedelta import relativedelta
+
 import requests
 
 import matplotlib as mpl
@@ -12,27 +15,50 @@ import numpy as np
 def c_to_f(t):
     return t * (212.-32.) / 100. + 32.
 
+def to_date(d):
+    '''Make sure d is a datetime.date.
+       This is ridiculously difficult to do with datetime,
+       because datetime.date can't be initialized from a datetime
+       but datetime.date doesn't have a date() method.
+    '''
+    if hasattr(d, "date"):
+        return d.date()
+    return d
+
 class LANLWeather(object):
     '''Fetch and parse data from the LANL weather machine.
     '''
 
-    def __init__(self, start, end, keys):
+    def __init__(self, tower, start, end, keys):
+        self.tower = tower
         self.keys = keys
+
         if not hasattr(start, 'year'):
-            self.start = datetime.datetime(*start)
+            self.start = datetime.date(*start)
         else:
-            self.start = start
+            self.start = datetime.date(start)
+
         if not hasattr(end, 'year'):
-            self.end = datetime.datetime(*endt)
+            self.end = datetime.date(*end)
         else:
             self.end = end
         # But the LANL weather machine barfs on requests with an end time
         # more recent than 2 hours ago. So make sure it's earlier:
-        now = datetime.datetime.now()
-        if (now - self.end).seconds < 7200:
-            self.end = now - datetime.timedelta(seconds=7200)
+        # now = datetime.datetime.now()
+        # if (now - self.end).seconds < 7200:
+        #     self.end = now - datetime.timedelta(seconds=7200)
+
+        # Where does the data end? Might not be the same as self.end.
+        self.realend = self.start
 
         self.data = {}
+        self.dates = []
+
+        # Set up cache directory. Default: ~/.cache/lanlweather
+        # but you can change it with the env var LANLWEATHER
+        self.cachedir = os.getenv("LANLWEATHER")
+        if not self.cachedir:
+            self.cachedir = os.path.expanduser("~/.cache/lanlweather")
 
     request_keys = [ 'spd1', 'spd2', 'spd3', # Speeds at 12, 23 and 46 m height
                      'sdspd1', 'sdspd2', 'sdspd3', # sdev of wind speeds
@@ -61,8 +87,54 @@ class LANLWeather(object):
                'ncom',       # North Community
              ]
 
-    def make_lanl_request(self, tower):
-        '''Make a data request to the LANL weather machine.
+    def get_data(self):
+        '''Get data from cache if possible. If it's not cached,
+           make net data requests to the weather machine.
+           Make a separate request for each month,
+           since the weather machine refuses requests for more than 3 months.
+           Use the tower and start/end dates already set in self.
+
+           We'll request full months even if less is requested,
+           and we'll request all keys even if we don't need them all,
+           so we can keep a more complete cache.
+        '''
+
+        # Loop over months requested.
+        # Start on the first of the month specified by startdate:
+        startday = self.start.replace(day=1)
+
+        # Loop over requested months
+        while True:
+            cachefile = os.path.join(self.cachedir,
+                                     "%04d-%02d-%s.csv" % (startday.year,
+                                                           startday.month,
+                                                           self.tower))
+            # See if this month and year is already cached.
+            if os.path.exists(cachefile):
+                with open(cachefile) as fp:
+                    datablob = fp.read()
+                    print "Read from cache file", cachefile
+            else:
+                print "Making request for", startday.year, startday.month
+
+                datablob = self.make_lanl_request(self.tower,
+                                                  startday.year, startday.month)
+
+                if not os.path.exists(self.cachedir):
+                    os.makedirs(self.cachedir)
+
+                with open(cachefile, "w") as outfile:
+                    outfile.write(datablob)
+                    print("Saved to cache %s" % cachefile)
+
+            self.parse_lanl_data(datablob)
+
+            startday += relativedelta(months=1)
+            if to_date(startday) > to_date(self.end):
+                break
+
+    def make_lanl_request(self, tower, year, month):
+        '''Make a data request for 15-minute data to the LANL weather machine.
            tower is a string, like 'ta54'
            keys is a list of keys we're interested in (see request_keys).
            start and end times can be either datetimes or [y, m, d, [h, m, s]]
@@ -71,100 +143,121 @@ class LANLWeather(object):
            at a time, and it lags: if you request data for anything in the
            last hour, it bails and returns an empty file.
         '''
+        # Figure out the end time for the request.
+        # If it's this month, then we can only request data
+        # up until about an hour ago.
+        # Otherwise, we want everything until the end of the
+        # last day of the month.
+        now = datetime.datetime.now()
+        if year == now.year and month == now.month:
+            endtime = now - datetime.timedelta(hours=2)
+        else:
+            # set it to the first of the same month, at 23:59:
+            endtime = datetime.datetime(year, month, 1, 23, 59)
+            # bump it to the first of the next month:
+            endtime += relativedelta(months=1)
+            # set it to the last day of the previous (original) month:
+            endtime -= datetime.timedelta(days=1)
+
+        print "make lanl request:", year, month, "01 00:00 to", \
+            endtime.year, endtime.month, endtime.day, \
+            endtime.hour, endtime.minute
+
         request_data = { 'tower': tower,
                          'format': 'tab',
                          'type': '15',
                          'access': 'extend',
                          'SUBMIT_SIGNALS': 'Download Data',
 
-                         'startyear': '%04d' % self.start.year,
-                         'startmonth': '%02d' % self.start.month,
-                         'startday': '%02d' % self.start.day,
+                         'startyear': '%04d' % year,
+                         'startmonth': '%02d' % month,
+                         'startday': '01',
                          'starthour': '00',
                          'startminute': '00',
 
-                         'endyear': '%04d' % self.end.year,
-                         'endmonth': '%02d' % self.end.month,
-                         'endday': '%02d' % self.end.day,
-                         'endhour':  '%02d' % self.end.hour,
-                         'endminute': '00'
+                         'endyear': '%04d' % endtime.year,
+                         'endmonth': '%02d' % endtime.month,
+                         'endday': '%02d' % endtime.day,
+                         'endhour':  '%02d' % endtime.hour,
+                         'endminute': '%02d' % endtime.minute
         }
 
-        request_data['checkbox'] = ','.join(self.keys)
+        # request_data['checkbox'] = ','.join(self.keys)
+        # Request everything, not just the keys we're plotting,
+        # so we have everything cached for later.
+        request_data['checkbox'] = ','.join(LANLWeather.request_keys)
 
         r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
 
         if not r.text:
             raise RuntimeError, "Empty response!"
 
-        # While testing, save it locally so we don't keep hammering LANL.
-        outfile = open("lanldata.csv", "w")
-        outfile.write(r.text)
-        outfile.close()
-        print "Wrote to lanldata.csv"
-
-        self.parse_lanl_data(r.text)
-
-    def read_local_data_file(self):
-        infile = open("lanldata.csv", "r")
-        blob = infile.read()
-        infile.close()
-        print "Read from lanldata.csv"
-        self.parse_lanl_data(blob)
+        return r.text
 
     def parse_lanl_data(self, blob):
         lines = blob.split('\n')
-        self.fields = lines[5].split('\t')
-        self.units = lines[6].split('\t')
 
-        # Find the indices in the data for each key we're interested in:
-        self.indices = []
+        # Find the indices in the data for each key we're interested in.
+        fields = lines[5].split('\t')
+        units = lines[6].split('\t')
+
+        # indices will be a list paralleling self.keys,
+        # saving the index of each key in the data table we're reading.
+        indices = []
+
         for i, k in enumerate(self.keys):
-            idx = self.fields.index(k)
+            idx = fields.index(k)
             if idx <= 0:
                 raise IndexError, k + " is not in dataset"
-            self.indices.append(idx)
+            indices.append(idx)
 
-            # and initialize a vector of values for that key
-            self.data[k] = []
-
-        self.dates = []
+            # initialize a vector of values for that key, if not already there:
+            if k not in self.data:
+                self.data[k] = []
 
         # We'll also need to know the indices for the time values.
-        year = self.fields.index('year')
-        month = self.fields.index('month')
-        day = self.fields.index('day')
-        hour = self.fields.index('hour')
-        minute = self.fields.index('minute')
+        year = fields.index('year')
+        month = fields.index('month')
+        day = fields.index('day')
+        hour = fields.index('hour')
+        minute = fields.index('minute')
 
         for line in lines[7:]:
             line = line.strip()
             if not line:
                 continue
             l = line.split('\t')
-            self.dates.append(datetime.datetime(int(l[year]),
-                                                int(l[month]), int(l[day]),
-                                                int(l[hour]), int(l[minute]),
-                                                0))
+            d = datetime.datetime(int(l[year]), int(l[month]), int(l[day]),
+                                  int(l[hour]), int(l[minute]), 0)
+            if self.dates and d <= self.dates[-1]:
+                print "WARNING! Dates out of order,", d, "<=", self.dates[-1]
+            self.dates.append(d)
             for i, k in enumerate(self.keys):
-                idx = self.indices[i]
+                idx = indices[i]
+
+                # Missing data is denoted with a *.
+                # Matplotlib can't deal with None.
                 if not l[idx] or l[idx] == '*':
                     self.data[k].append(0.)
+
+                # convert temps C -> F
                 elif k.startswith('temp'):
                     self.data[k].append(c_to_f(float(l[idx])))
+
                 else:
                     self.data[k].append(float(l[idx]))
 
         # We'll scale to self.end, so in case we rounded down,
         # reset self.end so we don't have extra whitespace on the plot.
-        self.end = self.dates[-1]
+        if to_date(self.dates[-1]) > to_date(self.realend):
+            self.realend = self.dates[-1]
 
 class LANLWeatherPlots(LANLWeather):
     '''Plot (as well as fetch and parse) data from the LANL weather machine.
     '''
 
-    def __init__(self, start, end, keys):
-        super(LANLWeatherPlots, self).__init__(start, end, keys)
+    def __init__(self, tower, start, end, keys):
+        super(LANLWeatherPlots, self).__init__(tower, start, end, keys)
         self.fig = plt.figure(figsize=(15, 5))
 
     def show(self):
@@ -185,8 +278,8 @@ class LANLWeatherPlots(LANLWeather):
         # self.ax3.set_adjustable('box-forced')
 
         # This gets rid of the intra-plot whitespace:
-        self.ax1.set_xlim([self.start, self.end])
-        self.ax3.set_xlim([self.start, self.end])
+        self.ax1.set_xlim([self.start, self.realend])
+        self.ax3.set_xlim([self.start, self.realend])
 
         # This gets rid of some of the extra whitespace between/around plots.
         # pad controls padding at the top, bottom and sides;
@@ -200,39 +293,35 @@ class LANLWeatherPlots(LANLWeather):
 
         plt.show()
 
-    def plot_winds(self, ws, wd, plot_range=None):
+    def plot_winds(self, ws, wd):
         """
         Required input:
             ws: Key used for Wind speeds (knots)
             wd: Key used for Wind direction (degrees)
         Optional Input:
-            plot_range: Data range for making figure (list of (min,max,step))
         """
-        # PLOT WIND SPEED AND WIND DIRECTION
+        # Plot the wind directions first: want it underneath
+        # so it doesn't overwhelm the wind speed plot.
         self.ax1 = self.fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
-        ln1 = self.ax1.plot(self.dates, self.data[ws], label='Wind Speed')
-        plt.fill_between(self.dates, self.data[ws], 0)
-        if not plot_range:
-            plot_range = [0, 20, 1]
-        plt.ylabel('Wind Speed (knots)', multialignment='center')
-        self.ax1.set_ylim([0, max(self.data[ws])])
-        # self.ax1.set_ylim(plot_range[0], plot_range[1], plot_range[2])
+        ln1 = self.ax1.plot(self.dates, self.data[wd],
+                            '.', color="orange", label='Wind Direction')
+
+        plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
+        self.ax1.set_ylim([0, 360])
+        # plt.yticks([45, 135, 225, 315], ['NE', 'SE', 'SW', 'NW'])
+        plt.yticks([0, 90, 180, 270, 360], ['N', 'E', 'S', 'W', 'N'])
+
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
 
         plt.setp(self.ax1.get_xticklabels(), visible=True)
 
-        # Now plot the wind directions.
+        # Plot wind speed on top of wind direction
         axtwin = self.ax1.twinx()
-        ln2 = axtwin.plot(self.dates,
-                          self.data[wd],
-                          '.k',
-                          linewidth=0.5,
-                          label='Wind Direction')
-        plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
-        axtwin.set_ylim([0, 360])
-        # plt.yticks([45, 135, 225, 315], ['NE', 'SE', 'SW', 'NW'])
-        plt.yticks([0, 90, 180, 270, 360], ['N', 'E', 'S', 'W', 'N'])
+        ln2 = axtwin.plot(self.dates, self.data[ws],
+                          color='b', label='Wind Speed')
+        plt.ylabel('Wind Speed (knots)', multialignment='center')
+        axtwin.set_ylim([0, max(self.data[ws])])
 
         # Top label
         lns = ln1 + ln2
@@ -241,36 +330,28 @@ class LANLWeatherPlots(LANLWeather):
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
 
     def plot_temp(self, temp, plot_range=None):
-        if not plot_range:
-            plot_range = [0, max(self.data[temp]), 4]
         self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
-        self.ax3.plot(self.dates,
-                      self.data[temp],
-                      'g-',
-                      label='Ground temperature')
+        self.ax3.plot(self.dates, self.data[temp],
+                      '-', color='blue', label='Ground temperature')
         self.ax3.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
                         prop={'size': 12})
         plt.setp(self.ax3.get_xticklabels(), visible=True)
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
-        plt.fill_between(self.dates, self.data[temp], plt.ylim()[0], color='g')
         plt.ylabel('Temperature', multialignment='center')
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        self.ax3.set_ylim(plot_range[0], plot_range[1], plot_range[2])
+        self.ax3.set_ylim(0, max(self.data[temp]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
 def main():
-    lwp = LANLWeatherPlots([2017, 3, 1], datetime.datetime.now(),
-                           ["spd1", "dir1", "temp0"],)
-    live = True
-    if live:
-        lwp.make_lanl_request('ta54')
-    else:
-        lwp.read_local_data_file()
+    lwp = LANLWeatherPlots('ta54', [2017, 1, 1], datetime.datetime.now(),
+                           ["spd1", "dir1", "temp0"])
+
+    lwp.get_data()
 
     lwp.plot_winds('spd1', 'dir1')
     lwp.plot_temp('temp0')
