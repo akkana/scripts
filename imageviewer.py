@@ -201,11 +201,12 @@ class ImageViewer(gtk.DrawingArea):
                                 self.height - label_height,
                                 layout)
 
-class ImageViewerWindow(object):
+class ImageViewerWindow(gtk.Window):
     '''Bring up a window that can view images.
     '''
 
     def __init__(self, file_list=None, width=1024, height=768):
+        super(ImageViewerWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
         self.file_list = file_list
         self.imgno = 0
 
@@ -215,11 +216,10 @@ class ImageViewerWindow(object):
 
         self.isearch = False
 
-        self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
-        self.win.set_border_width(10)
+        self.set_border_width(10)
 
-        self.win.connect("delete_event", gtk.main_quit)
-        self.win.connect("destroy", gtk.main_quit)
+        self.connect("delete_event", gtk.main_quit)
+        self.connect("destroy", gtk.main_quit)
 
         self.main_vbox = gtk.VBox(spacing=8)
 
@@ -227,20 +227,20 @@ class ImageViewerWindow(object):
         self.viewer.set_size_request(self.width, self.height)
         self.main_vbox.pack_start(self.viewer)
 
-        self.win.add(self.main_vbox)
+        self.add(self.main_vbox)
 
         # Realize apparently happens too early.
-        # self.win.connect("realize", self.expose_handler)
+        # self.connect("realize", self.expose_handler)
 
         if self.file_list:
             self.viewer.load_image(self.file_list[0])
 
     def run(self):
-        self.win.show_all();
+        self.show_all();
         gtk.main()
 
     def set_key_handler(self, fcn):
-        self.win.connect("key-press-event", fcn, self)
+        self.connect("key-press-event", fcn, self)
 
     def new_image(self, imgfile):
         self.file_list = [ imgfile ]
