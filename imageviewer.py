@@ -236,7 +236,7 @@ class ImageViewerWindow(gtk.Window):
             self.viewer.load_image(self.file_list[0])
 
     def run(self):
-        self.show_all();
+        self.show_all()
         gtk.main()
 
     def set_key_handler(self, fcn):
