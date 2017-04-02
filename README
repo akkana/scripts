@@ -150,6 +150,10 @@ imageviewer.py:
     A generic image viewer widget and image viewer window that can
     be imported into other python programs.
 
+imageviewer3.py:
+    A generic image viewer widget and image viewer window using GTK3
+    via gi, so they can be used with Python 3.
+
 ipsearch:
     Search for live hosts on the current net.
     Useful for things like finding that Raspberry Pi you just booted.
@@ -294,6 +298,13 @@ termcolors:
 termsize:
     Set stty size to the size of the current terminal window
     (e.g. when logged in to an embedded Posix device over a serial line).
+
+transimageviewer.py:
+    A translucent image viewer (inheriting from imageviewer.py)
+    that passes clicks and other events through to the window below.
+    Useful for things like saving GPS waypoints from a map image.
+    Also offers a rare example of how to use the X11 SHAPE extension
+    from pygtk, including input shapes.
 
 turtlefrac.py:
     Draw fractals (specifically a Sierpinski triangle)

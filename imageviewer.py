@@ -18,6 +18,8 @@ class ImageViewer(gtk.DrawingArea):
         self.width = None
         self.height = None
         self.cur_img = None
+        self.width = None
+        self.height = None
 
     def expose_handler(self, widget, event):
         if not self.xgc_bg:
@@ -28,6 +30,7 @@ class ImageViewer(gtk.DrawingArea):
             self.xgc_fg.set_rgb_fg_color(gtk.gdk.color_parse("yellow"))
 
             x, y, w, h = self.get_allocation()
+
             if w != self.width or h != self.height:
                 # get_allocation() gives a number that's too large,
                 # and if we later try to draw_rectangle() with these
@@ -42,6 +45,14 @@ class ImageViewer(gtk.DrawingArea):
             if w and h and self.cur_img and not self.pixbuf:
                 self.prepare_image()
 
+        self.show_image()
+
+    def resize(self, new_w, new_h):
+        if new_w == self.width and new_h == self.height:
+            return
+        self.width = new_w
+        self.height = new_h
+        self.prepare_image()
         self.show_image()
 
     # Mapping from EXIF orientation tag to degrees rotated.
@@ -221,13 +232,16 @@ class ImageViewerWindow(gtk.Window):
         self.connect("delete_event", gtk.main_quit)
         self.connect("destroy", gtk.main_quit)
 
-        self.main_vbox = gtk.VBox(spacing=8)
+        self.main_vbox = gtk.VBox(spacing=4)
 
         self.viewer = ImageViewer()
-        self.viewer.set_size_request(self.width, self.height)
+        self.viewer.connect("configure_event", self.configure_event)
+
         self.main_vbox.pack_start(self.viewer)
 
         self.add(self.main_vbox)
+
+        self.resize(self.width, self.height)
 
         # Realize apparently happens too early.
         # self.connect("realize", self.expose_handler)
@@ -239,8 +253,11 @@ class ImageViewerWindow(gtk.Window):
         self.show_all()
         gtk.main()
 
-    def set_key_handler(self, fcn):
-        self.connect("key-press-event", fcn, self)
+    # configure event is registered on the viewer, not the window.
+    def configure_event(self, widget, event):
+        # vx, vy, vw, vh = self.viewer.get_allocation()
+        x, y, self.width, self.height = self.get_allocation()
+        self.viewer.resize(event.width, event.height)
 
     def new_image(self, imgfile):
         self.file_list = [ imgfile ]
@@ -269,5 +286,5 @@ def key_press_event(widget, event, imagewin):
 if __name__ == "__main__":
     import sys
     win = ImageViewerWindow(sys.argv[1:])
-    win.set_key_handler(key_press_event)
+    win.connect("key-press-event", key_press_event, win)
     win.run()
