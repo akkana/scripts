@@ -134,6 +134,18 @@ function toggleAnimation() {
   }
 }
 
+function setHemisphere(hemisphere)
+{
+  if (hemisphere == "northern")
+  {
+    document.getElementById("jupframe").removeAttribute("style");
+  }
+  else
+  {
+    document.getElementById("jupframe").setAttribute("style", "transform: rotate(180deg)");
+  }
+}
+
 function drawJupiter(jup, date) {
   busy = document.getElementById("recalculating")
   busy.style.visibility = "visible";
@@ -333,6 +345,12 @@ Or you can set a date explicitly:
 <input type="button" name="faster" value="faster" onClick="animateFaster(20);">
 <input type="button" name="slower" value="slower" onClick="animateFaster(-20);">
 <span id="animDelay">Delay: 100 milliseconds</span>
+
+<p>
+  Viewing hemisphere:<br>
+  <input type="radio" name="hemisphere" value="northern" onClick="setHemisphere('northern')" checked>Northern<br>
+  <input type="radio" name="hemisphere" value="southern" onClick="setHemisphere('southern')">Southern<br>
+</p>
 
 <p>
 Show events for
