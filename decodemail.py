@@ -16,7 +16,7 @@ Usage = """Usage: %s [-a] headername [filename]
 
 Find a line matching the given header name (Subject:, From:, etc.)
 and decode it according to RFC 2047.
-Without a filemame, will read standard input.
+Without a filename, will read standard input.
 Adding -a will print all matches within the given file, not just the first.
 Multiple headers may be combined with |
 
