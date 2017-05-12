@@ -43,6 +43,16 @@ mylist.remove("item")    # Removes the first instance of "item"
 mylist.pop(i)            # Removes and returns list[i]
 
 ########################################################
+# Debugging and stack traces
+########################################################
+
+# Print a stack trace -- how did we get here?
+traceback.print_stack()
+
+# Equivalent of verbose mode in a shell: print each line before executing.
+python -m trace --trace /tmp/foo.py
+
+########################################################
 # Stringy stuff
 ########################################################
 
