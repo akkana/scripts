@@ -3,8 +3,9 @@
 import sys
 
 from PyQt5.QtCore import QUrl
-from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, QLineEdit, QStatusBar
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
+     QLineEdit, QStatusBar, QProgressBar
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 
 from PyQt5 import QtWidgets
 
@@ -28,36 +29,100 @@ class BrowserWindow(QMainWindow):
         btn_act.triggered.connect(self.go_forward)
         toolbar.addAction(btn_act)
 
+        btn_act = QAction("Reload", self)
+        btn_act.setStatusTip("Reload")
+        btn_act.triggered.connect(self.reload)
+        toolbar.addAction(btn_act)
+
         self.urlbar = QLineEdit()
         self.urlbar.setPlaceholderText("URL goes here")
+        #self.urlbar.textChanged[str].connect(self.load_url)
+        self.urlbar.returnPressed.connect(self.urlbar_load)
         toolbar.addWidget(self.urlbar)
 
-        self.view = QWebEngineView()
-        self.setCentralWidget(self.view)
+        #
+        # Set up the WebEngineView
+        #
+        self.webview = QWebEngineView()
+
+        # We need a QWebEnginePage in order to get linkHovered events
+        self.webenginepage = QWebEnginePage()
+        self.webview.setPage(self.webenginepage)
+
+        self.setCentralWidget(self.webview)
+        self.webview.urlChanged.connect(self.url_changed)
+        self.webview.loadStarted.connect(self.load_started)
+        self.webview.loadFinished.connect(self.load_finished)
+        self.webview.loadProgress.connect(self.load_progress)
+        self.webenginepage.linkHovered.connect(self.link_hover)
 
         self.setStatusBar(QStatusBar(self))
+        self.progress = QProgressBar()
+        self.statusBar().addPermanentWidget(self.progress)
 
+        # Key bindings
+        # For keys like function keys, use QtGui.QKeySequence("F12")
         QtWidgets.QShortcut("Ctrl+Q", self, activated = self.close)
-        # QtWidgets.QShortcut(QtGui.QKeySequence("F12"), self.centralwidget, self.goFullScreen)
+        QtWidgets.QShortcut("Ctrl+L", self, activated = self.select_urlbar)
 
         self.resize(1024, 768)
 
     def update_buttons(self):
-        # check e.g. self.view.page().action(QWebEnginePage.Back).isEnabled())
+        # check e.g. self.webview.page().action(QWebEnginePage.Back).isEnabled())
         pass
 
     def load_url(self, url):
-        self.view.load(QUrl(url))
+        self.webview.load(QUrl(url))
+
+    def select_urlbar(self):
+        self.urlbar.selectAll()
+        self.urlbar.setFocus()
 
     #
     # Slots
     #
 
+    def urlbar_load(self):
+        url = self.urlbar.text()
+        print("load url from urlbar", url)
+        val = self.webview.load(QUrl(url))
+        print("load returned", val)
+
     def go_back(self):
-        self.view.back()
+        self.webview.back()
 
     def go_forward(self):
-        self.view.forward()
+        self.webview.forward()
+
+    def reload(self):
+        self.webview.reload()
+
+    def url_changed(self, url):
+        if url != self.urlbar.text():
+            # I can't find any way to find out about load errors.
+            # But an attempted load that fails gives a url_changed(about:blank)
+            # so maybe we can detect it that way.
+            if url.toString() == 'about:blank':
+                print("Couldn't load " + self.urlbar.text())
+                self.statusBar().showMessage("Couldn't load "
+                                             + self.urlbar.text())
+            else:
+                self.urlbar.setText(url.toDisplayString())
+
+    def link_hover(self, url):
+        self.statusBar().showMessage(url)
+
+    def load_started(self):
+        self.progress.show()
+
+    def load_finished(self, ok):
+        # OK is useless: if we try to load a bad URL, we won't get a
+        # loadFinished on that; instead it will switch to about:blank,
+        # load that successfully and call loadFinished with ok=True.
+        self.progress.hide()
+
+    def load_progress(self, progress):
+        self.progress.setValue(progress)
 
 class BrowserView():
     def __init__(self):
