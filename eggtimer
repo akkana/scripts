@@ -4,14 +4,14 @@ import sys, os, time
 import Tkinter
 
 # Callback for key events:
-def bye(x) :
+def bye(x):
   sys.exit(0)
 
-def Usage() :
+def Usage():
   print "Usage:", sys.argv[0], "minutes message"
   sys.exit(1)
 
-def showAlert(message) :
+def showAlert(message):
   # This is supposed to show a dialog, but tkMessageBox doesn't exist:
   # tkMessageBox.showwarning("hello", message)
 
@@ -37,14 +37,14 @@ def showAlert(message) :
   root.mainloop()
 
 # main: read the runtime arguments.
-try :
+try:
   sleeptime = int(sys.argv[1]) * 60
 except ValueError, e:
   Usage()
 
-if len(sys.argv) > 2 :
+if len(sys.argv) > 2:
   message = ' '.join(sys.argv[2:])
-else :
+else:
   message = "Wake up!"
 
 print "Sleeping for", sleeptime, "seconds with message:", message
@@ -52,13 +52,13 @@ print "Sleeping for", sleeptime, "seconds with message:", message
 # Now try to fork and give control back to the terminal:
 # Unfortunately, tkinter apparently refuses to run from the child process,
 # for reasons that don't seem to be documented anywhere.
-# try: 
-#   pid = os.fork() 
+# try:
+#   pid = os.fork()
 #   if pid > 0:
 #     # exit first parent
-#     sys.exit(0) 
-# except OSError, e: 
-#  print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror) 
+#     sys.exit(0)
+# except OSError, e:
+#  print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror)
 
 time.sleep(sleeptime)
 
