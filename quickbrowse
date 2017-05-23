@@ -2,12 +2,44 @@
 
 import sys
 
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QUrl, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
+     QWebEngineProfile
 
 from PyQt5 import QtWidgets
+
+class ReadlineEdit(QLineEdit):
+    def __init__(self):
+        super (ReadlineEdit, self).__init__()
+
+    def keyPressEvent(self, event):
+        # http://pyqt.sourceforge.net/Docs/PyQt4/qt.html#Key-enum
+        if (event.modifiers() & Qt.ControlModifier):
+            k = event.key()
+            if k == Qt.Key_Control:
+                return
+            if k == Qt.Key_A:
+                self.home(False)
+            elif k == Qt.Key_E:
+                self.end(False)
+            elif k == Qt.Key_B:
+                self.cursorBackward(False, 1)
+            elif k == Qt.Key_F:
+                self.cursorForward(False, 1)
+            elif k == Qt.Key_H:
+                self.backspace()
+            elif k == Qt.Key_D:
+                self.del_()
+            elif k == Qt.Key_W:
+                self.cursorWordBackward(True)
+                self.del_()
+            elif k == Qt.Key_U:
+                self.clear()
+            else:
+                # call base class keyPressEvent
+                QLineEdit.keyPressEvent(self, event)
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -34,9 +66,8 @@ class BrowserWindow(QMainWindow):
         btn_act.triggered.connect(self.reload)
         toolbar.addAction(btn_act)
 
-        self.urlbar = QLineEdit()
+        self.urlbar = ReadlineEdit()
         self.urlbar.setPlaceholderText("URL goes here")
-        #self.urlbar.textChanged[str].connect(self.load_url)
         self.urlbar.returnPressed.connect(self.urlbar_load)
         toolbar.addWidget(self.urlbar)
 
@@ -45,8 +76,13 @@ class BrowserWindow(QMainWindow):
         #
         self.webview = QWebEngineView()
 
-        # We need a QWebEnginePage in order to get linkHovered events
-        self.webenginepage = QWebEnginePage()
+        # We need a QWebEnginePage in order to get linkHovered events,
+        # and to set a profile.
+        self.profile = QWebEngineProfile()    # New anonymous (supposedly) profile:
+        print("Profile off the record?", self.profile.isOffTheRecord())
+        self.webenginepage = QWebEnginePage(self.profile)
+        print("Webpage off the record?", self.webenginepage.profile().isOffTheRecord())
+
         self.webview.setPage(self.webenginepage)
 
         self.setCentralWidget(self.webview)
@@ -73,6 +109,9 @@ class BrowserWindow(QMainWindow):
 
     def load_url(self, url):
         self.webview.load(QUrl(url))
+        print("load_url", url)
+        print("Profile off the record?", self.profile.isOffTheRecord())
+        print("Webpage off the record?", self.webenginepage.profile().isOffTheRecord())
 
     def select_urlbar(self):
         self.urlbar.selectAll()
