@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+import sys
+
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, QLineEdit, QStatusBar
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+from PyQt5 import QtWidgets
+
+class BrowserWindow(QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super(BrowserWindow, self).__init__(*args, **kwargs)
+
+        self.setWindowTitle("Quickbrowse")
+
+        toolbar = QToolBar("Toolbar")
+        self.addToolBar(toolbar)
+
+        btn_act = QAction("Back", self)
+        # for an icon: QAction(QIcon("bug.png"), "Your button", self)
+        btn_act.setStatusTip("Go back")
+        btn_act.triggered.connect(self.go_back)
+        toolbar.addAction(btn_act)
+
+        btn_act = QAction("Forward", self)
+        btn_act.setStatusTip("Go forward")
+        btn_act.triggered.connect(self.go_forward)
+        toolbar.addAction(btn_act)
+
+        self.urlbar = QLineEdit()
+        self.urlbar.setPlaceholderText("URL goes here")
+        toolbar.addWidget(self.urlbar)
+
+        self.view = QWebEngineView()
+        self.setCentralWidget(self.view)
+
+        self.setStatusBar(QStatusBar(self))
+
+        QtWidgets.QShortcut("Ctrl+Q", self, activated = self.close)
+        # QtWidgets.QShortcut(QtGui.QKeySequence("F12"), self.centralwidget, self.goFullScreen)
+
+        self.resize(1024, 768)
+
+    def update_buttons(self):
+        # check e.g. self.view.page().action(QWebEnginePage.Back).isEnabled())
+        pass
+
+    def load_url(self, url):
+        self.view.load(QUrl(url))
+
+    #
+    # Slots
+    #
+
+    def go_back(self):
+        self.view.back()
+
+    def go_forward(self):
+        self.view.forward()
+
+class BrowserView():
+    def __init__(self):
+        super(BrowserView, self).__init__()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    win = BrowserWindow()
+    if len(sys.argv) > 1:
+        win.load_url(sys.argv[1])
+    win.show()
+    app.exec_()
+
