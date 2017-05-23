@@ -124,9 +124,17 @@ class BrowserWindow(QMainWindow):
     def load_progress(self, progress):
         self.progress.setValue(progress)
 
-class BrowserView():
-    def __init__(self):
-        super(BrowserView, self).__init__()
+#
+# PyQt is super crashy. Any little error, like an extra argument in a slot,
+# causes it to kill Python with a core dump.
+# Setting sys.excepthook works around this behavior, and execution continues.
+#
+def excepthook(excType=None, excValue=None, tracebackobj=None, *,
+               message=None, version_tag=None, parent=None):
+    print("exception! excValue='%s'" % excValue)
+
+sys.excepthook = excepthook
+# sys.excepthook = traceback.print_exception
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
