@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+import os
 import sys
+import signal
 
 from PyQt5.QtCore import QUrl, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
@@ -9,6 +11,10 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
 
 from PyQt5 import QtWidgets
+
+# The file used to remotely trigger the browser to open more tabs.
+# The %d will be the process ID of the running browser.
+URL_FILE = "/tmp/quickbrowse-urls-%d"
 
 class ReadlineEdit(QLineEdit):
     def __init__(self):
@@ -130,8 +136,6 @@ class BrowserWindow(QMainWindow):
 
         self.active_tab = 0
 
-        self.new_tab()
-
         self.setStatusBar(QStatusBar(self))
         self.progress = QProgressBar()
         self.statusBar().addPermanentWidget(self.progress)
@@ -203,6 +207,15 @@ class BrowserWindow(QMainWindow):
         # check e.g. self.webview.page().action(QWebEnginePage.Back).isEnabled())
         pass
 
+    def signal_handler(self, signal, frame):
+        print("Ouch! signal", signal, ", self=", self, ", frame=", frame)
+        #self.blockSignals(True)
+        with open(URL_FILE % os.getpid()) as url_fp:
+            for url in url_fp:
+                print("signal handler: opening tab for", url.strip())
+                self.new_tab(url.strip())
+        #self.blockSignals(False)
+
     #
     # Slots
     #
@@ -232,10 +245,73 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
 # sys.excepthook = excepthook
 
 if __name__ == '__main__':
+    SIGNAL = signal.SIGUSR1
+    args = sys.argv[1:]
+
+    def get_procname(procargs):
+        '''Return the program name: either the first commandline argument,
+           or, if that argument is some variant of "python", the second.
+        '''
+        basearg = os.path.basename(procargs[0])
+        if basearg.startswith('python'):
+            basearg = os.path.basename(procargs[1])
+        return basearg
+    progname = get_procname(sys.argv)
+
+    def find_proc_by_name(name):
+        """Looks for a process with the given basename, ignoring a possible
+           "python" prefix in case it's another Python script.
+           Will ignore the current running process.
+           Returns the pid, or None.
+        """
+        PROCDIR = '/proc'
+        for proc in os.listdir(PROCDIR):
+            if not proc[0].isdigit():
+                continue
+            # Race condition: processes can come and go, so we may not be
+            # able to open something just because it was there when we
+            # did the listdir.
+            try:
+                with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
+                    procargs = procfp.read().split('\0')
+                    basearg = get_procname(procargs)
+                    if basearg == name and int(proc) != os.getpid():
+                        return int(proc)
+            except Exception as e:
+                print("Exception", e)
+                pass
+        return None
+
+    if args and args[0] == "--new-tab":
+        # Try to use an existing instance of quickbrowse
+        # instead of creating a new window.
+        urls = args[1:]
+        progname = get_procname(sys.argv)
+        pid = find_proc_by_name(progname)
+        print("progname is", progname, ", pid is", pid)
+        if pid:
+            # Create the file of URLs:
+            with open(URL_FILE % pid, 'w') as url_fp:
+                for url in urls:
+                    print(url, file=url_fp)
+
+            os.kill(int(pid), SIGNAL)
+            sys.exit(0)
+        print("No existing %s process: starting a new one." % progname)
+
+    # Return control to the shell before creating the window:
+    rc = os.fork()
+    if rc:
+        sys.exit(0)
+
     app = QApplication(sys.argv)
     win = BrowserWindow()
-    if len(sys.argv) > 1:
-        win.load_url(sys.argv[1])
+    for url in args:
+        win.new_tab(url)
     win.show()
+
+    # Handle SIGUSR1 signal so we can be signalled to open other tabs:
+    signal.signal(SIGNAL, win.signal_handler)
+
     app.exec_()
 
