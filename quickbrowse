@@ -4,9 +4,9 @@ import os
 import sys
 import signal
 
-from PyQt5.QtCore import QUrl, Qt
+from PyQt5.QtCore import QUrl, Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
-     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QWidget
+     QLineEdit, QStatusBar, QProgressBar, QTabWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
 
@@ -55,6 +55,24 @@ class BrowserView(QWebEngineView):
         super(BrowserView, self).__init__()
 
         self.browser_win = browserwin
+
+    # Override the context menu event so we can copy the clipboard
+    # selection to primary after a "Copy Link URL" action.
+    # Qt5 only copies it to Clipboard, making X primary paste impossible.
+    def contextMenuEvent(self, event):
+        menu = self.page().createStandardContextMenu()
+
+        # In theory we could loop over actions, find one and change it.
+        # for action in menu.actions():
+        #     print("Action", action.text())
+        #     if action.text().startswith("Copy Link"):
+        #         pass
+
+        action = menu.exec_(event.globalPos())
+        if (action and action.text().startswith("Copy Link")):
+            # Copy clipboard text to the primary selection:
+            qc = QApplication.clipboard()
+            qc.setText(qc.text(qc.Clipboard), qc.Selection)
 
     #
     # Slots
@@ -204,17 +222,14 @@ class BrowserWindow(QMainWindow):
         self.tabwidget.setTabText(whichtab, title)
 
     def update_buttons(self):
-        # check e.g. self.webview.page().action(QWebEnginePage.Back).isEnabled())
+        # TODO: To enable/disable buttons, check e.g.
+        # self.webview.page().action(QWebEnginePage.Back).isEnabled())
         pass
 
     def signal_handler(self, signal, frame):
-        print("Ouch! signal", signal, ", self=", self, ", frame=", frame)
-        #self.blockSignals(True)
         with open(URL_FILE % os.getpid()) as url_fp:
             for url in url_fp:
-                print("signal handler: opening tab for", url.strip())
                 self.new_tab(url.strip())
-        #self.blockSignals(False)
 
     #
     # Slots
@@ -312,6 +327,16 @@ if __name__ == '__main__':
 
     # Handle SIGUSR1 signal so we can be signalled to open other tabs:
     signal.signal(SIGNAL, win.signal_handler)
+
+    # The Qt main loop blocks the ability to listen for Unix signals.
+    # The solution to this is apparently to run a timer to block the
+    # Qt main loop every so often so signals have a chance to get through.
+    # XXX For a better solution using sockets:
+    # https://github.com/qutebrowser/qutebrowser/blob/v0.10.x/qutebrowser/misc/crashsignal.py#L304-L314
+    # http://doc.qt.io/qt-4.8/unix-signals.html
+    timer = QTimer()
+    timer.start(500)  # You may change this if you wish.
+    timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
 
     app.exec_()
 
