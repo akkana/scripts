@@ -4,7 +4,7 @@ import sys
 
 from PyQt5.QtCore import QUrl, Qt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
-     QLineEdit, QStatusBar, QProgressBar
+     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
 
@@ -41,6 +41,54 @@ class ReadlineEdit(QLineEdit):
                 # call base class keyPressEvent
                 QLineEdit.keyPressEvent(self, event)
 
+# Need to subclass QWebEngineView, in order to have an object that
+# can own each load_finished() callback and have a pointer to
+# the main BrowserWindow so it can figure out which tab is loading.
+class BrowserView(QWebEngineView):
+    def __init__(self, browserwin):
+        super(BrowserView, self).__init__()
+
+        self.browser_win = browserwin
+
+    #
+    # Slots
+    #
+
+    def url_changed(self, url):
+        if url != self.browser_win.urlbar.text():
+            # I can't find any way to find out about load errors.
+            # But an attempted load that fails gives a url_changed(about:blank)
+            # so maybe we can detect it that way.
+            if url.toString() == 'about:blank':
+                print("Couldn't load " + self.urlbar.text())
+                self.browser_win.statusBar().showMessage("Couldn't load "
+                                                         + self.urlbar.text())
+            else:
+                self.browser_win.urlbar.setText(url.toDisplayString())
+
+    def link_hover(self, url):
+        self.browser_win.statusBar().showMessage(url)
+
+    def load_started(self):
+        self.browser_win.progress.show()
+
+    def load_finished(self, ok):
+        # OK is useless: if we try to load a bad URL, we won't get a
+        # loadFinished on that; instead it will switch to about:blank,
+        # load that successfully and call loadFinished with ok=True.
+        self.browser_win.progress.hide()
+
+        # print("load_finished")
+        # print("In load_finished, view is", self.webviews[self.active_tab], "and page is", self.webviews[self.active_tab].page())
+        # print("Profile off the record?", self.profile.isOffTheRecord())
+        # print("Webpage off the record?", self.webviews[self.active_tab].page().profile().isOffTheRecord())
+
+        self.browser_win.set_tab_text(self.title(), self)
+
+    def load_progress(self, progress):
+        self.browser_win.progress.setValue(progress)
+
+
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(BrowserWindow, self).__init__(*args, **kwargs)
@@ -71,26 +119,18 @@ class BrowserWindow(QMainWindow):
         self.urlbar.returnPressed.connect(self.urlbar_load)
         toolbar.addWidget(self.urlbar)
 
-        #
-        # Set up the WebEngineView
-        #
-        self.webview = QWebEngineView()
+        self.profile = QWebEngineProfile()
+        # print("Profile initially off the record?",
+        #       self.profile.isOffTheRecord())
 
-        # We need a QWebEnginePage in order to get linkHovered events,
-        # and to set a profile.
-        self.profile = QWebEngineProfile()    # New anonymous (supposedly) profile:
-        print("Profile off the record?", self.profile.isOffTheRecord())
-        self.webenginepage = QWebEnginePage(self.profile)
-        print("Webpage off the record?", self.webenginepage.profile().isOffTheRecord())
+        self.tabwidget = QTabWidget()
+        self.webviews = []
 
-        self.webview.setPage(self.webenginepage)
+        self.setCentralWidget(self.tabwidget)
 
-        self.setCentralWidget(self.webview)
-        self.webview.urlChanged.connect(self.url_changed)
-        self.webview.loadStarted.connect(self.load_started)
-        self.webview.loadFinished.connect(self.load_finished)
-        self.webview.loadProgress.connect(self.load_progress)
-        self.webenginepage.linkHovered.connect(self.link_hover)
+        self.active_tab = 0
+
+        self.new_tab()
 
         self.setStatusBar(QStatusBar(self))
         self.progress = QProgressBar()
@@ -100,22 +140,68 @@ class BrowserWindow(QMainWindow):
         # For keys like function keys, use QtGui.QKeySequence("F12")
         QtWidgets.QShortcut("Ctrl+Q", self, activated = self.close)
         QtWidgets.QShortcut("Ctrl+L", self, activated = self.select_urlbar)
+        QtWidgets.QShortcut("Ctrl+T", self, activated = self.new_tab)
 
         self.resize(1024, 768)
 
-    def update_buttons(self):
-        # check e.g. self.webview.page().action(QWebEnginePage.Back).isEnabled())
-        pass
+    def new_tab(self, url=None):
+        webview = BrowserView(self)
+        self.webviews.append(webview)
+
+        # We need a QWebEnginePage in order to get linkHovered events,
+        # and to set an anonymous profile.
+        # print("New tab, profile still off the record?",
+        #       self.profile.isOffTheRecord())
+        webpage = QWebEnginePage(self.profile, webview)
+        # print("New Webpage off the record?",
+        #       webpage.profile().isOffTheRecord())
+        webview.setPage(webpage)
+        # print("New view's page off the record?",
+        #       webview.page().profile().isOffTheRecord())
+        # print("In new tab, view is", webview, "and page is", webpage)
+
+        self.tabwidget.addTab(webview, "New tab")
+
+        webview.urlChanged.connect(webview.url_changed)
+        webview.loadStarted.connect(webview.load_started)
+        webview.loadFinished.connect(webview.load_finished)
+        webview.loadProgress.connect(webview.load_progress)
+        webpage.linkHovered.connect(webview.link_hover)
+
+        if url:
+            save_active = self.active_tab
+            self.active_tab = len(self.webviews)-1
+            self.load_url(url)
+            self.active_tab = save_active
 
     def load_url(self, url):
-        self.webview.load(QUrl(url))
-        print("load_url", url)
-        print("Profile off the record?", self.profile.isOffTheRecord())
-        print("Webpage off the record?", self.webenginepage.profile().isOffTheRecord())
+        self.webviews[self.active_tab].load(QUrl(url))
 
     def select_urlbar(self):
         self.urlbar.selectAll()
         self.urlbar.setFocus()
+
+    def find_view(self, view):
+        for i, v in enumerate(self.webviews):
+            if v == view:
+                return i
+        return None
+
+    def set_tab_text(self, title, view):
+        '''Set tab and, perhaps, window title after a page load.
+           view is the requesting BrowserView, and will be compared
+           to our webviews[] to figure out which tab to set.
+        '''
+        whichtab = None
+        whichtab = self.find_view(view)
+        if whichtab == None:
+            print("Warning: set_tab_text for unknown view")
+            return
+        self.tabwidget.setTabText(whichtab, title)
+
+    def update_buttons(self):
+        # check e.g. self.webview.page().action(QWebEnginePage.Back).isEnabled())
+        pass
 
     #
     # Slots
@@ -123,45 +209,16 @@ class BrowserWindow(QMainWindow):
 
     def urlbar_load(self):
         url = self.urlbar.text()
-        print("load url from urlbar", url)
-        val = self.webview.load(QUrl(url))
-        print("load returned", val)
+        self.load_url(url)
 
     def go_back(self):
-        self.webview.back()
+        self.webviews[self.active_tab].back()
 
     def go_forward(self):
-        self.webview.forward()
+        self.webviews[self.active_tab].forward()
 
     def reload(self):
-        self.webview.reload()
-
-    def url_changed(self, url):
-        if url != self.urlbar.text():
-            # I can't find any way to find out about load errors.
-            # But an attempted load that fails gives a url_changed(about:blank)
-            # so maybe we can detect it that way.
-            if url.toString() == 'about:blank':
-                print("Couldn't load " + self.urlbar.text())
-                self.statusBar().showMessage("Couldn't load "
-                                             + self.urlbar.text())
-            else:
-                self.urlbar.setText(url.toDisplayString())
-
-    def link_hover(self, url):
-        self.statusBar().showMessage(url)
-
-    def load_started(self):
-        self.progress.show()
-
-    def load_finished(self, ok):
-        # OK is useless: if we try to load a bad URL, we won't get a
-        # loadFinished on that; instead it will switch to about:blank,
-        # load that successfully and call loadFinished with ok=True.
-        self.progress.hide()
-
-    def load_progress(self, progress):
-        self.progress.setValue(progress)
+        self.webviews[self.active_tab].reload()
 
 #
 # PyQt is super crashy. Any little error, like an extra argument in a slot,
@@ -172,8 +229,7 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
                message=None, version_tag=None, parent=None):
     print("exception! excValue='%s'" % excValue)
 
-sys.excepthook = excepthook
-# sys.excepthook = traceback.print_exception
+# sys.excepthook = excepthook
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
