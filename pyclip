@@ -1,14 +1,21 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
-import gtk
 import re
 
-primary = gtk.clipboard_get(gtk.gdk.SELECTION_PRIMARY)
+try:
+    import gtk
 
-if not primary.wait_is_text_available() :
-    sys.exit(0)
+    primary = gtk.clipboard_get(gtk.gdk.SELECTION_PRIMARY)
+    if not primary.wait_is_text_available() :
+        sys.exit(0)
+    s = primary.wait_for_text()
 
-s = primary.wait_for_text()
+except:
+    from PyQt5.QtCore import QApplication
+
+    qc = QApplication.clipboard()
+    s = qc.text(c.Selection)
+    # Use qc.Clipboard if you want the clipboard selection
 
 # If it's a LinkedIn URL, fix their stupid errors:
 if re.search('(www\.)*linkedin.com/', s, flags=re.IGNORECASE):
