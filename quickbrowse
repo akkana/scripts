@@ -3,6 +3,7 @@
 import os
 import sys
 import signal
+import traceback
 
 from PyQt5.QtCore import QUrl, Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
@@ -67,6 +68,8 @@ class BrowserView(QWebEngineView):
         #     print("Action", action.text())
         #     if action.text().startswith("Copy Link"):
         #         pass
+        # You can also apparently change an action with
+        # action.triggered.connect(qApp.quit)
 
         action = menu.exec_(event.globalPos())
         if (action and action.text().startswith("Copy Link")):
@@ -83,12 +86,13 @@ class BrowserView(QWebEngineView):
             # I can't find any way to find out about load errors.
             # But an attempted load that fails gives a url_changed(about:blank)
             # so maybe we can detect it that way.
+            urlbar = self.browser_win.urlbar
             if url.toString() == 'about:blank':
-                print("Couldn't load " + self.urlbar.text())
-                self.browser_win.statusBar().showMessage("Couldn't load "
-                                                         + self.urlbar.text())
+                print("Couldn't load " + urlbar.text())
+                self.browser_win.statusBar().showMessage("Couldn't load '%s'" %
+                                                         urlbar.text())
             else:
-                self.browser_win.urlbar.setText(url.toDisplayString())
+                urlbar.setText(url.toDisplayString())
 
     def link_hover(self, url):
         self.browser_win.statusBar().showMessage(url)
@@ -160,9 +164,9 @@ class BrowserWindow(QMainWindow):
 
         # Key bindings
         # For keys like function keys, use QtGui.QKeySequence("F12")
-        QtWidgets.QShortcut("Ctrl+Q", self, activated = self.close)
-        QtWidgets.QShortcut("Ctrl+L", self, activated = self.select_urlbar)
-        QtWidgets.QShortcut("Ctrl+T", self, activated = self.new_tab)
+        QtWidgets.QShortcut("Ctrl+Q", self, activated=self.close)
+        QtWidgets.QShortcut("Ctrl+L", self, activated=self.select_urlbar)
+        QtWidgets.QShortcut("Ctrl+T", self, activated=self.new_tab)
 
         self.resize(1024, 768)
 
@@ -255,9 +259,12 @@ class BrowserWindow(QMainWindow):
 #
 def excepthook(excType=None, excValue=None, tracebackobj=None, *,
                message=None, version_tag=None, parent=None):
-    print("exception! excValue='%s'" % excValue)
+    # print("exception! excValue='%s'" % excValue)
+    # logging.critical(''.join(traceback.format_tb(tracebackobj)))
+    # logging.critical('{0}: {1}'.format(excType, excValue))
+    traceback.print_exception(excType, excValue, tracebackobj)
 
-# sys.excepthook = excepthook
+sys.excepthook = excepthook
 
 if __name__ == '__main__':
     SIGNAL = signal.SIGUSR1
