@@ -3,15 +3,13 @@
 # Convert HTML pages to PDF.
 # Copyright 2017 by Akkana Peck -- share and enjoy under the GPL v2 or later.
 
+# If PdfFileMerger fails,
 # To convert all the output files into a single multi-page PDF, use this:
 # gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=multipage.pdf -dBATCH file*.pdf
 
-# Parameters that should be specifiable on the commandline.
-# Currently only the resolution is.
-x_res = 1024
-outdir = "pdf"
-
 import sys
+
+import urllib.request
 
 from PyQt5.QtCore import QUrl, QSizeF, QMarginsF
 from PyQt5.QtWidgets import QApplication
@@ -22,19 +20,49 @@ from PyPDF2 import PdfFileMerger
 from io import BytesIO
 
 class HeadlessPagePrinter():
-    def __init__(self, app):
+    '''Load a single page and convert it to PDF.
+       When the PDF is ready, call the pdf_ready() callback.
+    '''
+    def __init__(self, app, pdf_ready, x_res=1024):
         self.profile = QWebEngineProfile()
         self.webpage = QWebEnginePage(self.profile, app)
         self.webpage.loadFinished.connect(self.load_finished)
+        self.x_res = x_res
 
-        self.print_finished = None
+        self.pdf_ready = pdf_ready
 
-    def load_url(self, url, print_finished):
-        '''print_finished is a callback called with a QString
+    def load_url(self, url):
+        '''pdf_ready is a callback called with a QString
            of the PDF bytes 'printed'.
         '''
-        self.print_finished = print_finished
-        self.webpage.load(QUrl(url))
+        # Sadly, QWebEnginePage has no way to apply custom stylesheets
+        # or otherwise change style.
+        # So we have to intercept the load and insert our print style
+        # directly into the page, rather than just loading a URL.
+        # self.webpage.load(QUrl(url))
+
+        # Use urllib because it handles file:// requests, unlike requests.
+        r = urllib.request.urlopen(url)
+        html = r.read().decode(r.headers.get_content_charset() or 'utf-8')
+
+        html = html.replace('</head>', '''
+<style type="text.css">
+@media print {
+  body {
+    width: %dpx;
+    height: 768px;
+    position: absolute; left: 0px; top: 0px;
+    border: 0; margin: 0; padding: 0;
+    overflow: hidden;
+  }
+  #notes, #nextdiv { display: none; }
+  #points li { visibility: visible; }
+}
+</style>
+</head>''' % self.x_res)
+        print(html)
+
+        self.webpage.setHtml(html, QUrl('file:///home/akkana/Docs/Preso/moon-peec/'))
 
     def set_html(self, html):
         self.webpage.setHtml(html)
@@ -45,30 +73,37 @@ class HeadlessPagePrinter():
         # print("Contents size is %f x %f" %
         #       (self.webpage.contentsSize().width(),
         #        self.webpage.contentsSize().height()))
-        self.print_page()
-
-    def print_page(self):
-        filename = "/tmp/test.pdf"
 
         margins = QMarginsF(0, 0, 0, 0)
-        DPMM = 3.54
-        # 1024/DPMM, 768/DPMM  --> 290, 217
-        layout = QPageLayout(QPageSize(QSizeF(1024/DPMM, 768/DPMM),
+
+        # With QSizeF(271, 203.3), it makes a 1024x768 PDF; but it
+        # prints the whole 1366 web page so it will fit in a 1024x768 box,
+        # even if the content extends outside.
+        # But an @media print CSS rule to keep everything at 1024 fixes that.
+        # With QSizeF(362, 203.3) it can print a full 1366x768.
+        if self.x_res > 1024:
+            xmm = 362
+        else:
+            xmm = 271
+        ymm = 203.3
+        print("Page size of", xmm, ymm)
+        layout = QPageLayout(QPageSize(QSizeF(xmm, ymm),
                                        QPageSize.Millimeter),
                              QPageLayout.Portrait, margins,
                              QPageLayout.Millimeter, margins)
 
-        print("print to pdf", filename)
-        self.webpage.printToPdf(self.print_finished, layout)
+        self.webpage.printToPdf(self.pdf_ready, layout)
 
 class SlidePrinter:
-    def __init__(self, app):
-        self.renderer = HeadlessPagePrinter(app)
+    def __init__(self, app, outfile, x_res=1024):
+        self.renderer = HeadlessPagePrinter(app, self.pdf_ready, x_res=x_res)
 
         # PdfFileMerger always fails with "Multiple definitions in dictionary"
         # unless you add strict=False.
         # https://github.com/mstamy2/PyPDF2/issues/244
         self.merger = PdfFileMerger(strict=False)
+
+        self.outfile = outfile
 
     def add_pages(self, urllist):
         self.urllist = urllist
@@ -81,10 +116,9 @@ class SlidePrinter:
             sys.exit(0)
         print("\n=== Rendering url", self.urlindex, ":",
               self.urllist[self.urlindex])
-        self.renderer.load_url(self.urllist[self.urlindex],
-                               self.print_finished)
+        self.renderer.load_url(self.urllist[self.urlindex])
 
-    def print_finished(self, pdf_bytes):
+    def pdf_ready(self, pdf_bytes):
         print("finished rendering to", len(pdf_bytes), "bytes")
         if pdf_bytes:
             filename = "/tmp/page%d.pdf" % self.urlindex
@@ -99,22 +133,21 @@ class SlidePrinter:
         self.urlindex += 1
         if self.urlindex >= len(self.urllist):
             print("\nTrying to save the merged file")
-            filename = "/tmp/merged.pdf"
-            with open(filename, "wb") as fp:
+            with open(self.outfile, "wb") as fp:
                 self.merger.write(fp)
-            print("Wrote", filename)
+            print("Wrote", self.outfile)
             sys.exit(0)
 
         else:
             self.next_page()
 
 if __name__ == '__main__':
+    if len(sys.argv) <= 1:
+        print("what pages?")
+        sys.exit(1)
+
     app = QApplication(sys.argv)
-    # renderer = HeadlessPagePrinter(app)
-    slideprinter = SlidePrinter(app)
-    if len(sys.argv) > 1:
-        slideprinter.add_pages(sys.argv[1:])
-    else:
-        print("what page?")
+    slideprinter = SlidePrinter(app, "/tmp/outfile.pdf", x_res=1024)
+    slideprinter.add_pages(sys.argv[1:])
     app.exec_()
 
