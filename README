@@ -317,6 +317,13 @@ tweet:
 qhtmlprint:
     Convert a set of HTML slides (e.g. in navigate.js) into PDF.
     For turning an HTML presentation into a PDF slide deck.
+    Unfortunately the QtWebkit libraries this depends on
+    seem to be abandoned; see qslide2pdf for a newer version.
+
+qslide2pdf:
+    Convert a set of HTML slides (e.g. in navigate.js) into PDF.
+    For turning an HTML presentation into a PDF slide deck.
+    Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
 
 quickbrowse:
     A very minimal browser in pygtk. If you don't pass an argument but
