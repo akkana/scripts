@@ -24,7 +24,8 @@ def print_sheet(sheetname, sh):
     for rownum in range(sh.nrows):
         for colnum in range(sh.ncols):
             # Figure out how many characters this cell needs.
-            val = sh.cell(rownum, colnum).value
+            val = sh.cell(rownum, colnum).value.decode('utf-8')
+            print "Val", val
 
             # This gets lots of null strings, so filter them out:
             if not val:
