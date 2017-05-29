@@ -201,7 +201,10 @@ class BrowserWindow(QMainWindow):
             self.active_tab = save_active
 
     def load_url(self, url):
-        self.webviews[self.active_tab].load(QUrl(url))
+        qurl = QUrl(url)
+        if not qurl.scheme() and os.path.exists(url):
+            qurl.setScheme('file')
+        self.webviews[self.active_tab].load(qurl)
 
     def select_urlbar(self):
         self.urlbar.selectAll()
