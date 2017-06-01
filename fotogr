@@ -109,12 +109,14 @@ Conditions can include three types of patterns:
   3. Starts with neither: one of these must be present (OR).
 
 Optional arguments:
+  -d dir,dir,dir  comma-separated list of directories to use (else .)
   -s, --separate  print separate lines from different tag files
 
 Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
     args = sys.argv[1:]
+    dirlist = [ '.' ]
     if args[0] == '-h' or args[0] == '--help':
         Usage()
     if args[0] == '-s':
@@ -122,6 +124,11 @@ Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''
         args = args[1:]
     else:
         separate = False
+    if args[0] == '-d':
+        if len(args) == 1:
+            Usage()
+        dirlist = args[1].split(',')
+        args = args[2:]
 
     andpats = []
     orpats  = []
@@ -134,7 +141,7 @@ Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''
         else:
             orpats.append(pat)
 
-    r = search_for_keywords(['.'], orpats, andpats, notpats, separate)
+    r = search_for_keywords(dirlist, orpats, andpats, notpats, separate)
     s = set(r)
     r = list(s)
     r.sort()
