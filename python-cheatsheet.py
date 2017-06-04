@@ -438,6 +438,13 @@ plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
 # like ax.axis('tight') or plt.axis('tight'), prevent set_?lib
 # and tight_layout from working.
 
+# Exit on key q
+plt.figure(1).canvas.mpl_connect('key_press_event',
+                                 lambda e:
+                                     sys.exit(0) if e.key == 'ctrl+q'
+                                     else None)
+
+
 ################################################################
 # Python3 differences
 ################################################################
