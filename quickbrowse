@@ -4,6 +4,7 @@ import os
 import sys
 import signal
 import traceback
+import posixpath
 
 from PyQt5.QtCore import QUrl, Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
@@ -88,9 +89,9 @@ class BrowserView(QWebEngineView):
             # so maybe we can detect it that way.
             urlbar = self.browser_win.urlbar
             if url.toString() == 'about:blank':
-                print("Couldn't load " + urlbar.text())
                 self.browser_win.statusBar().showMessage("Couldn't load '%s'" %
                                                          urlbar.text())
+                print("Couldn't load " + urlbar.text())
             else:
                 urlbar.setText(url.toDisplayString())
 
@@ -202,9 +203,19 @@ class BrowserWindow(QMainWindow):
 
     def load_url(self, url):
         qurl = QUrl(url)
-        if not qurl.scheme() and os.path.exists(url):
-            qurl.setScheme('file')
+        if not qurl.scheme():
+            if os.path.exists(url):
+                qurl.setScheme('file')
+                if not os.path.isabs(url):
+                    # Is it better to use posixpath.join or os.path.join?
+                    # Both work on Linux.
+                    qurl.setPath(os.path.normpath(posixpath.join(os.getcwd(),
+                                                                 url)))
+            else:
+                qurl.setScheme('http')
+
         self.webviews[self.active_tab].load(qurl)
+        self.urlbar.setText(url)
 
     def select_urlbar(self):
         self.urlbar.selectAll()
