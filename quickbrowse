@@ -73,7 +73,7 @@ class BrowserView(QWebEngineView):
         # action.triggered.connect(qApp.quit)
 
         action = menu.exec_(event.globalPos())
-        if (action and action.text().startswith("Copy Link")):
+        if (action and action.text().startswith("Copy")):
             # Copy clipboard text to the primary selection:
             qc = QApplication.clipboard()
             qc.setText(qc.text(qc.Clipboard), qc.Selection)
