@@ -55,8 +55,8 @@ class HeadlessPagePrinter():
     border: 0; margin: 0; padding: 0;
     overflow: hidden;
   }
+  #points li { visibility: visible !important; }
   #notes, #nextdiv { display: none; }
-  #points li { visibility: visible; }
 }
 </style>
 </head>''' % self.x_res)
@@ -146,8 +146,25 @@ if __name__ == '__main__':
         print("what pages?")
         sys.exit(1)
 
+    # -1024 or -1366
+    if len(sys.argv) > 2 and sys.argv[1].startswith('-'):
+        try:
+            x_res = int(sys.argv[1][1:])
+            args = sys.argv[2:]
+        except:
+            print("Can't parse flag", sys.argv[1])
+            sys.exit(1)
+    else:
+        x_res = 1024
+        args = sys.argv[1:]
+
+    if len(args) < 1:
+        print("Usage: %s [-1024|-1366] file.html file.html ..."
+              % os.basename(sys.argv[0]))
+        sys.exit(1)
+
     app = QApplication(sys.argv)
-    slideprinter = SlidePrinter(app, "/tmp/outfile.pdf", x_res=1024)
-    slideprinter.add_pages(sys.argv[1:])
+    slideprinter = SlidePrinter(app, "/tmp/outfile.pdf", x_res=x_res)
+    slideprinter.add_pages(args)
     app.exec_()
 
