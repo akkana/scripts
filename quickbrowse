@@ -168,6 +168,7 @@ class BrowserWindow(QMainWindow):
         QtWidgets.QShortcut("Ctrl+Q", self, activated=self.close)
         QtWidgets.QShortcut("Ctrl+L", self, activated=self.select_urlbar)
         QtWidgets.QShortcut("Ctrl+T", self, activated=self.new_tab)
+        QtWidgets.QShortcut("Ctrl+R", self, activated=self.reload)
 
         self.resize(1024, 768)
 
