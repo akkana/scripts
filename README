@@ -326,11 +326,16 @@ qslide2pdf:
     Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
 
 quickbrowse:
-    A very minimal browser in pygtk. If you don't pass an argument but
-    there's anything in the X selection when you run it, it will
-    browse to that URL first. I use it to check URLs that don't
-    work in my regular Firefox profile, either because of noscript/cookie
-    issues or because of Firefox compatibility issues.
+    A minimal browser in python-qtWebEngine. Fast and light,
+    supposedly anonymous, no storage of cookies or other identifying
+    information. Useful for things like viewing URLs from mutt or
+    checking websites that don't work well with a Firefox/NoScript profile.
+
+quickbrowsegwk:
+    Minimal browser: an older version of quickbrowse written in
+    python2-webkit-GTK, now orphaned and no longer available on newer
+    releases. If you don't pass an argument but there's anything in
+    the X selection when you run it, it will browse to that URL first.
 
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
