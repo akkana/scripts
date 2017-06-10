@@ -105,13 +105,7 @@ diffiles.py:
     Find files that differ between two directories -- even if
     they've been moved to different places in the directory structure.
 
-doc2html:
-    Run wvHtml on a .doc file, but then use BeautifulSoup to clean
-    up at least some of the mess wvHtml makes.
-
-docx2html:
-    Run mammoth on a .docx file to convert to HTML, then prettyprint
-    it with BeautifulSoup.
+docx2html, doc2html have been replaced by word2html.
 
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
@@ -379,6 +373,11 @@ weborphans:
 
 wikitable.py:
     Parse a data table from a wikipedia page, outputting CSV.
+
+word2html:
+    Convert .docx or .doc to prettyprinted HTML.
+    Uses python-mammoth for docx, and either uniconv + python-mammoth
+    or wvHtml for .doc. Uses BeautifulSoup for prettyprinting.
 
 wordview:
     Convert a doc or docx file to html, and call a new firefox window on it.

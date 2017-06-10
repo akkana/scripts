@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+
+# Convert Word files, either doc or docx, to HTML
+# using python-mammoth for .docx to HTML
+# and unoconv (if available) or wvHtml (otherwise) for .doc.
+
+from __future__ import print_function
+
+import sys
+import os.path
+import subprocess
+
+import mammoth
+from bs4 import BeautifulSoup
+
+def docx2html(infile, outfile):
+    with open(infile) as fp:
+        mammout = mammoth.convert_to_html(fp)
+    for m in mammout.messages:
+        print("Mammoth %s: %s" % (m.type, m.message))
+
+    # Prettyprint it
+    soup = BeautifulSoup(mammout.value, "lxml")
+    html = soup.prettify().encode("utf-8")
+
+    if outfile == "--":
+        print(html)
+    else:
+        with open(outfile, "w") as fp:
+            print(html, file=fp)
+
+def doc2html(infile, outfile):
+    base, ext = os.path.splitext(infile)
+    docxfile = base + ".docx"
+    try:
+        rv = subprocess.call(["unoconv", "-f", "docx", "-o", docxfile, infile])
+    except OSError:
+        rv = 1
+    if not rv:
+        return docx2html(docxfile, outfile)
+
+    # unoconv failed. Try wvHtml.
+    print("Warning: no unoconv, trying wvHtml instead.")
+    try:
+        rv = subprocess.call(["wvHtml", infile, outfile])
+    except OSError:
+        rv = 1
+    if not rv:
+        return
+
+    print("Couldn't convert %s with either unoconv or wvHtml. Aborting."
+          % infile)
+    sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or len(sys.argv) > 3 \
+       or sys.argv[1] == "-h" or sys.argv[1] == "--help":
+        print("Usage: %s infile.docx [outfile.html]")
+        sys.exit(1)
+    infile = sys.argv[1]
+    base, ext = os.path.splitext(infile)
+    if len(sys.argv) == 3:
+        outfile = sys.argv[2]
+    else:
+        outfile = base + ".html"
+
+    if ext.lower() == ".doc":
+        doc2html(infile, outfile)
+
+    else:
+        docx2html(infile, outfile)
+
+    print("Wrote to %s" % outfile)
