@@ -148,7 +148,7 @@ fp = open(outfile, 'w')
 # soup = BeautifulSoup(s)
 # print >>fp, soup.prettify()
 
-print(soup.prettify(), file=fp)
+print(soup.prettify().encode('UTF-8'), file=fp)
 
 fp.close()
 
