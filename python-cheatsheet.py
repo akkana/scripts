@@ -52,6 +52,11 @@ traceback.print_stack()
 # Equivalent of verbose mode in a shell: print each line before executing.
 python -m trace --trace /tmp/foo.py
 
+# Debugging in python2:
+print >>sys.stderr, "foo"
+# and in python3:
+print('foo', file=sys.stderr)
+
 ########################################################
 # Stringy stuff
 ########################################################
@@ -100,6 +105,9 @@ for b in string_list:
 r = r'abc\def'
 c = 'abc\\def'
 r == c    # True
+
+# Replace non-breaking spaces in unicode (python3):
+s = s.replace("\u00A0"," ")
 
 ########################################################
 # iterator, list and dictionary helpers
@@ -228,6 +236,22 @@ days_this_month = calendar.monthrange(today.year, today.month)[1]
 one_month_from_now = today + datetime.timedelta(days=days_this_month)
 
 # There's also isodate.parse_datetime which I haven't looked into yet.
+
+########################################################
+# BeautifulSoup
+########################################################
+
+Difference between .string and .text:
+  .string returns a NavigableString object, which offers a lot of
+          the same methods tags do.
+  .text returns a unicode object that concatenates  all the child strings.
+
+Useful recent additions: tag.replace_with_children()
+
+# Find tags with inline style attribute:
+for t in soup.findAll(style=True)
+# Harder way, using lambda:
+soup.findAll(lambda tag: 'style' in tag.attrs)
 
 ########################################################
 # OS-specific stuff
