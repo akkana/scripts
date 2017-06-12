@@ -19,15 +19,24 @@ def docx2html(infile, outfile):
     for m in mammout.messages:
         print("Mammoth %s: %s" % (m.type, m.message))
 
-    # Prettyprint it
-    soup = BeautifulSoup(mammout.value, "lxml")
-    html = soup.prettify().encode("utf-8")
+    html = prettyprint_html(mammout.value)
 
     if outfile == "--":
         print(html)
     else:
         with open(outfile, "w") as fp:
             print(html, file=fp)
+
+def prettyprint_html(inhtml):
+    # Prettyprint it
+    soup = BeautifulSoup(inhtml, "lxml")
+    return soup.prettify().encode("utf-8")
+
+def html2html(infile, outfile):
+    with open(infile) as infp:
+        pphtml = prettyprint_html(infp.read())
+        with open(outfile, "w") as outfp:
+            outfp.write(pphtml)
 
 def doc2html(infile, outfile):
     base, ext = os.path.splitext(infile)
@@ -61,11 +70,19 @@ if __name__ == "__main__":
     base, ext = os.path.splitext(infile)
     if len(sys.argv) == 3:
         outfile = sys.argv[2]
+    elif ext == ".html":
+        outfile = base + "-pp.html"
     else:
         outfile = base + ".html"
 
     if ext.lower() == ".doc":
         doc2html(infile, outfile)
+
+    elif ext.lower() == ".html":
+        # If it's already HTML, just prettyprint it.
+        # It's a handy way of doing so since otherwise there's no
+        # command-line prettyprinter.
+        html2html(infile, outfile)
 
     else:
         docx2html(infile, outfile)

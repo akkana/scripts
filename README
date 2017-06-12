@@ -75,6 +75,10 @@ check-monitors
     A trivial shell script to probe for connected monitors and
     use xrandr to activate the right one.
 
+cleanhtml.py
+    Clean up HTML edited by gmail users -- remove font/color/style tags
+    and such. Then prettyprint (somewhat -- add newlines, at least).
+
 colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
 
