@@ -3,10 +3,11 @@
 import sys
 import whois
     # python-whois from pypi, not whois from pypi or python-whois from debian
+    # https://bitbucket.org/richardpenman/pywhois
 import datetime
 from dateutil.relativedelta import relativedelta
 
-format="%25s   %10s %s"
+format="%25s   %10s %3s %s"
 
 if __name__ == '__main__':
     domainlist = []
@@ -25,16 +26,16 @@ if __name__ == '__main__':
                     print("Yikes, %s != %s" % (str(e), str(expdate)))
         else:
             expdate = domain["expiration_date"].date()
-        domainlist.append((name, expdate))
+        domainlist.append((name, expdate, domain.registrar))
 
     domainlist.sort(key = lambda a: a[1])
 
     two_months_from_now = datetime.datetime.today() + relativedelta(months=2)
     two_months_from_now = two_months_from_now.date()
-    print(format % ("Domain", "Expires", ""))
+    print(format % ("Domain", "Expires", "", "Registrar"))
     for d in domainlist:
         if d[1] < two_months_from_now:
             alert = "***"
         else:
             alert = ""
-        print(format % (d[0], d[1].strftime('%Y-%m-%d'), alert))
+        print(format % (d[0], d[1].strftime('%Y-%m-%d'), alert, d[2]))
