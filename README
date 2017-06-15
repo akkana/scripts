@@ -78,6 +78,9 @@ check-monitors
 cleanhtml.py
     Clean up HTML edited by gmail users -- remove font/color/style tags
     and such. Then prettyprint (somewhat -- add newlines, at least).
+    Minimal, but serves as an example for how to clean up HTML:
+    every source may have different types of clutter, so you may need
+    to customize for whatever source you're trying to clean up.
 
 colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
@@ -256,6 +259,10 @@ readkey.py:
 repo-pullpush:
     Modify a git repository, taking the existing URL, making that
     the pushurl and adding a passwordless pull URL alongside it.
+
+scrubjay:
+    Demo of how to use tweepy for the Twitter API.
+    No UI as yet.
 
 serio:
     A proof-of-concept serial terminal app in Python.

@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+# An example of how to use tweepy for the Twitter API.
+
+# Unfortunately, OAuth seems to rely on every user having their own
+# secret app code; that means that to use this, you have to register
+# a new app with a new name, then get your own consumer and consumer_secret
+# keys; then you can use this app to get your own token and secret token.
+# Why OAuth requires four tokens if it can only ever be used for one
+# user at a time and the tokens aren't supposed to be shared is beyond me.
+#
+# Set up ~/.config/YOURAPPNAME/ to look like this:
+# consumer YOUR_CONSUMER_KEY
+# consumer_secret YOUR_CONSUMER_SECRET_KEY
+# access_token YOUR_ACCESS_TOKEN
+# access_token_secret YOUR_ACCESS_TOKEN_SECRET
+# The first two are required, the second two are optional.
+# If the access tokens are missing but you manage to authenticate
+# with a PIN, the file will be rewritten with all four keys.
+
+import tweepy
+
+import sys
+import os
+
+def authenticate(appname):
+    if 'XDG_CONFIG_HOME' in os.environ:
+        confdir = os.path.join(os.environ['XDG_CONFIG_HOME'], appname)
+    else:
+        confdir = os.path.expanduser("~/.config/%s" % appname)
+    conffile = os.path.join(confdir, "auth")
+
+    oauthtokens = {}
+
+    with open(conffile) as conf:
+        for line in conf:
+            line = line.split()
+            oauthtokens[line[0]] = line[1]
+        print("Read tokens:", oauthtokens)
+
+    if "consumer" not in oauthtokens or \
+       "consumer_secret" not in oauthtokens:
+            raise(RuntimeError("No consumer auth tokens in %s" % conffile))
+
+    auth = tweepy.OAuthHandler(oauthtokens["consumer"],
+                               oauthtokens["consumer_secret"])
+
+    if "access_token" in oauthtokens and "access_token_secret" in oauthtokens:
+        print("Authenticating with known tokens")
+        auth.set_access_token(oauthtokens["access_token"],
+                              oauthtokens["access_token_secret"])
+    else:
+        print("Requesting tokens ...")
+
+        redirect_url = auth.get_authorization_url()
+        print("Please visit %s in a browser, authorize and get a PIN")
+
+        pin = input('PIN:')
+        access_token, access_token_secret = auth.get_access_token(pin)
+
+        print("Saving access tokens in %s" % conffile)
+        with open(conffile, "w") as conf:
+            for key in ["consumer", "consumer_secret",
+                        "access_token", "access_token_secret"]:
+                conf.write("%s %s\n" % (key, oauthtokens[key]))
+
+    # By this point we should be authenticated.
+
+    api = tweepy.API(auth)
+    return api
+
+def get_timeline(api):
+    public_tweets = api.home_timeline()
+    for tweet in public_tweets:
+        print("===\n" + tweet.text)
+
+if __name__ == '__main__':
+    appname = os.path.basename(sys.argv[0])
+    try:
+        api = authenticate(appname)
+    except (tweepy.TweepError, RuntimeError):
+        print("Authentication failed, sorry")
+        sys.exit(1)
+
+    get_timeline(api)
+
