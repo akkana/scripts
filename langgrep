@@ -29,8 +29,8 @@ def check_file_lang(filename, lang):
     if os.path.isdir(filename) or not os.path.exists(filename):
         return False
     try:
-        f = open(filename)
-        firstline = f.readline(80)
+        f = open(filename, 'rb')
+        firstline = f.readline()
         f.close()
     except IOError as e:
         print("IOError", e)
@@ -38,7 +38,7 @@ def check_file_lang(filename, lang):
         sys.exit(1)
         return False
 
-    if firstline[0:2] == "#!" and string.find(firstline, lang) >= 0:
+    if firstline[0:2] == "#!" and firstline.find(lang) >= 0:
         return True
     return False
 
@@ -95,7 +95,7 @@ try:
             # Otherwise lines are so long they're confusing.
             if not pout:
                 continue
-            for line in pout.split('\n'):
+            for line in pout.decode().split('\n'):
                 # For some reason the split is giving us every other line empty
                 if not line:
                     continue
