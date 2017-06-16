@@ -480,7 +480,7 @@ $ 2to3 -wn file_or_directory
 # and you can just pass encoding as a second argument when you
 # coerce between str and byte, no need to remember encode/decode.
 
-# Encode/decode in PYTHON3:
+# Encode/decode in Python3:
 >>> str(b'string of bytes')
 'string of bytes'
 >>> str(b'string of bytes', 'utf-8')
@@ -491,3 +491,4 @@ b'pi\xc3\xb1on'
 "b'pi\\xc3\\xb1on'"
 >>> str(b'pi\xc3\xb1on', 'utf-8')
 'piñon'
+>>> 
