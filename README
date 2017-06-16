@@ -261,8 +261,9 @@ repo-pullpush:
     the pushurl and adding a passwordless pull URL alongside it.
 
 scrubjay:
-    Demo of how to use tweepy for the Twitter API.
+    Demo of how to use a few different Twitter API.
     No UI as yet.
+    Two variants: scrubjay-tweepy (tweepy) and scrubjay-p-t (python-twitter).
 
 serio:
     A proof-of-concept serial terminal app in Python.

@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+# An example of how to use tweepy for the Twitter API.
+
+# Unfortunately, OAuth seems to rely on every user having their own
+# secret app code; that means that to use this, you have to register
+# a new app with a new name, then get your own consumer and consumer_secret
+# keys; then you can use this app to get your own token and secret token.
+# Why OAuth requires four tokens if it can only ever be used for one
+# user at a time and the tokens aren't supposed to be shared is beyond me.
+#
+# Set up ~/.config/YOURAPPNAME/ to look like this:
+# consumer YOUR_CONSUMER_KEY
+# consumer_secret YOUR_CONSUMER_SECRET_KEY
+# access_token YOUR_ACCESS_TOKEN
+# access_token_secret YOUR_ACCESS_TOKEN_SECRET
+# The first two are required, the second two are optional.
+# If the access tokens are missing but you manage to authenticate
+# with a PIN, the file will be rewritten with all four keys.
+
+import twitter
+
+import sys
+import os
+import time
+
+class TwitAPI:
+    def __init__(self, appname):
+        self.api = None
+        self.tweets_seen = set()
+
+        if 'XDG_CONFIG_HOME' in os.environ:
+            confdir = os.path.join(os.environ['XDG_CONFIG_HOME'], appname)
+        else:
+            confdir = os.path.expanduser("~/.config/%s" % appname)
+        conffile = os.path.join(confdir, "auth")
+
+        oauthtokens = {}
+
+        with open(conffile) as conf:
+            for line in conf:
+                line = line.split()
+                oauthtokens[line[0]] = line[1]
+
+        if "consumer" not in oauthtokens or \
+           "consumer_secret" not in oauthtokens or \
+           "access_token" not in oauthtokens or \
+           "access_token_secret" not in oauthtokens:
+                self.api = None
+                raise(RuntimeError("Need all four OAuth tokens in %s" \
+                                   % conffile))
+
+        self.api = twitter.Api(consumer_key=oauthtokens["consumer"],
+                               consumer_secret=oauthtokens["consumer_secret"],
+                               access_token_key=oauthtokens["access_token"],
+                               access_token_secret=oauthtokens["access_token_secret"])
+        # By this point we should be authenticated.
+
+    def print_timeline(self):
+        timeline = self.api.GetHomeTimeline()    # Returns a twitter.Status
+        print("\n========================================================")
+        for tweet in timeline:
+            if tweet.id in self.tweets_seen:
+                continue
+
+            print("\n=== %s (%s) ===" % (tweet.user.screen_name,
+                                         tweet.user.name))
+            print(tweet.text)
+            print("\n    %s" % tweet.created_at)
+            self.tweets_seen.add(tweet.id)
+
+if __name__ == '__main__':
+    appname = os.path.basename(sys.argv[0])
+    twitter = TwitAPI(appname)
+    print("Authorized")
+
+    # try:
+    #     twitter = TwitAPI(appname)
+    # except:
+    #     print("Authentication failed, sorry")
+    #     sys.exit(1)
+
+    while True:
+        twitter.print_timeline()
+        time.sleep(60)
+

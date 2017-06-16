@@ -36,7 +36,6 @@ def authenticate(appname):
         for line in conf:
             line = line.split()
             oauthtokens[line[0]] = line[1]
-        print("Read tokens:", oauthtokens)
 
     if "consumer" not in oauthtokens or \
        "consumer_secret" not in oauthtokens:
