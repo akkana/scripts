@@ -9,14 +9,15 @@
 # Why OAuth requires four tokens if it can only ever be used for one
 # user at a time and the tokens aren't supposed to be shared is beyond me.
 #
-# Set up ~/.config/YOURAPPNAME/ to look like this:
+# Get your tokens when you register your app on Twitter's website,
+# then set up ~/.config/YOURAPPNAME/ to look like this:
 # consumer YOUR_CONSUMER_KEY
 # consumer_secret YOUR_CONSUMER_SECRET_KEY
 # access_token YOUR_ACCESS_TOKEN
 # access_token_secret YOUR_ACCESS_TOKEN_SECRET
-# The first two are required, the second two are optional.
-# If the access tokens are missing but you manage to authenticate
-# with a PIN, the file will be rewritten with all four keys.
+
+# Module Documentation:
+#   https://python-twitter.readthedocs.io/en/latest/twitter.html
 
 import twitter
 
