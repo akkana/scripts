@@ -159,6 +159,9 @@ ipsearch:
     Search for live hosts on the current net.
     Useful for things like finding that Raspberry Pi you just booted.
 
+ipscan:
+    A Bourne shell (sh) version of ipsearch that uses nmap.
+
 keyreader.py
     Read characters one at a time (cbreak mode),
     with or without blocking, with or without echo.

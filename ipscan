@@ -1,0 +1,19 @@
+#!/usr/bin/sh
+
+# Simple network scanner using nmap and sh.
+
+# maybe -sP instead of -sn, check on the difference
+sudo nmap -sn 192.168.1.0/24 | while read line1; do
+    case "$line1" in
+        "Nmap scan report"* )
+            read line2
+            read macaddr
+            ;;
+        *       )
+            continue
+    esac
+    host=$(echo $line1 | sed 's/Nmap scan report for //')
+    echo $host $macaddr
+done
+
+
