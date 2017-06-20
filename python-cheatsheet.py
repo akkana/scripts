@@ -113,6 +113,10 @@ s = s.replace("\u00A0"," ")
 # iterator, list and dictionary helpers
 ########################################################
 
+# Comprehensions can be multiple:
+[ a*b+c for a in A for b in B for c in C ]
+# though itertools.product is arguably cleaner for math problems like that.
+
 # Pairwise loops with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
 heights = [324, 381, 442]
