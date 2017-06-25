@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# By Akkana. This code is in the public domain, use in any way you want.
+
 class tee():
     '''A file-like class that can optionally send output to a log file.
        Inspired by
