@@ -40,11 +40,35 @@ def decode_piece(piece):
 
     return ret
 
+def decode_and_split(piece, header_wanted):
+    thispiece = decode_piece(piece)
+
+    # If the header is an address, we have to split it into parts
+    # before we can decode it. If it's another header
+    # such as Subject, we can't do that.
+    if header_wanted.startswith("From") \
+            or header_wanted.startswith("To") \
+            or header_wanted.startswith("Cc") \
+            or header_wanted.startswith("Bcc"):
+        pieces = email.utils.parseaddr(thispiece)
+        if pieces[0] or pieces[1]:
+            if Debug:
+                print "formataddr says: '%s'" % \
+                    email.utils.formataddr(map(decode_piece, pieces)).strip()
+            return header_wanted + ' ' + \
+                email.utils.formataddr(map(decode_piece,
+                                           pieces)).strip()
+        else:
+            print >>sys.stderr, "parseaddr failed on", thispiece
+
+    return thispiece
+
 def decode_file(filename, header_wanted, all=False, casematch=False):
     if filename == '-':
         fil = sys.stdin
     else:
         fil = open(filename)
+    print "All?", all
 
     if not casematch:
         header_wanted = header_wanted.lower()
@@ -59,68 +83,40 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         if not casematch:
             testline = line.lower()
 
-        # if Debug:
-        #     print "line:", line
+        if Debug:
+            print "line:", line
+
+        # Are we looking for continuation lines?
+        if output:
+            if testline.startswith(' ') or testline.startswith('\t'):
+                # It's a continuation line: keep appending.
+                output += ' ' + decode_piece(line.strip())
+                # XXX should probably remember the header we're currently
+                # matching, and decode_and_split with that header.
+                continue
+
+            # It's not a continuation line. Print output, and either
+            # exit, or clear output and go back to looking for headers.
+            print output
+            if all:
+                output = ''
+            else:
+                sys.exit(0)
+
         # If it matches the header we seek, or if we've already started
         # matching the header and we're looking for continuation lines,
         # build up our string:
         for header_wanted in headers:
             # if Debug:
             #     print "=== looking for", header_wanted
-            if (not output and testline.startswith(header_wanted)) \
-               or (output and (testline.startswith(' ') \
-                               or testline.startswith('\t'))):
-                # We have a match! But we may need to read multiple lines,
-                # since one header can be split over several lines.
+
+            if testline.startswith(header_wanted):
                 found_something = True
                 if Debug:
                     print "\nFound something:", line
-                    print "  which decodes to:", decode_piece(line.strip())
+                output = decode_and_split(line.strip(), header_wanted)
+                break    # No need to look for other headers on this line
 
-                # Strip output because we don't want the final newline.
-                # But add a space if this is a continuation.
-                if output:
-                    output += ' '
-
-                thispiece = decode_piece(line.strip())
-                if Debug:
-                    print "decode_piece returned: '%s'" % thispiece
-
-                # If the header is an address, we have to split it into parts
-                # before we can decode it. If it's another header
-                # such as Subject, we can't do that.
-                if header_wanted.startswith("From") \
-                        or header_wanted.startswith("To") \
-                        or header_wanted.startswith("Cc") \
-                        or header_wanted.startswith("Bcc"):
-                    pieces = email.utils.parseaddr(thispiece)
-                    if pieces[0] or pieces[1]:
-                        if Debug:
-                            print "formataddr says: '%s'" % \
-                                email.utils.formataddr(map(decode_piece, pieces)).strip()
-                        output += header_wanted + ' ' + \
-                                  email.utils.formataddr(map(decode_piece,
-                                                             pieces)).strip()
-                    else:
-                        output += thispiece
-                        print "parseaddr failed on", thispiece,
-
-                else:
-                    output += thispiece
-                if Debug:
-                    print "Now output is ---%s---" % output
-
-            elif output:
-                # if we've already matched the header, and this isn't a
-                # continuation line, then we're done. Print and exit.
-                if Debug:
-                    print "output:", output
-                    print "stripped output:",
-                print output.strip()
-                if all:
-                    output = ''
-                else:
-                    sys.exit(0)
     if output:
         if Debug:
             print "final output:",
