@@ -45,9 +45,10 @@ class ReadlineEdit(QLineEdit):
                 self.del_()
             elif k == Qt.Key_U:
                 self.clear()
-            else:
-                # call base class keyPressEvent
-                QLineEdit.keyPressEvent(self, event)
+            return
+
+        # For anything else, call the base class.
+        super(ReadlineEdit, self).keyPressEvent(event)
 
 # Need to subclass QWebEngineView, in order to have an object that
 # can own each load_finished() callback and have a pointer to
@@ -55,6 +56,8 @@ class ReadlineEdit(QLineEdit):
 class BrowserView(QWebEngineView):
     def __init__(self, browserwin):
         super(BrowserView, self).__init__()
+
+        self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
 
         self.browser_win = browserwin
 
@@ -99,6 +102,12 @@ class BrowserView(QWebEngineView):
         self.browser_win.statusBar().showMessage(url)
 
     def load_started(self):
+        # Setting the default encoding in __init__ doesn't do anything;
+        # it gets reset as soon as we load a page.
+        # There's no documentation on where it's supposed to be set,
+        # but setting it here seems to work.
+        # self.settings().setDefaultTextEncoding("utf-8")
+
         self.browser_win.progress.show()
 
     def load_finished(self, ok):
@@ -181,6 +190,7 @@ class BrowserWindow(QMainWindow):
         # print("New tab, profile still off the record?",
         #       self.profile.isOffTheRecord())
         webpage = QWebEnginePage(self.profile, webview)
+
         # print("New Webpage off the record?",
         #       webpage.profile().isOffTheRecord())
         webview.setPage(webpage)
