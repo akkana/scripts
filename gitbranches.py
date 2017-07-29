@@ -2,6 +2,7 @@
 
 # Manage git branches between local and remote,
 # since git is so incredibly inept at that.
+# Also figure out whether a repo needs to be pushed upstream.
 
 # Uses python-git package on Debian.
 
@@ -18,12 +19,10 @@ import os
 
 from git import Repo
 
-def list_branches(repopath, add_tracking=False):
-    '''List branches with their tracking info. If add_tracking is True,
-       try to make the local and remote branches mirror each other.
-    '''
-    repo = Repo(repopath)
+def needs_pushing(repo):
+    print("not sure yet")
 
+def fetch_from_upstream(repo):
     if not repo.remotes:
         print "No remotes!"
         return
@@ -32,6 +31,11 @@ def list_branches(repopath, add_tracking=False):
     remote = repo.remotes[0]
     print("Fetching from %s..." % remote.name)
     remote.fetch()
+
+def list_branches(repo, add_tracking=False):
+    '''List branches with their tracking info. If add_tracking is True,
+       try to make the local and remote branches mirror each other.
+    '''
 
     remotebranches = {}
     for branch in repo.remotes[0].refs:
@@ -107,15 +111,34 @@ def list_branches(repopath, add_tracking=False):
             print("Created new branch %s to track %s" % (name,
                                                          remotebranches[name]))
 
-def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "-a":
-        list_branches(".", True)
-    else:
-        list_branches(".", False)
-
 def Usage():
     print("Usage: %s [-a]" % os.path.basename(sys.argv[0]))
     print("  -a: Add tracking to branches that don't have it")
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Check git branches vs. upstream. By default, just lists branch status.')
+    parser.add_argument('-f', "--fetch", dest="fetch", default=False,
+                        action="store_true",
+                        help='Fetch from upstream before doing anything else')
+    parser.add_argument('-t', "--track", dest="track", default=False,
+                        action="store_true",
+                        help='Sync tracking of local and remote branches')
+    parser.add_argument('repo', nargs='?', default='.',
+                        help='The git repo: defaults to the current directory')
+
+    args = parser.parse_args()
+
+    repo = Repo(args.repo)
+
+    if args.fetch:
+        fetch_from_upstream(repo)
+
+    if args.track:
+        list_branches(repo, True)
+    else:
+        list_branches(repo, False)
 
 if __name__ == '__main__':
     main()
