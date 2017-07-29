@@ -480,6 +480,9 @@ plt.figure(1).canvas.mpl_connect('key_press_event',
 # Migrate python2 to python3 in place (omit -n to leave a .bak):
 $ 2to3 -wn file_or_directory
 
+# To make something work in both 2 and 3:
+from __future__ import print_function
+
 # All strings in python3 are automatically unicode,
 # and you can just pass encoding as a second argument when you
 # coerce between str and byte, no need to remember encode/decode.
@@ -495,4 +498,12 @@ b'pi\xc3\xb1on'
 "b'pi\\xc3\\xb1on'"
 >>> str(b'pi\xc3\xb1on', 'utf-8')
 'piñon'
->>> 
+>>>
+
+################################################################
+# pip hints
+################################################################
+
+Pip reinstall:
+    pip install -I
+--force-reinstall isn't enough, you need --upgrade which is -I
