@@ -13,14 +13,13 @@
 # the (rather incomplete) docs at
 # http://gitpython.readthedocs.io/en/stable/tutorial.html
 # http://gitpython.readthedocs.io/en/stable/reference.html
+#
+# Also interesting: https://github.com/bill-auger/git-branch-status/
 
 import sys
 import os
 
 from git import Repo
-
-def needs_pushing(repo):
-    print("not sure yet")
 
 def fetch_from_upstream(repo):
     if not repo.remotes:
@@ -31,6 +30,56 @@ def fetch_from_upstream(repo):
     remote = repo.remotes[0]
     print("Fetching from %s..." % remote.name)
     remote.fetch()
+
+def comprefs(ref):
+    '''Find the most recent place where this branch and its upstream
+       matched. Return (commits_since_in_local, commits_since_in_upstream).
+    '''
+    upstream = ref.tracking_branch()
+    if not upstream:
+        # print("No upstream for " + ref.name)
+        return None, None
+
+    # The trick is to find the last SHA that's in both of ref and upstream.
+    # Then figure out if either one has anything more recent.
+    for i, entry in enumerate(reversed(ref.log())):
+        for j, upstream_entry in enumerate(reversed(upstream.log())):
+            if entry.newhexsha == upstream_entry.newhexsha:
+                return i, j
+
+    # If we get here, there's no common element between the two.
+    return None, None
+
+def check_push_status(repo):
+    '''Does this repo have changes that haven't been pushed upstream?
+    '''
+    # git status --porcelain -uno
+    print("Locally modified files:")
+    porcelain = repo.git.status(porcelain=True).splitlines()
+    for l in porcelain:
+        if not l.startswith("?? "):
+            print l
+    print("")
+
+    # git for-each-ref --format="%(refname:short) %(push:track)" refs/heads | fgrep '[ahead'
+    foreachref = repo.git.execute(['git', 'for-each-ref',
+                                   '--format="%(refname:short) %(push:track)"',
+                                   'refs/heads']).splitlines()
+    # git.execute weirdly adds " at the beginning and end of each line.
+    print("for-each-ref says:")
+    for l in foreachref:
+        if l.startswith('"') and l.endswith('"'):
+            l = l[1:-1]
+        print("  " + l)
+    print("")
+
+    print("Need to push?")
+    for ref in repo.heads:
+        l, r = comprefs(ref)
+        if l > 0:
+            print("  %s: local is ahead by %d commits" % (ref.name, l))
+        if r > 0:
+            print("  %s: remote is ahead by %d commits" % (ref.name, r))
 
 def list_branches(repo, add_tracking=False):
     '''List branches with their tracking info. If add_tracking is True,
@@ -58,31 +107,30 @@ def list_branches(repo, add_tracking=False):
 
     localbranchnames = set(localbranches.keys())
     remotebranchnames = set(remotebranches.keys())
-    print "Local branches:", localbranchnames
-    print "Remote branches:", remotebranchnames
 
-    print("")
+    print("Local branch tracking info:")
     for branch in localbranches:
         lb = localbranches[branch]
         if lb.tracking_branch():
-            print("%s -> %s" % (lb.name, lb.tracking_branch().name))
+            print("  %s -> %s" % (lb.name, lb.tracking_branch().name))
         else:
-            print(lb.name)
+            print("  " + lb.name)
     print("")
 
+    print("Branches without tracking:")
     # Print local branches that don't track any remote branch.
     # Don't do anything about this, though.
     for name in localbranchnames - remotebranchnames:
         if not localbranches[name].tracking_branch():
-            print("%s doesn't have a corresponding remote branch" % name)
+            print("  %s doesn't have a corresponding remote branch" % name)
 
     # What remote branches aren't tracked at all?
     for name in remotebranchnames - remotetracks:
-        print("%s isn't tracked by a local branch"
+        print("  %s isn't tracked by a local branch"
               % remotebranches[name].name)
         if name in localbranches:
             if localbranches[name].tracking_branch():
-                print("Local %s is tracking %s instead of %s"
+                print("  Local %s is tracking %s instead of %s"
                       % (name, localbranches[name].tracking_branch().name,
                       remotebranches[name].name))
                 # If it's tracking something else, we shouldn't change that.
@@ -94,7 +142,7 @@ def list_branches(repo, add_tracking=False):
                           % (name, remotebranches[name].name))
                     localbranches[name].set_tracking_branch(remotebranches[name])
                 else:
-                    print("Local %s isn't tracking remote %s"
+                    print("  Local %s isn't tracking remote %s"
                           % (name, remotebranches[name].name))
 
         elif add_tracking:
@@ -118,7 +166,13 @@ def Usage():
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Check git branches vs. upstream. By default, just lists branch status.')
+    parser = argparse.ArgumentParser(description='Check git branches vs. upstream. By default, -lc.')
+    parser.add_argument('-l', "--list", dest="list", default=False,
+                        action="store_true",
+                        help='List branches and their statuses')
+    parser.add_argument('-c', "--check", dest="check", default=False,
+                        action="store_true",
+                        help='Check whether a repo is behind upstream and needs pushing')
     parser.add_argument('-f', "--fetch", dest="fetch", default=False,
                         action="store_true",
                         help='Fetch from upstream before doing anything else')
@@ -137,7 +191,13 @@ def main():
 
     if args.track:
         list_branches(repo, True)
+    elif args.list:
+        list_branches(repo, False)
+    elif args.check:
+        check_push_status(repo)
     else:
+        check_push_status(repo)
+        print("")
         list_branches(repo, False)
 
 if __name__ == '__main__':
