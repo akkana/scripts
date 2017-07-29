@@ -144,8 +144,9 @@ fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
 
-gitbranches.py:
+gitbranchsync.py:
     Display git branches and what they're tracking,
+    check whether a repository needs pushing upstream,
     and optionally make local branches track remotes of the same name.
     A solution to the problem of git making it idiotically difficult
     to keep several machines in sync with the branches in a git repository.
