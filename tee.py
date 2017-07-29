@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 # By Akkana. This code is in the public domain, use in any way you want.
 
@@ -21,7 +21,7 @@ http://www.redmountainsw.com/wordpress/archives/python-subclassing-file-types
             self.fd2.close()
 
     def write(self, text):
-        if isinstance(text, unicode):
+        if (sys.version_info < (3, 0)) and isinstance(text, unicode):
             text = text.encode('utf-8')
         self.fd1.write(text)
         self.fd2.write(text)
