@@ -73,8 +73,12 @@ def check_push_status(repo, silent=False):
         print("")
 
     differences = 0
+    alllocaldiffs = 0
+    allremotediffs = 0
     for ref in repo.heads:
         localdiffs, remotediffs = comprefs(ref)
+        alllocaldiffs += localdiffs
+        allremotediffs += remotediffs
         upstream = ref.tracking_branch()
         if not upstream:
             # Can't push if there's no upstream!
@@ -113,7 +117,7 @@ def check_push_status(repo, silent=False):
             if not silent:
                 print("  " + line)
 
-    return (modfiles, localdiffs, remotediffs)
+    return modfiles, alllocaldiffs, allremotediffs
 
 def list_branches(repo, add_tracking=False):
     '''List branches with their tracking info. If add_tracking is True,
