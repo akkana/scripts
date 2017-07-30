@@ -48,10 +48,13 @@ def comprefs(ref):
                 return i, j
 
     # If we get here, there's no common element between the two.
-    reponame = os.path.basename(ref.repo.working_dir)
-    print("%s Warning: no common commit between %s and %s" % (reponame,
-                                                              ref.name,
-                                                              upstream.name))
+    # But don't worry about that if there were no local entries;
+    # maybe it's just a mirror of a remote branch with no local mods.
+    # In that case, i won't be defined.
+    if 'i' in locals():
+        reponame = os.path.basename(ref.repo.working_dir)
+        print("%s Warning: no common commit between %s and %s"
+              % (reponame, ref.name, upstream.name))
     return 0, 0
 
 def check_push_status(repo, silent=False):
