@@ -57,60 +57,63 @@ def check_push_status(repo, silent=False):
        Print any info, but also return the number of changes that differ.
        If silent is set, don't print anything, just calculate and return.
     '''
-    differences = 0
-
+    modfiles = 0
     # git status --porcelain -uno
     porcelain = repo.git.status(porcelain=True).splitlines()
     for l in porcelain:
         if not l.startswith("?? "):
             if not silent:
-                if not differences:
+                if not modfiles:
                     print("Need to commit locally modified files:")
                 print l
-            differences += 1
-    if differences and not silent:
+            modfiles += 1
+    if not silent:
         print("")
 
-    needspush = False
+    differences = 0
     for ref in repo.heads:
-        l, r = comprefs(ref)
-        if l or r:
-            if not needspush:
+        localdiffs, remotediffs = comprefs(ref)
+        upstream = ref.tracking_branch()
+        if not upstream:
+            # Can't push if there's no upstream!
+            continue
+        if localdiffs or remotediffs:
+            if not differences:
                 if not silent:
                     print("Need to push:")
                 needspush = True
-            upstream = ref.tracking_branch()
-        if l > 0 and not silent:
-            print("  %s is ahead of %s by %d commits" % (ref.name,
-                                                         upstream.name, l))
-        if r > 0 and not silent:
-            print("  %s is ahead of %s by %d commits" % (upstream.name,
-                                                         ref.name, r))
-        differences += l + r
+        elif not silent:
+            print("Up to date with %s" % upstream.name)
 
+        if localdiffs > 0 and not silent:
+            print("  %s is ahead of %s by %d commits" % (ref.name,
+                                                         upstream.name,
+                                                         localdiffs))
+        if remotediffs > 0 and not silent:
+            print("  %s is ahead of %s by %d commits" % (upstream.name,
+                                                         ref.name, remotediffs))
+
+    # Perhaps temporarily, compare with the output of what I used before,
     # git for-each-ref --format="%(refname:short) %(push:track)" refs/heads | fgrep '[ahead'
-    # This doesn't always agree with the number we calculated with comprefs;
-    # sometimes for-each-ref shows a smaller number,
-    # in particular when there's been an undo-commit (reset --soft HEAD^)
     foreachref = repo.git.execute(['git', 'for-each-ref',
                                    '--format="%(refname:short) %(push:track)"',
                                    'refs/heads']).splitlines()
     # git.execute weirdly adds " at the beginning and end of each line.
     foundref = False
-    for l in foreachref:
-        if '[ahead' in l:
-            if l.startswith('"') and l.endswith('"'):
-                l = l[1:-1]
+    for line in foreachref:
+        if '[ahead' in line:
+            if line.startswith('"') and line.endswith('"'):
+                line = line[1:-1]
             if not foundref:
                 if not silent:
                     print("for-each-ref says:")
                 foundref = True
             if not silent:
-                print("  " + l)
+                print("  " + line)
     if foundref and not silent:
         print("")
 
-    return differences
+    return modfiles + localdiffs + remotediffs
 
 def list_branches(repo, add_tracking=False):
     '''List branches with their tracking info. If add_tracking is True,
@@ -211,14 +214,20 @@ def list_branches(repo, add_tracking=False):
         for name in local_only:
             print(fmt % (name, ""))
 
-def Usage():
-    print("Usage: %s [-a]" % os.path.basename(sys.argv[0]))
-    print("  -a: Add tracking to branches that don't have it")
-
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Check git branches vs. upstream. By default, -lc.')
+    parser = argparse.ArgumentParser(
+        description='Check git branches vs. upstream.',
+        epilog='''Won't make changes to the repo unless -t is specified.
+With no arguments, -lc is the default.
+
+Examples:
+Show status of a repo: %(prog)s -fc
+Update a repo so remote branches are tracked: %(prog)s -ft
+''',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument('-l', "--list", dest="list", default=False,
                         action="store_true",
                         help='List branches and their statuses')
@@ -233,7 +242,7 @@ def main():
                         help='Sync tracking of local and remote branches')
     parser.add_argument('-s', "--silent", dest="silent", default=False,
                         action="store_true",
-                        help='Suppress output of -c')
+                        help='Suppress output of -c (for use in scripts)')
     parser.add_argument('repo', nargs='?', default='.',
                         help='The git repo: defaults to the current directory')
 
