@@ -48,8 +48,10 @@ def comprefs(ref):
                 return i, j
 
     # If we get here, there's no common element between the two.
-    print("Warning: no common commit between %s and %s" % (ref.name,
-                                                           upstream.name))
+    reponame = os.path.basename(ref.repo.working_dir)
+    print("%s Warning: no common commit between %s and %s" % (reponame,
+                                                              ref.name,
+                                                              upstream.name))
     return 0, 0
 
 def check_push_status(repo, silent=False):
@@ -111,7 +113,7 @@ def check_push_status(repo, silent=False):
             if not silent:
                 print("  " + line)
 
-    return modfiles + localdiffs + remotediffs
+    return (modfiles, localdiffs, remotediffs)
 
 def list_branches(repo, add_tracking=False):
     '''List branches with their tracking info. If add_tracking is True,
@@ -220,6 +222,11 @@ def main():
         epilog='''Won't make changes to the repo unless -t is specified.
 With no arguments, -lc is the default.
 
+Exit code:
+  0 if everything is clean
+  1 if the repo is clean but unpushed
+  2 if there are locally modified files
+
 Examples:
 Show status of a repo: %(prog)s -fc
 Update a repo so remote branches are tracked: %(prog)s -ft
@@ -265,7 +272,13 @@ Update a repo so remote branches are tracked: %(prog)s -ft
         list_branches(repo, True)
 
     if args.check:
-        retval = check_push_status(repo, args.silent)
+        modfiles, localdiffs, remotediffs = check_push_status(repo, args.silent)
+        if modfiles:
+            retval = 2
+        elif localdiffs:
+            retval = 1
+        else:
+            retval = 0
 
     if args.list:
         list_branches(repo, False)
