@@ -52,9 +52,10 @@ def comprefs(ref):
                                                            upstream.name))
     return 0, 0
 
-def check_push_status(repo):
+def check_push_status(repo, silent=False):
     '''Does this repo have changes that haven't been pushed upstream?
        Print any info, but also return the number of changes that differ.
+       If silent is set, don't print anything, just calculate and return.
     '''
     differences = 0
 
@@ -62,11 +63,12 @@ def check_push_status(repo):
     porcelain = repo.git.status(porcelain=True).splitlines()
     for l in porcelain:
         if not l.startswith("?? "):
-            if not differences:
-                print("Need to commit locally modified files:")
-            print l
+            if not silent:
+                if not differences:
+                    print("Need to commit locally modified files:")
+                print l
             differences += 1
-    if differences:
+    if differences and not silent:
         print("")
 
     needspush = False
@@ -74,18 +76,22 @@ def check_push_status(repo):
         l, r = comprefs(ref)
         if l or r:
             if not needspush:
-                print("Need to push:")
+                if not silent:
+                    print("Need to push:")
                 needspush = True
             upstream = ref.tracking_branch()
-        if l > 0:
+        if l > 0 and not silent:
             print("  %s is ahead of %s by %d commits" % (ref.name,
                                                          upstream.name, l))
-        if r > 0:
+        if r > 0 and not silent:
             print("  %s is ahead of %s by %d commits" % (upstream.name,
                                                          ref.name, r))
         differences += l + r
 
     # git for-each-ref --format="%(refname:short) %(push:track)" refs/heads | fgrep '[ahead'
+    # This doesn't always agree with the number we calculated with comprefs;
+    # sometimes for-each-ref shows a smaller number,
+    # in particular when there's been an undo-commit (reset --soft HEAD^)
     foreachref = repo.git.execute(['git', 'for-each-ref',
                                    '--format="%(refname:short) %(push:track)"',
                                    'refs/heads']).splitlines()
@@ -96,10 +102,12 @@ def check_push_status(repo):
             if l.startswith('"') and l.endswith('"'):
                 l = l[1:-1]
             if not foundref:
-                print("for-each-ref says:")
+                if not silent:
+                    print("for-each-ref says:")
                 foundref = True
-            print("  " + l)
-    if foundref:
+            if not silent:
+                print("  " + l)
+    if foundref and not silent:
         print("")
 
     return differences
@@ -120,6 +128,9 @@ def list_branches(repo, add_tracking=False):
             continue
         remotebranches[simplename] = branch
 
+    # Formatting: what's the longest name?
+    maxlen = 0
+
     # Dictionary-ize the local branches too,
     # and make sets showing which local branches track something,
     # and which remote branches are tracked.
@@ -128,6 +139,7 @@ def list_branches(repo, add_tracking=False):
     remotetracks = set()
     for branch in repo.heads:
         localbranches[branch.name] = branch
+        maxlen = max(maxlen, len(branch.name))
         if branch.tracking_branch():
             localtracks.add(branch.name)
             remotetracks.add(branch.tracking_branch().name.split('/')[-1])
@@ -135,62 +147,69 @@ def list_branches(repo, add_tracking=False):
     localbranchnames = set(localbranches.keys())
     remotebranchnames = set(remotebranches.keys())
 
-    print("Local branch tracking info:")
+    # The four lists we care about
+    tracking_branches = []       # local tracks remote
+    not_tracking_branches = []   # local doesn't track remote of same name
+    local_only = []              # local, no remote of same name
+    remote_only = []             # remote, no local of same name
+
     for branch in localbranches:
         lb = localbranches[branch]
         if lb.tracking_branch():
-            print("  %s -> %s" % (lb.name, lb.tracking_branch().name))
+            tracking_branches.append(lb.name)
+        elif lb.name in remotebranches:
+            not_tracking_branches.append(lb.name)
         else:
-            print("  " + lb.name)
+            local_only.append(lb.name)
 
-    locals_need_tracking = False
-    # Print local branches that don't track any remote branch.
-    # Don't do anything about this, though.
-    for name in localbranchnames - remotebranchnames:
-        if not localbranches[name].tracking_branch():
-            if not locals_need_tracking:
-                print("\nLocal branches without tracking:")
-                locals_need_tracking = True
-            print("  %s doesn't have a corresponding remote branch" % name)
+    for name in remotebranchnames - localbranchnames:
+        remote_only.append(name)
 
-    # What remote branches aren't tracked at all?
-    remotes_need_tracking = False
-    for name in remotebranchnames - remotetracks:
-        if not remotes_need_tracking:
-            print("\nRemote branches that aren't tracked:")
-            remotes_need_tracking = True
-        print("  %s isn't tracked by a local branch"
-              % remotebranches[name].name)
-        if name in localbranches:
-            if localbranches[name].tracking_branch():
-                print("  Local %s is tracking %s instead of %s"
-                      % (name, localbranches[name].tracking_branch().name,
-                      remotebranches[name].name))
-                # If it's tracking something else, we shouldn't change that.
-            else:
-                if add_tracking:
-                    # The local branch already exists, just needs to
-                    # be set to track the remote of the same name.
-                    print("Setting local %s to track %s"
-                          % (name, remotebranches[name].name))
-                    localbranches[name].set_tracking_branch(remotebranches[name])
-                else:
-                    print("  Local %s isn't tracking remote %s"
-                          % (name, remotebranches[name].name))
+    # Now we've collected all the info we need. Time to print it out.
+    maxlen = min(maxlen, 35)
+    fmt = "  %%%ds  %%s" % maxlen
 
-        elif add_tracking:
-            # We have no local branch matching the remote branch.
-            # Need to create a new branch by that name:
-            # equivalent of git checkout -t <remote>/name
-            # or git branch --track branch-name origin/branch-name
-            # Can't use repo.create_head(name) because it doesn't allow
-            # for arguments like reference.
-            new_branch = git.Head.create(repo, name,
-                                         reference=remotebranches[name])
-            localbranches[name] = new_branch
-            new_branch.set_tracking_branch(remotebranches[name])
-            print("Created new branch %s to track %s" % (name,
+    if tracking_branches:
+        print("\nLocal branches tracking remotes:")
+        for name in tracking_branches:
+            print(fmt % (name,
+                         " -> %s" % localbranches[name].tracking_branch().name))
+
+    if not_tracking_branches:
+        print("\nLocal branches that aren't tracking their remotes:")
+        for name in not_tracking_branches:
+            print(fmt % (name, " vs  %s" % remotebranches[name].name))
+
+            if add_tracking:
+                # The local branch already exists, just needs to
+                # be set to track the remote of the same name.
+                print("Setting local %s to track %s"
+                      % (name, remotebranches[name].name))
+                localbranches[name].set_tracking_branch(remotebranches[name])
+
+    if remote_only:
+        print("\nRemote-only branches, not mirrored here:")
+        for name in remote_only:
+            print(fmt % remotebranches[name].name)
+
+            if add_tracking:
+                # We have no local branch matching the remote branch.
+                # Need to create a new branch by that name:
+                # equivalent of git checkout -t <remote>/name
+                # or git branch --track branch-name origin/branch-name
+                # Can't use repo.create_head(name) because it doesn't allow
+                # for arguments like reference.
+                new_branch = git.Head.create(repo, name,
+                                             reference=remotebranches[name])
+                localbranches[name] = new_branch
+                new_branch.set_tracking_branch(remotebranches[name])
+                print("Created branch %s to track %s" % (name,
                                                          remotebranches[name]))
+
+    if local_only:
+        print("\nLocal-only branches, not tracking a remote")
+        for name in local_only:
+            print(fmt % (name, ""))
 
 def Usage():
     print("Usage: %s [-a]" % os.path.basename(sys.argv[0]))
@@ -212,6 +231,9 @@ def main():
     parser.add_argument('-t', "--track", dest="track", default=False,
                         action="store_true",
                         help='Sync tracking of local and remote branches')
+    parser.add_argument('-s', "--silent", dest="silent", default=False,
+                        action="store_true",
+                        help='Suppress output of -c')
     parser.add_argument('repo', nargs='?', default='.',
                         help='The git repo: defaults to the current directory')
 
@@ -236,7 +258,7 @@ def main():
         list_branches(repo, True)
 
     if args.check:
-        retval = check_push_status(repo)
+        retval = check_push_status(repo, args.silent)
 
     if args.list:
         list_branches(repo, False)
