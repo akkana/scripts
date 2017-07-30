@@ -110,8 +110,6 @@ def check_push_status(repo, silent=False):
                 foundref = True
             if not silent:
                 print("  " + line)
-    if foundref and not silent:
-        print("")
 
     return modfiles + localdiffs + remotediffs
 
