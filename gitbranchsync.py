@@ -197,7 +197,7 @@ def list_branches(repo, add_tracking=False):
     if remote_only:
         print("\nRemote-only branches, not mirrored here:")
         for name in remote_only:
-            print(fmt % remotebranches[name].name)
+            print(fmt % (remotebranches[name].name, ""))
 
             if add_tracking:
                 # We have no local branch matching the remote branch.
@@ -206,10 +206,15 @@ def list_branches(repo, add_tracking=False):
                 # or git branch --track branch-name origin/branch-name
                 # Can't use repo.create_head(name) because it doesn't allow
                 # for arguments like reference.
-                new_branch = git.Head.create(repo, name,
-                                             reference=remotebranches[name])
-                localbranches[name] = new_branch
-                new_branch.set_tracking_branch(remotebranches[name])
+                # These don't work:
+                # new_branch = repo.head.create(repo, name,
+                #                               reference=remotebranches[name])
+                # new_branch = repo.git.Head.create(repo, name,
+                #                                   reference=remotebranches[name])
+                # localbranches[name] = new_branch
+                # new_branch.set_tracking_branch(remotebranches[name])
+                # so try the higher level command:
+                repo.git.checkout(remotebranches[name].name, b=name)
                 print("Created branch %s to track %s" % (name,
                                                          remotebranches[name]))
 
