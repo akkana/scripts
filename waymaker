@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Take a file and of descriptions, multi-line and separated by blank lines,
 # and turn it into a collection of GPX waypoints
@@ -24,7 +24,7 @@ def write_gpx_file(entries, filename, omit_address=True):
     fp.write('''<?xml version="1.0" encoding="UTF-8"?>
 <gpx
  version="1.0"
-creator="makeway v. 0.1"
+creator="waymaker v. 0.2"
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xmlns="http://www.topografix.com/GPX/1/0"
 xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd">
@@ -84,7 +84,7 @@ def geocode(addr):
 
     url = "http://maps.googleapis.com/maps/api/geocode/json?address=%s&sensor=false" %   (urllib.parse.quote(addr.replace(' ', '+')))
     try:
-        data = urllib.request.urlopen(url).read()
+        data = str(urllib.request.urlopen(url).read(), 'utf-8')
         loaded = json.loads(data)
         if loaded['status'] == 'OVER_QUERY_LIMIT':
             print("Hit the Google Maps query limit; sleeping for 2 seconds between queries")
