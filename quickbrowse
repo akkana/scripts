@@ -6,7 +6,7 @@ import signal
 import traceback
 import posixpath
 
-from PyQt5.QtCore import QUrl, Qt, QTimer
+from PyQt5.QtCore import QUrl, Qt, QTimer, QEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
@@ -61,6 +61,27 @@ class BrowserView(QWebEngineView):
 
         self.browser_win = browserwin
 
+        self.installEventFilter(self)
+
+        # ICK! I can't find any way to intercept a middle click and get
+        # the URL under the mouse during the click. But we do get hover
+        # events -- so if we always record the last hovered URL,
+        # then when we see a middleclick we can load that URL.
+        # Again, ICK!
+        self.last_hovered = None
+
+    def eventFilter(self, source, event):
+        if (event.type() == QEvent.ChildAdded and source is self
+            and event.child().isWidgetType()):
+            self._glwidget = event.child()
+            self._glwidget.installEventFilter(self)
+        elif (event.type() == QEvent.MouseButtonPress
+              and source is self._glwidget):
+            if event.button() == 4:    # middle button is 4. Go figure.
+                self.browser_win.new_tab(self.last_hovered)
+                return True
+        return super().eventFilter(source, event)
+
     # Override the context menu event so we can copy the clipboard
     # selection to primary after a "Copy Link URL" action.
     # Qt5 only copies it to Clipboard, making X primary paste impossible.
@@ -100,6 +121,7 @@ class BrowserView(QWebEngineView):
 
     def link_hover(self, url):
         self.browser_win.statusBar().showMessage(url)
+        self.last_hovered = url
 
     def load_started(self):
         # Setting the default encoding in __init__ doesn't do anything;
@@ -166,6 +188,8 @@ class BrowserWindow(QMainWindow):
 
         self.setCentralWidget(self.tabwidget)
 
+        self.tabwidget.tabBar().installEventFilter(self)
+        self.prev_middle = -1
         self.active_tab = 0
 
         self.setStatusBar(QStatusBar(self))
@@ -180,6 +204,21 @@ class BrowserWindow(QMainWindow):
         QtWidgets.QShortcut("Ctrl+R", self, activated=self.reload)
 
         self.resize(1024, 768)
+
+    def eventFilter(self, object, event):
+        if object == self.tabwidget.tabBar() and \
+            event.type() in [QEvent.MouseButtonPress,
+                             QEvent.MouseButtonRelease] and \
+            event.button() == Qt.MidButton:
+            tabindex = object.tabAt(event.pos())
+            if event.type() == QEvent.MouseButtonPress:
+                self.prev_middle = tabindex
+            else:
+                if tabindex != -1 and tabindex == self.prev_middle:
+                    self.close_tab(tabindex)
+                self.prev_middle = -1
+            return True
+        return False
 
     def new_tab(self, url=None):
         webview = BrowserView(self)
@@ -211,6 +250,9 @@ class BrowserWindow(QMainWindow):
             self.active_tab = len(self.webviews)-1
             self.load_url(url)
             self.active_tab = save_active
+
+    def close_tab(self, tabindex):
+        self.tabwidget.removeTab(tabindex)
 
     def load_url(self, url):
         qurl = QUrl(url)
