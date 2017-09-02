@@ -1,5 +1,9 @@
 #! /usr/bin/env python
 
+# A simple music player using pygame.
+# Requirements: python-pygame python-id3 python-mutagen
+# Copyright 2015 by Akkana Peck: share and enjoy under the GPLv2 or later.
+
 import sys, os
 import time
 import random
