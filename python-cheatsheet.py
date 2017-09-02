@@ -109,6 +109,24 @@ r == c    # True
 # Replace non-breaking spaces in unicode (python3):
 s = s.replace("\u00A0"," ")
 
+###########
+# All the ways of formatting numbers, from https://stackoverflow.com/a/2962966
+
+# String concatenation:
+filename = 'file' + str(num) + '.txt'
+
+# Conversion Specifier:
+filename = 'file%s.txt' % num
+
+# Using local variable names:
+filename = 'file%(num)s.txt' % locals()  # Neat trick
+
+# Using format():
+filename = 'file{0}.txt'.format(num)     # Note: This is the new preferred way
+
+# Using string.Template:
+filename = string.Template('file${num}.txt').substitute(locals()))
+
 ########################################################
 # iterator, list and dictionary helpers
 ########################################################
