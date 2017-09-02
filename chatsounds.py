@@ -1,8 +1,10 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python
 
 # xchat script to play different sounds in different circumstances.
 # Copyright 2012 by Akkana Peck, http://shallowsky.com.
 # Share and enjoy under the GPLv2 or (at your option) any later version.
+
+from __future__ import print_function
 
 __module_name__ = "chatsounds"
 __module_version__ = "0.3"
@@ -32,7 +34,7 @@ def debugprint(*args, **kwargs):
     outfile = kwargs['file']
 
     # Can't seem to pass just *args to print in python 2
-    print >>outfile, ' '.join(map(str, args))
+    print(' '.join(map(str, args)), file=outfile)
 
 class SoundPlayer :
     """
