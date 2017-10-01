@@ -8,6 +8,13 @@
 # androidsd:/relative/path and it will try to find the SD card
 # if it's mounted as /storage/nnnn-nnnn.
 #
+# Note: this isn't well tested at all. It works well enough on my
+# own personal phone (Galaxy S5 running Marshmallow) but I have
+# no way of testing it on other Android hardware,
+# and Google seems to love to change everything completely with every release.
+# I'm happy to take patches or bug reports if you use it on other
+# Android devices, and I'd love to hear where it does and doesn't work.
+#
 # Copyright 2017 by Akkana; share and enjoy under the GPL v2 or later.
 
 import sys, os
@@ -59,28 +66,43 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
-    if recursive:
-        print("Sorry, don't know how to do recursive list on android yet")
     print "Trying to list", path
-    proc = subprocess.Popen(["adb", "shell", "ls", "-l", path],
-                            shell=False,
-                            stdout=subprocess.PIPE)
+
+    if recursive:
+        args = ["adb", "shell", "ls", "-lR", path]
+    else:
+        args = ["adb", "shell", "ls", "-l", path]
+
+    proc = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
     stdout_lines = proc.communicate()[0].split('\n')
     file_list = []
+    cur_subdir = ''
     for l in stdout_lines:
-        l = l.strip().split()
+        l = l.strip()
+        if not l:
+            continue
+
+        # In recursive mode, each directory will be listed with a colon.
+        if recursive and l.endswith(':'):
+            cur_subdir = l[:-1]
+            continue
+
+        l = l.split()
         nwords = len(l)
         if not nwords:
             continue
         elif nwords == 7:
+            fname = l[-1]
+            if recursive and cur_subdir:
+                fname = posixpath.join(cur_subdir, fname)
             if sizes:
                 try:
-                    file_list.append((l[-1], int(l[3])))
+                    file_list.append((fname, int(l[3])))
                 except:
                     # This could happen for the initial "Total:" line
                     pass
             else:
-                file_list.append(l[-1])
+                file_list.append(fname)
         elif nwords == 6:
             print("%s is a directory" % l[-1])
         else:
