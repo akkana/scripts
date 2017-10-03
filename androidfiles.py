@@ -67,6 +67,8 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
        like foo/bar/baz.jpg.
     '''
     print "Trying to list", path
+    lenpath = len(path)
+    print "lenpath:", lenpath
 
     if recursive:
         args = ["adb", "shell", "ls", "-lR", path]
@@ -94,7 +96,12 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         elif nwords == 7:
             fname = l[-1]
             if recursive and cur_subdir:
-                fname = posixpath.join(cur_subdir, fname)
+                fname = posixpath.normpath(posixpath.join(cur_subdir, fname))[lenpath:]
+                # Dependng on whether the original path ended with a slash,
+                # fname might incorrectly start with one
+                # because lenpath might be too small by one.
+                if fname.startswith('/'):
+                    fname = fname[1:]
             if sizes:
                 try:
                     file_list.append((fname, int(l[3])))
@@ -121,21 +128,20 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
+    lenpath = len(path)
     if recursive:
         file_list = []
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
-            if sorted:
-                files.sort()
             for f in files:
                 f = os.path.normpath(f)
-                file_list.append(os.path.join(root, f))
+                file_list.append(os.path.join(root, f)[lenpath:])
 
     else:
         file_list = os.listdir(path)
 
-        if sorted:
-            file_list.sort()
+    if sorted:
+        file_list.sort()
 
     if not sizes:
         return file_list
@@ -143,11 +149,12 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     # Get the size for each file.
     sizelist = []
     for filename in file_list:
-        if os.path.isdir(filename):
+        filepath = os.path.join(path, filename)
+        if os.path.isdir(filepath):
             sizelist.append((filename, 0))
         else:
             try:
-                sizelist.append((filename, os.stat(filename).st_size))
+                sizelist.append((filename, os.stat(filepath).st_size))
             except OSError:
                 sizelist.append((filename, 0))
 
@@ -160,11 +167,71 @@ def copyto(f, outdir, fname):
     subprocess.call(["adb", "push", f, posixpath.join(strip_schema(outdir),
                                                       fname)])
 
-def sync(src, dest):
+def sync(src, dst):
     '''Synchronize recursively (like rsync -av --size-only)
        between two locations, e.g. a local directory and an android one.
        Only copy files whose size is different.
+       src and dst are either a local path or an android: or androidsd: schema,
+       and can point to a file or a directory.
     '''
+    src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
+    dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
+    print "Found", len(src_ls), "in src,", len(dst_ls), "in dst"
+
+    isrc = 0
+    idst = 0
+    updates = []    # the list of files we need to update
+    removes = []
+
+    while True:
+        if isrc >= len(src_ls) and idst >= len(dst_ls):
+            # Done with both lists!
+            break
+
+        if isrc >= len(src_ls):
+            # No more src files, but there are still dst files. Remove?
+            removes.append(dst_ls[idst][0])
+            idst += 1
+            continue
+
+        if idst >= len(dst_ls):
+            # No more dst files, but there are still src files to copy.
+            updates.append(src_ls[isrc][0])
+            isrc += 1
+            continue
+
+        if src_ls[isrc][0] < dst_ls[idst][0]:
+            # The file exists on the src but not the dst. Need to copy.
+            updates.append(src_ls[isrc][0])
+            isrc += 1
+            continue
+
+        if src_ls[isrc][0] > dst_ls[idst][0]:
+            # The file exists on the dst but not the src. Remove?
+            removes.append(dst_ls[idst][0])
+            idst += 1
+            continue
+
+        if src_ls[isrc][0] == dst_ls[idst][0]:
+            # The file exists on both src and dst
+            if src_ls[isrc][1] != dst_ls[idst][1]:
+                # the files have different sizes, need to sync.
+                updates.append(ls_src[isrc][0])
+            isrc += 1
+            idst += 1
+            continue
+
+        print("Internal error comparing %s and %s" % (src_ls[isrc][0],
+                                                      dst_ls[idst][0]))
+        isrc += 1
+        idst += 1
+
+    print("Need to update %d files and remove %d files" % (len(updates),
+                                                           len(removes)))
+    print("======= Updates")
+    print("\n  ".join(updates))
+    print("======= Removes")
+    print("\n  ".join(removes))
 
 if __name__ == "__main__":
     # copyto('/home/akkana/POD/Science/Story_Collider/249076872-the-story-collider-jonaki-bhattacharyya-losing-control.mp3', 'android:/mnt/extSdCard/Music/Podcasts', '16-05-99-so-special.mp3')
@@ -172,6 +239,10 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: %s path [path ...]" % os.path.basename(sys.argv[0]))
         sys.exit(1)
+
+    if len(sys.argv) == 3:
+        sync(sys.argv[1], sys.argv[2])
+        sys.exit(0)
 
     sizes = True
     recursive = True
