@@ -233,6 +233,53 @@ def sync(src, dst):
     print("======= Removes")
     print("\n  ".join(removes))
 
+    # Before actually copying, see if it looks like something has been moved:
+    # the same filename in a different directory.
+    def check_for_move(changes, whichlist, whichopstr, whichliststr):
+        for f in changes:
+            newversion = is_in_list(f, whichlist)
+            if newversion:
+                # Now find it in the source list to compare sizes
+                oldversion = None
+                for s in src_ls:
+                    if s[0] == f:
+                        oldversion = s
+                        break
+                if not oldversion:
+                    print("Internal error: %s on %s list but can't find it."
+                          % (f, whichopstr))
+                    continue
+                if oldversion[1] == newversion[1]:
+                    print("Looks like %s in %s is %s on %s"
+                          % (oldversion[0], whichopstr,
+                             newversion[0], whichliststr))
+
+    check_for_move(updates, dst_ls, "updates", "dst")
+    check_for_move(removes, src_ls, "removes", "src")
+
+def is_in_list(fname, filelist):
+    '''Is the given filename (a basename, not a full pathname)
+       in the given list? The filelist may be a list of pathnames,
+       or it may be a list of (pathname, size).
+       Either way, return the matching element of filelist, or None.
+    '''
+    for f in filelist:
+        # Is it a string-like object or a list-like object?
+        # String-like objects have endswith.
+        if hasattr(f, 'endswith'):
+            fn = f
+        else:
+            fn = f[0]
+        fn = os.path.basename(fn)
+        # XXX This will work on *nix. On Windows, we need to use
+        # os.path if it's local, posixpath if it's remote.
+        # For now I'm not going to worry about that.
+
+        if fname == fn:
+            return f
+
+    return None
+
 if __name__ == "__main__":
     # copyto('/home/akkana/POD/Science/Story_Collider/249076872-the-story-collider-jonaki-bhattacharyya-losing-control.mp3', 'android:/mnt/extSdCard/Music/Podcasts', '16-05-99-so-special.mp3')
 
