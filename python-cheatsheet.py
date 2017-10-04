@@ -10,6 +10,16 @@
 # I can't vouch for these books myself.
 
 ########################################################
+# Interactive Python interpreter
+########################################################
+# Reload a module you already imported: modulename isn't quoted.
+import modulename
+reload(modulename)
+# If you've imported it under some other name, use the name you used
+import modulename as mn
+reload(mn)
+
+########################################################
 # What's available in objects and modules?
 ########################################################
 
@@ -126,6 +136,17 @@ filename = 'file{0}.txt'.format(num)     # Note: This is the new preferred way
 
 # Using string.Template:
 filename = string.Template('file${num}.txt').substitute(locals()))
+
+########################################################
+# Byte strings and byte arrays
+########################################################
+
+buf = bytearray(b'\x51\x02\x00\x00\x00')
+buf.append(0xa2)
+buf.insert(2, 0xf7)
+
+# struct: https://docs.python.org/2/library/struct.html
+# is perhaps a better way to handle byte strings like this.
 
 ########################################################
 # iterator, list and dictionary helpers
@@ -274,6 +295,16 @@ Useful recent additions: tag.replace_with_children()
 for t in soup.findAll(style=True)
 # Harder way, using lambda:
 soup.findAll(lambda tag: 'style' in tag.attrs)
+
+########################################################
+# Some handy utility classes
+########################################################
+
+# Copying and moving files: shutil.copy and shutil.move
+
+# Handle quoting for something that might need to be passed to a shell:
+# in Python 3, shlex.quote() does it, but if it needs to be compatible
+# with both 2 and 3, use pipes.quote().
 
 ########################################################
 # OS-specific stuff
@@ -522,6 +553,15 @@ b'pi\xc3\xb1on'
 # pip hints
 ################################################################
 
+'''
 Pip reinstall:
     pip install -I
 --force-reinstall isn't enough, you need --upgrade which is -I
+
+Get a list of installed files:
+Basically, you can't. pip show -f packagename
+gives a Location which may or may not
+be where every file in the package ends up.
+pip uninstall packagename does give the full list, but there's no -n
+option so you have to actually install the package to see the file list.
+'''
