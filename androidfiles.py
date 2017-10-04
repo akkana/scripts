@@ -20,6 +20,7 @@
 import sys, os
 import subprocess
 import posixpath
+import shutil
 import re
 
 def is_android(path):
@@ -66,9 +67,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
-    print "Trying to list", path
     lenpath = len(path)
-    print "lenpath:", lenpath
 
     if recursive:
         args = ["adb", "shell", "ls", "-lR", path]
@@ -79,24 +78,32 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     stdout_lines = proc.communicate()[0].split('\n')
     file_list = []
     cur_subdir = ''
-    for l in stdout_lines:
-        l = l.strip()
-        if not l:
+    for line in stdout_lines:
+        line = line.strip()
+        if not line:
             continue
 
         # In recursive mode, each directory will be listed with a colon.
-        if recursive and l.endswith(':'):
-            cur_subdir = l[:-1]
+        if recursive and line.endswith(':'):
+            cur_subdir = line[:-1]
             continue
 
-        l = l.split()
+        l = line.split()
         nwords = len(l)
         if not nwords:
             continue
-        elif nwords == 7:
-            fname = l[-1]
+
+        if line.startswith('-rw'):
+            if nwords < 7:
+                print("Not enough words for a file listing: %s"% l)
+                continue
+            # Account for filenames with spaces: anything from element 6
+            # to the end is the filename.
+            fname = ' '.join(l[6:])
+
             if recursive and cur_subdir:
-                fname = posixpath.normpath(posixpath.join(cur_subdir, fname))[lenpath:]
+                fname = posixpath.normpath(posixpath.join(cur_subdir,
+                                                          fname))[lenpath:]
                 # Dependng on whether the original path ended with a slash,
                 # fname might incorrectly start with one
                 # because lenpath might be too small by one.
@@ -110,10 +117,13 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
                     pass
             else:
                 file_list.append(fname)
-        elif nwords == 6:
-            print("%s is a directory" % l[-1])
-        else:
-            print("Wrong number %d of things, %s" % (nwords, l))
+
+        # elif line.startswith('drw'):
+        #     print("%s is a directory" % l[-1])
+
+        # else:
+        #     print("Not a file or directory: %s" % l)
+
     if sorted:
         file_list.sort()
 
@@ -160,12 +170,72 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
 
     return sizelist
 
-def copyto(f, outdir, fname):
-    '''Copy a local file (f is the full pathname) to the android device
-       at android location outdir, android new filename fname.
+# Routines to copy to/from/on android.
+# These assume the schemas have already been removed.
+def copy_to_android(src, dst):
+    subprocess.call(["adb", "push", src, dst])
+
+def copy_from_android(src, dst):
+    # Copy from android to local
+    subprocess.call(["adb", "pull", src, dst])
+
+def copy_on_android(src, dst):
+    subprocess.call(["adb", "shell", "cp", src, dst])
+
+def move_on_android(src, dst):
+    subprocess.call(["adb", "shell", "mv", src, dst])
+
+def remove_from_android(f):
+    subprocess.call(["adb", "shell", "rm", d])
+
+def mkdir_on_android(d):
+    subprocess.call(["adb", "shell", "mkdir", d])
+
+def rmdir_on_android(d, recursive=False):
+    if recursive:
+        subprocess.call(["adb", "shell", "rm", "-rf", d])
+    else:
+        subprocess.call(["adb", "shell", "rmdir", d])
+
+def mkdir(d):
+    if is_android(d):
+        mkdir_on_android(strip_schema(d))
+    else:
+        os.mkdir(d)
+
+def copyfile(src, dst, move=False):
+    '''Copy src file to dst, where either or both can have
+       android: or androidsd: schemas.
+       Only intended to handle single files;
+       doesn't create directories first.
+       If move=True, use move rather than copy (remove the src).
     '''
-    subprocess.call(["adb", "push", f, posixpath.join(strip_schema(outdir),
-                                                      fname)])
+    if not is_android(src) and not is_android(dst):
+        if move:
+            shutil.move(src, dst)
+        else:
+            shutil.copyfile(src, dst)
+
+    elif is_android(src) and is_android(dst):
+        if move:
+            move_on_android(strip_schema(src), strip_schema(dst))
+        else:
+            copy_on_android(strip_schema(src), strip_schema(dst))
+
+    elif is_android(src):
+        srcpath = strip_schema(src)
+        copy_from_android(srcpath, dst)
+        if move:
+            remove_from_android(srcpath)
+
+    elif is_android(dst):
+        copy_to_android(src, strip_schema(dst))
+        if move:
+            os.unlink(src)
+
+    else:
+        print("Internal error: couldn't figure out how to %s %s to %s"
+              % ('move' if move else 'copy', src, dst))
 
 def find_basename_size_match(pair, pairlist):
     '''Take the basename of the given pair's first elemtn, and see if it matches
@@ -178,15 +248,16 @@ def find_basename_size_match(pair, pairlist):
         if os.path.basename(p[0]) == base:
             if p[1] == pair[1]:
                 return i
-            return -a
+            return -1
     return -1
 
-def sync(src, dst):
+def sync(src, dst, dryrun=True):
     '''Synchronize recursively (like rsync -av --size-only)
        between two locations, e.g. a local directory and an android one.
        Only copy files whose size is different.
        src and dst are either a local path or an android: or androidsd: schema,
        and can point to a file or a directory.
+       If dryrun, just print what is to be done, don't actually do it.
     '''
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
@@ -252,17 +323,68 @@ def sync(src, dst):
     # When setting up moves, we avoided adding the files to removes,
     # but the new location was still added to updates. Remvoe those.
     for movepair in moves:
-        updates.remove(movepair[1])
+        # print("Removing %s from updates, it's moving from %s"
+        #       % (movepair[1], movepair[0]))
+        try:
+            updates.remove(movepair[1])
+        except:
+            # If it wasn't in updates, then it already exists in the new
+            # location on the dest and doesn't need to be moved.
+            # Zero out that movepair, since it's hard to remove from a list
+            # while looping over that same list.
+            mvoepair = None
+
+    # Remove the entries we just nullified:
+    moves = [ m for m in moves if m != None ]
+
+    # Will we need to create any new directories?
+    # First, list all the directories we'll be using.
+    dstdirs = []
+
+    def find_dir_in(thedir, whichlist):
+        '''Is the given directory referenced in any of the pathnames
+           in whichlist?
+        '''
+        for pair in whichlist:
+            if thedir == os.path.dirname(pair[0]):
+                return True
+
+        return False
+
+    def check_for_dir(f):
+        d = os.path.dirname(f)
+        if d in dstdirs:
+            return
+        if find_dir_in(d, dst_ls):
+            return
+        dstdirs.append(d)
+
+    for f in updates:
+        check_for_dir(f)
+    for fpair in moves:
+        check_for_dir(fpair[1])
 
     print("Need to update %d files, remove %d files, and move %d files"
           % (len(updates),  len(removes), len(moves)))
-    print("======= Updates:")
-    print("\n  ".join(updates))
-    print("======= Removes:")
-    print("\n  ".join(removes))
+    print("======= Updates:\n  " + "\n  ".join(updates))
+    print("======= Removes:\n  " + "\n  ".join(removes))
     print("======= Moves:")
     for movepair in moves:
-        print("%s -> %s" % movepair)
+        print("  %s -> %s" % movepair)
+
+    print("Will need to create these directories:")
+    print("  " + "\n  ".join(dstdirs))
+
+    if dryrun:
+        return
+
+    # Time to actually do it!
+
+    # Do the moves first:
+
+    # Then the removes, to make room for the new stuff:
+
+    # Finally, the updates.
 
 def Usage():
         print("Usage:")
