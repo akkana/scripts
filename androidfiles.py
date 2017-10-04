@@ -356,6 +356,9 @@ def sync(src, dst, dryrun=True):
     # Remove the entries we just nullified:
     moves = [ m for m in moves if m != None ]
 
+    # XXX We've moved and removed files from the dst; will we be leaving
+    # any empty directories behind?
+
     # Will we need to create any new directories?
     # First, list all the directories we'll be using.
     dstdirs = []
