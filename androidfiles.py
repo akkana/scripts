@@ -21,6 +21,7 @@ import sys, os
 import subprocess
 import posixpath
 import shutil
+import pipes
 import re
 
 def is_android(path):
@@ -170,38 +171,40 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
 
     return sizelist
 
-# Routines to copy to/from/on android.
+# Helper routines to copy to/from/on android.
 # These assume the schemas have already been removed.
+def quote(s):
+    return pipes.quote(s)
+
 def copy_to_android(src, dst):
-    subprocess.call(["adb", "push", src, dst])
+    subprocess.call(["adb", "push", quote(src), quote(dst)])
 
 def copy_from_android(src, dst):
     # Copy from android to local
-    subprocess.call(["adb", "pull", src, dst])
+    subprocess.call(["adb", "pull", quote(src), quote(dst)])
 
 def copy_on_android(src, dst):
-    subprocess.call(["adb", "shell", "cp", src, dst])
+    subprocess.call(["adb", "shell", "cp", quote(src), quote(dst)])
 
 def move_on_android(src, dst):
-    subprocess.call(["adb", "shell", "mv", src, dst])
+    subprocess.call(["adb", "shell", "mv", quote(src), quote(dst)])
 
 def remove_from_android(f):
-    subprocess.call(["adb", "shell", "rm", d])
+    subprocess.call(["adb", "shell", "rm", quote(f)])
 
 def mkdir_on_android(d):
-    subprocess.call(["adb", "shell", "mkdir", d])
+    subprocess.call(["adb", "shell", "mkdir", quote(d)])
 
 def rmdir_on_android(d, recursive=False):
     if recursive:
-        subprocess.call(["adb", "shell", "rm", "-rf", d])
+        subprocess.call(["adb", "shell", "rm", "-rf", quote(d)])
     else:
-        subprocess.call(["adb", "shell", "rmdir", d])
+        subprocess.call(["adb", "shell", "rmdir", quote(d)])
 
-def mkdir(d):
-    if is_android(d):
-        mkdir_on_android(strip_schema(d))
-    else:
-        os.mkdir(d)
+####################################################################
+# Here are the public routines that we expect callers to know about:
+# copyfile, remove, move, mkdir
+# which can take an android: or androidsd: schema or a local path.
 
 def copyfile(src, dst, move=False):
     '''Copy src file to dst, where either or both can have
@@ -237,6 +240,21 @@ def copyfile(src, dst, move=False):
         print("Internal error: couldn't figure out how to %s %s to %s"
               % ('move' if move else 'copy', src, dst))
 
+def move(src, dst):
+    copyfile(src, dst, move=True)
+
+def mkdir(d):
+    if is_android(d):
+        mkdir_on_android(strip_schema(d))
+    else:
+        os.mkdir(d)
+
+def remove(f):
+    if is_android(f):
+        remove_from_android(strip_schema(f))
+    else:
+        os.unlink(f)
+
 def find_basename_size_match(pair, pairlist):
     '''Take the basename of the given pair's first elemtn, and see if it matches
        the basename of the first element of any of the pairs in pairlist.
@@ -258,6 +276,7 @@ def sync(src, dst, dryrun=True):
        src and dst are either a local path or an android: or androidsd: schema,
        and can point to a file or a directory.
        If dryrun, just print what is to be done, don't actually do it.
+       XXX: basically works but needs to remove empty directories.
     '''
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
@@ -345,46 +364,89 @@ def sync(src, dst, dryrun=True):
         '''Is the given directory referenced in any of the pathnames
            in whichlist?
         '''
+        # os.path.dirname doesn't end with a slash, so we shouldn't either.
+        while thedir.endswith('/'):
+            thedir = thedir[:-1]
         for pair in whichlist:
             if thedir == os.path.dirname(pair[0]):
                 return True
 
         return False
 
-    def check_for_dir(f):
+    def remember_needed_dirs(f):
         d = os.path.dirname(f)
         if d in dstdirs:
             return
         if find_dir_in(d, dst_ls):
             return
-        dstdirs.append(d)
+
+        # The directory probably needs to be created.
+        # But does any intermediate directory also need creation?
+        components = d.split('/')
+        partialdir = None
+        for comp in components:
+            if not partialdir:
+                partialdir = comp
+            else:
+                partialdir += '/'
+                partialdir += comp
+
+            if find_dir_in(partialdir, dst_ls):
+                break
+
+            dstdirs.append(d)
 
     for f in updates:
-        check_for_dir(f)
+        remember_needed_dirs(f)
     for fpair in moves:
-        check_for_dir(fpair[1])
-
-    print("Need to update %d files, remove %d files, and move %d files"
-          % (len(updates),  len(removes), len(moves)))
-    print("======= Updates:\n  " + "\n  ".join(updates))
-    print("======= Removes:\n  " + "\n  ".join(removes))
-    print("======= Moves:")
-    for movepair in moves:
-        print("  %s -> %s" % movepair)
-
-    print("Will need to create these directories:")
-    print("  " + "\n  ".join(dstdirs))
-
-    if dryrun:
-        return
+        remember_needed_dirs(fpair[1])
 
     # Time to actually do it!
 
-    # Do the moves first:
+    # We'll be prepending src and dst (including their schemae)
+    # so make sure they end with a slash:
+    if not src.endswith('/'):
+        src += '/'
+    if not dst.endswith('/'):
+        dst += '/'
+
+    # Make all needed directories:
+    print("\n\nMaking needed directories")
+    for d in dstdirs:
+        d = dst + d
+        print("mkdir " + d)
+        if not dryrun:
+            mkdir(d)
+
+    # Do the moves:
+    print("\n\nMoving files that changed location but not size")
+    for movepair in moves:
+        # These are both paths on the dst.
+        mvsrc = dst + movepair[0]
+        mvdst = dst + movepair[1]
+        print("%s -> %s" % (mvsrc, mvdst))
+        if not dryrun:
+            move(mvsrc, mvdst)
 
     # Then the removes, to make room for the new stuff:
+    print("\n\nRemoving files that are no longer needed on the dst")
+    for rm in removes:
+        rm = dst + rm
+        print(rm)
+        if not dryrun:
+            remove(rm)
 
     # Finally, the updates.
+    print("\n\nCopying up files that are new or changed")
+    for up in updates:
+        srcup = src + up
+        dstup = dst + up
+        print("Updating %s -> %s" % (srcup, dstup))
+        if not dryrun:
+            copyfile(srcup, dstup)
+
+    if dryrun:
+        print("\nThat's what we would have done, if this wasn't a dry run")
 
 def Usage():
         print("Usage:")
@@ -394,12 +456,12 @@ def Usage():
         print("        Sync from srcpath to dstpath")
         sys.exit(1)
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 2 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
         Usage()
 
     if len(sys.argv) == 4 and sys.argv[1] == '-s':
-        sync(sys.argv[2], sys.argv[3])
+        sync(sys.argv[2], sys.argv[3], dryrun=False)
         sys.exit(0)
 
     sizes = True
@@ -417,3 +479,5 @@ if __name__ == "__main__":
         else:
             print("%s: %s" % (path, ', '.join(files)))
 
+if __name__ == "__main__":
+    main()
