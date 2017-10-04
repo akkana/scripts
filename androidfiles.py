@@ -167,6 +167,20 @@ def copyto(f, outdir, fname):
     subprocess.call(["adb", "push", f, posixpath.join(strip_schema(outdir),
                                                       fname)])
 
+def find_basename_size_match(pair, pairlist):
+    '''Take the basename of the given pair's first elemtn, and see if it matches
+       the basename of the first element of any of the pairs in pairlist.
+       If so, compare the sizes (second element), and if they match,
+       return the index of the match in pairlist. Else return -1.
+    '''
+    base = os.path.basename(pair[0])
+    for i, p in enumerate(pairlist):
+        if os.path.basename(p[0]) == base:
+            if p[1] == pair[1]:
+                return i
+            return -a
+    return -1
+
 def sync(src, dst):
     '''Synchronize recursively (like rsync -av --size-only)
        between two locations, e.g. a local directory and an android one.
@@ -182,6 +196,7 @@ def sync(src, dst):
     idst = 0
     updates = []    # the list of files we need to update
     removes = []
+    moves = []
 
     while True:
         if isrc >= len(src_ls) and idst >= len(dst_ls):
@@ -208,7 +223,15 @@ def sync(src, dst):
 
         if src_ls[isrc][0] > dst_ls[idst][0]:
             # The file exists on the dst but not the src. Remove?
-            removes.append(dst_ls[idst][0])
+            # First, look to see if maybe it has moved somewhere else:
+            # if its basename is somewhere else in src_ls with the same size.
+            whereelse = find_basename_size_match(dst_ls[idst], src_ls)
+            if whereelse < 0:
+                removes.append(dst_ls[idst][0])
+            else:
+                # It did move! So dst_ls[idst][0] on the dst needs to move
+                # to the location of src_ls[whereelse][0] on the src.
+                moves.append((dst_ls[idst][0], src_ls[whereelse][0]))
             idst += 1
             continue
 
@@ -226,69 +249,35 @@ def sync(src, dst):
         isrc += 1
         idst += 1
 
-    print("Need to update %d files and remove %d files" % (len(updates),
-                                                           len(removes)))
-    print("======= Updates")
+    # When setting up moves, we avoided adding the files to removes,
+    # but the new location was still added to updates. Remvoe those.
+    for movepair in moves:
+        updates.remove(movepair[1])
+
+    print("Need to update %d files, remove %d files, and move %d files"
+          % (len(updates),  len(removes), len(moves)))
+    print("======= Updates:")
     print("\n  ".join(updates))
-    print("======= Removes")
+    print("======= Removes:")
     print("\n  ".join(removes))
+    print("======= Moves:")
+    for movepair in moves:
+        print("%s -> %s" % movepair)
 
-    # Before actually copying, see if it looks like something has been moved:
-    # the same filename in a different directory.
-    def check_for_move(changes, whichlist, whichopstr, whichliststr):
-        for f in changes:
-            newversion = is_in_list(f, whichlist)
-            if newversion:
-                # Now find it in the source list to compare sizes
-                oldversion = None
-                for s in src_ls:
-                    if s[0] == f:
-                        oldversion = s
-                        break
-                if not oldversion:
-                    print("Internal error: %s on %s list but can't find it."
-                          % (f, whichopstr))
-                    continue
-                if oldversion[1] == newversion[1]:
-                    print("Looks like %s in %s is %s on %s"
-                          % (oldversion[0], whichopstr,
-                             newversion[0], whichliststr))
-
-    check_for_move(updates, dst_ls, "updates", "dst")
-    check_for_move(removes, src_ls, "removes", "src")
-
-def is_in_list(fname, filelist):
-    '''Is the given filename (a basename, not a full pathname)
-       in the given list? The filelist may be a list of pathnames,
-       or it may be a list of (pathname, size).
-       Either way, return the matching element of filelist, or None.
-    '''
-    for f in filelist:
-        # Is it a string-like object or a list-like object?
-        # String-like objects have endswith.
-        if hasattr(f, 'endswith'):
-            fn = f
-        else:
-            fn = f[0]
-        fn = os.path.basename(fn)
-        # XXX This will work on *nix. On Windows, we need to use
-        # os.path if it's local, posixpath if it's remote.
-        # For now I'm not going to worry about that.
-
-        if fname == fn:
-            return f
-
-    return None
-
-if __name__ == "__main__":
-    # copyto('/home/akkana/POD/Science/Story_Collider/249076872-the-story-collider-jonaki-bhattacharyya-losing-control.mp3', 'android:/mnt/extSdCard/Music/Podcasts', '16-05-99-so-special.mp3')
-
-    if len(sys.argv) < 2:
-        print("Usage: %s path [path ...]" % os.path.basename(sys.argv[0]))
+def Usage():
+        print("Usage:")
+        print("    %s path [path ...]" % os.path.basename(sys.argv[0]))
+        print("        List the given paths")
+        print("    %s -s srcpath dstpath" % os.path.basename(sys.argv[0]))
+        print("        Sync from srcpath to dstpath")
         sys.exit(1)
 
-    if len(sys.argv) == 3:
-        sync(sys.argv[1], sys.argv[2])
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        Usage()
+
+    if len(sys.argv) == 4 and sys.argv[1] == '-s':
+        sync(sys.argv[2], sys.argv[3])
         sys.exit(0)
 
     sizes = True
