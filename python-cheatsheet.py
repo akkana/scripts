@@ -67,6 +67,10 @@ print >>sys.stderr, "foo"
 # and in python3:
 print('foo', file=sys.stderr)
 
+# Prettyprinting
+import pprint
+pprint.pprint(obj)
+
 ########################################################
 # Stringy stuff
 ########################################################
