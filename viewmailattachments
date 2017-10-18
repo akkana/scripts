@@ -119,7 +119,7 @@ def view_message_attachments(fp, tmpdir):
         '''
         partfile = tmp_file_name(part)
 
-        tmpfile = open(partfile, "w")
+        tmpfile = open(partfile, "wb")
         tmpfile.write(part.get_payload(decode=True))
         tmpfile.close()
         return partfile
@@ -207,7 +207,7 @@ def view_message_attachments(fp, tmpdir):
         cmd += BROWSER_FIRST_ARGS
 
     cmd.append("file://" + pleasewait_file)
-    print "Calling:", cmd
+    print("Calling: %s" % ' '.join(cmd))
     if BROWSER_BACKGROUND:
         mysubprocess.call_bg(cmd)
     else:
@@ -254,8 +254,9 @@ def view_message_attachments(fp, tmpdir):
             elif part.get_content_subtype() == \
                  "vnd.openxmlformats-officedocument.wordprocessingml.document" \
                  or part.get_content_subtype() == "msword":
-                mysubprocess.call(["unoconv", "-f", "html", "-o",
-                                   htmlfilename, partfile])
+                mysubprocess.call(["unoconv", "-f", "html",
+                                   "-T", "8",
+                                   "-o", htmlfilename, partfile])
 
                 htmlfilename = os.path.join(fileparts[0] + ".html")
                 htmlfiles.append(htmlfilename)
