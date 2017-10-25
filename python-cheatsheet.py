@@ -311,6 +311,16 @@ soup.findAll(lambda tag: 'style' in tag.attrs)
 # with both 2 and 3, use pipes.quote().
 
 ########################################################
+# Read lines from a subprocess as they appear:
+########################################################
+import subprocess
+
+proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
+while True:
+    line = proc.stdout.readline()
+    print("line: %s" % line)
+
+########################################################
 # OS-specific stuff
 ########################################################
 
