@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 
+# Read lirc output, in order to sense key presses on an IR remote.
+# There are various Python packages that claim to do this but
+# they tend to require elaborate setup and I couldn't get any to work.
+# This approach requires a lircd.conf but does not require a lircrc.
+# If irw works, then in theory, this should too.
 # Based on irw.c, https://github.com/aldebaran/lirc/blob/master/tools/irw.c
-# Python AF_UNIX socket example: https://pymotw.com/2/socket/uds.html
 
 import socket
-import sys
 
 SOCKPATH = "/var/run/lirc/lircd"
 
@@ -14,11 +17,7 @@ def init_irw():
     global sock
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     print ('starting up on %s' % SOCKPATH)
-    try:
-        sock.connect(SOCKPATH)
-    except socket.error, msg:
-        print >>sys.stderr, msg
-        sys.exit(1)
+    sock.connect(SOCKPATH)
 
 def next_key():
     '''Get the next key pressed. Return keyname, updown.
