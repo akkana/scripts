@@ -24,11 +24,39 @@ import time
 import shutil
 import email, mimetypes
 import tempfile
+import subprocess
+
+def find_first_maildir_file(maildir):
+    '''Maildir: inside /tmp/mutttmpbox, mutt creates another level of
+       directory, so the file will be something like /tmp/mutttmpbox/cur/1.
+       So recurse into directories until we find an actual mail file.
+       Return a full path to the filename.
+    '''
+    for root, dirs, files in os.walk(maildir):
+        for f in files:
+            if not f.startswith('.'):
+                return os.path.join(root, f)
+    return None
 
 def view_html_message(f, tmpdir):
     if f:
-        with open(f) as fp:
-            msg = email.message_from_string(fp.read())
+        if os.path.isdir(f):
+            # Maildir: f is a maildir like /tmp/mutttmpbox,
+            # and inside it, for some reason, mutt creates another
+            # level of directory named either cur or new
+            # depending on whether the message is already marked read.
+            # So we have to open the first file inside either cur or new.
+            # In case mutt changes this behavior, let's take the first
+            # non-dotfile inside the first non-dot directory.
+            msg = None
+            for maildir in os.listdir(f):
+                with open(find_first_maildir_file(f)) as fp:
+                    msg = email.message_from_string(fp.read())
+                    break
+        else:
+            # Mbox format: we assume there's only one message in the mbox.
+            with open(f) as fp:
+                msg = email.message_from_string(fp.read())
     else:
         msg = email.message_from_string(sys.stdin.read())
 
@@ -131,8 +159,8 @@ def view_html_message(f, tmpdir):
 
     # Now we have the file. Call a browser on it.
     print("Calling browser for file://%s" % htmlfile)
-    # os.system("firefox -new-window file://%s" % htmlfile)
-    os.system("quickbrowse file://%s" % htmlfile)
+    # subprocess.call(["firefox", "-new-window", "file://%s" % htmlfile])
+    subprocess.call(["quickbrowse", "file://%s" % htmlfile])
 
     # Wait a while to make sure firefox has loaded the images, then clean up.
     # time.sleep(6)
