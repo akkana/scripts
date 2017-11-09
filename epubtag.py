@@ -222,6 +222,10 @@ class EpubBook:
             #newnode = tag.cloneNode(False)
             newnode = self.dom.createElement(self.subjectTag)
 
+            # Suddenly all the parsers insist on seeing this element
+            # in the new dc: tags, which didn't seem to be needed before.
+            newnode.setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/")
+
             # Make a text node inside it:
             textnode = self.dom.createTextNode(new_tag)
             newnode.appendChild(textnode)
@@ -275,8 +279,14 @@ class EpubBook:
                 # it to UTF-8, barring re-opening the file and
                 # parsing the first line manually. So crazy!
                 encoding = 'UTF-8'
-                ozf.writestr(info, self.dom.toprettyxml(encoding=encoding,
-                                                        newl=''))
+                ozf.writestr(info, self.dom.toxml(encoding=encoding))
+
+                # toprettyxml keeps the old whitespace and also adds
+                # additional new whitespace ... including trailing
+                # whitespace on every line. Not best.
+                # ozf.writestr(info, self.dom.toprettyxml(encoding=encoding,
+                #                                         indent=" ",
+                #                                         newl=''))
                 # This also works:
                 # ozf.writestr(info,
                 #              self.dom.toprettyxml().encode(encoding,
