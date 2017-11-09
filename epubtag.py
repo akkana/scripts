@@ -56,7 +56,10 @@ class EpubBook:
         try:
             self.dom = xml.dom.minidom.parse(content)
         except IOError as e:
-            raise IOError(filename + ': ' + str(e))
+            raise IOError(self.filename + ': ' + str(e))
+        except xml.parsers.expat.ExpatError as e:
+            print("Can't parse %s: Expat error, %s" % (self.filename, str(e)),
+                  file=sys.stderr)
 
         content.close()
 
