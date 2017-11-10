@@ -146,7 +146,7 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
             root = os.path.normpath(root)
             for f in files:
                 f = os.path.normpath(f)
-                file_list.append(os.path.join(root, f)[lenpath:])
+                file_list.append(os.path.join(root, f)[lenpath+1:])
 
     else:
         file_list = os.listdir(path)
@@ -167,6 +167,7 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
             except OSError:
+                print "OSError on", filepath, "path was", path
                 sizelist.append((filename, 0))
 
     return sizelist
@@ -280,7 +281,6 @@ def sync(src, dst, dryrun=True):
     '''
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
-    print "Found", len(src_ls), "in src,", len(dst_ls), "in dst"
 
     isrc = 0
     idst = 0
@@ -367,16 +367,22 @@ def sync(src, dst, dryrun=True):
         '''Is the given directory referenced in any of the pathnames
            in whichlist?
         '''
-        # os.path.dirname doesn't end with a slash, so we shouldn't either.
-        while thedir.endswith('/'):
-            thedir = thedir[:-1]
+        # We need to end with a slash, because otherwise we might
+        # match books whose titles start with the same name as the dir.
+        if not thedir.endswith('/'):
+            thedir += '/'
         for pair in whichlist:
-            if thedir == os.path.dirname(pair[0]):
+            if pair[0].startswith(thedir):
                 return True
 
         return False
 
     def remember_needed_dirs(f):
+        '''Check full pathname f (from src_ls) to see if its dirname
+           already exists in the list of directories in dst_ls.
+           If it doesn't, then it will need to be created on the
+           destination, perhaps along with its ancestors.
+        '''
         d = os.path.dirname(f)
         if d in dstdirs:
             return
@@ -385,24 +391,23 @@ def sync(src, dst, dryrun=True):
 
         # The directory probably needs to be created.
         # But does any intermediate directory also need creation?
+        # Append them in descending order (a/b/c before a/b/c/d)
+        # since that's the order in which they need to be created.
+        # This code assumes posix on both ends.
+        # It probably won't work on Windows.
         components = d.split('/')
-        partialdir = None
-        for comp in components:
-            if not partialdir:
-                partialdir = comp
-            else:
-                partialdir += '/'
-                partialdir += comp
+        # d itself is os.path.join(components)
 
-            if find_dir_in(partialdir, dst_ls):
-                break
+        for i in range(1, len(components)):
+            dd = posixpath.join(*components[0:i])
+            if dd not in dstdirs and not find_dir_in(dd, dst_ls):
+                dstdirs.append(dd)
+        dstdirs.append(d)
 
-            dstdirs.append(d)
-
-    for f in updates:
-        remember_needed_dirs(f)
     for fpair in moves:
         remember_needed_dirs(fpair[1])
+    for f in updates:
+        remember_needed_dirs(f)
 
     # Time to actually do it!
 
@@ -452,25 +457,42 @@ def sync(src, dst, dryrun=True):
         print("\nThat's what we would have done, if this wasn't a dry run")
 
 def Usage():
-        print("Usage:")
-        print("    %s path [path ...]" % os.path.basename(sys.argv[0]))
-        print("        List the given paths")
-        print("    %s -s srcpath dstpath" % os.path.basename(sys.argv[0]))
-        print("        Sync from srcpath to dstpath")
-        sys.exit(1)
+    progname = os.path.basename(sys.argv[0])
+    print("""%s: list or sync directories with Android over adb.
+
+Usage:
+    %s path [path ...]
+        List the given paths"
+    %s -s srcpath dstpath
+        Sync from srcpath to dstpath
+
+    Paths may be local files, android:/path/to, or androidsd:/path/to."""
+        % (progname, progname, progname))
+    sys.exit(1)
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+    args = sys.argv[1:]
+    if not args:
         Usage()
 
-    if len(sys.argv) == 4 and sys.argv[1] == '-s':
-        sync(sys.argv[2], sys.argv[3], dryrun=False)
+    if args[0] == '-h' or args[0] == '--help':
+        Usage()
+
+    if args[0] == '-dryrun' or args[0] == '-n':
+        dryrun = True
+        args = args[1:]
+    else:
+        dryrun = False
+
+    if len(args) == 3 and args[0] == '-s':
+        sync(args[1], args[2], dryrun=dryrun)
         sys.exit(0)
 
     sizes = True
     recursive = True
 
     for path in (sys.argv[1:]):
+        print("Listing path %s" % path)
         files = list_dir(path, sizes=sizes, recursive=recursive)
         if sizes:
             print("%s:" % path)
