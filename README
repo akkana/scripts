@@ -43,8 +43,10 @@ analemma.py:
     Plot the analemma from the selected location, using PyEphem and PyGTK.
 
 androidfiles.py:
-    A tiny Python module to make it easier to list files on an
+    A Python module to make it easier to list files on an
     Android device using adb, and copy individual files to the device.
+    Can also synchronize two directories, trying to notice when files
+    need to be moved rather than removed and recopied.
     Used by podcopy.
 
 animate.js:
