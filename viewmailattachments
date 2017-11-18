@@ -31,6 +31,10 @@ from bs4 import BeautifulSoup
 USE_WVHTML_FOR_DOC = False
 BROWSER_ARGS = []
 
+# How many seconds do we need to wait for unoconv?
+# It defaults to 6, but on a 64-bit machine that's not enough.
+UNOCONV_STARTUP_TIME = "10"
+
 # Does the browser need a one-time argument for bringing up an initial window,
 # like Firefox's -private-window -new-instance ?
 BROWSER_FIRST_ARG = []
@@ -255,7 +259,7 @@ def view_message_attachments(fp, tmpdir):
                  "vnd.openxmlformats-officedocument.wordprocessingml.document" \
                  or part.get_content_subtype() == "msword":
                 mysubprocess.call(["unoconv", "-f", "html",
-                                   "-T", "8",
+                                   "-T", UNOCONV_STARTUP_TIME,
                                    "-o", htmlfilename, partfile])
 
                 htmlfilename = os.path.join(fileparts[0] + ".html")
