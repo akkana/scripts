@@ -223,6 +223,17 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
         yield top, dirs, nondirs
 
 ########################################################
+# Useful regular expressions
+########################################################
+
+# Find MAC address:
+match = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', instr, re.I)
+if match: return match.group()
+
+# Find IP address:
+match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr, re.I)
+
+########################################################
 # Argument parsing
 ########################################################
 #python recommends click first, then argparse, over optparse.
