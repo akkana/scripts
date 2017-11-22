@@ -197,6 +197,11 @@ mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
 
+mpcdemo.py:
+    A tiny demo of how to use multiprocess communication in the
+    multiprocessing module to start a worker thread and pass messages
+    to it.
+
 musicplayer.py:
     A little toy music player in Python, illustrating how to play audio.
     Actually more than a toy now -- I use it as my main music player.
