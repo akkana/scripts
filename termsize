@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 # Get the current size of the terminal window, and set stty size accordingly.
 # A replacement for xterm's resize program, with no X dependency.
