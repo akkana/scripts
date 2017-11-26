@@ -219,6 +219,10 @@ nokeywords:
     Keywords or Tags file -- i.e. image directories that need to be tagged
     with metapho.
 
+nonblock.py, nonblock-py3.py:
+    Examples of how to do nonblocking input in Py 2 and Py 3.
+    For code that works in either version, see termsize.
+
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
@@ -323,8 +327,8 @@ termcolors:
     Display ANSI colors for the current terminal.
 
 termsize:
-    Set stty size to the size of the current terminal window
-    (e.g. when logged in to an embedded Posix device over a serial line).
+    Set stty size to the size of the current terminal window,
+    e.g. when logged in to an embedded Posix device over a serial line.
 
 transimageviewer.py:
     A translucent image viewer (inheriting from imageviewer.py)
