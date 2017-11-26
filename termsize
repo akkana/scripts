@@ -3,7 +3,7 @@
 # Get the current size of the terminal window, and set stty size accordingly.
 # A replacement for xterm's resize program, with no X dependency.
 # Useful when logged in over a serial line.
-# Copyright 2013 by Akkana Peck -- share and enjoy under the GPL v2 or later.
+# Copyright 2013,2017 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
 # In the unlikely event you ever need to *set* the terminal size, check out:
 # https://github.com/zerorax/pyresize/blob/master/resize.py
