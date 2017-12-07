@@ -6,7 +6,22 @@
 # ipsearch -a uses arp only, which is fast but only shows
 # hosts in the arp cache.
 
-import sys, subprocess, socket, fcntl, struct
+import sys
+import subprocess
+import socket
+import fcntl
+import struct
+import re
+
+try:
+    from arpreq import arpreq
+except:
+    arpreq = None
+
+try:
+    from mac_lookup import match_mac
+except:
+    match_mac = None
 
 def ping(host):
     """Ping a host by name or address.
@@ -23,21 +38,24 @@ def arp(host):
     """Call arp -a on an address.
        return True if it answers, False otherwise.
     """
-    # print "host", host
+    # print("host", host)
     proc = subprocess.Popen(["arp", "-a", host],
                          stdout = subprocess.PIPE,
                          stderr = subprocess.PIPE)
     proc_out = proc.communicate()[0].strip()
-    # print "proc_out is '%s'" % proc_out
-    if "no match found" in proc_out:
-        # print "no match found, returning none"
+    # print("proc_out is '%s'" % proc_out)
+    if b"no match found" in proc_out:
+        # print("no match found, returning none")
         return None
     # else:
-    #     print "'no match found' isn't in '%s'" % proc_out
-    if "<incomplete>" in proc_out:
+    #     print("'no match found' isn't in '%s'" % proc_out)
+    if b"<incomplete>" in proc_out:
         return None
-    # print "found something"
-    return proc_out
+
+    match = re.search(b'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', proc_out, re.I)
+    if match:
+        return match.group().decode("utf-8")
+    return None
 
 def ip_addr(iface):
     """Get the IP address of the interface (e.g. eth0)
@@ -45,31 +63,64 @@ def ip_addr(iface):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     info = fcntl.ioctl(s.fileno(),
                        0x8915,  # SIOCGIFADDR
-                       struct.pack('256s', iface[:15]))
+                       struct.pack('256s', bytes(iface[:15], "utf-8")))
     return socket.inet_ntoa(info[20:24])
 
-def scan(ping_fn = ping):
-    ip = ip_addr("eth0")
-    print "My IP is", ip
-    network = '.'.join(ip.split('.')[0:3])
-    print "My network is", network
-    try:
-        if len(sys.argv) <= 1:
-            for h in xrange(1, 255):  # Yes, it should adjust based on net class
-                host = "%s.%d" % (network, h)
-                out = ping_fn(host)
-                if ping_fn != arp:
-                    arpout = arp(host)
-                else:
-                    arpout = ""
-                if out != None:
-                    print("%s: %s %s" % (host, out, arpout))
+def scan(iface="eth0", ping_fn=ping, ping_first=False):
+    myip = ip_addr(iface)
+    print("My IP is", myip)
+    mynetwork = '.'.join(myip.split('.')[0:3])
+    print("My network is", mynetwork)
+    fmt = "%16s  %18s  %12s  %s"
 
-    except KeyboardInterrupt:
-        print "Interrupt"
+    for h in range(1, 255):  # I know, it should adjust based on net class
+        hostip = "%s.%d" % (mynetwork, h)
+
+        if ping_first:
+            out = ping_fn(hostip)
+
+        if arpreq:
+            mac = arpreq(hostip)
+        else:
+            mac = arp(hostip)
+
+        if not mac:
+            continue
+
+        if match_mac:
+            oui = match_mac(mac)
+        else:
+            oui = ''
+
+        try:
+            hostname, blah1, blah2 = socket.gethostbyaddr(hostip)
+        except:
+            hostname = '?'
+
+        if hostip == myip:
+            print(fmt % (hostip, mac, hostname, oui), "(that's me)")
+        else:
+            print(fmt % (hostip, mac, hostname, oui))
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1].startswith("-a"):
-        scan(arp)
-    else:
-        scan()
+    def Usage():
+        print("""Usage: %s [-a] [-p]
+-p: ping each host first, in case they weren't in the arp cache already
+-a: Use arp -a to ping.
+""" % sys.argv[0])
+        sys.exit(1)
+
+    iface = "eth0"
+
+    try:
+        if len(sys.argv) > 1 and sys.argv[1].startswith("-a"):
+            scan(iface, arp)
+        elif len(sys.argv) > 1 and sys.argv[1].startswith("-p"):
+            scan(iface, ping_first=True)
+        elif len(sys.argv) > 1:
+            Usage()
+        else:
+            scan(iface)
+
+    except KeyboardInterrupt:
+        print("Interrupt")
