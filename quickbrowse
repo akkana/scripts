@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
+from PyQt5.QtCore import QAbstractNativeEventFilter
 
 from PyQt5 import QtWidgets
 
@@ -78,7 +79,12 @@ class BrowserView(QWebEngineView):
         elif (event.type() == QEvent.MouseButtonPress
               and source is self._glwidget):
             if event.button() == 4:    # middle button is 4. Go figure.
-                self.browser_win.new_tab(self.last_hovered)
+                if self.last_hovered:
+                    self.browser_win.new_tab(self.last_hovered)
+                else:
+                    qc = QApplication.clipboard()
+                    self.browser_win.load_url(qc.text(mode=qc.Selection))
+
                 return True
         return super().eventFilter(source, event)
 
@@ -203,6 +209,9 @@ class BrowserWindow(QMainWindow):
         QtWidgets.QShortcut("Ctrl+T", self, activated=self.new_tab)
         QtWidgets.QShortcut("Ctrl+R", self, activated=self.reload)
 
+        QtWidgets.QShortcut("Alt+Left", self, activated=self.go_back)
+        QtWidgets.QShortcut("Alt+Right", self, activated=self.go_forward)
+
         self.resize(1024, 768)
 
     def eventFilter(self, object, event):
@@ -267,10 +276,13 @@ class BrowserWindow(QMainWindow):
             else:
                 qurl.setScheme('http')
 
+        if not self.webviews:
+            self.new_tab(url)
         self.webviews[self.active_tab].load(qurl)
         self.urlbar.setText(url)
 
     def select_urlbar(self):
+        print("Supposedly selecting urlbar")
         self.urlbar.selectAll()
         self.urlbar.setFocus()
 
@@ -394,6 +406,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     app = QApplication(sys.argv)
+
     win = BrowserWindow()
     for url in args:
         win.new_tab(url)
