@@ -16,17 +16,21 @@ def has_camera():
        say, exiting with a different status if there's no camera.
        So we have to parse the output.
     '''
-    output = subprocess.check_output(["/usr/bin/gphoto2", "--auto-detect"]).split('\n')
-    seen_separator = False
-    for line in output:
-        if seen_separator:
-            if len(line) > 1 and not line[0].isspace():
-                global camera_name
-                camera_name = line.strip()
-                return camera_name
-        elif line.startswith("---------------"):
-            seen_separator = True
-    return False
+    try:
+        output = subprocess.check_output(["/usr/bin/gphoto2",
+                                          "--auto-detect"]).split('\n')
+        seen_separator = False
+        for line in output:
+            if seen_separator:
+                if len(line) > 1 and not line[0].isspace():
+                    global camera_name
+                    camera_name = line.strip()
+                    return camera_name
+            elif line.startswith("---------------"):
+                seen_separator = True
+        return False
+    except:
+        return False
 
 class Gphoto :
 

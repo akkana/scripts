@@ -147,8 +147,10 @@ class MotionDetectorViewer() :
            Image can be a PIL Image or a filename.
            Return True for success, False for error.
         '''
+        print "load_image", img
         self.cur_img = img
         if not img:
+            print "No image to load, returning"
             return
 
         # Is this a PIL Image? Does it have a mode attribute?
@@ -156,7 +158,7 @@ class MotionDetectorViewer() :
             print "Displaying the image already in memory"
             has_alpha = img.mode == 'RGBA'
             newpb = gtk.gdk.pixbuf_new_from_data(
-                img.tostring(),         # data
+                img.tobytes(),          # data
                 gtk.gdk.COLORSPACE_RGB, # color mode
                 has_alpha,
                 8,                      # bits
@@ -196,9 +198,11 @@ class MotionDetectorViewer() :
 
     def show_image(self):
         if not self.gc:
+            print "No GC!"
             return
 
         if not self.pixbuf:
+            print "No pixbuf!"
             return
 
         self.drawing_area.window.draw_pixbuf(self.gc, self.pixbuf, 0, 0, 0, 0)
@@ -237,6 +241,9 @@ if __name__ == '__main__':
     res=[320, 240]
     test_borders = [ [ [50, 270], [40, 200] ] ]
     localdir = os.path.expanduser('~/snapshots')
+    if not os.path.exists(localdir):
+        print localdir, "doesn't exist, can't save any snapshots"
+        sys.exit(1)
     remotedir = os.path.expanduser('~/moontrade/snapshots')
     #full_res = [3648, 2736]
     full_res = [1024, 768]

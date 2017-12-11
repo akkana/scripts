@@ -26,21 +26,28 @@ import os, sys
 import subprocess
 import time
 import StringIO
+import io
+from PIL import Image
+
+# Used to import this in PiCamera's __init__, but then the module
+# isn't available outside that function.
+# So we need to import it here and use a global variable, sigh.
+try:
+    import picamera
+    use_picamera = True
+except ImportError:
+    use_picamera = False
 
 class PiCamera:
 
     def __init__(self, verbose=False):
         self.verbose = verbose
-        try:
-            import picameraXXX
-            self.use_picamera = True
-            # temporarily not using picamera until we know how to
-            # take a picture in memory
-            if self.verbose:
+
+        self.use_picamera = use_picamera
+        if self.verbose:
+            if use_picamera:
                 print "Using picamera module"
-        except ImportError:
-            self.use_picamera = False
-            if self.verbose:
+            else:
                 print "Using raspistill"
 
     def take_still(self, outfile='/tmp/still.jpg',
@@ -54,7 +61,7 @@ class PiCamera:
                          res=[640, 480], format=None):
         '''Take a still photo by calling raspistill.
            If outfile is '-' then we will take a photo to memory
-           and return the buffer.
+           and return the buffer in a format suitable for PIL.
         '''
         if not os.path.exists('/usr/bin/raspistill'):
             raise SystemError, \
@@ -105,23 +112,43 @@ class PiCamera:
         '''
         if self.verbose:
             print "Taking photo with picamera module"
+
         with picamera.PiCamera() as camera:
             camera.resolution = res
             camera.start_preview()
             # Camera warm-up time
             time.sleep(2)
-            if still:
-                camera.capture(outfile)
+            if outfile == '-':
+                stream = io.BytesIO()
+                camera.capture(stream, format='jpeg')
+                # "Rewind" the stream to the beginning to read its contents
+                stream.seek(0)
+                return stream
             else:
-                camera.brightness = 60
-                camera.start_recording('video.h264')
-                sleep(10)
-                camera.stop_recording()
+                camera.capture(outfile)
 
             # Is this needed? What does previewing mean?
             camera.stop_preview()
 
-    def take_video_shell(self, outfile='/tmp/still.jpg',
+    def take_video_picamera(self, outfile='/tmp/video.h264',
+                   res=[640, 480], format=None):
+        '''This routine is untested and probably broken.'''
+        if self.verbose:
+            print "Taking photo with picamera module"
+        with self.camera as camera:
+            camera.resolution = res
+            camera.start_preview()
+            # Camera warm-up time
+            time.sleep(2)
+            camera.brightness = 60
+            camera.start_recording('video.h264')
+            sleep(10)
+            camera.stop_recording()
+
+            # Is this needed? What does previewing mean?
+            camera.stop_preview()
+
+    def take_video_shell(self, outfile='/tmp/video.h264',
                    res=[640, 480], format=None):
         '''This routine is untested and probably broken.'''
         if not self.has_camera():
