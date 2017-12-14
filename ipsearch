@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # Search for IP clients on the current network.
 # Only tested on Linux; requires ping or the Linux arguments for arp.
@@ -68,7 +68,7 @@ def ip_addr(iface):
 
 def scan(iface="eth0", ping_fn=ping, ping_first=False):
     myip = ip_addr(iface)
-    print("My IP is", myip)
+    print("My IP is", myip, "on", iface)
     mynetwork = '.'.join(myip.split('.')[0:3])
     print("My network is", mynetwork)
     fmt = "%16s  %18s  %12s  %s"
@@ -110,7 +110,19 @@ if __name__ == "__main__":
 """ % sys.argv[0])
         sys.exit(1)
 
-    iface = "eth0"
+    ifaces = [ "eth0", "wlan0" ]
+    myip = None
+
+    for iface in ifaces:
+        try:
+            myip = ip_addr(iface)
+            break
+        except OSError:
+            continue
+
+    if not myip:
+        print("Couldn't find my IP address")
+        sys.exit(1)
 
     try:
         if len(sys.argv) > 1 and sys.argv[1].startswith("-a"):
