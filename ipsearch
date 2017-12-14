@@ -66,7 +66,7 @@ def ip_addr(iface):
                        struct.pack('256s', bytes(iface[:15], "utf-8")))
     return socket.inet_ntoa(info[20:24])
 
-def scan(iface="eth0", ping_fn=ping, ping_first=False):
+def scan(iface="eth0", ping_fn=ping, ping_first=True):
     myip = ip_addr(iface)
     print("My IP is", myip, "on", iface)
     mynetwork = '.'.join(myip.split('.')[0:3])
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         if len(sys.argv) > 1 and sys.argv[1].startswith("-a"):
             scan(iface, arp)
         elif len(sys.argv) > 1 and sys.argv[1].startswith("-p"):
-            scan(iface, ping_first=True)
+            scan(iface, ping_first=False)
         elif len(sys.argv) > 1:
             Usage()
         else:
