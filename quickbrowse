@@ -76,16 +76,28 @@ class BrowserView(QWebEngineView):
             and event.child().isWidgetType()):
             self._glwidget = event.child()
             self._glwidget.installEventFilter(self)
-        elif (event.type() == QEvent.MouseButtonPress
-              and source is self._glwidget):
-            if event.button() == 4:    # middle button is 4. Go figure.
+        elif event.type() == QEvent.MouseButtonPress:
+            # Examples I've seen add "and source is self._glwidget)"
+            # but that's not always true, so it leads us to miss
+            # button clicks.
+
+            # Sometimes left button clicks magically work, but other
+            # times they do nothing. So handle them ourselves.
+            if event.button() == 1:
+                # It's so frustrating that there's no way to say
+                # "the link currently under the mouse"!
+                self.browser_win.load_url(self.last_hovered)
+                return True
+
+            # middle button is 4. Go figure.
+            if event.button() == 4:
                 if self.last_hovered:
                     self.browser_win.new_tab(self.last_hovered)
                 else:
                     qc = QApplication.clipboard()
                     self.browser_win.load_url(qc.text(mode=qc.Selection))
-
                 return True
+
         return super().eventFilter(source, event)
 
     # Override the context menu event so we can copy the clipboard
@@ -282,7 +294,6 @@ class BrowserWindow(QMainWindow):
         self.urlbar.setText(url)
 
     def select_urlbar(self):
-        print("Supposedly selecting urlbar")
         self.urlbar.selectAll()
         self.urlbar.setFocus()
 
@@ -389,7 +400,6 @@ if __name__ == '__main__':
         urls = args[1:]
         progname = get_procname(sys.argv)
         pid = find_proc_by_name(progname)
-        print("progname is", progname, ", pid is", pid)
         if pid:
             # Create the file of URLs:
             with open(URL_FILE % pid, 'w') as url_fp:
