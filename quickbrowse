@@ -83,14 +83,13 @@ class BrowserView(QWebEngineView):
 
             # Sometimes left button clicks magically work, but other
             # times they do nothing. So handle them ourselves.
-            if event.button() == 1:
+            if event.button() == Qt.LeftButton:
                 # It's so frustrating that there's no way to say
                 # "the link currently under the mouse"!
                 self.browser_win.load_url(self.last_hovered)
                 return True
 
-            # middle button is 4. Go figure.
-            if event.button() == 4:
+            if event.button() == Qt.MidButton:
                 if self.last_hovered:
                     self.browser_win.new_tab(self.last_hovered)
                 else:
@@ -173,6 +172,8 @@ class BrowserWindow(QMainWindow):
 
         self.setWindowTitle("Quickbrowse")
 
+        self.init_tab_name_len = 40
+
         toolbar = QToolBar("Toolbar")
         self.addToolBar(toolbar)
 
@@ -227,18 +228,29 @@ class BrowserWindow(QMainWindow):
         self.resize(1024, 768)
 
     def eventFilter(self, object, event):
-        if object == self.tabwidget.tabBar() and \
-            event.type() in [QEvent.MouseButtonPress,
-                             QEvent.MouseButtonRelease] and \
-            event.button() == Qt.MidButton:
-            tabindex = object.tabAt(event.pos())
+        if object != self.tabwidget.tabBar():
+            return False
+
+        if event.type() not in [QEvent.MouseButtonPress,
+                                QEvent.MouseButtonRelease]:
+            return False
+
+        tabindex = object.tabAt(event.pos())
+
+        if event.button() == Qt.LeftButton:
             if event.type() == QEvent.MouseButtonPress:
-                self.prev_middle = tabindex
+                self.active_tab = tabindex
+            return False    # So we'll still switch to that tab
+
+        if event.button() == Qt.MidButton:
+            if event.type() == QEvent.MouseButtonPress:
+                    self.prev_middle = tabindex
             else:
                 if tabindex != -1 and tabindex == self.prev_middle:
                     self.close_tab(tabindex)
                 self.prev_middle = -1
             return True
+
         return False
 
     def new_tab(self, url=None):
@@ -258,7 +270,11 @@ class BrowserWindow(QMainWindow):
         #       webview.page().profile().isOffTheRecord())
         # print("In new tab, view is", webview, "and page is", webpage)
 
-        self.tabwidget.addTab(webview, "New tab")
+        if url:
+            init_name = url[:self.init_tab_name_len]
+        else:
+            init_name = "New tab"
+        self.tabwidget.addTab(webview, init_name)
 
         webview.urlChanged.connect(webview.url_changed)
         webview.loadStarted.connect(webview.load_started)
@@ -276,6 +292,8 @@ class BrowserWindow(QMainWindow):
         self.tabwidget.removeTab(tabindex)
 
     def load_url(self, url):
+        '''Load the given URL in the current tab.
+        '''
         qurl = QUrl(url)
         if not qurl.scheme():
             if os.path.exists(url):
@@ -290,6 +308,9 @@ class BrowserWindow(QMainWindow):
 
         if not self.webviews:
             self.new_tab(url)
+        else:
+            self.set_tab_text(url[:self.init_tab_name_len],
+                              self.webviews[self.active_tab])
         self.webviews[self.active_tab].load(qurl)
         self.urlbar.setText(url)
 
