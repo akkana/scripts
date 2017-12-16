@@ -252,8 +252,8 @@ class ImageViewerWindow(Gtk.Window):
     def run(self):
         self.show_all();
         self.set_opacity(.5)
-        print("xid: ")
-        print(self.xid)
+        # print("xid: ")
+        # print(self.xid)
         Gtk.main()
 
     def set_key_handler(self, fcn):
