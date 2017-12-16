@@ -135,7 +135,7 @@ class AnalemmaWindow:
                         "shortest day"     : ( 0,  1),
                         "latest sunset"    : (-1,  0),
                         "earliest sunrise" : ( 1,  0),
-                        "longest day"      : ( 0, -1)
+                        "longest day"      : ( 0, -.5)
             }
             factor = 30
             xoffset = int(offsets[key][0] * factor)
@@ -382,16 +382,61 @@ Latest sunset: %s
             obslabel = "Observer in " + self.observer.name
         self.draw_string(obslabel, 10, 10)
 
+    def save(self):
+        print "Saved"
+
+    def key_press(self, widget, event):
+        if event.string == "q":
+            gtk.main_quit()
+        if event.keyval == gtk.keysyms.s and \
+           event.state == gtk.gdk.CONTROL_MASK:
+            self.save()
+            return True
+        return False
+
     def show_window(self):
         win = gtk.Window()
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.connect("expose-event", self.expose_handler)
+        win.connect("key-press-event", self.key_press)
         win.add(self.drawing_area)
         self.drawing_area.show()
         win.connect("destroy", gtk.main_quit)
         win.set_default_size(1025, 512)
         win.show()
         gtk.main()
+
+def observer_for_city(city):
+    try:
+        observer = ephem.city(city)
+        return observer
+    except KeyError:
+        # Add some cities pyephem doesn't know:
+        if city == 'San Jose':     # San Jose, CA at Houge Park
+            observer = ephem.Observer()
+            observer.name = "San Jose"
+            observer.lon = '-121:56.8'
+            observer.lat = '37:15.55'
+            observer.elevation = 100
+            return observer
+
+        elif city == 'Los Alamos':  # Los Alamos, NM Nature Center
+            observer = ephem.Observer()
+            observer.name = "Los Alamos"
+            observer.lon = '-106:18.36'
+            observer.lat = '35:53.09'
+            observer.elevation = 2100
+            return observer
+
+        elif city == 'White Rock':  # White Rock, NM Visitor Center
+            observer = ephem.Observer()
+            observer.name = "White Rock"
+            observer.lon = '-106:12.75'
+            observer.lat = '35:49.61'
+            observer.elevation = 1960
+            return observer
+
+        return None
 
 if __name__ == "__main__":
     def Usage():
@@ -402,21 +447,19 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
             Usage()
-        observer = ephem.city(sys.argv[1])
+        observer = observer_for_city(sys.argv[1])
+
     elif len(sys.argv) == 3:
         observer = ephem.Observer()
         observer.name = "custom"
         observer.lon = sys.argv[1]
         observer.lat = sys.argv[2]
+
     else:
-        # default to San Jose
-        # pyephem doesn't know ephem.city('San Jose')
-        # Houge Park is -121^56.53' 37^15.38'
-        observer = ephem.Observer()
-        observer.name = "San Jose"
-        observer.lon = '-121:56.8'
-        observer.lat = '37:15.55'
-        observer.elevation = 100
+        observer = observer_for_city('Los Alamos')
+
+    if not observer:
+        print "Can't find an observer for", ' '.join(sys.argv[1:])
 
     awin = AnalemmaWindow(observer, ephem.now().triple()[0])
     print awin.special_dates_str()
