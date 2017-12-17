@@ -407,8 +407,7 @@ Latest sunset: %s
         self.draw_string(obslabel, 10, 10)
 
     def save(self):
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 100, 100)
-        surface.write_to_png ("example.png")
+        self.ctx.get_target().write_to_png ("example.png")
         print("Saved")
 
     def key_press(self, widget, event):
