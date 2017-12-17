@@ -39,6 +39,7 @@ class AnalemmaWindow(Gtk.Window):
         self.backside_color = (1, .7, 0)
         self.text_color = (1, 1, 0)
         self.background_color = (0, 0, 1)
+        self.special_dot_size = 5
 
     def draw_sun_position(self, date):
         if not self.drawing_area:
@@ -141,7 +142,7 @@ class AnalemmaWindow(Gtk.Window):
             # print("Computed", self.sun.az, self.sun.alt)
             x, y = self.project(self.sun.az, self.sun.alt)
             # print("x, y =", x, y)
-            self.draw_dot(x, y, 6)
+            self.draw_dot(x, y, self.special_dot_size)
 
             # Offsets to figure out where to draw the string.
             # That's tough, because they're normally on top of each other.
@@ -175,14 +176,19 @@ class AnalemmaWindow(Gtk.Window):
             self.observer.date = self.gmt_for_time_on_date(equinox, (12, 0, 0))
             self.sun.compute(self.observer)
             x, y = self.project(self.sun.az, self.sun.alt)
-            self.draw_dot(x, y, 7)
+            print("%s equinox: %s" % (whicheq, str(self.observer.date)))
+            self.draw_dot(x, y, self.special_dot_size)
             x1 = x + offsets[0] * 20
             self.draw_line(x, y, x1, y)
             eqstr = "%s equinox\n%s" % (whicheq, str(equinox).split(' ')[0])
             self.draw_string(eqstr, x1, y, offsets)
 
-        draw_equinox("%d/1/1" % self.year, "Vernal", (-1, 0))
-        draw_equinox(observer.date, "Autumnal", (1, 0))
+        if observer.lat >= 0:    # Northern hemisphere
+            draw_equinox("%d/1/1" % self.year, "Vernal", (-1, 0))
+            draw_equinox(observer.date, "Autumnal", (1, 0))
+        else:                    # Southern hemisphere
+            draw_equinox("%d/1/1" % self.year, "Autumnal", (-1, 0))
+            draw_equinox(observer.date+10, "Vernal", (1, 0))
 
     def special_dates_str(self):
         if not self.special_dates:
@@ -237,16 +243,16 @@ Latest sunset: %s
         self.ctx.fill()
 
     def draw_dot(self, x, y, dotsize):
-        # Draw the dot centered, not hanging off to the lower right:
-        x = int(x - dotsize / 2)
-        y = int(y - dotsize / 2)
-
         if dotsize == 1:
             self.draw_line(x, y, x, y)
+
         elif dotsize <= 4:
-            # self.ctx.arc(x, y, dotsize, 0, 2*math.pi)
+            # Draw the dot centered, not hanging off to the lower right:
+            x = int(x - dotsize / 2)
+            y = int(y - dotsize / 2)
             self.draw_rectangle(x, y, dotsize, dotsize)
             self.ctx.fill()
+
         else:
             self.ctx.arc(x, y, dotsize, 0, 2*math.pi)
             self.ctx.fill()
@@ -288,7 +294,11 @@ Latest sunset: %s
     def project_rectangular(self, az, alt):
         """Rectangular -- don't do any projection, just scaling"""
 
-        # az -= math.pi
+        if az < math.pi/2:
+            az = math.pi - az
+        elif az > 3*math.pi/2:
+            az = 3 * math.pi - az
+
 
         y = int((math.pi/2 - alt) * (self.height * 2 / math.pi))
         x = int(az * self.width / math.pi - self.width/2)
@@ -323,12 +333,8 @@ Latest sunset: %s
         return (x, y)
 
     def project_and_draw(self, az, alt, dotsize=0):
-        if az < math.pi/2:
+        if az < math.pi/2 or az > 3*math.pi/2:
             self.ctx.set_source_rgb(*self.backside_color)
-            az = math.pi - az
-        elif az > 3*math.pi/2:
-            self.ctx.set_source_rgb(*self.backside_color)
-            az = 3 * math.pi - az
         else:
             self.ctx.set_source_rgb(*self.sun_color)
 
