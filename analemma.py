@@ -1,35 +1,48 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # Display an analemma for a specified location and time.
 # Copyright 2011 by Akkana Peck: share and enjoy under the GPL v2 or later.
 
-import gtk
 import ephem
 import sys
 import os
 import math
 
-class AnalemmaWindow:
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('PangoCairo', '1.0')
+
+from gi.repository import Gtk
+from gi.repository import Gdk
+from gi.repository import GdkPixbuf
+import cairo
+from gi.repository import Pango
+from gi.repository import PangoCairo
+from PIL import Image
+
+class AnalemmaWindow(Gtk.Window):
     def __init__(self, observer, year):
+        super(AnalemmaWindow, self).__init__()
+
         self.observer = observer
         self.year = year
 
         self.special_dates = None
         self.drawing_area = None
-        self.xgc = None
-        self.bgc = None
-        self.specialgc = None
+
         self.width = 0
         self.height = 0
         self.sun = ephem.Sun()
         self.sinusoidal = False
 
+        self.sun_color = (1, 1, 0)
+        self.backside_color = (1, .7, 0)
+        self.text_color = (1, 1, 0)
+        self.background_color = (0, 0, 1)
+
     def draw_sun_position(self, date):
         if not self.drawing_area:
-            print "no drawing area"
-            return
-        if not self.xgc:
-            print "no GC"
+            print("no drawing area")
             return
         self.observer.date = self.local_to_gmt(date, reverse=True)
 
@@ -64,7 +77,8 @@ class AnalemmaWindow:
 
         # Start just after midnight on New Year's Day.
         dt = self.local_to_gmt('%d/01/01 00:00:01' % (self.year))
-        while (dt.tuple()[0] == self.year):
+        # Loop until it's next year:
+        while (dt.tuple()[0] <= self.year):
             self.observer.date = dt
             risetime = self.observer.next_rising(ephem.Sun())
             self.observer.date = risetime
@@ -109,7 +123,7 @@ class AnalemmaWindow:
     def draw_special_dates(self, timestr):
         # Make a tuple out from timestr
         if ':' in timestr:
-            timetuple = map(int, timestr.split(':'))
+            timetuple = list(map(int, timestr.split(':')))
             while len(timetuple) < 3:
                 timetuple.append(0)
         else:
@@ -122,9 +136,12 @@ class AnalemmaWindow:
 
             gmt = self.gmt_for_time_on_date(d, timetuple)
             self.observer.date = self.gmt_for_time_on_date(d, timetuple)
+            # print(d, "gmt=", gmt)
             self.sun.compute(self.observer)
+            # print("Computed", self.sun.az, self.sun.alt)
             x, y = self.project(self.sun.az, self.sun.alt)
-            self.draw_dot(self.specialgc, x, y, 7)
+            # print("x, y =", x, y)
+            self.draw_dot(x, y, 6)
 
             # Offsets to figure out where to draw the string.
             # That's tough, because they're normally on top of each other.
@@ -140,8 +157,7 @@ class AnalemmaWindow:
             factor = 30
             xoffset = int(offsets[key][0] * factor)
             yoffset = int(offsets[key][1] * factor)
-            self.drawing_area.window.draw_line(self.specialgc, x, y,
-                                               x + xoffset, y + yoffset)
+            self.draw_line(x, y, x + xoffset, y + yoffset)
             s = str(self.special_dates[key])
             if key + " len" in self.special_dates:
                 # for longest/shortest days, split off the time part
@@ -149,8 +165,7 @@ class AnalemmaWindow:
                 # and then add the day length
                 s += ", %.1f hrs" % self.special_dates[key + " len"]
             self.draw_string(key + "\n" + s,
-                             x + xoffset, y + yoffset, self.specialgc,
-                             offsets=offsets[key])
+                             x + xoffset, y + yoffset, offsets=offsets[key])
 
         # Draw the equinoxes too. Solstices are too crowded what with
         # all the other special dates.
@@ -160,11 +175,11 @@ class AnalemmaWindow:
             self.observer.date = self.gmt_for_time_on_date(equinox, (12, 0, 0))
             self.sun.compute(self.observer)
             x, y = self.project(self.sun.az, self.sun.alt)
-            self.draw_dot(self.specialgc, x, y, 7)
+            self.draw_dot(x, y, 7)
             x1 = x + offsets[0] * 20
-            self.drawing_area.window.draw_line(self.specialgc, x, y, x1, y)
+            self.draw_line(x, y, x1, y)
             eqstr = "%s equinox\n%s" % (whicheq, str(equinox).split(' ')[0])
-            self.draw_string(eqstr, x1, y, self.specialgc, offsets)
+            self.draw_string(eqstr, x1, y, offsets)
 
         draw_equinox("%d/1/1" % self.year, "Vernal", (-1, 0))
         draw_equinox(observer.date, "Autumnal", (1, 0))
@@ -211,52 +226,76 @@ Latest sunset: %s
         etuple = edate.tuple()
         return etuple[3] + etuple[4]/60. + etuple[5]/3600.
 
-    def draw_dot(self, gc, x, y, dotsize):
+    def draw_line(self, x1, y1, x2, y2, width=1):
+        self.ctx.set_line_width(width)
+        self.ctx.move_to(x1, y1)
+        self.ctx.line_to(x2, y2)
+        self.ctx.stroke()
+
+    def draw_rectangle(self, x, y, width, height):
+        self.ctx.rectangle(x, y, width, height)
+        self.ctx.fill()
+
+    def draw_dot(self, x, y, dotsize):
         # Draw the dot centered, not hanging off to the lower right:
         x = int(x - dotsize / 2)
         y = int(y - dotsize / 2)
 
         if dotsize == 1:
-            self.drawing_area.window.draw_points(gc, [(x, y)])
+            self.draw_line(x, y, x, y)
         elif dotsize <= 4:
-            self.drawing_area.window.draw_rectangle(gc, True, x, y,
-                                                    dotsize, dotsize)
+            # self.ctx.arc(x, y, dotsize, 0, 2*math.pi)
+            self.draw_rectangle(x, y, dotsize, dotsize)
+            self.ctx.fill()
         else:
-            self.drawing_area.window.draw_arc(gc, True, x, y,
-                                              dotsize, dotsize, 0, 23040)
+            self.ctx.arc(x, y, dotsize, 0, 2*math.pi)
+            self.ctx.fill()
 
-    def draw_string(self, label, x, y, gc=None, offsets=None):
+    def draw_string(self, label, x, y, offsets=None):
         '''Draw a string at the specified point.
            offsets is an optional tuple specifying where the string will
            be drawn relative to the coordinates passed in;
            for instance, if offsets are (-1, -1) the string will be
            drawn with the bottom right edge at the given x, y.
         '''
-        layout = self.drawing_area.create_pango_layout(label)
-        # layout.set_font_description(self.font_desc)
-        if not gc:
-            gc = self.xgc
+        fontname = "Sans Italic 14"
+        # fontname = "Sans Italic 14"
+
+        layout = PangoCairo.create_layout(self.ctx)
+        desc = Pango.font_description_from_string(fontname)
+        layout.set_font_description( desc)
+        layout.set_text(label, -1)
+
         if offsets:
-            # pango draws text with the upper left corner at x, y.
-            # So that's an offset of (1, 1). Adjust if offsets are different.
             width, height = layout.get_pixel_size()
+            # # pango draws text with the upper left corner at x, y.
+            # # So that's an offset of (1, 1). Adjust if offsets are different.
+            # # XXX Cairo may do things differently.
+            # xbearing, ybearing, width, height, xadvance, yadvance = \
+            #                                   self.ctx.text_extents(label)
+
             if offsets[0] == 0:
                 x -= int(width/2)
             elif offsets[0] != 1:
                 x += int(width * offsets[0])
             if offsets[1] != 1:
                 y += int(height * offsets[1] - height/2)
-        self.drawing_area.window.draw_layout(gc, x, y, layout)
+
+        self.ctx.move_to(x, y)
+        PangoCairo.show_layout (self.ctx, layout)
+        # self.ctx.show_text(label)
 
     def project_rectangular(self, az, alt):
         """Rectangular -- don't do any projection, just scaling"""
+
+        # az -= math.pi
 
         y = int((math.pi/2 - alt) * (self.height * 2 / math.pi))
         x = int(az * self.width / math.pi - self.width/2)
 
         return (x, y)
 
-    def project_sinusoidal(self, lon, lat):
+    def project_sinusoidal(self, lon, lat, dotsize=0):
         """Return a sinusoidal projection as (x, y)"""
         # XXX Actually this is bogus, it's not being used right for alt/az.
 
@@ -264,82 +303,64 @@ Latest sunset: %s
         y = int((math.pi/2 - lat) * self.height * 2 / math.pi)
 
         if lat > 90:
-            print "lat is", lat
             return (0, 0)
 
         if lon < math.pi/2:
-            gc = self.bgc
+            self.ctx.set_source_rgb(*self.backside_color)
             lon = math.pi - lon
         elif lon > 3*math.pi/2:
-            gc = self.bgc
+            self.ctx.set_source_rgb(*self.backside_color)
             lon = 3 * math.pi - lon
         else:
-            gc = self.xgc
+            self.ctx.set_source_rgb(*self.sun_color)
 
         x = int(((lon - math.pi) * math.cos(lat) * self.width / math.pi)
                  + self.width/2)
 
         if dotsize > 0:
-            self.draw_dot(gc, x, y, dotsize)
-
-        #print int(lon*180/math.pi), int(lat*180/math.pi), x, y
+            self.draw_dot(x, y, dotsize)
 
         return (x, y)
 
-    def project_and_draw(self, az, alt, dotsize):
+    def project_and_draw(self, az, alt, dotsize=0):
         if az < math.pi/2:
-            gc = self.bgc
+            self.ctx.set_source_rgb(*self.backside_color)
             az = math.pi - az
         elif az > 3*math.pi/2:
-            gc = self.bgc
+            self.ctx.set_source_rgb(*self.backside_color)
             az = 3 * math.pi - az
         else:
-            gc = self.xgc
+            self.ctx.set_source_rgb(*self.sun_color)
 
         x, y = self.project(az, alt)
 
         if dotsize > 0:
-            self.draw_dot(gc, x, y, dotsize)
+            self.draw_dot(x, y, dotsize)
 
-    def project(self, az, alt):
+    def project(self, az, alt, dotsize=0):
         if self.sinusoidal:
             return self.project_sinusoidal(az, alt)
         else:
             return self.project_rectangular(az, alt)
 
-    def expose_handler(self, widget, event):
-        # print "Expose"
-        if not self.xgc:
-            self.xgc = widget.window.new_gc()
-            self.bgc = widget.window.new_gc()
-            self.specialgc = widget.window.new_gc()
-        self.width, self.height = self.drawing_area.window.get_size()
+    def draw(self, widget, ctx):
+        self.ctx = ctx
+
+        self.width, self.height = self.get_size()
 
         # Draw a blue background. But if we're using a sinusoidal
         # projection, then only color the projected part blue.
-        self.xgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 65535))
+        ctx.set_source_rgb(*self.background_color)
         if self.sinusoidal:
-        # the "backside" GC will have a different color
-            self.bgc.set_rgb_fg_color(gtk.gdk.Color(0, 0, 0))
-            self.drawing_area.window.draw_rectangle(self.bgc, True, 0, 0,
-                                                    self.width, self.height)
+            self.draw_rectangle(0, 0, self.width, self.height)
             for f in range(0, int(math.pi * 100)):
                 theta = f/200.
-                (x, y) = self.project_sinusoidal(math.pi/2, theta, 0)
-                #print f, theta, x, y
-                self.drawing_area.window.draw_rectangle(self.xgc, True,
-                                                        x, y,
-                                                        self.width - 2*x, 4)
+                (x, y) = self.project_sinusoidal(math.pi/2, theta)
+                self.draw_rectangle(x, y, self.width - 2*x, 4)
         else:
-            self.drawing_area.window.draw_rectangle(self.xgc, True, 0, 0,
-                                                    self.width, self.height)
-
-        # "Special" gc to be used for showing special dates
-        self.specialgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 65535))
+            self.draw_rectangle(0, 0, self.width, self.height)
 
         # Draw some projected grid lines
-        #self.xgc.set_rgb_fg_color(gtk.gdk.Color(16384, 16384, 16384))
-        self.xgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 65535))
         for f in range(0, int(math.pi * 100), 5):
             theta = f/200.   # i is going from 0 to pi/2
             # Draw the equator: (doesn't actually show up)
@@ -354,10 +375,7 @@ Latest sunset: %s
             # self.project_and_draw(math.pi*1.25, theta, 1)
 
         # Then prepare to draw the sun in yellow:
-        self.xgc.set_rgb_fg_color(gtk.gdk.Color(65535, 65535, 0))
-
-        # the "backside" GC will have a different color
-        self.bgc.set_rgb_fg_color(gtk.gdk.Color(65535, 32767, 0))
+        ctx.set_source_rgb(*self.sun_color)
 
         # Calculate earliest sunrise and suchlike.
         self.calc_special_dates()
@@ -383,28 +401,26 @@ Latest sunset: %s
         self.draw_string(obslabel, 10, 10)
 
     def save(self):
-        print "Saved"
+        print("Saved")
 
     def key_press(self, widget, event):
+        '''Handle a key press event anywhere in the window'''
         if event.string == "q":
-            gtk.main_quit()
-        if event.keyval == gtk.keysyms.s and \
-           event.state == gtk.gdk.CONTROL_MASK:
-            self.save()
-            return True
+            Gtk.main_quit()
+            return
+        print("Unknown key", event.string)
         return False
 
     def show_window(self):
-        win = gtk.Window()
-        self.drawing_area = gtk.DrawingArea()
-        self.drawing_area.connect("expose-event", self.expose_handler)
-        win.connect("key-press-event", self.key_press)
-        win.add(self.drawing_area)
-        self.drawing_area.show()
-        win.connect("destroy", gtk.main_quit)
-        win.set_default_size(1025, 512)
-        win.show()
-        gtk.main()
+        self.drawing_area = Gtk.DrawingArea()
+        self.set_default_size(1025, 512)
+        self.add(self.drawing_area)
+        # self.connect("delete_event", Gtk.main_quit)
+        self.connect("destroy", Gtk.main_quit)
+        self.connect("key-press-event", self.key_press)
+        self.drawing_area.connect('draw', self.draw)
+        self.show_all()
+        Gtk.main()
 
 def observer_for_city(city):
     try:
@@ -441,13 +457,14 @@ def observer_for_city(city):
 if __name__ == "__main__":
     def Usage():
         progname = os.path.basename(sys.argv[0])
-        print """Usage: %s [cityname]
-       %s [lat lon]""" % (progname, progname)
+        print("""Usage: %s [cityname]
+       %s [lat lon]""" % (progname, progname))
         sys.exit(0)
     if len(sys.argv) == 2:
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
             Usage()
         observer = observer_for_city(sys.argv[1])
+        print(sys.argv[1], observer.lon, observer.lat)
 
     elif len(sys.argv) == 3:
         observer = ephem.Observer()
@@ -459,9 +476,9 @@ if __name__ == "__main__":
         observer = observer_for_city('Los Alamos')
 
     if not observer:
-        print "Can't find an observer for", ' '.join(sys.argv[1:])
+        print("Can't find an observer for", ' '.join(sys.argv[1:]))
 
     awin = AnalemmaWindow(observer, ephem.now().triple()[0])
-    print awin.special_dates_str()
+    print(awin.special_dates_str())
     awin.show_window()
 
