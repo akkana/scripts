@@ -38,7 +38,7 @@ class AnalemmaWindow(Gtk.Window):
         self.sun_color = (1, 1, 0)
         self.backside_color = (1, .7, 0)
         self.text_color = (1, 1, 0)
-        self.background_color = (0, 0, 1)
+        self.background_color = (0, 0, 1, 1)
         self.special_dot_size = 5
 
     def draw_sun_position(self, date):
@@ -349,14 +349,21 @@ Latest sunset: %s
         else:
             return self.project_rectangular(az, alt)
 
-    def draw(self, widget, ctx):
+    def draw(self, widget, ctx, background=None):
+        '''Draw everything: the analemma and all the labels.
+           If background isn't passed, we'll default to
+           self.background_color (opaque blue), but save_image()
+           will pass in a transparent background.
+        '''
         self.ctx = ctx
 
         self.width, self.height = self.get_size()
 
         # Draw a blue background. But if we're using a sinusoidal
         # projection, then only color the projected part blue.
-        ctx.set_source_rgb(*self.background_color)
+        if not background:
+            background = self.background_color
+        ctx.set_source_rgba(*background)
         if self.sinusoidal:
             self.draw_rectangle(0, 0, self.width, self.height)
             for f in range(0, int(math.pi * 100)):
@@ -406,9 +413,31 @@ Latest sunset: %s
             obslabel = "Observer in " + self.observer.name
         self.draw_string(obslabel, 10, 10)
 
-    def save(self):
-        self.ctx.get_target().write_to_png ("example.png")
-        print("Saved")
+    def save_image(self):
+        '''Save the analemma as a PNG image, with the background
+           transparent so it can be overlayed on top of a planetarium
+           show, scenics, etc.
+           Will save to a file named Analemma-$sitename.png
+           with spaces replaced with dashes.
+        '''
+        outfile = "Analemma-%s.png" % self.observer.name.replace(' ', '-')
+
+        dst_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
+                                         self.width, self.height)
+
+        dst_ctx = cairo.Context(dst_surface)
+
+        # draw() will overwrite self.ctx, so save it first:
+        save_ctx = self.ctx
+
+        # Draw everything again to the new context.
+        self.draw(None, dst_ctx, (0, 0, 1, 0))
+
+        # Restore the GUI context:
+        self.ctx = save_ctx
+
+        dst_surface.write_to_png(outfile)
+        print("Saved to", outfile)
 
     def key_press(self, widget, event):
         '''Handle a key press event anywhere in the window'''
@@ -420,7 +449,7 @@ Latest sunset: %s
             return
         if event.keyval == Gdk.KEY_s and \
            event.state & Gdk.ModifierType.CONTROL_MASK:
-            self.save()
+            self.save_image()
             return True
         return False
 
