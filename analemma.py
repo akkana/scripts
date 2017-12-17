@@ -18,7 +18,6 @@ from gi.repository import GdkPixbuf
 import cairo
 from gi.repository import Pango
 from gi.repository import PangoCairo
-from PIL import Image
 
 class AnalemmaWindow(Gtk.Window):
     def __init__(self, observer, year):
@@ -430,7 +429,8 @@ Latest sunset: %s
         # draw() will overwrite self.ctx, so save it first:
         save_ctx = self.ctx
 
-        # Draw everything again to the new context.
+        # Draw everything again to the new context,
+        # with a transparent instead of an opaque background:
         self.draw(None, dst_ctx, (0, 0, 1, 0))
 
         # Restore the GUI context:
