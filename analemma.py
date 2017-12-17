@@ -411,10 +411,16 @@ Latest sunset: %s
 
     def key_press(self, widget, event):
         '''Handle a key press event anywhere in the window'''
-        if event.string == "q":
+        # Note: to handle just printables with no modifier keys,
+        # use e.g. if event.string == "q"
+
+        if event.keyval == Gdk.KEY_q:
             Gtk.main_quit()
             return
-        print("Unknown key", event.string)
+        if event.keyval == Gdk.KEY_s and \
+           event.state & Gdk.ModifierType.CONTROL_MASK:
+            self.save()
+            return True
         return False
 
     def show_window(self):
