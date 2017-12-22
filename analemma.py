@@ -1,7 +1,11 @@
 #! /usr/bin/env python3
 
 # Display an analemma for a specified location and time.
-# Copyright 2011 by Akkana Peck: share and enjoy under the GPL v2 or later.
+# Copyright 2011,2017 by Akkana Peck: share and enjoy under the GPL v2 or later.
+
+# If you see:
+#   Couldn't find foreign struct converter for 'cairo.Context'
+# it probably means you need python3-gi-cairo.
 
 import ephem
 import sys
