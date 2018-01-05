@@ -56,6 +56,7 @@ class ReadlineEdit(QLineEdit):
 # the main BrowserWindow so it can figure out which tab is loading.
 class BrowserView(QWebEngineView):
     def __init__(self, browserwin):
+
         super(BrowserView, self).__init__()
 
         self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
@@ -70,6 +71,11 @@ class BrowserView(QWebEngineView):
         # then when we see a middleclick we can load that URL.
         # Again, ICK!
         self.last_hovered = None
+
+        # Another ICK -- there's no reliable way to get URL loading
+        # errors, so we'll store URLs we try to load, and compare
+        # after load_finished to see if we're in the right place.
+        self.try_url = None
 
     def eventFilter(self, source, event):
         if (event.type() == QEvent.ChildAdded and source is self
@@ -124,17 +130,19 @@ class BrowserView(QWebEngineView):
     #
 
     def url_changed(self, url):
-        if url != self.browser_win.urlbar.text():
-            # I can't find any way to find out about load errors.
-            # But an attempted load that fails gives a url_changed(about:blank)
-            # so maybe we can detect it that way.
-            urlbar = self.browser_win.urlbar
-            if url.toString() == 'about:blank':
-                self.browser_win.statusBar().showMessage("Couldn't load '%s'" %
-                                                         urlbar.text())
-                print("Couldn't load " + urlbar.text())
-            else:
-                urlbar.setText(url.toDisplayString())
+        # I can't find any way to find out about load errors.
+        # But an attempted load that fails gives a url_changed(about:blank)
+        # so maybe we can detect it that way.
+        if not url or 'blank' in url.toString():
+            self.browser_win.statusBar().showMessage("Couldn't load '%s'" %
+                                                     self.try_url)
+            return
+
+        if self.browser_win.webviews[self.browser_win.active_tab] != self:
+            return
+
+        urlbar = self.browser_win.urlbar
+        urlbar.setText(url.toDisplayString())
 
     def link_hover(self, url):
         self.browser_win.statusBar().showMessage(url)
@@ -228,6 +236,8 @@ class BrowserWindow(QMainWindow):
         self.resize(1024, 768)
 
     def eventFilter(self, object, event):
+        '''Handle button presses in the tab bar'''
+
         if object != self.tabwidget.tabBar():
             return False
 
@@ -240,6 +250,7 @@ class BrowserWindow(QMainWindow):
         if event.button() == Qt.LeftButton:
             if event.type() == QEvent.MouseButtonPress:
                 self.active_tab = tabindex
+                self.urlbar.setText(self.webviews[tabindex].url().toDisplayString())
             return False    # So we'll still switch to that tab
 
         if event.button() == Qt.MidButton:
@@ -283,16 +294,16 @@ class BrowserWindow(QMainWindow):
         webpage.linkHovered.connect(webview.link_hover)
 
         if url:
-            save_active = self.active_tab
-            self.active_tab = len(self.webviews)-1
-            self.load_url(url)
-            self.active_tab = save_active
+            # save_active = self.active_tab
+            # self.active_tab = len(self.webviews)-1
+            self.load_url(url, len(self.webviews)-1)
+            # self.active_tab = save_active
 
     def close_tab(self, tabindex):
         self.tabwidget.removeTab(tabindex)
 
-    def load_url(self, url):
-        '''Load the given URL in the current tab.
+    def load_url(self, url, tab=None):
+        '''Load the given URL in the specified tab, or current tab if tab=None.
         '''
         qurl = QUrl(url)
         if not qurl.scheme():
@@ -308,11 +319,15 @@ class BrowserWindow(QMainWindow):
 
         if not self.webviews:
             self.new_tab(url)
+            tab = 0
         else:
+            if not tab:
+                tab = self.active_tab
             self.set_tab_text(url[:self.init_tab_name_len],
-                              self.webviews[self.active_tab])
-        self.webviews[self.active_tab].load(qurl)
-        self.urlbar.setText(url)
+                              self.webviews[tab])
+        self.webviews[tab].load(qurl)
+        if tab == self.active_tab:
+            self.urlbar.setText(url)
 
     def select_urlbar(self):
         self.urlbar.selectAll()
