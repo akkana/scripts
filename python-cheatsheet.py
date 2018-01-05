@@ -226,6 +226,10 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
 # Useful regular expressions
 ########################################################
 
+# Difference between match and search:
+# match matches only from the beginning of the string,
+# search will look anywhere in the string.
+
 # Find MAC address:
 match = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', instr, re.I)
 if match: return match.group()
@@ -330,6 +334,21 @@ proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
 while True:
     line = proc.stdout.readline()
     print("line: %s" % line)
+
+########################################################
+# Conditional import and testing imported libraries
+########################################################
+
+try:
+    import foo
+except:
+    pass
+import sys
+
+if 'foo' in sys.modules:
+    myfoo = foo.Foo()
+else:
+    myfoo = None
 
 ########################################################
 # OS-specific stuff
@@ -546,6 +565,12 @@ plt.figure(1).canvas.mpl_connect('key_press_event',
                                      sys.exit(0) if e.key == 'ctrl+q'
                                      else None)
 
+# Apply a function to a numpy array, returning another array
+def wraparound(x):
+    if x > 12: return x-24
+    return x
+vwraparound = np.vectorize(wraparound)
+wrapped_arr = vwraparound(orig_arr)
 
 ################################################################
 # Python3 differences
