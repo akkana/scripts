@@ -69,7 +69,6 @@ class BrowserView(QWebEngineView):
         # the URL under the mouse during the click. But we do get hover
         # events -- so if we always record the last hovered URL,
         # then when we see a middleclick we can load that URL.
-        # Again, ICK!
         self.last_hovered = None
 
         # Another ICK -- there's no reliable way to get URL loading
@@ -82,34 +81,28 @@ class BrowserView(QWebEngineView):
             and event.child().isWidgetType()):
             self._glwidget = event.child()
             self._glwidget.installEventFilter(self)
+            # return super().eventFilter(source, event)
+            return True
 
-        elif event.type() == QEvent.MouseButtonPress:
-            # Examples I've seen add "and source is self._glwidget)"
-            # but that's not always true, so it leads us to miss
-            # button clicks.
-
-            # Sometimes left button clicks magically work, but other
-            # times they do nothing. So handle them ourselves.
-            if event.button() == Qt.LeftButton:
-                if self.last_hovered:
-                    # It's so frustrating that there's no way to say
-                    # "the link currently under the mouse"!
-                    self.browser_win.load_url(self.last_hovered)
-                    return True
-
-                # If the click is in the scrollbar, we rely on the parent
-                # object to scroll the page:
-                return super().eventFilter(source, event)
-
-            if event.button() == Qt.MidButton:
-                if self.last_hovered:
-                    self.browser_win.new_tab(self.last_hovered)
-                else:
-                    qc = QApplication.clipboard()
-                    self.browser_win.load_url(qc.text(mode=qc.Selection))
-                return True
+        elif event.type() == QEvent.MouseButtonPress and \
+             event.button() == Qt.MidButton and not self.last_hovered:
+                # if self.last_hovered:
+                #     self.browser_win.new_tab(self.last_hovered)
+                # else:
+            qc = QApplication.clipboard()
+            print("Selection")
+            self.browser_win.load_url(qc.text(mode=qc.Selection))
+            return True
 
         return super().eventFilter(source, event)
+
+    def createWindow(self, wintype):
+        # Possible values for wintype: WebBrowserWindow, WebBrowserTab,
+        # WebDialog, WebBrowserBackgroundTab, all attributes of QWebEnginePage.
+        # Right now, though, we're ignoring type and making a new background
+        # tab in all cases.
+        self.browser_win.new_tab()
+        return self.browser_win.webviews[-1]
 
     # Override the context menu event so we can copy the clipboard
     # selection to primary after a "Copy Link URL" action.
