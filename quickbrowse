@@ -91,10 +91,15 @@ class BrowserView(QWebEngineView):
             # Sometimes left button clicks magically work, but other
             # times they do nothing. So handle them ourselves.
             if event.button() == Qt.LeftButton:
-                # It's so frustrating that there's no way to say
-                # "the link currently under the mouse"!
-                self.browser_win.load_url(self.last_hovered)
-                return True
+                if self.last_hovered:
+                    # It's so frustrating that there's no way to say
+                    # "the link currently under the mouse"!
+                    self.browser_win.load_url(self.last_hovered)
+                    return True
+
+                # If the click is in the scrollbar, we rely on the parent
+                # object to scroll the page:
+                return super().eventFilter(source, event)
 
             if event.button() == Qt.MidButton:
                 if self.last_hovered:
@@ -238,8 +243,6 @@ class BrowserWindow(QMainWindow):
 
     def eventFilter(self, object, event):
         '''Handle button presses in the tab bar'''
-
-        print("BrowserWindow eventFilter")
 
         if object != self.tabwidget.tabBar():
             print("Not in tab bar")
