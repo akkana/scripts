@@ -83,7 +83,7 @@ if __name__ == '__main__':
         print "Initializing the rangefinder ..."
         rf = HC_SR04()
         while True:
-            print "Distance: %.1f inches" % rf.average_distance(verbose=True)
+            print "Distance: %.1f inches" % rf.average_distance_in(verbose=True)
             time.sleep(1)
     except KeyboardInterrupt:
         # User pressed CTRL-C: reset GPIO settings.
