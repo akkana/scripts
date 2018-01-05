@@ -82,6 +82,7 @@ class BrowserView(QWebEngineView):
             and event.child().isWidgetType()):
             self._glwidget = event.child()
             self._glwidget.installEventFilter(self)
+
         elif event.type() == QEvent.MouseButtonPress:
             # Examples I've seen add "and source is self._glwidget)"
             # but that's not always true, so it leads us to miss
@@ -238,12 +239,18 @@ class BrowserWindow(QMainWindow):
     def eventFilter(self, object, event):
         '''Handle button presses in the tab bar'''
 
+        print("BrowserWindow eventFilter")
+
         if object != self.tabwidget.tabBar():
-            return False
+            print("Not in tab bar")
+            return super().eventFilter(object, event)
+            # return False
 
         if event.type() not in [QEvent.MouseButtonPress,
                                 QEvent.MouseButtonRelease]:
-            return False
+            # print("Not a button press or release", event)
+            return super().eventFilter(object, event)
+            # return False
 
         tabindex = object.tabAt(event.pos())
 
@@ -251,7 +258,8 @@ class BrowserWindow(QMainWindow):
             if event.type() == QEvent.MouseButtonPress:
                 self.active_tab = tabindex
                 self.urlbar.setText(self.webviews[tabindex].url().toDisplayString())
-            return False    # So we'll still switch to that tab
+            return super().eventFilter(object, event)
+            # return False    # So we'll still switch to that tab
 
         if event.button() == Qt.MidButton:
             if event.type() == QEvent.MouseButtonPress:
@@ -262,7 +270,8 @@ class BrowserWindow(QMainWindow):
                 self.prev_middle = -1
             return True
 
-        return False
+        print("Unknown button", event)
+        return super().eventFilter(object, event)
 
     def new_tab(self, url=None):
         webview = BrowserView(self)
