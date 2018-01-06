@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# Copyright (C) 2018 by Akkana Peck.
+# Share and enjoy under the GPL v2 or later.
+
+'''A simple private browser.'''
+
 import os
 import sys
 import signal

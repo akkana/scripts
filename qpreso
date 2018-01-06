@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+# Copyright (C) 2018 by Akkana Peck.
+# Share and enjoy under the GPL v2 or later.
+
+"""Viewer for HTML presentations."""
+
+
+import sys
+import os
+import argparse
+
+from PyQt5.QtCore import QUrl
+from PyQt5.QtWidgets import QApplication, QShortcut
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+class PresoView(QWebEngineView):
+    def __init__(self, url, zoom=1.0, show_notes=True):
+
+        super(PresoView, self).__init__()
+
+        # Are we making screenshots? TODO: make this a command-line param.
+        self.make_screenshots = False
+        self.imgnum = 0
+
+        # Size the audience will see (used for converting to images):
+        self.displaywidth = 1024
+        self.displayheight = 768
+        # Size of the window we'll actually display:
+        if show_notes:
+            self.fullwidth = 1366
+        else:
+            self.fullwidth = 1024
+        self.fullheight = 768
+
+        if zoom != 1.0 :
+            self.displaywidth = int(self.displaywidth * zoom)
+            self.displayheight = int(self.displayheight * zoom)
+            self.fullwidth = int(self.fullwidth * zoom)
+            self.fullheight = int(self.fullheight * zoom)
+            print("Display size: %d x %d" % (self.displaywidth,
+                                             self.displayheight))
+            print("Full size: %d x %d" % (self.fullwidth,
+                                          self.fullheight))
+
+        # Key bindings
+        # For keys like function keys, use QtGui.QKeySequence("F12")
+        QShortcut("Ctrl+Q", self, activated=self.close)
+        QShortcut("Ctrl+R", self, activated=self.reload)
+
+        QShortcut("Alt+Left", self, activated=self.back)
+        QShortcut("Alt+Right", self, activated=self.forward)
+
+        self.resize(self.fullwidth, self.fullheight)
+        self.load(QUrl.fromUserInput(url))
+
+
+def parse_args():
+    """Parse commandline arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('url', help='The URL to open')
+
+    args = parser.parse_known_args()[0]
+
+    # Figure out if the url is a filename or a url
+    if args.url.find(':') < 0 :
+        if args.url[0] == '/' :
+            args.url = 'file://' + args.url
+        else :
+            args.url = 'file://' + os.getcwd() + '/' + args.url
+
+    return args
+
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    app = QApplication(sys.argv)
+
+    pv = PresoView(args.url)
+    pv.show()
+
+    app.exec_()

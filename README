@@ -153,6 +153,10 @@ gitbranchsync.py:
     A solution to the problem of git making it idiotically difficult
     to keep several machines in sync with the branches in a git repository.
 
+gpreso:
+    A lightweight presentation program for displaying HTML slides.
+    Python2/GTK/webkit version. (Previously called preso.)
+
 htmlmail.py:
     Compose and send HTML mail, including image attachments.
 
@@ -243,9 +247,6 @@ podcopy:
     Remove characters in filenames that would cause problems on vfat
     filesystems, and ensure filenames are unique and files aren't dups.
 
-preso:
-    A lightweight presentation program for displaying HTML slides.
-
 pyclip:
     Read the X clipboard.
 
@@ -267,6 +268,10 @@ pysync:
 
 python-cheatsheet.py:
     Cheatsheet and syntax reminders for useful Python features.
+
+qpreso:
+    A lightweight presentation program for displaying HTML slides.
+    Python3/QwebEngine version.
 
 randombg:
     Choose a random background (wallpaper) from a directory named based on
