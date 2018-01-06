@@ -352,7 +352,7 @@ Latest sunset: %s
         else:
             return self.project_rectangular(az, alt)
 
-    def draw(self, widget, ctx, background=None):
+    def draw(self, widget, ctx, background=None, labels=True):
         '''Draw everything: the analemma and all the labels.
            If background isn't passed, we'll default to
            self.background_color (opaque blue), but save_image()
@@ -405,26 +405,25 @@ Latest sunset: %s
                 self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
                 self.draw_sun_position('%d/%d/20 %s' % (self.year, m, time))
 
-        # Mark special dates for mean solar noon.
-        self.draw_special_dates("12:00")
+        if labels:
+            # Mark special dates for mean solar noon.
+            self.draw_special_dates("12:00")
 
-        # Make a label
-        if observer.name == "custom":
-            obslabel = "Observer at %.1f N, %.1f E" % (observer.lat,
-                                                       observer.lon)
-        else:
-            obslabel = "Observer in " + self.observer.name
-        self.draw_string(obslabel, 10, 10)
+            # Make a label
+            if observer.name == "custom":
+                obslabel = "Observer at %.1f N, %.1f E" % (observer.lat,
+                                                           observer.lon)
+            else:
+                obslabel = "Observer in " + self.observer.name
+            self.draw_string(obslabel, 10, 10)
 
-    def save_image(self):
+    def save_image(self, outfile, labels=False):
         '''Save the analemma as a PNG image, with the background
            transparent so it can be overlayed on top of a planetarium
            show, scenics, etc.
            Will save to a file named Analemma-$sitename.png
            with spaces replaced with dashes.
         '''
-        outfile = "Analemma-%s.png" % self.observer.name.replace(' ', '-')
-
         dst_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
                                          self.width, self.height)
 
@@ -435,7 +434,7 @@ Latest sunset: %s
 
         # Draw everything again to the new context,
         # with a transparent instead of an opaque background:
-        self.draw(None, dst_ctx, (0, 0, 1, 0))
+        self.draw(None, dst_ctx, (0, 0, 1, 0), labels)
 
         # Restore the GUI context:
         self.ctx = save_ctx
@@ -453,7 +452,9 @@ Latest sunset: %s
             return
         if event.keyval == Gdk.KEY_s and \
            event.state & Gdk.ModifierType.CONTROL_MASK:
-            self.save_image()
+            obsname = self.observer.name.replace(' ', '-')
+            self.save_image("Analemma-%s.png" % obsname, labels=False)
+            self.save_image("Analemma-%s-labels.png" % obsname, labels=True)
             return True
         return False
 
