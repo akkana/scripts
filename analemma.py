@@ -24,31 +24,45 @@ from gi.repository import Pango
 from gi.repository import PangoCairo
 
 class AnalemmaWindow(Gtk.Window):
-    def __init__(self, observer, year):
+    def __init__(self, observer, year, lunar=False):
         super(AnalemmaWindow, self).__init__()
 
         self.observer = observer
         self.year = year
+        self.lunar = lunar
 
         self.special_dates = None
         self.drawing_area = None
 
         self.width = 0
         self.height = 0
-        self.sun = ephem.Sun()
+        # Even if we're actually showing the moon, call the object self.sun.
+        if self.lunar:
+            self.sun = ephem.Moon()
+        else:
+            self.sun = ephem.Sun()
         self.sinusoidal = False
 
         self.sun_color = (1, 1, 0)
         self.backside_color = (1, .7, 0)
         self.text_color = (1, 1, 0)
-        self.background_color = (0, 0, 1, 1)
+        self.background_color = (0, 0, .6, 1)
         self.special_dot_size = 5
 
     def draw_sun_position(self, date):
+        '''Draw a sun at the appropriate position for date.
+           date can be a string like "2018/8/9 12:00"
+           which is the format pyephem expects,
+           or an EphemDate.
+        '''
         if not self.drawing_area:
             print("no drawing area")
             return
-        self.observer.date = self.local_to_gmt(date, reverse=True)
+
+        if type(date) is ephem.Date:
+            self.observer.date = date
+        else:
+            self.observer.date = self.local_to_gmt(date, reverse=True)
 
         self.sun.compute(self.observer)
 
@@ -124,7 +138,7 @@ class AnalemmaWindow(Gtk.Window):
         tup[3], tup[4], tup[5] = timetuple
         return self.local_to_gmt(ephem.date(tuple(tup)), reverse=True)
 
-    def draw_special_dates(self, timestr):
+    def draw_special_dates(self, timestr, labels=True):
         # Make a tuple out from timestr
         if ':' in timestr:
             timetuple = list(map(int, timestr.split(':')))
@@ -146,6 +160,9 @@ class AnalemmaWindow(Gtk.Window):
             x, y = self.project(self.sun.az, self.sun.alt)
             # print("x, y =", x, y)
             self.draw_dot(x, y, self.special_dot_size)
+
+            if not labels:
+                continue
 
             # Offsets to figure out where to draw the string.
             # That's tough, because they're normally on top of each other.
@@ -181,10 +198,12 @@ class AnalemmaWindow(Gtk.Window):
             x, y = self.project(self.sun.az, self.sun.alt)
             print("%s equinox: %s" % (whicheq, str(self.observer.date)))
             self.draw_dot(x, y, self.special_dot_size)
-            x1 = x + offsets[0] * 20
-            self.draw_line(x, y, x1, y)
-            eqstr = "%s equinox\n%s" % (whicheq, str(equinox).split(' ')[0])
-            self.draw_string(eqstr, x1, y, offsets)
+
+            if labels:
+                x1 = x + offsets[0] * 20
+                self.draw_line(x, y, x1, y)
+                eqstr = "%s equinox\n%s" % (whicheq, str(equinox).split(' ')[0])
+                self.draw_string(eqstr, x1, y, offsets)
 
         if observer.lat >= 0:    # Northern hemisphere
             draw_equinox("%d/1/1" % self.year, "Vernal", (-1, 0))
@@ -393,22 +412,55 @@ Latest sunset: %s
         # Then prepare to draw the sun in yellow:
         ctx.set_source_rgb(*self.sun_color)
 
-        # Calculate earliest sunrise and suchlike.
-        self.calc_special_dates()
+        if self.lunar:
+            # When is the moon on the meridian today?
+            # Remember, it's self.sun even if it really is the moon.
+            self.observer.date = ephem.now()
+            transit = self.observer.next_transit(self.sun)
 
-        # Draw three analemmas, showing the sun positions at 7:40 am,
-        # noon, and 4:40 pm ... in each case adjusted for mean solar time,
-        # i.e. the observer's position within their timezone.
-        for time in [ '8:00', '12:00', '16:00' ]:
-            for m in range(1, 13):
-                self.draw_sun_position('%d/%d/1 %s' % (self.year, m, time))
-                self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
-                self.draw_sun_position('%d/%d/20 %s' % (self.year, m, time))
+            # For testing, try replacing 30 with, say, 5000 to see the
+            # motion of the moon over many years.
+            for i in range(0, 30):
+                self.draw_sun_position(transit)
+
+                # Also draw lunar analemmas 4 hours earlier and later:
+                # self.draw_sun_position(ephem.Date(transit - 4.0 * ephem.hour))
+                # self.draw_sun_position(ephem.Date(transit + 4.0 * ephem.hour))
+
+                # Increment the date.
+                # How many minutes earlier does the moon rise each day?
+                # Of course it varies because of the eccentricity
+                # (and other complications) of the moon's orbit,
+                # that being the whole point of looking for analemmas,
+                # so what we want is the average time.
+                #
+                # But the actual number should be 48.76 =
+                # 24 * 60 / 29.530588853, days in a synodic month.
+                # But in this simulation, 48.76 doesn't return the moon
+                # to the same place after the end of a month.
+                # 50.47 gives the tightest grouping.
+
+                # += doesn't work on ephem.Dates, it converts to float.
+                transit = ephem.Date(transit + 1.0 + 48.76 * ephem.minute)
+
+        else:
+            # Calculate earliest sunrise and suchlike.
+            self.calc_special_dates()
+
+            # Draw three analemmas, showing the sun positions at 7:40 am,
+            # noon, and 4:40 pm ... in each case adjusted for mean solar time,
+            # i.e. the observer's position within their timezone.
+            for time in [ '8:00', '12:00', '16:00' ]:
+                for m in range(1, 13):
+                    self.draw_sun_position('%d/%d/1 %s' % (self.year, m, time))
+                    self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
+                    self.draw_sun_position('%d/%d/20 %s' % (self.year, m, time))
+
+        # Mark special dates for mean solar noon.
+        if not self.lunar:
+            self.draw_special_dates("12:00", labels)
 
         if labels:
-            # Mark special dates for mean solar noon.
-            self.draw_special_dates("12:00")
-
             # Make a label
             if observer.name == "custom":
                 obslabel = "Observer at %.1f N, %.1f E" % (observer.lat,
@@ -460,7 +512,7 @@ Latest sunset: %s
 
     def show_window(self):
         self.drawing_area = Gtk.DrawingArea()
-        self.set_default_size(1025, 512)
+        self.set_default_size(1024, 512)
         self.add(self.drawing_area)
         # self.connect("delete_event", Gtk.main_quit)
         self.connect("destroy", Gtk.main_quit)
@@ -504,9 +556,20 @@ def observer_for_city(city):
 if __name__ == "__main__":
     def Usage():
         progname = os.path.basename(sys.argv[0])
-        print("""Usage: %s [cityname]
-       %s [lat lon]""" % (progname, progname))
+        print("""Usage: %s [cityname [sun|moon]]
+       %s lat lon [sun|moon]""" % (progname, progname))
         sys.exit(0)
+
+    # We can optionally show an analemma of the moon rather than the sun.
+    lunar = False
+
+    # Is the last argument either "sun" or "moon"? If so, split it off.
+    if sys.argv[-1] == 'sun':
+        sys.argv = sys.argv[:-1]
+    elif sys.argv[-1] == 'moon' or sys.argv[-1] == 'lunar':
+        lunar = True
+        sys.argv = sys.argv[:-1]
+
     if len(sys.argv) == 2:
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
             Usage()
@@ -524,8 +587,12 @@ if __name__ == "__main__":
 
     if not observer:
         print("Can't find an observer for", ' '.join(sys.argv[1:]))
+        # from ephem import cities
+        # observer = cities.lookup('Los Alamos, NM')
+        # but this is subject to Google rate lookup limits,
+        # don't do it repeatedly
 
-    awin = AnalemmaWindow(observer, ephem.now().triple()[0])
+    awin = AnalemmaWindow(observer, ephem.now().triple()[0], lunar)
     print(awin.special_dates_str())
     awin.show_window()
 
