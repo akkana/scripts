@@ -238,9 +238,39 @@ if match: return match.group()
 match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr, re.I)
 
 ########################################################
-# Argument parsing
+# Command-line Argument parsing
 ########################################################
-#python recommends click first, then argparse, over optparse.
+# #python recommends click first (not installed by default),
+# then argparse, over optparse.
+
+import argparse
+
+def parse_args():
+    """Parse commandline arguments."""
+    parser = argparse.ArgumentParser()
+
+    # Boolean flag
+    parser.add_argument('-c', "--check", dest="check", default=False,
+                        action="store_true", help="Help string")
+    # int or string flag.
+    # Without type=, will store a string.
+    parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
+                        help='Beta parameter (default: 2)')
+
+    # single argument
+    parser.add_argument('url', help='The URL to open')
+    # or, multiple arguments
+    parser.add_argument('urls', nargs='?', default='http://localhost/',
+                        help="URLs to open")
+
+    args = parser.parse_args(sys.argv)
+    # Now we have args.check, args.beta, args.url or urls.
+
+    # parse_known_args() is like parse_args() except that it doesn't
+    # give an error if you pass extra arguments; instead, it returns
+    # a 2-item tuple, consisting of the arg namespace and a list of
+    # the remaining args:
+    args, rest = parser.parse_known_args(sys.argv)
 
 ########################################################
 # Dates and times
@@ -581,6 +611,9 @@ $ 2to3 -wn file_or_directory
 
 # To make something work in both 2 and 3:
 from __future__ import print_function
+
+# print without a newline and to a file:
+print("Hello, world", end='', file=sys.stderr)
 
 # All strings in python3 are automatically unicode,
 # and you can just pass encoding as a second argument when you
