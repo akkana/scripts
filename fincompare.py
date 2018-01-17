@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Graph a bunch of financial assets (stocks or mutual funds)
 # specified on the commandline by ticker symbols.
@@ -24,6 +24,7 @@
 # Share and enjoy under the terms of the GPL v2 or later.
 
 import sys, os
+import time
 import datetime
 import math
 import numpy
@@ -31,8 +32,42 @@ import numpy
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-# from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
-from mpl_finance import quotes_historical_yahoo_ohlc as yahoo
+
+# matplotlib and mpl_finance can no longer read Yahoo data.
+# # from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
+# from mpl_finance import quotes_historical_yahoo_ohlc as yahoo
+# They're supposed to be replaced by the pandas datareader,
+# but unfortunately it can't read the data reliably either.
+# Some possible alternatives are mentioned at
+# http://www.financial-hacker.com/bye-yahoo-and-thank-you-for-the-fish/
+import pandas_datareader as pdr
+import pandas as pd
+
+outlog = ''
+errlog = ''
+
+# Yahoo data will randomly and unpredictably fail, but waiting a while
+# between fetches helps. Adjust the timeout as needed.
+timeout = 7
+
+# Separate reading the finance data into a separate routine,
+# since these web APIs change and need to be adjusted so often.
+first_time = True
+def read_finance_data(ticker, start_date, end_date):
+    global first_time
+    if first_time:
+        first_time = False
+    else:
+        print("(waiting %d secs) " % timeout, end='', file=sys.stderr)
+        sys.stderr.flush()
+        time.sleep(timeout)
+
+    print("Fetching", ticker, "data", file=sys.stderr)
+    fdata = pdr.DataReader(ticker,
+                           data_source='yahoo',
+                           start=start_date, end= end_date,
+                           retry_count= 10)
+    return fdata
 
 start = None
 initial = None
@@ -45,6 +80,7 @@ initial = None
 #
 imported_modules = {}
 
+# Parse arguments:
 if len(sys.argv) < 2:
     print("Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % sys.argv[0])
     print("No spaces between -i or -s and their values!")
@@ -69,9 +105,10 @@ else:
             # Parse the start time:
             start = datetime.datetime.strptime(f[2:], '%Y-%m-%d')
         elif f.startswith('-i'):
-            print("Minus i!")
             print("Trying initial from '%s'" % f[2:])
             initial = int(f[2:])
+        elif f.startswith('-t'):
+            timeout = int(f[2:])
         else:
             funds.append(f)
 
@@ -102,36 +139,34 @@ def plot_funds(tickerlist, initial, start, end):
        normalized to a given initial value.
     '''
 
+    global outlog, errlog
+
     numdays = (end - start).days
     daysinyear = 365.0
-    print('%9s %9s %9s %9s' % ('Ticker', 'daily', 'CC', 'abs'))
+    outlog += '%9s %9s %9s %9s\n' % ('Ticker', 'daily', 'CC', 'abs')
 
     # For testing, use something like
     # FUSVX = yahoo('FUSVX', datetime.datetime(2012, 10, 1),
     #                        datetime.datetime(2013, 4, 1),
     #                        asobject=True)
     for i, ticker in enumerate(tickerlist):
-        # This gives a runtime warning for SCAL, and all the aclose vals
-        # come out zero. Catching a RuntimeWarning isn't as simple as try;
-        # http://stackoverflow.com/questions/10519237/python-how-to-avoid-runtimewarning-in-function-definition
-        # http://stackoverflow.com/questions/9349434/how-do-i-check-for-numeric-overflow-without-getting-a-warning-in-python
         try:
-            fund_data = yahoo(ticker, start, end, asobject=True)
+            fund_data = read_finance_data(ticker, start, end)['Adj Close']
         except:
-            print("Couldn't get data for", ticker)
+            errlog += "Couldn't read %s\n" % ticker
             continue
 
         # Guard against failures of quotes_historical_yahoo;
         # without this check you'll see more uncatchable RuntimeWarnings.
-        if fund_data['aclose'][0] == 0:
+        if fund_data[0] == 0:
             print(ticker, ": First adjusted close is 0!")
             continue
 
         # Calculate effective daily-compounded interest rate
-        fixed_pct = fund_data['aclose'][-1]/fund_data['aclose'][0] - 1.
+        fixed_pct = fund_data[-1]/fund_data[0] - 1.
 
         Rcc = daysinyear / numdays * \
-            numpy.log(fund_data['aclose'][-1] / fund_data['aclose'][0])
+            numpy.log(fund_data[-1] / fund_data[0])
 
         # Convert CC return to daily-compounded return:
         Rdaily = daysinyear * (math.exp(Rcc / daysinyear) - 1.)
@@ -141,15 +176,17 @@ def plot_funds(tickerlist, initial, start, end):
         #                                        - fund_data['aclose'][0])
         #                               /numdays) - 1)
 
-        print("%9s %9.2f %9.2f %9.2f" % (ticker,
-                                         Rdaily*100, Rcc*100, fixed_pct*100))
+        outlog += "%9s %9.2f %9.2f %9.2f\n" % (ticker,
+                                               Rdaily*100, Rcc*100,
+                                               fixed_pct*100)
 
         # Normalize to the initial investment:
-        fund_data['aclose'] *= initial / fund_data['aclose'][0]
+        fund_data *= initial / fund_data[0]
 
         # and plot
-        ax1.plot_date(x=fund_data['date'], y=fund_data['aclose'],
-                      fmt=pick_color(i), label=ticker)
+        # ax1.plot_date(x=fund_data['date'], y=fund_data,
+        #               fmt=pick_color(i), label=ticker)
+        ax1.plot(fund_data, label=ticker)
 
 for i, f in enumerate(imported_modules.keys()):
     # XXX This will overwrite any -i and -s.
@@ -176,6 +213,10 @@ plt.axhline(y=initial, color='k')
 ax1.set_xlim(start, end)
 
 plot_funds(funds, initial, start, end)
+
+print(outlog)
+print("Errors:")
+print(errlog)
 
 ax1.set_ylabel("Value")
 plt.grid(True)
