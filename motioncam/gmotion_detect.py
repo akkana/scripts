@@ -24,9 +24,13 @@ import gc
 import os
 import sys
 from PIL import Image
+import RPi.GPIO as GPIO
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
+sys.path.insert(1, "/home/akkana/src/pi-zero-w-book/distance")
+
 import pycamera
+import ME007
 
 from motion_detect import MotionDetector
 
@@ -36,7 +40,8 @@ class MotionDetectorViewer() :
     def __init__(self, test_res, test_borders=None,
                  full_res=None,
                  localdir=None, remotedir=None,
-                 secs=5):
+                 secs=5,
+                 rangefinder=None):
         self.test_res = test_res
         self.width = test_res[0]
         self.height = test_res[1]
@@ -44,6 +49,10 @@ class MotionDetectorViewer() :
         self.remotedir = remotedir
         self.full_res = full_res
         self.millisecs = secs * 1000
+
+        self.use_tmp_file = True
+
+        self.rangefinder = rangefinder
 
         self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.win.set_border_width(10)
@@ -75,6 +84,7 @@ class MotionDetectorViewer() :
                             self.drawing_area)
 
         self.gc = None
+        self.redgc = None
         self.pixbuf = None
         self.imgwidth = None
         self.imgheight = None
@@ -109,6 +119,9 @@ class MotionDetectorViewer() :
 
         if not self.gc :
             self.gc = widget.window.new_gc()
+            self.redgc = widget.window.new_gc()
+            self.redgc.set_rgb_fg_color(gtk.gdk.Color(65535, 0, 0))
+            self.redgc.line_width = 5
             #x, y, self.imgwidth, self.imgheight = self.get_allocation()
 
             # Have we had load_image called, but we weren't ready for it?
@@ -210,27 +223,48 @@ class MotionDetectorViewer() :
     # This is the function that actually takes and compares photos
     # every few seconds and does all the work.
     def idle_handler(self, widget):
-        use_tmp_file = False
-        if use_tmp_file:
-            tmpfile = "/tmp/still.jpg"
-            print "Snapping to", tmpfile
-            self.md.locam.take_still(outfile=tmpfile, res=self.test_res)
-            im = Image.open(tmpfile)
-        else:   # keep it all in memory, no temp files
-            print "Snapping to memory"
-            img_data = self.md.locam.take_still(outfile='-', res=self.test_res)
-            im = Image.open(img_data)
+        print
+        changed = False
+        debugimage = None
+        if self.rangefinder:
+            inches = rangefinder.average_distance_in()
+            print "Distance", inches, "inches"
+            if inches < 25:
+                changed = True
 
-        changed, debugimage = self.md.compare_images(im)
+        if not changed:
+            if self.use_tmp_file:
+                tmpfile = "/tmp/still.jpg"
+                print "Snapping to", tmpfile
+                self.md.locam.take_still(outfile=tmpfile, res=self.test_res)
+                im = Image.open(tmpfile)
+            else:   # keep it all in memory, no temp files
+                print "Snapping to memory"
+                img_data = self.md.locam.take_still(outfile='-',
+                                                    res=self.test_res)
+                im = Image.open(img_data)
+
+            changed, debugimage = self.md.compare_images(im)
+
+        def red_frame():
+            diff = 10
+            self.drawing_area.window.draw_rectangle(self.redgc, False,
+                                                    diff, diff,
+                                                    self.width-diff*2,
+                                                    self.height-diff*2)
 
         if changed:
-            print "They're different!"
+            print "**** They're different!"
+            red_frame()
             self.md.snap_full_res()
 
         if debugimage:
             # debugimage.load()
             self.load_image(debugimage)
             self.show_image()
+            # We just overwrote the frame, so re-draw it:
+            if changed:
+                red_frame()
 
         self.buf1 = self.buf2
 
@@ -248,11 +282,17 @@ if __name__ == '__main__':
     #full_res = [3648, 2736]
     full_res = [1024, 768]
 
+    rangefinder = ME007.ME007(trigger=23, echo=24)
+
     md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
                               full_res=full_res,
                               localdir=localdir, remotedir=remotedir,
-                              secs=5)
+                              secs=5,
+                              rangefinder=rangefinder)
 
-    md.run()
-
+    try:
+        md.run()
+    except KeyboardInterrupt:
+        print "Bye"
+        GPIO.cleanup()
 
