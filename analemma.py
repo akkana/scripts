@@ -416,6 +416,7 @@ Latest sunset: %s
             # When is the moon on the meridian today?
             # Remember, it's self.sun even if it really is the moon.
             self.observer.date = ephem.now()
+            self.observer.date = ephem.Date('6/13/2005')
             transit = self.observer.next_transit(self.sun)
 
             # For testing, try replacing 30 with, say, 5000 to see the
@@ -424,8 +425,8 @@ Latest sunset: %s
                 self.draw_sun_position(transit)
 
                 # Also draw lunar analemmas 4 hours earlier and later:
-                # self.draw_sun_position(ephem.Date(transit - 4.0 * ephem.hour))
-                # self.draw_sun_position(ephem.Date(transit + 4.0 * ephem.hour))
+                self.draw_sun_position(ephem.Date(transit - 2.5 * ephem.hour))
+                self.draw_sun_position(ephem.Date(transit + 2.5 * ephem.hour))
 
                 # Increment the date.
                 # How many minutes earlier does the moon rise each day?
@@ -434,14 +435,18 @@ Latest sunset: %s
                 # that being the whole point of looking for analemmas,
                 # so what we want is the average time.
                 #
-                # But the actual number should be 48.76 =
+                # But the actual number should be
+                # (360 / 27.321661 - 360 / 365.25) * 24*60/360 = 48.76 hmm
+
+                # (previous reasoning, wrong) 48.76 =
                 # 24 * 60 / 29.530588853, days in a synodic month.
                 # But in this simulation, 48.76 doesn't return the moon
                 # to the same place after the end of a month.
                 # 50.47 gives the tightest grouping.
 
                 # += doesn't work on ephem.Dates, it converts to float.
-                transit = ephem.Date(transit + 1.0 + 48.76 * ephem.minute)
+                transit = ephem.Date(transit + 1.0 + 50.47 * ephem.minute)
+                # transit = ephem.Date(transit + 1.0 + 48.76 * ephem.minute)
 
         else:
             # Calculate earliest sunrise and suchlike.
