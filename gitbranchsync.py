@@ -30,6 +30,8 @@ def fetch_from_upstream(repo):
     remote = repo.remotes[0]
     print("Fetching from %s..." % remote.name)
     remote.fetch()
+    # This can fail with git.exc.GitCommandError
+    # for things like timeouts.
 
 def comprefs(ref):
     '''Find the most recent place where this branch and its upstream
