@@ -34,21 +34,21 @@ sampling = 4096    # or 16384
 #         }
 
 Notes = {
-    "A" : 220.000000,
+    "A"  : 220.000000,
     "A#" : 233.080000,
     "Ab" : 207.650000,
-    "B" : 246.940000,
+    "B"  : 246.940000,
     "Bb" : 233.080000,
-    "C" : 261.625000,
+    "C"  : 261.625000,
     "C#" : 277.185000,
-    "D" : 293.665000,
+    "D"  : 293.665000,
     "D#" : 311.125000,
     "Db" : 277.185000,
-    "E" : 329.625000,
+    "E"  : 329.625000,
     "Eb" : 311.125000,
-    "F" : 349.230000,
+    "F"  : 349.230000,
     "F#" : 369.995000,
-    "G" : 391.995000,
+    "G"  : 391.995000,
     "G#" : 415.305000,
     "Gb" : 369.995000,
 }
@@ -296,9 +296,12 @@ def play_from_keyboard():
             note = square_wave(freqlist[0], sampling)
             play_for(note, duration)
 
-def main():
+def init():
     pygame.mixer.pre_init(sample_rate, -16, 1) # 44.1kHz, 16-bit signed, mono
     pygame.init()
+
+def main():
+    init()
 
     if len(sys.argv) <= 1:
         return play_some_chords()
