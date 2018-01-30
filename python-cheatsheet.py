@@ -71,6 +71,12 @@ print('foo', file=sys.stderr)
 import pprint
 pprint.pprint(obj)
 
+# Binary bit fields to string: all the native ways of printing binary
+# in Python insist on signed integers.
+def tobin(data, width=8):
+    data_str = bin(data & (2**width-1))[2:].zfill(width)
+    return data_str
+
 ########################################################
 # Stringy stuff
 ########################################################
@@ -328,6 +334,25 @@ days_this_month = calendar.monthrange(today.year, today.month)[1]
 one_month_from_now = today + datetime.timedelta(days=days_this_month)
 
 # There's also isodate.parse_datetime which I haven't looked into yet.
+
+########################################################
+# Threading and multiprocessing
+########################################################
+
+# Easy way to schedule something:
+from threading import Timer
+import time
+
+def run_later(a, b):
+    print("Hello, it's later now, and time is %f" % time.time())
+    print(a, b)
+
+if __name__ == '__main__':
+    Timer(5, run_later, (1, 2)).start()
+    Timer(11, run_later, (4, 5)).start()
+    for i in range(10):
+          print(i*2)
+          time.sleep(2)
 
 ########################################################
 # BeautifulSoup
