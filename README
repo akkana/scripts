@@ -227,6 +227,10 @@ nonblock.py, nonblock-py3.py:
     Examples of how to do nonblocking input in Py 2 and Py 3.
     For code that works in either version, see termsize.
 
+noteplayer.py:
+    Spun off of play_chord.py: a more general pygame-based  note generator
+    usable asynchronously, like from a Raspberry Pi piano keyboard.
+
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
