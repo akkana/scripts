@@ -129,6 +129,10 @@ r == c    # True
 # Replace non-breaking spaces in unicode (python3):
 s = s.replace("\u00A0"," ")
 
+# Split with a regexp:
+sep = re.compile('[,\s]+')
+sep.split('HB42,SJR1, HR67 SB3')
+
 ###########
 # All the ways of formatting numbers, from https://stackoverflow.com/a/2962966
 
@@ -590,6 +594,20 @@ def summit(bignum):
 output = summit(100000)
 print("output = '%s'" % str(output))
 
+################################################################
+# Performance profiling
+################################################################
+
+$ python -m cProfile -o profiling_results myscript.py
+
+>>> import pstats
+>>> stats = pstats.Stats("profiling_results")
+>>> stats.sort_stats("tottime")
+>>> stats.print_stats(15)
+
+or, from the cmdline:
+
+python -c 'import pstats; stats = pstats.Stats("profiling_results"); stats.sort_stats("tottime"); stats.print_stats(15)'
 
 ################################################################
 # Matplotlib tips
@@ -656,6 +674,12 @@ b'pi\xc3\xb1on'
 >>> str(b'pi\xc3\xb1on', 'utf-8')
 'piñon'
 >>>
+
+# Conditional depending on python version:
+if sys.version[:1] == '2':
+    from urlparse import urlparse
+else:
+    from urllib.parse import urlparse
 
 ################################################################
 # pip hints
