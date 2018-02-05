@@ -16,7 +16,7 @@ import smtplib
 
 from bs4 import BeautifulSoup
 
-def compose_email_msg(recipient, sender, html, text=None):
+def compose_email_msg(recipient, sender, html, text=None, subject=None):
     """Compose an HTML email message which may include attached images.
        @param recipient Email address of the recipient
        @param sender Email address of the sender
@@ -26,6 +26,9 @@ def compose_email_msg(recipient, sender, html, text=None):
                    If False or None, no text part will be sent.
                    If True, we'll try to generate plaintext from the HTML.
                    Otherwise pass in the desired plain text (str or unicode).
+       @param subject Optional subject. If not specified, it will be taken
+                   from the title in the HTML part, if any;
+                   if none,it will be some sort of lame default.
        @return A MIME message object.
     """
     soup = BeautifulSoup(html, "lxml")
@@ -87,19 +90,21 @@ def compose_email_msg(recipient, sender, html, text=None):
     msg['From'] = encode_header(sender)
     msg['To'] = encode_header(recipient)
 
-    # See if the HTML message already has a subject,
+    # If a subject wasn't specified,
+    # see if the HTML message already has a subject,
     # either in <title> or <h1>. If not, use a default.
-    title = soup.find("title")
-    if title:
-        subject = title.string.strip()
-    else:
-        title = soup.find("h1")
+    if not subject:
+        title = soup.find("title")
         if title:
-            subject = title.text.strip()
+            subject = title.string.strip()
         else:
-            subject = "An HTML message"
+            title = soup.find("h1")
+            if title:
+                subject = title.text.strip()
+            else:
+                subject = "An HTML message"
 
-    print "Subject is", subject
+    # print "Subject is", subject
     msg['Subject'] = encode_header(subject)
 
     # Now handle any images embedded in the HTML.
