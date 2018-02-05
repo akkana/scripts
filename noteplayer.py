@@ -41,6 +41,7 @@ F = 349.230000
 G = 391.995000
 Gb = 369.995000
 
+# The pygame sound object currently playing ... so we can stop it.
 sound_playing = None
 
 # We need to keep a list of waves playing, so we can add or subtract them.
@@ -48,6 +49,13 @@ sound_playing = None
 # their comparison operator. So instead, use a dictionary where each
 # wave has a key corresponding to its frequency.
 waves_playing = {}
+
+# Generating waveforms is a bit slow on the Raspberry Pi.
+# Offer an ability to cache them. Each wave takes 88296 bytes.
+# Only one waveform is cached for each frequency;
+# don't use caching if you're combining different waveforms.
+do_cache = True
+wavecache = {}
 
 #
 # Some waveforms. These functions can be passed in to note-playing functions.
@@ -109,6 +117,17 @@ def play_current_waves():
         sound_playing.stop()
     sound_playing = sound
 
+# Get a cached wave, or generate a new one and cache it.
+def get_wave(freq, waveform=square_wave):
+    if freq in wavecache:
+        return wavecache[freq]
+
+    print("Generating new note for", freq)
+    wave = waveform(freq)
+    if do_cache:
+        wavecache[freq] = wave
+    return wave
+
 def start_note(freqlist, waveform=square_wave, additive=True):
     '''Start a note of a given frequency and waveform.
        freqlist can be either a list or a single frequency (float).
@@ -127,10 +146,10 @@ def start_note(freqlist, waveform=square_wave, additive=True):
         wave =  numpy.zeros(sample_rate)
         key = freqlist[0]
         for freq in freqlist:
-            wave = sum(wave, waveform(freq))
-            waves_playing[freq] = wave
+            wave = sum(wave, get_wave(freq))
+        waves_playing[freq] = wave
     else:
-        wave = waveform(freqlist)
+        wave = get_wave(freqlist)
         key = freqlist
 
     waves_playing[key] = wave
