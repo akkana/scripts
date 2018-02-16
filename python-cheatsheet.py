@@ -48,6 +48,10 @@ else:
 # and even if you iterate over them you never get down to a scalar char,
 # just unit-length strings.
 
+# Is something a dict? Use isinstance rather than type()
+# because isinstance will work for derived classes.
+if isinstance(x, dict):
+
 # Remove items from a list: I always forget how to do this.
 mylist.remove("item")    # Removes the first instance of "item"
 mylist.pop(i)            # Removes and returns list[i]
@@ -77,6 +81,16 @@ def tobin(data, width=8):
     data_str = bin(data & (2**width-1))[2:].zfill(width)
     return data_str
 
+# And, speaking of bit fields, Python's ~ operator is fairly useless
+# because it always turns on a sign bit, no matter how large the operand,
+# and there's apparently no way to mask it off.
+# So instead, use ^0xff (or appropriate length) if you want a bitwise NOT:
+>>> ~0xff
+-256
+>>> 0xff ^ 0xff
+0
+
+
 ########################################################
 # Stringy stuff
 ########################################################
@@ -90,6 +104,10 @@ def tobin(data, width=8):
 >>> u
 u'pi\xf1on'
 # For Python3 skip to the end of this file.
+
+# Fix "UnicodeEncodeError: 'ascii' codec can't encode character":
+.encode('utf-8', "xmlcharrefreplace")
+
 
 # Split a long string over multiple lines in the source file
 url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
@@ -301,8 +319,8 @@ three_months_from_now = today + relativedelta(months=3)
 # Subtracting datetimes gives a datetime.timedelta, and that's also
 # a good way to add or subtract time from a datetime.
 now = datetime.datetime.now()
-if (now - self.end).seconds < 7200:
-    self.end = now - datetime.timedelta(seconds=7200)
+if (now - time_end).seconds < 7200:
+    time_end = now - datetime.timedelta(seconds=7200)
 
 #
 # Parse a date in RFC 2822 format.
@@ -613,7 +631,7 @@ python -c 'import pstats; stats = pstats.Stats("profiling_results"); stats.sort_
 # Matplotlib tips
 ################################################################
 
-self.ax1 = self.fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
+ax1 = fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
 
 # Trimming all the spurious whitespace:
 
