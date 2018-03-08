@@ -237,7 +237,9 @@ class BrowserWindow(QMainWindow):
         QtWidgets.QShortcut("Alt+Left", self, activated=self.go_back)
         QtWidgets.QShortcut("Alt+Right", self, activated=self.go_forward)
 
-        self.resize(1024, 768)
+        # Resize to fit on an XGA screen, allowing for window chrome.
+        # XXX Should check the screen size and see if it can be bigger.
+        self.resize(1024, 735)
 
     def eventFilter(self, object, event):
         '''Handle button presses in the tab bar'''
