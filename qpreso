@@ -11,7 +11,7 @@ import os
 import argparse
 
 from PyQt5.QtCore import QUrl
-from PyQt5.QtWidgets import QApplication, QShortcut
+from PyQt5.QtWidgets import QApplication, QShortcut, QDesktopWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 class PresoView(QWebEngineView):
@@ -24,8 +24,9 @@ class PresoView(QWebEngineView):
         self.imgnum = 0
 
         # Size the audience will see (used for converting to images):
-        self.displaywidth = 1024
-        self.displayheight = 768
+        displaysize = QDesktopWidget().screenGeometry(-1)
+        self.displaywidth = displaysize.width()
+        self.displayheight = displaysize.height()
         # Size of the window we'll actually display:
         if show_notes:
             self.fullwidth = 1366
@@ -42,6 +43,12 @@ class PresoView(QWebEngineView):
                                              self.displayheight))
             print("Full size: %d x %d" % (self.fullwidth,
                                           self.fullheight))
+
+
+        # Run fullscreen if the display is XGA or smaller.
+        # displaysize = QApplication.desktop.screenGeometry()
+        if self.displayheight <= 768:
+            self.showFullScreen()
 
         # Key bindings
         # For keys like function keys, use QtGui.QKeySequence("F12")
