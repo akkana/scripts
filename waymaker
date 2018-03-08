@@ -14,7 +14,7 @@ import time
 
 # import googlemaps   # need this for exceptions
 # from googlemaps import GoogleMaps
-import urllib.request, urllib.parse, urllib.error, json, csv
+import urllib.request, urllib.parse, urllib.error, json
 
 def write_gpx_file(entries, filename, omit_address=True):
     '''Write the list of entries -- each entry is [lat, long, desc] --

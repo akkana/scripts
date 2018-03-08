@@ -29,7 +29,6 @@ import RPi.GPIO as GPIO
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 sys.path.insert(1, "/home/akkana/src/pi-zero-w-book/distance")
 
-import pycamera
 import ME007
 
 from motion_detect import MotionDetector
@@ -51,8 +50,6 @@ class MotionDetectorViewer() :
         self.millisecs = secs * 1000
 
         self.use_tmp_file = True
-
-        self.rangefinder = rangefinder
 
         self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.win.set_border_width(10)
@@ -102,6 +99,7 @@ class MotionDetectorViewer() :
                                  threshold=30,
                                  localdir=self.localdir,
                                  remotedir=self.localdir,
+                                 rangefinder=rangefinder,
                                  verbose=2)
         self.buf1 = None
         self.buf2 = None
@@ -226,11 +224,6 @@ class MotionDetectorViewer() :
         print
         changed = False
         debugimage = None
-        if self.rangefinder:
-            inches = rangefinder.average_distance_in()
-            print "Distance", inches, "inches"
-            if inches < 25:
-                changed = True
 
         if not changed:
             if self.use_tmp_file:
