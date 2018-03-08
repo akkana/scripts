@@ -134,7 +134,13 @@ def list_branches(repo, add_tracking=False):
         print("No remotes for repo %s" % repo.working_dir)
         return
 
-    for branch in repo.remotes[0].refs:
+    # Guard for a bug in git 2.11.0, on Debian sretch
+    try:
+        refs = repo.remotes[0].refs
+    except TypeError as e:
+        print("Skipping due to git bug: %s" % str(e))
+        return
+    for branch in refs:
         simplename = branch.name.split('/')[-1]
         if simplename == "HEAD":
             continue
