@@ -95,7 +95,7 @@ try:
             # Otherwise lines are so long they're confusing.
             if not pout:
                 continue
-            for line in pout.decode().split('\n'):
+            for line in pout.decode("utf-8").split('\n'):
                 # For some reason the split is giving us every other line empty
                 if not line:
                     continue
@@ -105,7 +105,8 @@ try:
                     path = pathparts[-1]
                 else:
                     path = '/'.join(pathparts[-2:])
-                print("%s%s" % (path, line[colon:]))
+                s = "%s%s" % (path, line[colon:])
+                print(s.encode('utf-8', "backslashreplace"))
 
 # Try to catch ctrl-C and print a nicer message. This doesn't work, though:
 # subprocess.call just terminates the whole process.
