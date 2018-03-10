@@ -23,26 +23,30 @@ DEBUGFILE=/tmp/check-monitors
 
 date >>$DEBUGFILE
 
+getmonitor() {
+    xrandr | grep $1 | sed 's/ .*$//'
+}
+
 # Check whether an HDMI monitor is connected: returns 0 on success
 xrandr | grep HDMI | grep " connected " >>$DEBUGFILE 2>&1
 if [ $? -eq 0 ]; then
     echo "==== Choosing HDMI" >>$DEBUGFILE
-    xrandr --output VGA1 --off
-    xrandr --output LVDS1 --off
-    xrandr --output HDMI1 --auto
+    xrandr --output $(getmonitor LVDS) --off
+    xrandr --output $(getmonitor VGA) --off
+    xrandr --output $(getmonitor HDMI) --auto
 else
     xrandr | grep VGA | grep " connected " >>$DEBUGFILE
     if [ $? -eq 0 ]; then
         echo "==== Choosing VGA" >>$DEBUGFILE 2>&1
-        xrandr --output HDMI1 --off
-        xrandr --output LVDS1 --off
-        xrandr --output VGA1 --auto
+        xrandr --output $(getmonitor HDMI) --off
+        xrandr --output $(getmonitor LVDS) --off
+        xrandr --output $(getmonitor VGA) --auto
     else
         # Fall back on the built-in laptop display, LVDS1
         echo "==== Choosing built-in display" >>$DEBUGFILE
-        xrandr --output VGA1 --off
-        xrandr --output HDMI1 --off
-        xrandr --output LVDS1 --auto
+        xrandr --output $(getmonitor VGA) --off
+        xrandr --output $(getmonitor HDMI) --off
+        xrandr --output $(getmonitor LVDS) --auto
     fi
 fi
 
