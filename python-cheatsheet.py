@@ -362,6 +362,19 @@ one_month_from_now = today + datetime.timedelta(days=days_this_month)
 ########################################################
 
 # Easy way to schedule something:
+
+# In a single-threaded environment:
+import sched, time
+def print_time():
+    print "From print_time", time.time()
+
+if __name__ == '__main__':
+    s = sched.scheduler(time.time, time.sleep)
+    s.enter(5, 1, print_time, ())
+    s.enter(10, 1, print_time, ())
+    s.run()
+
+# In multi-threaded environments:
 from threading import Timer
 import time
 
