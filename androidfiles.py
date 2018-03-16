@@ -139,14 +139,19 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
+    print "list_local_dir", path, sorted, sizes, recursive
     lenpath = len(path)
     if recursive:
         file_list = []
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
+            print "root", root
             for f in files:
                 f = os.path.normpath(f)
-                file_list.append(os.path.join(root, f)[lenpath+1:])
+                print "  appending", os.path.join(root, f)
+                # What was I thinking here?
+                # file_list.append(os.path.join(root, f)[lenpath+1:])
+                file_list.append(os.path.join(root, f))
 
     else:
         file_list = os.listdir(path)
@@ -160,15 +165,19 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     # Get the size for each file.
     sizelist = []
     for filename in file_list:
-        filepath = os.path.join(path, filename)
+        filepath = os.path.normpath(os.path.join(path, filename))
+        print root, path, filename
+        print "filepath:", filepath
         if os.path.isdir(filepath):
             sizelist.append((filename, 0))
         else:
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
+                print "Got the size for", filepath
             except OSError:
                 print "OSError on", filepath, "path was", path
                 sizelist.append((filename, 0))
+                sys.exit(0)
 
     return sizelist
 
