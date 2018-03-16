@@ -27,9 +27,12 @@ from PIL import Image
 import RPi.GPIO as GPIO
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
-sys.path.insert(1, "/home/akkana/src/pi-zero-w-book/distance")
 
-import ME007
+try:
+    import ME007
+    have_rangefinder = True
+except:
+    have_rangefinder = False
 
 from motion_detect import MotionDetector
 
@@ -275,7 +278,10 @@ if __name__ == '__main__':
     #full_res = [3648, 2736]
     full_res = [1024, 768]
 
-    rangefinder = ME007.ME007(trigger=23, echo=24)
+    if have_rangefinder:
+        rangefinder = ME007.ME007(trigger=23, echo=24)
+    else:
+        rangefinder = None
 
     md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
                               full_res=full_res,
