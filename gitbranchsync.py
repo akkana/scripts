@@ -80,7 +80,13 @@ def check_push_status(repo, silent=False):
     differences = 0
     alllocaldiffs = 0
     allremotediffs = 0
-    for ref in repo.heads:
+    # Another workaround for the git 2.11.0 bug:
+    try:
+        heads = repo.heads
+    except TypeError as e:
+        print("Skipping repo %s due to git bug:\n  %s" % (repo.git_dir, str(e)))
+        return None, None, None
+    for ref in heads:
         localdiffs, remotediffs = comprefs(ref)
         alllocaldiffs += localdiffs
         allremotediffs += remotediffs
@@ -138,7 +144,7 @@ def list_branches(repo, add_tracking=False):
     try:
         refs = repo.remotes[0].refs
     except TypeError as e:
-        print("Skipping due to git bug: %s" % str(e))
+        print("Skipping %s due to git bug:\n  %s" % (repo.git_dir, str(e)))
         return
     for branch in refs:
         simplename = branch.name.split('/')[-1]
