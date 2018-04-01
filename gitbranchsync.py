@@ -23,7 +23,7 @@ from git import Repo
 
 def fetch_from_upstream(repo):
     if not repo.remotes:
-        print "No remotes!"
+        print("No remotes!")
         return
 
     # Fetch from the remote, then build up a dictionary of remote branch names.
@@ -72,7 +72,7 @@ def check_push_status(repo, silent=False):
             if not silent:
                 if not modfiles:
                     print("Need to commit locally modified files:")
-                print l
+                print(l)
             modfiles += 1
     if not silent:
         print("")
