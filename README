@@ -254,9 +254,9 @@ podcopy:
 pyclip:
     Read the X clipboard.
 
-pykey:
+pykey.py:
     Simulate keypresses under X. A simpler, Python version of
-    Crikey http://shallowsky.com/software/crikey/
+    Crikey, http://shallowsky.com/software/crikey/
 
 pyplay.py:
     A class to play sounds asynchronously by calling aplay (or an app
