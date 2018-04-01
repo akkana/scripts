@@ -125,6 +125,7 @@ def send_string(str) :
                 )
             window.send_event(event, propagate = True)
 
-for argp in range(1, len(sys.argv)) :
-    send_string(sys.argv[argp])
-    display.sync()
+if __name__ == '__main__':
+    for argp in range(1, len(sys.argv)) :
+        send_string(sys.argv[argp])
+        display.sync()
