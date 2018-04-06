@@ -24,6 +24,9 @@ from PyQt5 import QtWidgets
 # The %d will be the process ID of the running browser.
 URL_FILE = "/tmp/quickbrowse-urls-%d"
 
+# How long can a tab name be?
+MAX_TAB_NAME = 22
+
 class ReadlineEdit(QLineEdit):
     def __init__(self):
         super (ReadlineEdit, self).__init__()
@@ -137,6 +140,9 @@ class BrowserView(QWebEngineView):
         # I can't find any way to find out about load errors.
         # But an attempted load that fails gives a url_changed(about:blank)
         # so maybe we can detect it that way.
+        tabname = url.toDisplayString()[:MAX_TAB_NAME]
+        self.browser_win.set_tab_text(tabname, self)
+
         if not url or 'blank' in url.toString():
             self.browser_win.statusBar().showMessage("Couldn't load '%s'" %
                                                      self.try_url)
@@ -158,7 +164,6 @@ class BrowserView(QWebEngineView):
         # There's no documentation on where it's supposed to be set,
         # but setting it here seems to work.
         # self.settings().setDefaultTextEncoding("utf-8")
-
         self.browser_win.progress.show()
 
     def load_finished(self, ok):
@@ -172,7 +177,8 @@ class BrowserView(QWebEngineView):
         # print("Profile off the record?", self.profile.isOffTheRecord())
         # print("Webpage off the record?", self.webviews[self.active_tab].page().profile().isOffTheRecord())
 
-        self.browser_win.set_tab_text(self.title(), self)
+        tabname = self.title()[:MAX_TAB_NAME]
+        self.browser_win.set_tab_text(tabname, self)
 
     def load_progress(self, progress):
         self.browser_win.progress.setValue(progress)
@@ -245,7 +251,7 @@ class BrowserWindow(QMainWindow):
         '''Handle button presses in the tab bar'''
 
         if object != self.tabwidget.tabBar():
-            print("Not in tab bar")
+            print("eventFilter Not in tab bar")
             return super().eventFilter(object, event)
             # return False
 
