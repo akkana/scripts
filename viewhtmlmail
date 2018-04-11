@@ -150,6 +150,10 @@ def view_html_message(f, tmpdir):
 
     # Substitute all the filenames for CIDs:
     for sf in subfiles:
+        # Yes, yes, I know:
+        # https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags/
+        # but eventually this script will be integrated with viewmailattachments
+        # (which uses BeautifulSoup) and that problem will go away.
         htmlsrc = re.sub('cid: ?' + sf['Content-Id'],
                          'file://' + sf['filename'],
                          htmlsrc, flags=re.IGNORECASE)
