@@ -13,12 +13,10 @@ import posixpath
 
 from PyQt5.QtCore import QUrl, Qt, QTimer, QEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
-     QLineEdit, QStatusBar, QProgressBar, QTabWidget
+     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
 from PyQt5.QtCore import QAbstractNativeEventFilter
-
-from PyQt5 import QtWidgets
 
 # The file used to remotely trigger the browser to open more tabs.
 # The %d will be the process ID of the running browser.
@@ -63,7 +61,19 @@ class ReadlineEdit(QLineEdit):
 # can own each load_finished() callback and have a pointer to
 # the main BrowserWindow so it can figure out which tab is loading.
 class BrowserView(QWebEngineView):
-    def __init__(self, browserwin):
+    def __init__(self, browserwin, *args, **kwargs):
+
+        # Strip out arguments we handle that are different from QMainWindow:
+        if 'width' in kwargs:
+            self.width = kwargs['width']
+            del kwargs['width']
+        else:
+            self.width = 1024
+        if 'height' in kwargs:
+            self.height = kwargs['height']
+            del kwargs['height']
+        else:
+            self.height = 768
 
         super(BrowserView, self).__init__()
 
@@ -186,8 +196,33 @@ class BrowserView(QWebEngineView):
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
+        # Strip out arguments we handle that are different from QMainWindow:
+        if 'width' in kwargs:
+            self.width = kwargs['width']
+            del kwargs['width']
+        else:
+            self.width = 1024
+        if 'height' in kwargs:
+            self.height = kwargs['height']
+            del kwargs['height']
+        else:
+            self.height = 768
+
+        # Then run the default constructor.
         super(BrowserWindow, self).__init__(*args, **kwargs)
 
+        self.profile = QWebEngineProfile()
+        # print("Profile initially off the record?",
+        #       self.profile.isOffTheRecord())
+
+        self.init_chrome()
+
+        # Resize to fit on an XGA screen, allowing for window chrome.
+        # XXX Should check the screen size and see if it can be bigger.
+        self.resize(self.width, self.height)
+
+    def init_chrome(self):
+        # Set up the browser window chrome:
         self.setWindowTitle("Quickbrowse")
 
         self.init_tab_name_len = 40
@@ -216,10 +251,6 @@ class BrowserWindow(QMainWindow):
         self.urlbar.returnPressed.connect(self.urlbar_load)
         toolbar.addWidget(self.urlbar)
 
-        self.profile = QWebEngineProfile()
-        # print("Profile initially off the record?",
-        #       self.profile.isOffTheRecord())
-
         self.tabwidget = QTabWidget()
         self.webviews = []
 
@@ -235,17 +266,13 @@ class BrowserWindow(QMainWindow):
 
         # Key bindings
         # For keys like function keys, use QtGui.QKeySequence("F12")
-        QtWidgets.QShortcut("Ctrl+Q", self, activated=self.close)
-        QtWidgets.QShortcut("Ctrl+L", self, activated=self.select_urlbar)
-        QtWidgets.QShortcut("Ctrl+T", self, activated=self.new_tab)
-        QtWidgets.QShortcut("Ctrl+R", self, activated=self.reload)
+        QShortcut("Ctrl+Q", self, activated=self.close)
+        QShortcut("Ctrl+L", self, activated=self.select_urlbar)
+        QShortcut("Ctrl+T", self, activated=self.new_tab)
+        QShortcut("Ctrl+R", self, activated=self.reload)
 
-        QtWidgets.QShortcut("Alt+Left", self, activated=self.go_back)
-        QtWidgets.QShortcut("Alt+Right", self, activated=self.go_forward)
-
-        # Resize to fit on an XGA screen, allowing for window chrome.
-        # XXX Should check the screen size and see if it can be bigger.
-        self.resize(1024, 735)
+        QShortcut("Alt+Left", self, activated=self.go_back)
+        QShortcut("Alt+Right", self, activated=self.go_forward)
 
     def eventFilter(self, object, event):
         '''Handle button presses in the tab bar'''
@@ -346,6 +373,23 @@ class BrowserWindow(QMainWindow):
         self.webviews[tab].load(qurl)
         if tab == self.active_tab:
             self.urlbar.setText(url)
+
+    def load_html(self, html, base=None):
+        '''Load a string containing HTML.
+           The base is the file: URL the HTML should be considered to have
+           come from, to avoid "Not allowed to load local resource" errors
+           when clicking on links.
+        '''
+        if not self.webviews:
+            self.new_tab()
+            tab = 0
+        else:
+            if not tab:
+                tab = self.active_tab
+            self.set_tab_text(url[:self.init_tab_name_len],
+                              self.webviews[tab])
+
+        self.webviews[tab].setHtml(html, QUrl(base))
 
     def select_urlbar(self):
         self.urlbar.selectAll()

@@ -365,11 +365,13 @@ qslide2pdf:
     For turning an HTML presentation into a PDF slide deck.
     Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
 
-quickbrowse:
+quickbrowse.py:
     A minimal browser in python-qtWebEngine. Fast and light,
     supposedly anonymous, no storage of cookies or other identifying
     information. Useful for things like viewing URLs from mutt or
     checking websites that don't work well with a Firefox/NoScript profile.
+    Can be used standalone (ln -s /path/to/quickbrowse.py ~/bin/quickbrowse)
+    and/or as a python module for derived browser-based programs.
 
 quickbrowsegwk:
     Minimal browser: an older version of quickbrowse written in
