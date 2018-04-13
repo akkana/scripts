@@ -206,7 +206,8 @@ class BrowserWindow(QMainWindow):
             self.height = kwargs['height']
             del kwargs['height']
         else:
-            self.height = 768
+            # Short enough to fit in XGA, 768 height:
+            self.height = 735
 
         # Then run the default constructor.
         super(BrowserWindow, self).__init__(*args, **kwargs)
@@ -331,7 +332,9 @@ class BrowserWindow(QMainWindow):
         else:
             init_name = "New tab"
 
-        if self.tabwidget:
+        # For some bizarre reason you can't just check if self.tabwidget:
+        # that test is false even when it's a QTabWidget.
+        if self.tabwidget != None:
             self.tabwidget.addTab(webview, init_name)
 
         webview.urlChanged.connect(webview.url_changed)
@@ -345,6 +348,8 @@ class BrowserWindow(QMainWindow):
             # self.active_tab = len(self.webviews)-1
             self.load_url(url, len(self.webviews)-1)
             # self.active_tab = save_active
+
+        return webview
 
     def close_tab(self, tabindex):
         self.tabwidget.removeTab(tabindex)
