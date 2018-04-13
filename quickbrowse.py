@@ -330,7 +330,9 @@ class BrowserWindow(QMainWindow):
             init_name = url[:self.init_tab_name_len]
         else:
             init_name = "New tab"
-        self.tabwidget.addTab(webview, init_name)
+
+        if self.tabwidget:
+            self.tabwidget.addTab(webview, init_name)
 
         webview.urlChanged.connect(webview.url_changed)
         webview.loadStarted.connect(webview.load_started)
@@ -384,9 +386,8 @@ class BrowserWindow(QMainWindow):
             self.new_tab()
             tab = 0
         else:
-            if not tab:
-                tab = self.active_tab
-            self.set_tab_text(url[:self.init_tab_name_len],
+            tab = self.active_tab
+            self.set_tab_text("---",  # XXX Replace with html title if possible
                               self.webviews[tab])
 
         self.webviews[tab].setHtml(html, QUrl(base))
@@ -406,6 +407,8 @@ class BrowserWindow(QMainWindow):
            view is the requesting BrowserView, and will be compared
            to our webviews[] to figure out which tab to set.
         '''
+        if not self.tabwidget:
+            return
         whichtab = None
         whichtab = self.find_view(view)
         if whichtab == None:
