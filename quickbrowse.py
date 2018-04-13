@@ -412,7 +412,7 @@ class BrowserWindow(QMainWindow):
            view is the requesting BrowserView, and will be compared
            to our webviews[] to figure out which tab to set.
         '''
-        if not self.tabwidget:
+        if self.tabwidget == None:
             return
         whichtab = None
         whichtab = self.find_view(view)
