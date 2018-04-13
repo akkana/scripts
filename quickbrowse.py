@@ -216,6 +216,8 @@ class BrowserWindow(QMainWindow):
         # print("Profile initially off the record?",
         #       self.profile.isOffTheRecord())
 
+        self.init_tab_name_len = 40
+
         self.init_chrome()
 
         # Resize to fit on an XGA screen, allowing for window chrome.
@@ -225,8 +227,6 @@ class BrowserWindow(QMainWindow):
     def init_chrome(self):
         # Set up the browser window chrome:
         self.setWindowTitle("Quickbrowse")
-
-        self.init_tab_name_len = 40
 
         toolbar = QToolBar("Toolbar")
         self.addToolBar(toolbar)
@@ -253,6 +253,7 @@ class BrowserWindow(QMainWindow):
         toolbar.addWidget(self.urlbar)
 
         self.tabwidget = QTabWidget()
+        self.tabwidget.setTabBarAutoHide(True)
         self.webviews = []
 
         self.setCentralWidget(self.tabwidget)
