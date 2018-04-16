@@ -382,6 +382,10 @@ class BrowserWindow(QMainWindow):
         if tab == self.active_tab:
             self.urlbar.setText(url)
 
+            # After loading a URL, the user will want focus in the
+            # content area so things like Page Down will work.
+            self.webviews[tab].setFocus()
+
     def load_html(self, html, base=None):
         '''Load a string containing HTML.
            The base is the file: URL the HTML should be considered to have
@@ -463,7 +467,7 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
 
 sys.excepthook = excepthook
 
-if __name__ == '__main__':
+def main():
     SIGNAL = signal.SIGUSR1
     args = sys.argv[1:]
 
@@ -544,3 +548,5 @@ if __name__ == '__main__':
 
     app.exec_()
 
+if __name__ == '__main__':
+    main()
