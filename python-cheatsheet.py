@@ -184,6 +184,9 @@ buf.insert(2, 0xf7)
 # iterator, list and dictionary helpers
 ########################################################
 
+# Delete an item from a dictionary:
+del thedic[key]
+
 # Comprehensions can be multiple:
 [ a*b+c for a in A for b in B for c in C ]
 # though itertools.product is arguably cleaner for math problems like that.
