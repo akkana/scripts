@@ -54,13 +54,18 @@ class PDFWidget(QLabel):
             pageno -= 1
         self.page = self.document.page(pageno)
 
-        pagesize = self.page.pageSize()
+        self.pagesize = self.page.pageSize()
 
+        self.render()
+
+    def render(self):
+        '''Render to a pixmap at the current DPI setting.
+        '''
         # Most Qt5 programs seem to use setGeometry(x, y, w, h)
         # to set initial window size. resize() is the only method I've
         # found that doesn't force initial position as well as size.
-        self.resize(pagesize.width() * self.dpi/POINTS_PER_INCH,
-                    pagesize.height() * self.dpi/POINTS_PER_INCH)
+        self.resize(self.pagesize.width() * self.dpi/POINTS_PER_INCH,
+                    self.pagesize.height() * self.dpi/POINTS_PER_INCH)
 
         self.setWindowTitle('PDF Viewer')
 
@@ -103,22 +108,36 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
         self.scroll_layout = QVBoxLayout(scroll_contents)
 
-        pagew = PDFWidget(filename, document=None, pageno=1, dpi=dpi)
-        self.scroll_layout.addWidget(pagew)
+        self.pages = [ PDFWidget(filename, document=None, pageno=1, dpi=dpi) ]
+        self.scroll_layout.addWidget(self.pages[0])
 
         scrollbar_size = 5    # pixels
-        self.resize(pagew.width() + scrollbar_size,
-                    pagew.height() + scrollbar_size)
+        self.resize(self.pages[0].width() + scrollbar_size,
+                    self.pages[0].height() + scrollbar_size)
 
-        for p in range(2, pagew.document.numPages()):
+        for p in range(2, self.pages[0].document.numPages()):
             document = None
             pagew = PDFWidget(filename, document=document, pageno=p, dpi=dpi)
             # pagew.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.scroll_layout.addWidget(pagew)
+            self.pages.append(pagew)
 
         self.scroll_layout.addStretch(1)
 
         self.show()
+
+    def resizeEvent(self, event):
+        oldWidth = event.oldSize().width()
+        newWidth = event.size().width()
+
+        if oldWidth > 0:
+            for page in self.pages:
+                # Resize according to width, ignoring height.
+                page.dpi *= newWidth / oldWidth
+                page.render()
+
+        super(PDFScrolledWidget, self).resizeEvent(event)
+
 
 if __name__ == '__main__':
 
