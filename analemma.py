@@ -8,6 +8,7 @@
 # it probably means you need python3-gi-cairo.
 
 import ephem
+from ephem import cities
 import sys
 import os
 import math
@@ -24,10 +25,12 @@ from gi.repository import Pango
 from gi.repository import PangoCairo
 
 class AnalemmaWindow(Gtk.Window):
-    def __init__(self, observer, year, lunar=False):
+    def __init__(self, observer, year, lunar=False, background=None):
         super(AnalemmaWindow, self).__init__()
 
         self.observer = observer
+        print("AnalemmaWindow: observer at %.1f %.1f" % (observer.lat,
+                                                         observer.lon))
         self.year = year
         self.lunar = lunar
 
@@ -46,7 +49,10 @@ class AnalemmaWindow(Gtk.Window):
         self.sun_color = (1, 1, 0)
         self.backside_color = (1, .7, 0)
         self.text_color = (1, 1, 0)
-        self.background_color = (0, 0, .6, 1)
+        if background:
+            self.background_color = background
+        else:
+            self.background_color = (0, 0, .6, 1)
         self.special_dot_size = 5
 
     def draw_sun_position(self, date):
@@ -214,23 +220,26 @@ class AnalemmaWindow(Gtk.Window):
 
     def special_dates_str(self):
         if not self.special_dates:
-            self.calc_special_dates()
-        s = '''
+            try:
+                self.calc_special_dates()
+                # This can fail with ephem.AlwaysUpError in polar regions.
+                return '''
 Longest day: %d hours on %s
 Shortest day: %d hours on %s
 Earliest sunrise: %s
 Latest sunrise: %s
 Earliest sunset: %s
 Latest sunset: %s
-''' %      (self.special_dates["longest day len"],
-            str(self.special_dates["longest day"]),
-            self.special_dates["shortest day len"],
-            str(self.special_dates["shortest day"]),
-            str(self.special_dates["earliest sunrise"]),
-            str(self.special_dates["latest sunrise"]),
-            str(self.special_dates["earliest sunset"]),
-            str(self.special_dates["latest sunset"]))
-        return s
+''' %                (self.special_dates["longest day len"],
+                      str(self.special_dates["longest day"]),
+                      self.special_dates["shortest day len"],
+                      str(self.special_dates["shortest day"]),
+                      str(self.special_dates["earliest sunrise"]),
+                      str(self.special_dates["latest sunrise"]),
+                      str(self.special_dates["earliest sunset"]),
+                      str(self.special_dates["latest sunset"]))
+            except (ephem.AlwaysUpError, ephem.NeverUpError):
+                return 'Polar region: skipping special dates'
 
     def local_mean_time(self, d, reverse=False):
         '''Adjust GMT to local time.
@@ -316,11 +325,12 @@ Latest sunset: %s
     def project_rectangular(self, az, alt):
         """Rectangular -- don't do any projection, just scaling"""
 
-        if az < math.pi/2:
-            az = math.pi - az
-        elif az > 3*math.pi/2:
-            az = 3 * math.pi - az
+        span = math.pi * 1.2
 
+        # if az < math.pi/2:
+        #     az = math.pi - az
+        # elif az > 3*math.pi/2:
+        #     az = 3 * math.pi - az
 
         y = int((math.pi/2 - alt) * (self.height * 2 / math.pi))
         x = int(az * self.width / math.pi - self.width/2)
@@ -455,7 +465,7 @@ Latest sunset: %s
             # Draw three analemmas, showing the sun positions at 7:40 am,
             # noon, and 4:40 pm ... in each case adjusted for mean solar time,
             # i.e. the observer's position within their timezone.
-            for time in [ '8:00', '12:00', '16:00' ]:
+            for time in [ '7:30', '12:00', '16:30' ]:
                 for m in range(1, 13):
                     self.draw_sun_position('%d/%d/1 %s' % (self.year, m, time))
                     self.draw_sun_position('%d/%d/10 %s' % (self.year, m, time))
@@ -468,10 +478,12 @@ Latest sunset: %s
         if labels:
             # Make a label
             if observer.name == "custom":
-                obslabel = "Observer at %.1f N, %.1f E" % (observer.lat,
-                                                           observer.lon)
+                obslabel = "%.1f N, %.1f E" % (observer.lat, observer.lon)
             else:
-                obslabel = "Observer in " + self.observer.name
+                obslabel = self.observer.name
+                # Split off lengthy labels that interfere with time labels
+                if ", " in obslabel:
+                    obslabel = obslabel.split(', ')[0]
             self.draw_string(obslabel, 10, 10)
 
     def save_image(self, outfile, labels=False):
@@ -517,7 +529,7 @@ Latest sunset: %s
 
     def show_window(self):
         self.drawing_area = Gtk.DrawingArea()
-        self.set_default_size(1024, 512)
+        self.set_default_size(1024, 450)   # was 512
         self.add(self.drawing_area)
         # self.connect("delete_event", Gtk.main_quit)
         self.connect("destroy", Gtk.main_quit)
@@ -528,35 +540,41 @@ Latest sunset: %s
 
 def observer_for_city(city):
     try:
-        observer = ephem.city(city)
-        return observer
+        return ephem.city(city)
     except KeyError:
-        # Add some cities pyephem doesn't know:
-        if city == 'San Jose':     # San Jose, CA at Houge Park
-            observer = ephem.Observer()
-            observer.name = "San Jose"
-            observer.lon = '-121:56.8'
-            observer.lat = '37:15.55'
-            observer.elevation = 100
-            return observer
+        pass
 
-        elif city == 'Los Alamos':  # Los Alamos, NM Nature Center
-            observer = ephem.Observer()
-            observer.name = "Los Alamos"
-            observer.lon = '-106:18.36'
-            observer.lat = '35:53.09'
-            observer.elevation = 2100
-            return observer
+    try:
+        return cities.lookup(city)
+    except ValueError:
+        pass
 
-        elif city == 'White Rock':  # White Rock, NM Visitor Center
-            observer = ephem.Observer()
-            observer.name = "White Rock"
-            observer.lon = '-106:12.75'
-            observer.lat = '35:49.61'
-            observer.elevation = 1960
-            return observer
+    # Add some cities pyephem doesn't know:
+    if city == 'San Jose':     # San Jose, CA at Houge Park
+        observer = ephem.Observer()
+        observer.name = "San Jose"
+        observer.lon = '-121:56.8'
+        observer.lat = '37:15.55'
+        observer.elevation = 100
+        return observer
 
-        return None
+    elif city == 'Los Alamos':  # Los Alamos, NM Nature Center
+        observer = ephem.Observer()
+        observer.name = "Los Alamos"
+        observer.lon = '-106:18.36'
+        observer.lat = '35:53.09'
+        observer.elevation = 2100
+        return observer
+
+    elif city == 'White Rock':  # White Rock, NM Visitor Center
+        observer = ephem.Observer()
+        observer.name = "White Rock"
+        observer.lon = '-106:12.75'
+        observer.lat = '35:49.61'
+        observer.elevation = 1960
+        return observer
+
+    return None
 
 if __name__ == "__main__":
     def Usage():
@@ -579,25 +597,27 @@ if __name__ == "__main__":
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
             Usage()
         observer = observer_for_city(sys.argv[1])
-        print(sys.argv[1], observer.lon, observer.lat)
 
     elif len(sys.argv) == 3:
         observer = ephem.Observer()
-        observer.name = "custom"
-        observer.lon = sys.argv[1]
-        observer.lat = sys.argv[2]
+        observer.lat = sys.argv[1]
+        observer.lon = sys.argv[2]
+        observer.elevation = 100
+        observer.name = "Observer at %s, %s" % (observer.lon, observer.lat)
 
     else:
         observer = observer_for_city('Los Alamos')
 
     if not observer:
         print("Can't find an observer for", ' '.join(sys.argv[1:]))
+        sys.exit(1)
         # from ephem import cities
         # observer = cities.lookup('Los Alamos, NM')
         # but this is subject to Google rate lookup limits,
         # don't do it repeatedly
 
-    awin = AnalemmaWindow(observer, ephem.now().triple()[0], lunar)
+    awin = AnalemmaWindow(observer, ephem.now().triple()[0], lunar,
+                          background=(0, 0, 0))
     print(awin.special_dates_str())
     awin.show_window()
 
