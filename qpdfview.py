@@ -131,12 +131,18 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         newWidth = event.size().width()
 
         if oldWidth > 0:
-            for page in self.pages:
-                # Resize according to width, ignoring height.
-                page.dpi *= newWidth / oldWidth
-                page.render()
+            self.zoom(newWidth / oldWidth)
 
         super(PDFScrolledWidget, self).resizeEvent(event)
+
+    def zoom(self, frac=1.25):
+        for page in self.pages:
+            # Resize according to width, ignoring height.
+            page.dpi *= frac
+            page.render()
+
+    def unzoom(self, frac=.8):
+        self.zoom(frac)
 
 
 if __name__ == '__main__':

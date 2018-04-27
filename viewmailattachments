@@ -55,7 +55,7 @@ if USE_QUICKBROWSE:
 
     # Should we convert PDF to HTML? Depends on BROWSER:
     # Firefox has a built-in PDF viewer, but quickbrowse doesn't.
-    CONVERT_PDF_TO_HTML = True
+    CONVERT_PDF_TO_HTML = False
 
 else:    # Firefox in private browsing mode
     BROWSER = "firefox"

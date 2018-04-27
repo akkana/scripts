@@ -18,6 +18,13 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
 from PyQt5.QtCore import QAbstractNativeEventFilter
 
+# Use qpdfview for PDFs if it's available:
+try:
+    import qpdfview
+    handle_pdf = True
+except:
+    handle_pdf = False
+
 # The file used to remotely trigger the browser to open more tabs.
 # The %d will be the process ID of the running browser.
 URL_FILE = "/tmp/quickbrowse-urls-%d"
@@ -56,6 +63,22 @@ class ReadlineEdit(QLineEdit):
 
         # For anything else, call the base class.
         super(ReadlineEdit, self).keyPressEvent(event)
+
+if handle_pdf:
+    class PDFBrowserView(qpdfview.PDFScrolledWidget):
+        def __init__(self, browserwin, url):
+            if url.startswith('file://'):
+                self.theurl = url[7:]
+            else:
+                self.theurl = url
+
+            super(PDFBrowserView, self).__init__(self.theurl)
+
+        def url(self):
+            return QUrl(self.theurl)
+
+        def toDisplayString(self):
+            return self.url
 
 # Need to subclass QWebEngineView, in order to have an object that
 # can own each load_finished() callback and have a pointer to
@@ -193,6 +216,12 @@ class BrowserView(QWebEngineView):
     def load_progress(self, progress):
         self.browser_win.progress.setValue(progress)
 
+    def zoom(self, factor=1.25):
+        self.setZoomFactor(self.zoomFactor() * factor)
+
+    def unzoom(self, factor=.8):
+        self.zoom(factor)
+
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -272,6 +301,10 @@ class BrowserWindow(QMainWindow):
         QShortcut("Ctrl+L", self, activated=self.select_urlbar)
         QShortcut("Ctrl+T", self, activated=self.new_tab)
         QShortcut("Ctrl+R", self, activated=self.reload)
+
+        QShortcut("Ctrl++", self, activated=self.zoom)
+        QShortcut("Ctrl+=", self, activated=self.zoom)
+        QShortcut("Ctrl+-", self, activated=self.unzoom)
 
         QShortcut("Alt+Left", self, activated=self.go_back)
         QShortcut("Alt+Right", self, activated=self.go_forward)
@@ -358,7 +391,17 @@ class BrowserWindow(QMainWindow):
     def load_url(self, url, tab=None):
         '''Load the given URL in the specified tab, or current tab if tab=None.
         '''
+        if handle_pdf and url.lower().endswith('.pdf'):
+            if self.tabwidget != None:
+                pdfview = PDFBrowserView(self, url)
+                self.tabwidget.addTab(pdfview, "PDF")
+                self.webviews.append(pdfview)
+            else:
+                print("No tabwidget yet")
+            return
+
         qurl = QUrl(url)
+
         if not qurl.scheme():
             if os.path.exists(url):
                 qurl.setScheme('file')
@@ -381,10 +424,6 @@ class BrowserWindow(QMainWindow):
         self.webviews[tab].load(qurl)
         if tab == self.active_tab:
             self.urlbar.setText(url)
-
-            # After loading a URL, the user will want focus in the
-            # content area so things like Page Down will work.
-            self.webviews[tab].setFocus()
 
     def load_html(self, html, base=None):
         '''Load a string containing HTML.
@@ -425,6 +464,14 @@ class BrowserWindow(QMainWindow):
             print("Warning: set_tab_text for unknown view")
             return
         self.tabwidget.setTabText(whichtab, title)
+
+    def zoom(self):
+        if 'zoom' in dir(self.webviews[self.active_tab]):
+            self.webviews[self.active_tab].zoom()
+
+    def unzoom(self):
+        if 'unzoom' in dir(self.webviews[self.active_tab]):
+            self.webviews[self.active_tab].unzoom()
 
     def update_buttons(self):
         # TODO: To enable/disable buttons, check e.g.
@@ -467,7 +514,7 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
 
 sys.excepthook = excepthook
 
-def main():
+if __name__ == '__main__':
     SIGNAL = signal.SIGUSR1
     args = sys.argv[1:]
 
@@ -548,5 +595,3 @@ def main():
 
     app.exec_()
 
-if __name__ == '__main__':
-    main()
