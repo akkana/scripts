@@ -17,7 +17,7 @@
 import sys
 from PyQt5.QtWidgets import QWidget, QApplication, \
      QLabel, QScrollArea, QSizePolicy, QVBoxLayout
-from PyQt5.QtGui import QPainter, QColor, QFont
+from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap
 from PyQt5.QtCore import Qt, QPoint, QSize
 
 from popplerqt5 import Poppler
@@ -26,7 +26,15 @@ from popplerqt5 import Poppler
 # If you want to use a DPI other than 72, you have to convert.
 POINTS_PER_INCH = 72
 
-class PDFWidget(QWidget):    # Or inherit from QLabel?
+class PDFWidget(QLabel):
+
+    '''
+    A widget showing one page of a PDF.
+    If you want to show multiple pages of the same PDF,
+    make sure you share the document (let the first PDFWidget
+    create the document, then pass thatPDFwidget.document to any
+    subsequent widgets you create) or use a ScrolledPDFWidget.
+    '''
 
     def __init__(self, filename, document=None, pageno=1, dpi=72):
         super(PDFWidget, self).__init__()
@@ -56,7 +64,9 @@ class PDFWidget(QWidget):    # Or inherit from QLabel?
 
         self.setWindowTitle('PDF Viewer')
 
-        self.show()
+        img = self.page.renderToImage(self.dpi, self.dpi)
+        self.pixmap = QPixmap.fromImage(img)
+        self.setPixmap(self.pixmap)
 
     #classmethod
     def new_document(filename):
@@ -77,57 +87,36 @@ class PDFWidget(QWidget):    # Or inherit from QLabel?
         return document
 
 
-        '''pages can be either a number (1), a list ([1, 2, 3])
-           or a string ("*", "all", "1-5").
-           At least eventually.
-        '''
+class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
-    def paintEvent(self, event):
-
-        # Poppler from gi.repository:
-        # self.page.render(SOME_CAIRO_SURFACE)
-
-        # Poppler from popplerqt5:
-        qp = QPainter()
-
-        qp.begin(self)
-
-        # Not clear how to use renderToPainter(): not like this, apparently.
-        # self.page.renderToPainter(qp)
-
-        img = self.page.renderToImage(self.dpi, self.dpi)
-        qp.drawImage(QPoint(0, 0), img)
-        qp.end()
-
-class PDFScrolledWidget(QScrollArea):
+    '''
+    Show all pages of a PDF, with scrollbars.
+    '''
 
     def __init__(self, filename, dpi=72):
         super(PDFScrolledWidget, self).__init__()
 
-        self.pdfw = PDFWidget(filename, document=None, pageno=1, dpi=dpi)
-        self.pdfw.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        # self.pdfw.setScaledContents(True)
+        self.setWidgetResizable(True)
 
-        # # self.imageLabel.setBackgroundRole(QPalette.Base)
-        # self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        # self.setScaledContents(True)
+        scroll_contents = QWidget()
+        self.setWidget(scroll_contents)
 
-        # self.scrollArea = QScrollArea()
-        # # self.scrollArea.setBackgroundRole(QPalette.Dark)
-        # self.scrollArea.setWidget(self.imageLabel)
-        # self.setCentralWidget(self.scrollArea)
+        self.scroll_layout = QVBoxLayout(scroll_contents)
 
-        # self.scrollArea.setBackgroundRole(QPalette.Dark)
-
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.pdfw)
-        self.setLayout(vbox)
-
-        self.setWidget(self.pdfw)
+        pagew = PDFWidget(filename, document=None, pageno=1, dpi=dpi)
+        self.scroll_layout.addWidget(pagew)
 
         scrollbar_size = 5    # pixels
-        self.resize(self.pdfw.width() + scrollbar_size,
-                    self.pdfw.height() + scrollbar_size)
+        self.resize(pagew.width() + scrollbar_size,
+                    pagew.height() + scrollbar_size)
+
+        for p in range(2, pagew.document.numPages()):
+            document = None
+            pagew = PDFWidget(filename, document=document, pageno=p, dpi=dpi)
+            # pagew.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+            self.scroll_layout.addWidget(pagew)
+
+        self.scroll_layout.addStretch(1)
 
         self.show()
 
@@ -137,6 +126,7 @@ if __name__ == '__main__':
 
     w = PDFScrolledWidget(sys.argv[1])
     # w = PDFWidget(sys.argv[1])
+    w.show()
 
     sys.exit(app.exec_())
 
