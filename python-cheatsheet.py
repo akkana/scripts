@@ -25,6 +25,8 @@ reload(mn)
 
 # Show methods in an object
 dir(obj)
+# Does a function exist in an object?
+if 'zoom' in dir(obj):
 
 # Does a function exist in a module?
 hasattr(os, 'get_terminal_size'):
