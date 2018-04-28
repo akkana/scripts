@@ -9,7 +9,8 @@
 # or Debian package python3-poppler-qt5
 
 # Poppler is theoretically available from gi (instead of popplerqt5),
-# but I haven't found any way to get that Poppler to work.
+# but I haven't found any way to get that Poppler to work with Qt5
+# because it can only draw to a Cairo context.
 # import gi
 # gi.require_version('Poppler', '0.18')
 # from gi.repository import Poppler
@@ -106,12 +107,21 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         scroll_contents = QWidget()
         self.setWidget(scroll_contents)
 
+        # A VBox to lay out all the pages vertically:
         self.scroll_layout = QVBoxLayout(scroll_contents)
 
+        # Create the widget for the first page of the PDF,
+        # which will also create the Poppler document we'll use
+        # to render the other pages.
         self.pages = [ PDFWidget(filename, document=None, pageno=1, dpi=dpi) ]
+
+        # Add page 1 to the vertical layout:
         self.scroll_layout.addWidget(self.pages[0])
 
-        scrollbar_size = 5    # pixels
+        # Now there's a size. Set the initial page size to be big enough
+        # to show one page, including room for scrollbars, at 72 DPI.
+        # XXX This should also take into account factors like screen size.
+        scrollbar_size = 5    # guess at approximate scrollbar size in pixels
         self.resize(self.pages[0].width() + scrollbar_size,
                     self.pages[0].height() + scrollbar_size)
 
@@ -127,6 +137,8 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         self.show()
 
     def resizeEvent(self, event):
+        '''On resize, re-render the PDF to fit the new width.
+        '''
         oldWidth = event.oldSize().width()
         newWidth = event.size().width()
 
@@ -136,12 +148,17 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         super(PDFScrolledWidget, self).resizeEvent(event)
 
     def zoom(self, frac=1.25):
+        '''Zoom the page by the indicated fraction.
+        '''
         for page in self.pages:
             # Resize according to width, ignoring height.
             page.dpi *= frac
             page.render()
 
     def unzoom(self, frac=.8):
+        '''Zoom the page by the indicated fraction.
+           Same as unzoom but with a default that zooms out instead of in.
+        '''
         self.zoom(frac)
 
 
