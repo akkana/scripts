@@ -104,6 +104,7 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
         self.setWidgetResizable(True)
 
+        # Create a widget inside the scroller for the VBox layout to use:
         scroll_contents = QWidget()
         self.setWidget(scroll_contents)
 
