@@ -16,10 +16,12 @@
 # from gi.repository import Poppler
 
 import sys
+import requests
+
 from PyQt5.QtWidgets import QWidget, QApplication, \
      QLabel, QScrollArea, QSizePolicy, QVBoxLayout
 from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap
-from PyQt5.QtCore import Qt, QPoint, QSize
+from PyQt5.QtCore import Qt, QPoint, QSize, QUrl, QByteArray
 
 from popplerqt5 import Poppler
 
@@ -37,8 +39,8 @@ class PDFWidget(QLabel):
     subsequent widgets you create) or use a ScrolledPDFWidget.
     '''
 
-    def __init__(self, filename, document=None, pageno=1, dpi=72):
-        super(PDFWidget, self).__init__()
+    def __init__(self, filename, document=None, pageno=1, dpi=72, parent=None):
+        super(PDFWidget, self).__init__(parent)
 
         self.filename = filename
 
@@ -75,18 +77,19 @@ class PDFWidget(QLabel):
         self.setPixmap(self.pixmap)
 
     #classmethod
-    def new_document(filename):
-        '''Create a Poppler.Document from the given URL or filename.
+    def new_document(url):
+        '''Create a Poppler.Document from the given URL, QUrl or filename.
         '''
 
-        # Using Poppler from gi.repository:
-        # (This part works, it's the part in paint() that doesn't.)
-        # self.document = Poppler.Document.new_from_file('file://' + filename,
-        #                                                None)
-        # self.page = self.document.get_page(0)
+        # If it's not a local file, we'll need to load it.
+        qurl = QUrl(url)
+        if qurl.scheme():
+            r = requests.get(qurl.toString())
+            qbytes = QByteArray(r.content)
+            document = Poppler.Document.loadFromData(qbytes)
+        else:
+            document = Poppler.Document.load(url)
 
-        # Using Poppler from popplerqt5:
-        document = Poppler.Document.load(filename)
         # self.document.setRenderHint(Poppler.Document.TextHinting)
         document.setRenderHint(Poppler.Document.TextAntialiasing)
 
@@ -99,8 +102,8 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
     Show all pages of a PDF, with scrollbars.
     '''
 
-    def __init__(self, filename, dpi=72):
-        super(PDFScrolledWidget, self).__init__()
+    def __init__(self, filename, dpi=72, parent=None):
+        super(PDFScrolledWidget, self).__init__(parent)
 
         self.setWidgetResizable(True)
 
@@ -134,8 +137,6 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
             self.pages.append(pagew)
 
         self.scroll_layout.addStretch(1)
-
-        self.show()
 
     def resizeEvent(self, event):
         '''On resize, re-render the PDF to fit the new width.

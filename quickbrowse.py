@@ -13,9 +13,10 @@ import posixpath
 
 from PyQt5.QtCore import QUrl, Qt, QTimer, QEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
-     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut
+     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
+from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PyQt5.QtCore import QAbstractNativeEventFilter
 
 # Use qpdfview for PDFs if it's available:
@@ -24,6 +25,11 @@ try:
     handle_pdf = True
 except:
     handle_pdf = False
+
+def is_pdf(url):
+    if not url:
+        return False
+    return handle_pdf and url.lower().endswith('.pdf')
 
 # The file used to remotely trigger the browser to open more tabs.
 # The %d will be the process ID of the running browser.
@@ -64,15 +70,16 @@ class ReadlineEdit(QLineEdit):
         # For anything else, call the base class.
         super(ReadlineEdit, self).keyPressEvent(event)
 
+# Only define the PDFBrowserView if we have the modules it requires.
 if handle_pdf:
     class PDFBrowserView(qpdfview.PDFScrolledWidget):
-        def __init__(self, browserwin, url):
+        def __init__(self, browserwin, url, parent=None):
             if url.startswith('file://'):
                 self.theurl = url[7:]
             else:
                 self.theurl = url
 
-            super(PDFBrowserView, self).__init__(self.theurl)
+            super(PDFBrowserView, self).__init__(self.theurl, parent=parent)
 
         def url(self):
             return QUrl(self.theurl)
@@ -98,7 +105,10 @@ class BrowserView(QWebEngineView):
         else:
             self.height = 768
 
-        super(BrowserView, self).__init__()
+        if 'parent' in kwargs:
+            super(BrowserView, self).__init__(kwargs['parent'])
+        else:
+            super(BrowserView, self).__init__()
 
         self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
 
@@ -131,7 +141,6 @@ class BrowserView(QWebEngineView):
                 #     self.browser_win.new_tab(self.last_hovered)
                 # else:
             qc = QApplication.clipboard()
-            print("Selection")
             self.browser_win.load_url(qc.text(mode=qc.Selection))
             return True
 
@@ -143,7 +152,7 @@ class BrowserView(QWebEngineView):
         # Right now, though, we're ignoring type and making a new background
         # tab in all cases.
         self.browser_win.new_tab()
-        return self.browser_win.webviews[-1]
+        return self.browser_win.browserviews[-1]
 
     # Override the context menu event so we can copy the clipboard
     # selection to primary after a "Copy Link URL" action.
@@ -181,7 +190,7 @@ class BrowserView(QWebEngineView):
                                                      self.try_url)
             return
 
-        if self.browser_win.webviews[self.browser_win.active_tab] != self:
+        if self.browser_win.browserviews[self.browser_win.active_tab] != self:
             return
 
         urlbar = self.browser_win.urlbar
@@ -197,7 +206,15 @@ class BrowserView(QWebEngineView):
         # There's no documentation on where it's supposed to be set,
         # but setting it here seems to work.
         # self.settings().setDefaultTextEncoding("utf-8")
+
         self.browser_win.progress.show()
+
+        # If the link is PDF, the WebEngineView won't do anything with it,
+        # but also doesn't give any obvious way to divert it.
+        # Maybe open a new tab for it here:
+        # But last_hovered isn't enough, we might be starting a load
+        # from a commandline argument or other means.
+        # How do we find out the URL being loaded?
 
     def load_finished(self, ok):
         # OK is useless: if we try to load a bad URL, we won't get a
@@ -206,9 +223,9 @@ class BrowserView(QWebEngineView):
         self.browser_win.progress.hide()
 
         # print("load_finished")
-        # print("In load_finished, view is", self.webviews[self.active_tab], "and page is", self.webviews[self.active_tab].page())
+        # print("In load_finished, view is", self.browserviews[self.active_tab], "and page is", self.browserviews[self.active_tab].page())
         # print("Profile off the record?", self.profile.isOffTheRecord())
-        # print("Webpage off the record?", self.webviews[self.active_tab].page().profile().isOffTheRecord())
+        # print("Webpage off the record?", self.browserviews[self.active_tab].page().profile().isOffTheRecord())
 
         tabname = self.title()[:MAX_TAB_NAME]
         self.browser_win.set_tab_text(tabname, self)
@@ -222,6 +239,78 @@ class BrowserView(QWebEngineView):
     def unzoom(self, factor=.8):
         self.zoom(factor)
 
+# XXX Maybe use a request interceptor,
+# https://stackoverflow.com/questions/37658772/pyqt5-6-interceptrequest-doesnt-work
+# or https://stackoverflow.com/questions/36485315/is-it-possible-to-get-url-of-clicked-link-in-webengineview
+
+class BrowserPage(QWebEnginePage):
+    def __init__(self, profile, browser_view, browser_window):
+        self.browser_view = browser_view
+        self.browser_window = browser_window
+        super(BrowserPage, self).__init__(profile)
+
+    def acceptNavigationRequest(self, url, navtype, isMainFrame):
+        # isMainFrame is false for a link in an iframe.
+        # navtype is something like QWebEnginePage.NavigationTypeLinkClicked:
+        # print("acceptNavigationRequest", url, navtype, isMainFrame)
+
+        if not isMainFrame:
+            return True
+
+        urlpath = url.path()
+        if urlpath.lower().endswith('.pdf'):
+            self.browser_window.load_url(url.toString(), 0)
+            return False
+
+        return True
+
+class BrowserRequestInterceptor(QWebEngineUrlRequestInterceptor):
+    def interceptRequest(self, request_info):
+        # print("\n\ninterceptRequest", type(request_info), dir(request_info))
+        # info is a PyQt5.QtWebEngineCore.QWebEngineUrlRequestInfo
+        # https://doc.qt.io/qt-5.10/qwebengineurlrequestinfo.html
+        #   navigationType() can be:
+        # 'NavigationTypeBackForward', 'NavigationTypeFormSubmitted', 'NavigationTypeLink', 'NavigationTypeOther', 'NavigationTypeReload', 'NavigationTypeTyped'
+        # But you can't trust it very far: for instance, resources within
+        # a page will incorrectly claim NavigationTypeLink.
+        #   requestMethod() can be GET or POST
+        #   firstPartyUrl() is the page that issued the request
+        #   requestUrl() is the request URL itself
+        #   resourceType() can be things like media, favicon etc.
+
+        # It has these items in dir():
+        '''
+['NavigationType', 'NavigationTypeBackForward', 'NavigationTypeFormSubmitted', 'NavigationTypeLink', 'NavigationTypeOther', 'NavigationTypeReload', 'NavigationTypeTyped', 'ResourceType', 'ResourceTypeCspReport', 'ResourceTypeFavicon', 'ResourceTypeFontResource', 'ResourceTypeImage', 'ResourceTypeMainFrame', 'ResourceTypeMedia', 'ResourceTypeObject', 'ResourceTypePing', 'ResourceTypePluginResource', 'ResourceTypePrefetch', 'ResourceTypeScript', 'ResourceTypeServiceWorker', 'ResourceTypeSharedWorker', 'ResourceTypeStylesheet', 'ResourceTypeSubFrame', 'ResourceTypeSubResource', 'ResourceTypeUnknown', 'ResourceTypeWorker', 'ResourceTypeXhr', '__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', 'block', 'firstPartyUrl', 'navigationType', 'redirect', 'requestMethod', 'requestUrl', 'resourceType', 'setHttpHeader']
+        '''
+
+        # Don't do anything for resources on the page, only for the page itself.
+        # The other way to detect this is to check whether
+        # request_info.firstPartyUrl() == request_info.requestUrl()
+        if request_info.resourceType() != request_info.ResourceTypeMainFrame:
+            return
+
+        print("      Request URL:", request_info.requestUrl())
+        print("    1st party URL:", request_info.firstPartyUrl())
+        if request_info.navigationType() == request_info.NavigationTypeLink:
+            print("         Nav type: LINK")
+        else:
+            print("         Nav type:", request_info.navigationType())
+        print("    Resource Type:", request_info.resourceType())
+        print()
+
+        # Things we can do:
+        # request_info.block(True)      - don't load this url
+        # request_info.redirect(qurl)   - Redirect to a different url
+
+        urlpath = request_info.requestUrl().path()
+
+        if urlpath.endswith('membership.html'):
+            print("Nope, you can't go to the membership page")
+            request_info.block(True)
+
+        elif urlpath.endswith('calendar.html'):
+            print("Redirecting from the calendar page")
+            request_info.redirect(QUrl('https://doc.qt.io/qt-5.10/qwebengineurlrequestinfo.html'))
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -241,9 +330,13 @@ class BrowserWindow(QMainWindow):
         # Then run the default constructor.
         super(BrowserWindow, self).__init__(*args, **kwargs)
 
+        self.browserviews = []
+
         self.profile = QWebEngineProfile()
         # print("Profile initially off the record?",
         #       self.profile.isOffTheRecord())
+        # self.interceptor = BrowserRequestInterceptor()
+        # self.profile.setRequestInterceptor(self.interceptor)
 
         self.init_tab_name_len = 40
 
@@ -283,7 +376,6 @@ class BrowserWindow(QMainWindow):
 
         self.tabwidget = QTabWidget()
         self.tabwidget.setTabBarAutoHide(True)
-        self.webviews = []
 
         self.setCentralWidget(self.tabwidget)
 
@@ -328,7 +420,7 @@ class BrowserWindow(QMainWindow):
         if event.button() == Qt.LeftButton:
             if event.type() == QEvent.MouseButtonPress:
                 self.active_tab = tabindex
-                self.urlbar.setText(self.webviews[tabindex].url().toDisplayString())
+                self.urlbar.setText(self.browserviews[tabindex].url().toDisplayString())
             return super().eventFilter(object, event)
             # return False    # So we'll still switch to that tab
 
@@ -345,43 +437,44 @@ class BrowserWindow(QMainWindow):
         return super().eventFilter(object, event)
 
     def new_tab(self, url=None):
-        webview = BrowserView(self)
-        self.webviews.append(webview)
-
-        # We need a QWebEnginePage in order to get linkHovered events,
-        # and to set an anonymous profile.
-        # print("New tab, profile still off the record?",
-        #       self.profile.isOffTheRecord())
-        webpage = QWebEnginePage(self.profile, webview)
-
-        # print("New Webpage off the record?",
-        #       webpage.profile().isOffTheRecord())
-        webview.setPage(webpage)
-        # print("New view's page off the record?",
-        #       webview.page().profile().isOffTheRecord())
-        # print("In new tab, view is", webview, "and page is", webpage)
-
         if url:
             init_name = url[:self.init_tab_name_len]
         else:
             init_name = "New tab"
 
-        # For some bizarre reason you can't just check if self.tabwidget:
-        # that test is false even when it's a QTabWidget.
-        if self.tabwidget != None:
+        if is_pdf(url):
+            webview = PDFBrowserView(self, url)
+            self.browserviews.append(webview)
             self.tabwidget.addTab(webview, init_name)
 
-        webview.urlChanged.connect(webview.url_changed)
-        webview.loadStarted.connect(webview.load_started)
-        webview.loadFinished.connect(webview.load_finished)
-        webview.loadProgress.connect(webview.load_progress)
-        webpage.linkHovered.connect(webview.link_hover)
+        else:
+            webview = BrowserView(self)
 
-        if url:
-            # save_active = self.active_tab
-            # self.active_tab = len(self.webviews)-1
-            self.load_url(url, len(self.webviews)-1)
-            # self.active_tab = save_active
+            # We need a QWebEnginePage in order to get linkHovered events,
+            # and to set an anonymous profile.
+            # print("New tab, profile still off the record?",
+            #       self.profile.isOffTheRecord())
+            webpage = BrowserPage(self.profile, webview, self)
+
+            # print("New Webpage off the record?",
+            #       webpage.profile().isOffTheRecord())
+            webview.setPage(webpage)
+            # print("New view's page off the record?",
+            #       webview.page().profile().isOffTheRecord())
+            # print("In new tab, view is", webview, "and page is", webpage)
+
+            self.browserviews.append(webview)
+            self.tabwidget.addTab(webview, init_name)
+
+            if url:
+                self.load_url(url, len(self.browserviews)-1)
+
+            # Set up the signals:
+            webview.urlChanged.connect(webview.url_changed)
+            webview.loadStarted.connect(webview.load_started)
+            webview.loadFinished.connect(webview.load_finished)
+            webview.loadProgress.connect(webview.load_progress)
+            webpage.linkHovered.connect(webview.link_hover)
 
         return webview
 
@@ -390,14 +483,16 @@ class BrowserWindow(QMainWindow):
 
     def load_url(self, url, tab=None):
         '''Load the given URL in the specified tab, or current tab if tab=None.
+           url is a str, not a QUrl.
+           PDF URLs will be loaded in a new tab, because there doesn't
+           seem to be a way of replacing the BrowserView with a BrowserPDFView.
         '''
-        if handle_pdf and url.lower().endswith('.pdf'):
-            if self.tabwidget != None:
-                pdfview = PDFBrowserView(self, url)
-                self.tabwidget.addTab(pdfview, "PDF")
-                self.webviews.append(pdfview)
-            else:
-                print("No tabwidget yet")
+
+        # Note that tab=0 is a valid argument here.
+        # When testing whether tab is set, be sure to test for None.
+
+        if is_pdf(url):
+            self.new_tab(url)
             return
 
         qurl = QUrl(url)
@@ -413,17 +508,18 @@ class BrowserWindow(QMainWindow):
             else:
                 qurl.setScheme('http')
 
-        if not self.webviews:
-            self.new_tab(url)
+        if len(self.browserviews) == 0:
+            self.new_tab()
             tab = 0
-        else:
-            if not tab:
-                tab = self.active_tab
-            self.set_tab_text(url[:self.init_tab_name_len],
-                              self.webviews[tab])
-        self.webviews[tab].load(qurl)
+        elif tab == None:
+            tab = self.active_tab
+
+        self.set_tab_text(url[:self.init_tab_name_len],
+                          self.browserviews[tab])
         if tab == self.active_tab:
             self.urlbar.setText(url)
+
+        self.browserviews[tab].load(qurl)
 
     def load_html(self, html, base=None):
         '''Load a string containing HTML.
@@ -431,22 +527,22 @@ class BrowserWindow(QMainWindow):
            come from, to avoid "Not allowed to load local resource" errors
            when clicking on links.
         '''
-        if not self.webviews:
+        if not self.browserviews:
             self.new_tab()
             tab = 0
         else:
             tab = self.active_tab
             self.set_tab_text("---",  # XXX Replace with html title if possible
-                              self.webviews[tab])
+                              self.browserviews[tab])
 
-        self.webviews[tab].setHtml(html, QUrl(base))
+        self.browserviews[tab].setHtml(html, QUrl(base))
 
     def select_urlbar(self):
         self.urlbar.selectAll()
         self.urlbar.setFocus()
 
     def find_view(self, view):
-        for i, v in enumerate(self.webviews):
+        for i, v in enumerate(self.browserviews):
             if v == view:
                 return i
         return None
@@ -454,7 +550,7 @@ class BrowserWindow(QMainWindow):
     def set_tab_text(self, title, view):
         '''Set tab and, perhaps, window title after a page load.
            view is the requesting BrowserView, and will be compared
-           to our webviews[] to figure out which tab to set.
+           to our browserviews[] to figure out which tab to set.
         '''
         if self.tabwidget == None:
             return
@@ -466,12 +562,12 @@ class BrowserWindow(QMainWindow):
         self.tabwidget.setTabText(whichtab, title)
 
     def zoom(self):
-        if 'zoom' in dir(self.webviews[self.active_tab]):
-            self.webviews[self.active_tab].zoom()
+        if 'zoom' in dir(self.browserviews[self.active_tab]):
+            self.browserviews[self.active_tab].zoom()
 
     def unzoom(self):
-        if 'unzoom' in dir(self.webviews[self.active_tab]):
-            self.webviews[self.active_tab].unzoom()
+        if 'unzoom' in dir(self.browserviews[self.active_tab]):
+            self.browserviews[self.active_tab].unzoom()
 
     def update_buttons(self):
         # TODO: To enable/disable buttons, check e.g.
@@ -492,13 +588,13 @@ class BrowserWindow(QMainWindow):
         self.load_url(url)
 
     def go_back(self):
-        self.webviews[self.active_tab].back()
+        self.browserviews[self.active_tab].back()
 
     def go_forward(self):
-        self.webviews[self.active_tab].forward()
+        self.browserviews[self.active_tab].forward()
 
     def reload(self):
-        self.webviews[self.active_tab].reload()
+        self.browserviews[self.active_tab].reload()
 
 #
 # PyQt is super crashy. Any little error, like an extra argument in a slot,
