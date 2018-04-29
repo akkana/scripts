@@ -157,7 +157,6 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         self.setWidgetResizable(True)
 
         # Try to eliminate the guesswork in sizing the window to content:
-        self.setContentsMargins(0, 0, 0, 0)
         self.setFrameShape(self.NoFrame)
 
         # I would like to set both scrollbars to AsNeeded:
@@ -174,6 +173,7 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
         # A VBox to lay out all the pages vertically:
         self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
 
         # Create the widget for the first page of the PDF,
         # which will also create the Poppler document we'll use
@@ -229,13 +229,15 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         else:
             vscrollbarwidth = 14
 
-        # XXX Getting the width of the content plus the scrollbar width
-        # isn't enough. There are also margins, and there doesn't seem
-        # to be any way either to turn off the margins or to find out
-        # how big they are. In practice, on my system right now, I need
-        # to add 12 pixels to avoid having a horizontal scrollbar.
-        # It would be lovely if Qt offered a way to do this right.
-        width = self.scroll_content.width() + vscrollbarwidth + 12
+        # Getting the size of a widget is tricky.
+        # self.widget().width(), for some reason, gives the width minus 12
+        # pixels, while self.widget().sizeHint().width() gives the
+        # correct size.
+        # So that means, apparently, if you want the margins of a widget
+        # you can get them by subtracting width() and height() from sizeHint().
+        # print("widget width is", self.widget().width(),
+        #       ", sizehint", self.widget().sizeHint().width())
+        width = self.widget().sizeHint().width() + vscrollbarwidth
         height = self.pages[0].pagesize.height() + vscrollbarwidth
 
         self.resize(width, height)
