@@ -16,12 +16,13 @@
 # from gi.repository import Poppler
 
 import sys
-import requests
+import traceback
 
-from PyQt5.QtWidgets import QWidget, QApplication, \
+from PyQt5.QtWidgets import QWidget, QApplication, QShortcut, \
      QLabel, QScrollArea, QSizePolicy, QVBoxLayout
 from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap
 from PyQt5.QtCore import Qt, QPoint, QSize, QUrl, QByteArray
+from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from popplerqt5 import Poppler
 
@@ -39,15 +40,29 @@ class PDFWidget(QLabel):
     subsequent widgets you create) or use a ScrolledPDFWidget.
     '''
 
-    def __init__(self, filename, document=None, pageno=1, dpi=72, parent=None):
+    def __init__(self, url, document=None, pageno=1, dpi=72, parent=None,
+                 load_cb=None):
+        '''
+           load_cb: will be called when the document is loaded.
+        '''
         super(PDFWidget, self).__init__(parent)
 
-        self.filename = filename
+        self.filename = url
+
+        self.load_cb = load_cb
+
+        self.network_manager = None
+
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         if not document:
-            self.document = PDFWidget.new_document(filename)
+            self.document = None
+            if url:
+                self.start_load(url)
         else:
             self.document = document
+        self.page = None
+        self.pagesize = QSize(600, 800)
 
         self.dpi = dpi
 
@@ -55,20 +70,39 @@ class PDFWidget(QLabel):
         # most PDF users will expect, so subtract:
         if pageno > 0:
             pageno -= 1
-        self.page = self.document.page(pageno)
-
-        self.pagesize = self.page.pageSize()
+        self.pageno = pageno
 
         self.render()
+
+    def sizeHint(self):
+        if not self.page:
+            if not self.document:
+                return QSize(600, 800)
+            self.page = self.document.page(self.pageno)
+
+        if not self.pagesize:
+            self.pagesize = self.page.pageSize()
+
+        return self.pagesize
 
     def render(self):
         '''Render to a pixmap at the current DPI setting.
         '''
+        if not self.document:
+            return
+
+        if not self.page:
+            self.page = self.document.page(self.pageno)
+            self.pagesize = self.page.pageSize()
+
+            self.document.setRenderHint(Poppler.Document.TextAntialiasing)
+            # self.document.setRenderHint(Poppler.Document.TextHinting)
+
         # Most Qt5 programs seem to use setGeometry(x, y, w, h)
         # to set initial window size. resize() is the only method I've
         # found that doesn't force initial position as well as size.
-        self.resize(self.pagesize.width() * self.dpi/POINTS_PER_INCH,
-                    self.pagesize.height() * self.dpi/POINTS_PER_INCH)
+        # self.resize(self.pagesize.width() * self.dpi/POINTS_PER_INCH,
+        #             self.pagesize.height() * self.dpi/POINTS_PER_INCH)
 
         self.setWindowTitle('PDF Viewer')
 
@@ -76,24 +110,35 @@ class PDFWidget(QLabel):
         self.pixmap = QPixmap.fromImage(img)
         self.setPixmap(self.pixmap)
 
-    #classmethod
-    def new_document(url):
+    def start_load(self, url):
         '''Create a Poppler.Document from the given URL, QUrl or filename.
         '''
 
         # If it's not a local file, we'll need to load it.
+        # http://doc.qt.io/qt-5/qnetworkaccessmanager.html
         qurl = QUrl(url)
         if qurl.scheme():
-            r = requests.get(qurl.toString())
-            qbytes = QByteArray(r.content)
-            document = Poppler.Document.loadFromData(qbytes)
+            if not self.network_manager:
+                self.network_manager = QNetworkAccessManager();
+            self.network_manager.finished.connect(self.download_finished)
+            self.network_manager.get(QNetworkRequest(qurl))
+
+            # r = requests.get(qurl.toString())
+            # qbytes = QByteArray(r.content)
+            # document = Poppler.Document.loadFromData(qbytes)
         else:
-            document = Poppler.Document.load(url)
+            self.document = Poppler.Document.load(url)
+            if self.load_cb:
+                self.load_cb()
 
-        # self.document.setRenderHint(Poppler.Document.TextHinting)
-        document.setRenderHint(Poppler.Document.TextAntialiasing)
+    def download_finished(self, network_reply):
+        qbytes = network_reply.readAll()
+        self.document = Poppler.Document.loadFromData(qbytes)
 
-        return document
+        self.render()
+
+        if self.load_cb:
+            self.load_cb()
 
 
 class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
@@ -105,46 +150,106 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
     def __init__(self, filename, dpi=72, parent=None):
         super(PDFScrolledWidget, self).__init__(parent)
 
+        self.loaded = False
+
+        self.vscrollbar = None
+
         self.setWidgetResizable(True)
 
+        # Try to eliminate the guesswork in sizing the window to content:
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setFrameShape(self.NoFrame)
+
+        # I would like to set both scrollbars to AsNeeded:
+        # but if the vertical scrollbar is AsNeeded, the content
+        # gets loaded initially, then the QScrollArea decides it
+        # needs a vertical scrollbar, adds it and resizes the content
+        # inside, so everything gets scaled by 0.98.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
         # Create a widget inside the scroller for the VBox layout to use:
-        scroll_contents = QWidget()
-        self.setWidget(scroll_contents)
+        self.scroll_content = QWidget()
+        self.setWidget(self.scroll_content)
 
         # A VBox to lay out all the pages vertically:
-        self.scroll_layout = QVBoxLayout(scroll_contents)
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
 
         # Create the widget for the first page of the PDF,
         # which will also create the Poppler document we'll use
         # to render the other pages.
-        self.pages = [ PDFWidget(filename, document=None, pageno=1, dpi=dpi) ]
+        self.pages = [ PDFWidget(filename, document=None, pageno=1, dpi=dpi,
+                                 load_cb = self.load_cb) ]
+        self.pages[0].setContentsMargins(0, 0, 0, 0)
+        self.pages[0].setFrameShape(self.NoFrame)
 
         # Add page 1 to the vertical layout:
         self.scroll_layout.addWidget(self.pages[0])
 
-        # Now there's a size. Set the initial page size to be big enough
-        # to show one page, including room for scrollbars, at 72 DPI.
-        # XXX This should also take into account factors like screen size.
-        scrollbar_size = 5    # guess at approximate scrollbar size in pixels
-        self.resize(self.pages[0].width() + scrollbar_size,
-                    self.pages[0].height() + scrollbar_size)
 
-        for p in range(2, self.pages[0].document.numPages()):
-            document = None
-            pagew = PDFWidget(filename, document=document, pageno=p, dpi=dpi)
+    def load_cb(self):
+        page1 = self.pages[0]
+
+        width = page1.width()
+        height = page1.height()
+        if self.vscrollbar:
+            sbw = self.vscrollbar.width()
+            width += sbw
+            height += sbw
+
+        for p in range(2, page1.document.numPages()):
+            pagew = PDFWidget(page1.filename, document=page1.document,
+                              pageno=p, dpi=page1.dpi)
+            pagew.setContentsMargins(0, 0, 0, 0)
+
             # pagew.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
             self.scroll_layout.addWidget(pagew)
             self.pages.append(pagew)
 
         self.scroll_layout.addStretch(1)
 
+        # Now there's a size. Set the initial page size to be big enough
+        # to show one page, including room for scrollbars, at 72 DPI.
+        self.resizeToFitContent()
+
+        # Don't set the loaded flag until after the first set of resizes,
+        # so resizeEvent() won't zoom.
+        self.loaded = True
+
+    def resizeToFitContent(self):
+        '''Resize to be wide enough not to show a horizontal scrollbar,
+           and just a little taller than the first page of PDF content.
+        '''
+        # XXX This should also take into account factors like screen size.
+
+        if not self.vscrollbar:
+            self.vscrollbar = self.verticalScrollBar()
+        if self.vscrollbar:
+            vscrollbarwidth = self.vscrollbar.width()
+        else:
+            vscrollbarwidth = 14
+
+        # XXX Getting the width of the content plus the scrollbar width
+        # isn't enough. There are also margins, and there doesn't seem
+        # to be any way either to turn off the margins or to find out
+        # how big they are. In practice, on my system right now, I need
+        # to add 12 pixels to avoid having a horizontal scrollbar.
+        # It would be lovely if Qt offered a way to do this right.
+        width = self.scroll_content.width() + vscrollbarwidth + 12
+        height = self.pages[0].pagesize.height() + vscrollbarwidth
+
+        self.resize(width, height)
+
+    # def showEvent(self, event):
+
     def resizeEvent(self, event):
-        '''On resize, re-render the PDF to fit the new width.
+        '''On resizes after the initial resize,
+           re-render the PDF to fit the new width.
         '''
         oldWidth = event.oldSize().width()
         newWidth = event.size().width()
 
-        if oldWidth > 0:
+        if oldWidth > 0 and self.loaded:
             self.zoom(newWidth / oldWidth)
 
         super(PDFScrolledWidget, self).resizeEvent(event)
@@ -165,11 +270,27 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
 
 if __name__ == '__main__':
+    #
+    # PyQt is super crashy. Any little error, like an extra argument in a slot,
+    # causes it to kill Python with a core dump.
+    # Setting sys.excepthook works around this , and execution continues.
+    #
+    def excepthook(excType=None, excValue=None, tracebackobj=None, *,
+                   message=None, version_tag=None, parent=None):
+        # print("exception! excValue='%s'" % excValue)
+        # logging.critical(''.join(traceback.format_tb(tracebackobj)))
+        # logging.critical('{0}: {1}'.format(excType, excValue))
+        traceback.print_exception(excType, excValue, tracebackobj)
+
+    sys.excepthook = excepthook
 
     app = QApplication(sys.argv)
 
     w = PDFScrolledWidget(sys.argv[1])
     # w = PDFWidget(sys.argv[1])
+
+    QShortcut("Ctrl+Q", w, activated=w.close)
+
     w.show()
 
     sys.exit(app.exec_())
