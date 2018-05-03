@@ -488,48 +488,57 @@ def sync(src, dst, dryrun=True):
 
 def Usage():
     progname = os.path.basename(sys.argv[0])
-    print("""%s: list or sync directories with Android over adb.
+    return ("""%s: list or sync directories with Android over adb.
 
 Usage:
     %s path [path ...]
         List the given paths"
-    %s -s srcpath dstpath
+    %s -s [-n] srcpath dstpath
         Sync from srcpath to dstpath
 
     Paths may be local files, android:/path/to, or androidsd:/path/to."""
         % (progname, progname, progname))
-    sys.exit(1)
 
 def parse_args():
     """Parse commandline arguments."""
-    parser = argparse.ArgumentParser(description="List or sync files between Linux and Android")
+    parser = argparse.ArgumentParser(usage=Usage(),
+                                     description="List or sync files between Linux and Android")
 
     parser.add_argument('-n', "--dryrun", dest="dryrun", default=False,
                         action="store_true")
+    # Doesn't currently work without recursive,
+    # but might eventually want to make that optional.
+    # parser.add_argument('-r', "--recursive", dest="recursive", default=False,
+    #                     action="store_true")
     parser.add_argument('-s', "--sync", dest="sync", default=False,
                         action="store_true")
-    parser.add_argument("src")
-    parser.add_argument("dst", nargs='?')
-    return parser.parse_args()
+    parser.add_argument('-z', "--no-size", dest="nosize", default=False,
+                        action="store_true")
+    parser.add_argument("paths", nargs='+')
+
+    args = parser.parse_args()
+
+    # I can't find a way to get argparse to handle this.
+    if args.sync and len(args.paths) != 2:
+        print "-s must have exactly 2 parameters, src and dst\n"
+        print Usage()
+        sys.exit(2)
+
+    return args
 
 def main():
 
     args = parse_args()
+    # print args
 
     if args.sync:
-        print("args:", args)
-        sync(args.src, args.dst, dryrun=args.dryrun)
-        sys.exit(0)
+        sync(args.paths[0], args.paths[1], dryrun=args.dryrun)
+        return
 
-    sizes = True
-    recursive = True
-
-    # Eventually allow for listing multiple paths,
-    # which will require some argparse wizardy.
-    for path in ([args.src]):
-        files = list_dir(path, sizes=sizes, recursive=recursive)
-        if sizes:
-            print("%s:" % path)
+    for path in (args.paths):
+        print("\n%s :" % path)
+        files = list_dir(path, sizes=(not args.nosize), recursive=True)
+        if not args.nosize:
             for f in files:
                 if f[1] < 500:
                     print("%d\t%s" % (f[1], f[0]))
