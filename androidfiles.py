@@ -23,6 +23,7 @@ import posixpath
 import shutil
 import pipes
 import re
+import argparse
 
 def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
@@ -36,7 +37,7 @@ def strip_schema(path):
     if path.startswith("androidsd:"):
         sdcards = find_sdcards()
         if not sdcards:
-            return None
+            raise RuntimeError, "Can't access Android device"
         return '/storage/' + sdcards[0] + '/' + path[10:]
 
     return path
@@ -104,7 +105,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
 
             if recursive and cur_subdir:
                 fname = posixpath.normpath(posixpath.join(cur_subdir,
-                                                          fname))[lenpath:]
+                                                          fname))[lenpath-1:]
                 # Dependng on whether the original path ended with a slash,
                 # fname might incorrectly start with one
                 # because lenpath might be too small by one.
@@ -139,19 +140,20 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
-    print "list_local_dir", path, sorted, sizes, recursive
+    # print "list_local_dir", path, sorted, sizes, recursive
     lenpath = len(path)
     if recursive:
         file_list = []
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
-            print "root", root
+            # print "root", root
             for f in files:
                 f = os.path.normpath(f)
-                print "  appending", os.path.join(root, f)
-                # What was I thinking here?
-                # file_list.append(os.path.join(root, f)[lenpath+1:])
-                file_list.append(os.path.join(root, f))
+
+                if root == '.':
+                    file_list.append(f)
+                else:
+                    file_list.append(os.path.join(root, f))
 
     else:
         file_list = os.listdir(path)
@@ -165,15 +167,15 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     # Get the size for each file.
     sizelist = []
     for filename in file_list:
-        filepath = os.path.normpath(os.path.join(path, filename))
-        print root, path, filename
-        print "filepath:", filepath
+        filepath = os.path.normpath(filename)
+        # print root, path, filename
+        # print "filepath:", filepath
         if os.path.isdir(filepath):
             sizelist.append((filename, 0))
         else:
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
-                print "Got the size for", filepath
+                # print "Got the size for", filepath
             except OSError:
                 print "OSError on", filepath, "path was", path
                 sizelist.append((filename, 0))
@@ -291,9 +293,12 @@ def sync(src, dst, dryrun=True):
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
 
+    # Indices as we loop over the src and dst lists:
     isrc = 0
     idst = 0
-    updates = []    # the list of files we need to update
+
+    # The list of files we need to update, remove or move:
+    updates = []
     removes = []
     moves = []
 
@@ -431,6 +436,12 @@ def sync(src, dst, dryrun=True):
     print("\n\nMaking needed directories")
     for d in dstdirs:
         d = dst + d
+
+        # XXX Somehow these are coming out /path/to/dirname/.
+        # As a temporary fix, remove the final /.
+        if d.endswith('/.'):
+            d = d[:-2]
+
         print("mkdir " + d)
         if not dryrun:
             mkdir(d)
@@ -455,12 +466,22 @@ def sync(src, dst, dryrun=True):
 
     # Finally, the updates.
     print("\n\nCopying up files that are new or changed")
+    srclen = len(src)
+
+    # Special case: if we're syncing from ./ it will have been stripped
+    # from the destination path, so those are two more characters we
+    # won't need to remove from dstup.
+    # XXX Be smarter about translating up to dstup, making sure to
+    # change only the src->dst paths.
+    if src.startswith('./'):
+        srclen -= 2
     for up in updates:
-        srcup = src + up
-        dstup = dst + up
-        print("Updating %s -> %s" % (srcup, dstup))
+        # At this point, up is the full path in src.
+        # Translate it to its dst path.
+        dstup = dst + up[srclen:]
+        print("Updating %s -> %s" % (up, dstup))
         if not dryrun:
-            copyfile(srcup, dstup)
+            copyfile(up, dstup)
 
     if dryrun:
         print("\nThat's what we would have done, if this wasn't a dry run")
@@ -479,29 +500,33 @@ Usage:
         % (progname, progname, progname))
     sys.exit(1)
 
+def parse_args():
+    """Parse commandline arguments."""
+    parser = argparse.ArgumentParser(description="List or sync files between Linux and Android")
+
+    parser.add_argument('-n', "--dryrun", dest="dryrun", default=False,
+                        action="store_true")
+    parser.add_argument('-s', "--sync", dest="sync", default=False,
+                        action="store_true")
+    parser.add_argument("src")
+    parser.add_argument("dst", nargs='?')
+    return parser.parse_args()
+
 def main():
-    args = sys.argv[1:]
-    if not args:
-        Usage()
 
-    if args[0] == '-h' or args[0] == '--help':
-        Usage()
+    args = parse_args()
 
-    if args[0] == '-dryrun' or args[0] == '-n':
-        dryrun = True
-        args = args[1:]
-    else:
-        dryrun = False
-
-    if len(args) == 3 and args[0] == '-s':
-        sync(args[1], args[2], dryrun=dryrun)
+    if args.sync:
+        print("args:", args)
+        sync(args.src, args.dst, dryrun=args.dryrun)
         sys.exit(0)
 
     sizes = True
     recursive = True
 
-    for path in (sys.argv[1:]):
-        print("Listing path %s" % path)
+    # Eventually allow for listing multiple paths,
+    # which will require some argparse wizardy.
+    for path in ([args.src]):
         files = list_dir(path, sizes=sizes, recursive=recursive)
         if sizes:
             print("%s:" % path)
@@ -514,4 +539,7 @@ def main():
             print("%s: %s" % (path, ', '.join(files)))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as e:
+        print str(e)
