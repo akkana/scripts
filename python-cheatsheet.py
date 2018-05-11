@@ -290,13 +290,26 @@ def parse_args():
     parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
                         help='Beta parameter (default: 2)')
 
-    # single argument
+    # Flag that takes multiple arguments, with different names for each arg.
+    # Note that this is also a way around the problem of passing
+    # an argument that starts with a dash: argparse won't allow strings
+    # that start with a dash, thinking they're flags, but if they
+    # look like numbers with no extra characters embedded, it will
+    # allow them.
+    parser.add_argument('-a', '--area', action='store',
+                        type=int, nargs=4,
+                        dest='area', default=[-180, 180, -70, 74],
+                        metavar=("west", "east", "south", "north"),
+                        help="Area to plot")
+
+    # single positional argument
     parser.add_argument('url', help='The URL to open')
+
     # or, multiple arguments
     parser.add_argument('urls', nargs='?', default='http://localhost/',
                         help="URLs to open")
 
-    args = parser.parse_args(sys.argv)
+    args = parser.parse_args(sys.argv[1:])
     # Now we have args.check, args.beta, args.url or urls.
 
     # parse_known_args() is like parse_args() except that it doesn't
@@ -304,6 +317,19 @@ def parse_args():
     # a 2-item tuple, consisting of the arg namespace and a list of
     # the remaining args:
     args, rest = parser.parse_known_args(sys.argv)
+
+# Optional argument example:
+    parser.add_argument('-n', "--dryrun", dest="dryrun", default=False,
+                        action="store_true")
+    parser.add_argument('-s', "--sync", dest="sync", default=False,
+                        action="store_true")
+    parser.add_argument("src")
+    parser.add_argument("dst", nargs='?')
+    args = parser.parse_args(sys.argv)
+
+# For something more complicated, like different numbers of arguments
+# depending on a flag, it's not clear argparse can handle that.
+# See androidfiles.py for a sample workaround.
 
 ########################################################
 # Dates and times
@@ -330,6 +356,8 @@ if (now - time_end).seconds < 7200:
 #
 # Parse a date in RFC 2822 format.
 #
+datetime.datetime.strptime('2016-01-01', '%Y-%m-%d')
+
 # email.utils.parsedate returns a tuple.
 t = time.mktime(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
 (y, m, d, h, m, s, weekday, yearday, isdst) = t
@@ -361,6 +389,13 @@ days_this_month = calendar.monthrange(today.year, today.month)[1]
 one_month_from_now = today + datetime.timedelta(days=days_this_month)
 
 # There's also isodate.parse_datetime which I haven't looked into yet.
+
+# Number of days in a month:
+calendar.monthrange(year, month)[1]
+# monthrange returns weekday of the first day and number of days in the month.
+
+# Or do it using only datatime:
+(datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
 
 ########################################################
 # Threading and multiprocessing
