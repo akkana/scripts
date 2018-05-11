@@ -216,11 +216,17 @@ class BrowserView(QWebEngineView):
         # from a commandline argument or other means.
         # How do we find out the URL being loaded?
 
+    load_failed_error = '''<br><br><br><br><big>Yikes! Load failed</big>'''
+
     def load_finished(self, ok):
         # OK is useless: if we try to load a bad URL, we won't get a
         # loadFinished on that; instead it will switch to about:blank,
         # load that successfully and call loadFinished with ok=True.
         self.browser_win.progress.hide()
+        url = self.browser_win.browserviews[self.browser_win.active_tab].url().toString()
+        self.browser_win.progress.hide()
+        if not ok or not url:
+            self.browser_win.browserviews[self.browser_win.active_tab].setHtml(BrowserView.load_failed_error)
 
         # print("load_finished")
         # print("In load_finished, view is", self.browserviews[self.active_tab], "and page is", self.browserviews[self.active_tab].page())
