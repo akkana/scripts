@@ -22,7 +22,8 @@ from PyQt5.QtWidgets import QWidget, QApplication, QShortcut, \
      QLabel, QScrollArea, QSizePolicy, QVBoxLayout
 from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap
 from PyQt5.QtCore import Qt, QPoint, QSize, QUrl, QByteArray
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
+from PyQt5.QtNetwork import QNetworkAccessManager, \
+     QNetworkReply, QNetworkRequest
 
 from popplerqt5 import Poppler
 
@@ -220,8 +221,6 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         '''Resize to be wide enough not to show a horizontal scrollbar,
            and just a little taller than the first page of PDF content.
         '''
-        # XXX This should also take into account factors like screen size.
-
         if not self.vscrollbar:
             self.vscrollbar = self.verticalScrollBar()
         if self.vscrollbar:
@@ -287,6 +286,12 @@ if __name__ == '__main__':
     sys.excepthook = excepthook
 
     app = QApplication(sys.argv)
+
+    # It's helpful to know screen size, to choose appropriate DPI.
+    # XXX It's currently ignored but will eventually be used.
+    desktops = QApplication.desktop()
+    geometry = desktops.screenGeometry(desktops.screenNumber(self))
+    print("screen geometry is", geometry.width(), geometry.height())
 
     w = PDFScrolledWidget(sys.argv[1])
     # w = PDFWidget(sys.argv[1])
