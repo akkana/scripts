@@ -73,8 +73,9 @@ def clean_up_html(soup, remove_images=True):
     return soup
 
 if __name__ == '__main__':
-    with open("/tmp/judy.html") as infp:
-        soup = BeautifulSoup(infp, "lxml")
-        clean = clean_up_html(soup)
-        print(prettyprint(clean))
+    for f in sys.argv[1:]:
+        with open(f) as infp:
+            soup = BeautifulSoup(infp, "lxml")
+            clean = clean_up_html(soup)
+            print(prettyprint(clean))
 
