@@ -3356,6 +3356,7 @@ class BirdCodes:
         ,,TRMU,,,Tricolored Munia,,Lonchura malacca,LONMAL,,
         ,,CHMU,,,Chestnut Munia,,Lonchura atricapilla,LONATR,,
         ,,PTWH,,,Pin-tailed Whydah,,Vidua macroura,VIDMAC,,
+        ,,ROPI,,,Rock Pigeon,,Columbia Livia,XXXXXXX,,
         +,,UNBI,,,Unidentified Bird,,Aves (gen, sp),AVEGSP,,'''
 
 htmlhead = '''Content-type: text/html
