@@ -12,6 +12,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
+# LANL error messages, like "System Unavailable", are unfortunately
+# served as HTML rather than something more easily parseable.
+from bs4 import BeautifulSoup
+
 def c_to_f(t):
     return t * (212.-32.) / 100. + 32.
 
@@ -127,7 +131,21 @@ class LANLWeather(object):
                     outfile.write(datablob)
                     print("Saved to cache %s" % cachefile)
 
-            self.parse_lanl_data(datablob)
+            try:
+                self.parse_lanl_data(datablob)
+            except Exception, e:
+                print "Couldn't parse blob in", cachefile
+                print str(e)
+
+                # Try to parse the error message
+                with open(cachefile) as fp:
+                    soup = BeautifulSoup(fp, 'lxml')
+                    # pagecontent = soup.find('div', { 'id': 'pagecontent' })
+                    pagecontent = soup.find(id='pagecontent')
+                    print("HTML Error: %s" % pagecontent.text)
+                os.unlink(cachefile)
+
+                sys.exit(1)
 
             startday += relativedelta(months=1)
             if to_date(startday) > to_date(self.end):
@@ -187,7 +205,8 @@ class LANLWeather(object):
         # so we have everything cached for later.
         request_data['checkbox'] = ','.join(LANLWeather.request_keys)
 
-        r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
+        # r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
+        r = requests.post('http://www.weather.lanl.gov/data_request_green_weather.asp', data = request_data)
 
         if not r.text:
             raise RuntimeError, "Empty response!"
@@ -260,6 +279,9 @@ class LANLWeatherPlots(LANLWeather):
         super(LANLWeatherPlots, self).__init__(tower, start, end, keys)
         self.fig = plt.figure(figsize=(15, 5))
 
+        self.ax1 = None
+        self.ax3 = None
+
     def show(self):
         # Various desperate attempts to trim spurious whitespace:
 
@@ -278,8 +300,10 @@ class LANLWeatherPlots(LANLWeather):
         # self.ax3.set_adjustable('box-forced')
 
         # This gets rid of the intra-plot whitespace:
-        self.ax1.set_xlim([self.start, self.realend])
-        self.ax3.set_xlim([self.start, self.realend])
+        if self.ax1:
+            self.ax1.set_xlim([self.start, self.realend])
+        if self.ax3:
+            self.ax3.set_xlim([self.start, self.realend])
 
         # This gets rid of some of the extra whitespace between/around plots.
         # pad controls padding at the top, bottom and sides;
@@ -292,6 +316,35 @@ class LANLWeatherPlots(LANLWeather):
         plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
 
         plt.show()
+
+    def plot_seasonal_wind(self, ws):
+        """
+        Plot wind speed by season, averaging over all available years.
+        Required input:
+            ws: Key used for Wind speeds (knots)
+        Optional Input:
+        """
+        # self.dates, self.data[ws]
+        avs = [0.0] * 366
+        datapoints = [0] * 366
+        for i, d in enumerate(self.dates):
+            day_of_year = d.timetuple().tm_yday - 1
+            # print("Day of year", day_of_year, "timetuple", d.timetuple())
+            avs[day_of_year] += self.data[ws][i]
+            # XXX Note that this will be off by a day in non leap years.
+            datapoints[day_of_year] += 1
+
+        for d, dp in enumerate(datapoints):
+            avs[d] /= dp
+        days = [ datetime.date(2018,1,1) + datetime.timedelta(d)
+                 for d, dp in enumerate(datapoints) ]
+
+        plt.plot(days, avs, # '.',
+                 color="green", label='Average wind speed, 2014-present')
+
+        plt.ylabel('Date (ignore year)')
+        plt.ylabel('Wind speed average for day')
+        plt.legend(loc='upper left')
 
     def plot_winds(self, ws, wd):
         """
@@ -348,13 +401,14 @@ class LANLWeatherPlots(LANLWeather):
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
 def main():
-    lwp = LANLWeatherPlots('ta54', [2017, 1, 1], datetime.datetime.now(),
+    lwp = LANLWeatherPlots('ta54', [2014, 1, 1], datetime.datetime.now(),
                            ["spd1", "dir1", "temp0"])
 
     lwp.get_data()
 
-    lwp.plot_winds('spd1', 'dir1')
-    lwp.plot_temp('temp0')
+    lwp.plot_seasonal_wind('spd1')
+    # lwp.plot_winds('spd1', 'dir1')
+    # lwp.plot_temp('temp0')
 
     lwp.show()
 
