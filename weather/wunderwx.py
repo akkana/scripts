@@ -42,7 +42,7 @@ for station in wundata['location']['nearby_weather_stations']['pws']['station']:
                                    station['distance_mi'])
 
 '''
-<hesiodus>- wunderwx.py                                                                                                                                                                                           ~/src/scripts/weather 9:19PM
+<hesiodus>- wunderwx.py
 {u'current_observation': {u'UV': u'0',
                           u'dewpoint_c': 4,
                           u'dewpoint_f': 40,
