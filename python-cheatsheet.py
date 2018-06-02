@@ -752,6 +752,11 @@ if sys.version[:1] == '2':
 else:
     from urllib.parse import urlparse
 
+# Call input everywhere but make that call raw_input if it's python2:
+try: input = raw_input
+except NameError: pass
+
+
 ################################################################
 # pip hints
 ################################################################
