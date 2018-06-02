@@ -113,24 +113,18 @@ class PDFWidget(QLabel):
 
     def start_load(self, url):
         '''Create a Poppler.Document from the given URL, QUrl or filename.
+           Return, then asynchronously call self.load_cb.
         '''
 
         # If it's not a local file, we'll need to load it.
         # http://doc.qt.io/qt-5/qnetworkaccessmanager.html
         qurl = QUrl(url)
-        if qurl.scheme():
-            if not self.network_manager:
-                self.network_manager = QNetworkAccessManager();
-            self.network_manager.finished.connect(self.download_finished)
-            self.network_manager.get(QNetworkRequest(qurl))
-
-            # r = requests.get(qurl.toString())
-            # qbytes = QByteArray(r.content)
-            # document = Poppler.Document.loadFromData(qbytes)
-        else:
-            self.document = Poppler.Document.load(url)
-            if self.load_cb:
-                self.load_cb()
+        if not qurl.scheme():
+            qurl = QUrl.fromLocalFile(url)
+        if not self.network_manager:
+            self.network_manager = QNetworkAccessManager();
+        self.network_manager.finished.connect(self.download_finished)
+        self.network_manager.get(QNetworkRequest(qurl))
 
     def download_finished(self, network_reply):
         qbytes = network_reply.readAll()
@@ -290,8 +284,8 @@ if __name__ == '__main__':
     # It's helpful to know screen size, to choose appropriate DPI.
     # XXX It's currently ignored but will eventually be used.
     desktops = QApplication.desktop()
-    geometry = desktops.screenGeometry(desktops.screenNumber(self))
-    print("screen geometry is", geometry.width(), geometry.height())
+    geometry = desktops.screenGeometry(desktops.screenNumber())
+    # print("screen geometry is", geometry.width(), geometry.height())
 
     w = PDFScrolledWidget(sys.argv[1])
     # w = PDFWidget(sys.argv[1])
