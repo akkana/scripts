@@ -135,6 +135,8 @@ class BrowserView(QWebEngineView):
             # return super().eventFilter(source, event)
             return True
 
+        # Middle click, not over a link: load the selection.
+        # XXX This prevents pasting into text fields too. Must fix.
         elif event.type() == QEvent.MouseButtonPress and \
              event.button() == Qt.MidButton and not self.last_hovered:
                 # if self.last_hovered:
@@ -493,6 +495,11 @@ class BrowserWindow(QMainWindow):
            PDF URLs will be loaded in a new tab, because there doesn't
            seem to be a way of replacing the BrowserView with a BrowserPDFView.
         '''
+
+        # If there are newlines, remove newlines plus all adjacent whitespace.
+        if '\n' in url:
+            lines = url.split('\n')
+            url = ''.join([ l.strip() for l in lines ])
 
         # Note that tab=0 is a valid argument here.
         # When testing whether tab is set, be sure to test for None.
