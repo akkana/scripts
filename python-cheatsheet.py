@@ -723,7 +723,7 @@ wrapped_arr = vwraparound(orig_arr)
 # Migrate python2 to python3 in place (omit -n to leave a .bak):
 $ 2to3 -wn file_or_directory
 
-# To make something work in both 2 and 3:
+# To make print() work in both 2 and 3:
 from __future__ import print_function
 
 # print without a newline and to a file:
@@ -755,7 +755,28 @@ else:
 # Call input everywhere but make that call raw_input if it's python2:
 try: input = raw_input
 except NameError: pass
+# OR:
+if hasattr(__builtins__, 'raw_input'):
+    input = raw_input
 
+################################################################
+# Type hinting
+################################################################
+
+'''
+Several ways of hinting about types in Python 3:
+Type hinting with the typing module:
+  https://docs.python.org/3/library/typing.html
+
+Function annotations, PEP 3107:
+  https://www.python.org/dev/peps/pep-3107/
+
+Some related tools:
+MyPy: an experimental optional static type checker (uses type hints)
+  http://mypy-lang.org/
+PySonar: a type inferencer and indexer
+  https://yinwang0.wordpress.com/2010/09/12/pysonar/
+'''
 
 ################################################################
 # pip hints
