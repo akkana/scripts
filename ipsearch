@@ -84,7 +84,7 @@ def scan(iface="eth0", ping_fn=ping, ping_first=True, port=None):
         print("My IP is", myip, "on", iface)
         print("My network is", mynetwork)
 
-    fmt = "%15s  %18s  %12s  %s"
+    fmt = "%15s %18s %12s %s"
 
     for h in range(1, 255):  # I know, it should adjust based on net class
         hostip = "%s.%d" % (mynetwork, h)
