@@ -12,6 +12,7 @@ import socket
 import fcntl
 import struct
 import re
+import argparse
 
 try:
     from arpreq import arpreq
@@ -23,6 +24,8 @@ try:
 except:
     match_mac = None
 
+gDebugging = False
+
 def ping(host):
     """Ping a host by name or address.
        return True if it answers, False otherwise.
@@ -33,6 +36,13 @@ def ping(host):
     if rv == 0:
         return ""
     return None
+
+def check_port(host, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(.25)
+    result = sock.connect_ex((host, port))
+    sock.close()
+    return not result
 
 def arp(host):
     """Call arp -a on an address.
@@ -66,15 +76,29 @@ def ip_addr(iface):
                        struct.pack('256s', bytes(iface[:15], "utf-8")))
     return socket.inet_ntoa(info[20:24])
 
-def scan(iface="eth0", ping_fn=ping, ping_first=True):
+def scan(iface="eth0", ping_fn=ping, ping_first=True, port=None):
     myip = ip_addr(iface)
-    print("My IP is", myip, "on", iface)
     mynetwork = '.'.join(myip.split('.')[0:3])
-    print("My network is", mynetwork)
-    fmt = "%16s  %18s  %12s  %s"
+
+    if (gDebugging):
+        print("My IP is", myip, "on", iface)
+        print("My network is", mynetwork)
+
+    fmt = "%15s  %18s  %12s  %s"
 
     for h in range(1, 255):  # I know, it should adjust based on net class
         hostip = "%s.%d" % (mynetwork, h)
+        sys.stdout.flush()
+
+        if gDebugging:
+            print(hostip, end='\r')
+            sys.stdout.flush()
+
+        if port:
+            if not check_port(hostip, port):
+                sys.stdout.flush()
+                continue
+            sys.stdout.flush()
 
         if ping_first:
             out = ping_fn(hostip)
@@ -124,13 +148,29 @@ if __name__ == "__main__":
         print("Couldn't find my IP address")
         sys.exit(1)
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-a', "--arpa", dest="arpa", default=False,
+                        action="store_true", help="Use arp -a to ping")
+    parser.add_argument('-P', "--ping", dest="pingfirst", default=False,
+                        action="store_true", help="Ping each host first")
+    parser.add_argument('-d', "--debug", dest="debug", default=False,
+                        action="store_true", help="Verbose debugging")
+
+    parser.add_argument('-p', action="store", dest="port", type=int,
+                        default=None, help='Check if this port is open')
+
+    args = parser.parse_args(sys.argv[1:])
+    if args.debug:
+        gDebugging = True
+
     try:
-        if len(sys.argv) > 1 and sys.argv[1].startswith("-a"):
+        if args.port:
+            scan(iface, port=args.port)
+        elif args.arpa:
             scan(iface, arp)
-        elif len(sys.argv) > 1 and sys.argv[1].startswith("-p"):
+        elif args.pingfirst:
             scan(iface, ping_first=False)
-        elif len(sys.argv) > 1:
-            Usage()
         else:
             scan(iface)
 
