@@ -126,26 +126,23 @@ def scan(iface="eth0", ping_fn=ping, ping_first=True, port=None):
         else:
             print(fmt % (hostip, mac, hostname, oui))
 
+def net_interfaces():
+    ifaces = []
+    with open("/proc/net/dev") as fp:
+        for line in fp:
+            match = re.search('([a-z0-9]+): ', line)
+            if match:
+                iface = match.group(1)
+                if not iface.startswith('lo'):
+                    ifaces.append(iface)
+    return ifaces
+
 if __name__ == "__main__":
     def Usage():
         print("""Usage: %s [-a] [-p]
 -p: ping each host first, in case they weren't in the arp cache already
 -a: Use arp -a to ping.
 """ % sys.argv[0])
-        sys.exit(1)
-
-    ifaces = [ "eth0", "wlan0" ]
-    myip = None
-
-    for iface in ifaces:
-        try:
-            myip = ip_addr(iface)
-            break
-        except OSError:
-            continue
-
-    if not myip:
-        print("Couldn't find my IP address")
         sys.exit(1)
 
     parser = argparse.ArgumentParser()
@@ -163,6 +160,23 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     if args.debug:
         gDebugging = True
+
+    ifaces = net_interfaces()
+    if gDebugging:
+        print("Net interfaces:", ' '.join(ifaces))
+
+    myip = None
+
+    for iface in ifaces:
+        try:
+            myip = ip_addr(iface)
+            break
+        except OSError:
+            continue
+
+    if not myip:
+        print("Couldn't find my IP address")
+        sys.exit(1)
 
     try:
         if args.port:
