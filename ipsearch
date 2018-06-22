@@ -186,6 +186,17 @@ def scan(iface, port=None):
         else:
             print(fmt % (hostip, mac, hostname, oui))
 
+def net_interfaces():
+    ifaces = []
+    with open("/proc/net/dev") as fp:
+        for line in fp:
+            match = re.search('([a-z0-9]+): ', line)
+            if match:
+                iface = match.group(1)
+                if not iface.startswith('lo'):
+                    ifaces.append(iface)
+    return ifaces
+
 if __name__ == "__main__":
     def Usage():
         print("""Usage: %s [-a] [-p]
@@ -241,6 +252,23 @@ if __name__ == "__main__":
             # sys.exit(1)
     elif g_debugging:
         print("Using arpreq library")
+
+    ifaces = net_interfaces()
+    if g_debugging:
+        print("Net interfaces:", ' '.join(ifaces))
+
+    myip = None
+
+    for iface in ifaces:
+        try:
+            myip = ip_addr(iface)
+            break
+        except OSError:
+            continue
+
+    if not myip:
+        print("Couldn't find my IP address")
+        sys.exit(1)
 
     try:
         scan(iface, port=args.port)
