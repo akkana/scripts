@@ -82,8 +82,8 @@ class KeyReader :
             inp, outp, err = select.select([sys.stdin], [], [])
         try:
             return sys.stdin.read()
-        except IOError, e:
-            # print "IOError:", e
+        except IOError as e:
+            # print("IOError:", e)
             return None
 
 def main():
@@ -96,7 +96,7 @@ def main():
         if key:
             print("-%s-" % key)
         else:
-            print "None"
+            print("None")
 
 if __name__ == '__main__':
     main()
