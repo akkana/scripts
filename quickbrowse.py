@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile
-from PyQt5.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PyQt5.QtCore import QAbstractNativeEventFilter
 
 # Use qpdfview for PDFs if it's available:
@@ -247,10 +246,6 @@ class BrowserView(QWebEngineView):
     def unzoom(self, factor=.8):
         self.zoom(factor)
 
-# XXX Maybe use a request interceptor,
-# https://stackoverflow.com/questions/37658772/pyqt5-6-interceptrequest-doesnt-work
-# or https://stackoverflow.com/questions/36485315/is-it-possible-to-get-url-of-clicked-link-in-webengineview
-
 class BrowserPage(QWebEnginePage):
     def __init__(self, profile, browser_view, browser_window):
         self.browser_view = browser_view
@@ -271,54 +266,6 @@ class BrowserPage(QWebEnginePage):
             return False
 
         return True
-
-class BrowserRequestInterceptor(QWebEngineUrlRequestInterceptor):
-    def interceptRequest(self, request_info):
-        # print("\n\ninterceptRequest", type(request_info), dir(request_info))
-        # info is a PyQt5.QtWebEngineCore.QWebEngineUrlRequestInfo
-        # https://doc.qt.io/qt-5.10/qwebengineurlrequestinfo.html
-        #   navigationType() can be:
-        # 'NavigationTypeBackForward', 'NavigationTypeFormSubmitted', 'NavigationTypeLink', 'NavigationTypeOther', 'NavigationTypeReload', 'NavigationTypeTyped'
-        # But you can't trust it very far: for instance, resources within
-        # a page will incorrectly claim NavigationTypeLink.
-        #   requestMethod() can be GET or POST
-        #   firstPartyUrl() is the page that issued the request
-        #   requestUrl() is the request URL itself
-        #   resourceType() can be things like media, favicon etc.
-
-        # It has these items in dir():
-        '''
-['NavigationType', 'NavigationTypeBackForward', 'NavigationTypeFormSubmitted', 'NavigationTypeLink', 'NavigationTypeOther', 'NavigationTypeReload', 'NavigationTypeTyped', 'ResourceType', 'ResourceTypeCspReport', 'ResourceTypeFavicon', 'ResourceTypeFontResource', 'ResourceTypeImage', 'ResourceTypeMainFrame', 'ResourceTypeMedia', 'ResourceTypeObject', 'ResourceTypePing', 'ResourceTypePluginResource', 'ResourceTypePrefetch', 'ResourceTypeScript', 'ResourceTypeServiceWorker', 'ResourceTypeSharedWorker', 'ResourceTypeStylesheet', 'ResourceTypeSubFrame', 'ResourceTypeSubResource', 'ResourceTypeUnknown', 'ResourceTypeWorker', 'ResourceTypeXhr', '__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', 'block', 'firstPartyUrl', 'navigationType', 'redirect', 'requestMethod', 'requestUrl', 'resourceType', 'setHttpHeader']
-        '''
-
-        # Don't do anything for resources on the page, only for the page itself.
-        # The other way to detect this is to check whether
-        # request_info.firstPartyUrl() == request_info.requestUrl()
-        if request_info.resourceType() != request_info.ResourceTypeMainFrame:
-            return
-
-        print("      Request URL:", request_info.requestUrl())
-        print("    1st party URL:", request_info.firstPartyUrl())
-        if request_info.navigationType() == request_info.NavigationTypeLink:
-            print("         Nav type: LINK")
-        else:
-            print("         Nav type:", request_info.navigationType())
-        print("    Resource Type:", request_info.resourceType())
-        print()
-
-        # Things we can do:
-        # request_info.block(True)      - don't load this url
-        # request_info.redirect(qurl)   - Redirect to a different url
-
-        urlpath = request_info.requestUrl().path()
-
-        if urlpath.endswith('membership.html'):
-            print("Nope, you can't go to the membership page")
-            request_info.block(True)
-
-        elif urlpath.endswith('calendar.html'):
-            print("Redirecting from the calendar page")
-            request_info.redirect(QUrl('https://doc.qt.io/qt-5.10/qwebengineurlrequestinfo.html'))
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -343,8 +290,6 @@ class BrowserWindow(QMainWindow):
         self.profile = QWebEngineProfile()
         # print("Profile initially off the record?",
         #       self.profile.isOffTheRecord())
-        # self.interceptor = BrowserRequestInterceptor()
-        # self.profile.setRequestInterceptor(self.interceptor)
 
         self.init_tab_name_len = 40
 
