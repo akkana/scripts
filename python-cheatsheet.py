@@ -19,19 +19,30 @@ reload(modulename)
 import modulename as mn
 reload(mn)
 
-########################################################
-# What's available in objects and modules?
-########################################################
+#############################################################
+# What's available in objects and modules? and type-checking.
+#############################################################
 
 # Show methods in an object
 dir(obj)
 # Does a function exist in an object?
-if 'zoom' in dir(obj):
+if 'attr_name' in dir(obj):
+if hasattr(obj, 'attr_name'):
 
 # Does a function exist in a module?
 hasattr(os, 'get_terminal_size'):
 # You can also get with a default:
 getattr(os, 'get_terminal_size', "Doesn't exist")
+
+# Is a variable defined? You have to check locals and globals separately.
+if 'myVar' in locals():
+if 'myVar' in globals():
+
+# Or, more generally,
+try:
+    myVar
+except NameError:
+    myVar = None
 
 # Is something a particular type? (But of course duck-typing is better.)
 if type(s) is str:
@@ -268,7 +279,8 @@ match = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', instr, re.I)
 if match: return match.group()
 
 # Find IP address:
-match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr, re.I)
+match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr)
+if match: return match.group()
 
 ########################################################
 # Command-line Argument parsing
@@ -487,7 +499,9 @@ else:
 # Read keys in cbreak mode.
 # Some info at:
 # http://docs.python.org/2/faq/library.html#how-do-i-get-a-single-keypress-at-a-time
-# but it's incomplete, so see keyreader.py for a better solution.
+# but it's incomplete, so see
+# https://github.com/akkana/scripts/blob/master/keyreader.py
+# for a better solution.
 #
 # Of course, you can also do this with curses.
 
@@ -578,6 +592,96 @@ for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "
 # NO -9
 # APPLY -10
 # HELP -11
+
+
+################################################################
+# Nonlocal variables, class statics, and closures
+################################################################
+
+# Class-static variables, more or less:
+def f(a):
+    try:
+        f.numruns += 1
+    except AttributeError:
+        # First time through
+        f.numruns = 1
+    # To avoid try/except you can also test if 'numruns' in f.__dict__
+    # or hasattr(f, 'numruns')
+
+    print(a, "f has been run %d times" % f.numruns)
+
+f(1)
+f(12)
+f(42)
+
+
+# Variables inside an inner function can see outer function variables
+# (including parameters) as read-only. Use "nonlocal" to modify them.
+# Example:
+
+def outer_fcn():
+    thestr = "Set by outer"
+
+    def inner_fcn1():
+        print("Inside fcn1:", thestr)
+
+    def inner_fcn2():
+        thestr = "Inner function overrode the variable"
+        print("Inside fcn2:", thestr)
+
+    def inner_fcn3():
+        nonlocal thestr
+        thestr = "Changed by inner function"
+        print("Inside fcn3:", thestr)
+
+    print("Initially:", thestr)
+    inner_fcn1()
+    print("After fcn1:", thestr)
+    inner_fcn2()
+    print("After fcn2:", thestr)
+    inner_fcn3()
+    print("After fcn3:", thestr)
+
+outer_fcn()
+
+# Note: when inner() is defined inside outer(), every time outer() is called
+# there's a small overhead because a function object is created for inner(),
+# whether or not it is used.
+# To see the overhead, try this nifty trick:
+import dis; dis.dis(lambda x: lambda n: x*n)
+
+# A closure is when a nested function references a value in its enclosing scope.
+# Closure is basically a limited form of scheme-style static scoping.
+
+# Example:
+
+gGlob = "before print_msg was called"
+
+def print_msg(msg):
+    outer_var = "Variable local to print_msg"
+
+    def printer():
+        print(msg, '-', outer_var, '-', gGlob)
+
+    return printer
+
+another = print_msg("Hello")
+gGlob = "after print_msg was called"
+another()
+
+# Output: Hello after print_msg was called
+#
+# The value of msg was set when print_msg() was called,
+# and when another() is run, it's run with a scope where its nonlocal variable,
+# msg, is remembered.
+# But it's limited: it  doesn't remember global variables from
+# outside the function.
+
+# Finding out what's in the closure:
+print("Closure:")
+for c in another.__closure__:
+    print('-', c.cell_contents)
+
 
 ######################################################
 # Decorators -- attempt at a useful example.
