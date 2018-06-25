@@ -9,8 +9,10 @@ import os
 import sys
 import traceback
 import posixpath
+import socket
+import select
 
-from PyQt5.QtCore import QUrl, Qt, QTimer, QEvent
+from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
@@ -30,7 +32,7 @@ def is_pdf(url):
     return handle_pdf and url.lower().endswith('.pdf')
 
 # The socket used to send remote commands:
-NAMED_PIPE = "/tmp/quickbrowse-%d"
+CMD_PIPE = "/tmp/quickbrowse-%d"
 
 # How long can a tab name be?
 MAX_TAB_NAME = 22
@@ -297,37 +299,49 @@ class BrowserWindow(QMainWindow):
         # XXX Should check the screen size and see if it can be bigger.
         self.resize(self.width, self.height)
 
-        # Set up the listener for remote commands
+        # Set up the listener for remote commands, the filename
         # and the buffer where we'll store those commands:
+        self.cmdsockname = None
         self.cmdread = b''
         self.set_up_listener()
 
-        # and set up a timer so we can check for reads on the pipe:
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_pipe)
-        self.timer.start(500)    # milliseconds
-
+    # Each process has one BrowserWindow, and each BrowserWindow has one
+    # command pipe (a Unix-domain socket) where it can accept commands.
     def set_up_listener(self):
-        # Each process has one BrowserWindow, and each BrowserWindow
-        # has one named pipe where it can accept commands.
-        self.pipe_name = NAMED_PIPE % 0000  # os.getpid()
-        if not os.path.exists(self.pipe_name):
-            os.mkfifo(self.pipe_name)
+        # Make sure the socket does not already exist
+        self.cmdsockname = CMD_PIPE % 0  # os.getpid()
+        try:
+            os.unlink(self.cmdsockname)
+        except OSError:
+            if os.path.exists(self.cmdsockname):
+                raise
 
-        # For some reason, regular open() doesn't always work on named pipes
-        # and sometimes hangs. Use os.open instead.
-        self.cmdpipe = os.open(self.pipe_name, os.O_RDONLY | os.O_NONBLOCK)
+        # Create a UDS socket
+        self.cmdsock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
-    def check_pipe(self):
-        # Loop reading all data available.
-        while True:
-            data = os.read(self.cmdpipe, 1024)
-            if not data:
-                if self.cmdread and self.cmdread.endswith(b'\n'):
-                    break
-                return
-            # There is data: add it to self.cmdread:
-            self.cmdread += data
+        # Bind the socket to the port
+        self.cmdsock.bind(self.cmdsockname)
+
+        # Listen for incoming connections
+        self.cmdsock.listen(1)
+
+        self.notifier = QSocketNotifier(self.cmdsock.fileno(),
+                                        QSocketNotifier.Read)
+
+        self.notifier.activated.connect(self.pipe_ready)
+
+    def pipe_ready(self):
+        connection, client_address = self.cmdsock.accept()
+        with connection:
+            try:
+                while True:
+                    data = connection.recv(1024)
+                    if not data: break
+                    self.cmdread += data
+
+            finally:
+                # Clean up the connection
+                connection.close()
 
         # Commands end with newlines.
         # Figure out how many commands we've read, if any.
@@ -355,10 +369,20 @@ class BrowserWindow(QMainWindow):
         '''Send a command to a running quickbrowse process.
            This will usually be called from a separate, new, process.
         '''
-        pipe_name = NAMED_PIPE % 0000  # os.getpid()
-        pipeout = os.open(pipe_name, os.O_WRONLY)
-        os.write(pipeout, b'%s %s\n' % (cmd.encode('utf-8'),
-                                        url.encode('utf-8')))
+        cmdsockname = CMD_PIPE % 0  # os.getpid()
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+        # Next line can raise socket.err, especially if there's no listener,
+        # but rather than catching them, we'll raise it
+        # and the caller can use that to decide to open a new window.
+        sock.connect(cmdsockname)
+
+        try:
+            sock.sendall(b"%s %s\n" % (cmd.encode('utf-8'),
+                                       url.encode('utf-8')))
+
+        finally:
+            sock.close()
 
     def init_chrome(self):
         # Set up the browser window chrome:
@@ -494,7 +518,8 @@ class BrowserWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Clean up
-        os.unlink(self.pipe_name)
+        if self.cmdsockname:
+            os.unlink(self.cmdsockname)
 
     def close_tab(self, tabindex):
         self.tabwidget.removeTab(tabindex)
@@ -672,10 +697,9 @@ if __name__ == '__main__':
         urls = args[1:]
         try:
             for url in urls:
-                print("Trying to send", url)
                 BrowserWindow.send_command("new-tab", url)
             sys.exit(0)
-        except FileNotFoundError as msg:
+        except socket.error as msg:
             print("No existing %s process: starting a new one." % progname)
             # Remove the --new-tab argument
             args = args[1:]
