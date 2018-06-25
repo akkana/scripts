@@ -93,7 +93,7 @@ try:
 
         redraw_screen(highlight=divisor)
         key = stdscr.getch()
-        
+
 except Exception as e:
     errstr += "Exception: " + str(e)
 
