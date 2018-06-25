@@ -7,7 +7,6 @@
 
 import os
 import sys
-import signal
 import traceback
 import posixpath
 
@@ -30,9 +29,8 @@ def is_pdf(url):
         return False
     return handle_pdf and url.lower().endswith('.pdf')
 
-# The file used to remotely trigger the browser to open more tabs.
-# The %d will be the process ID of the running browser.
-URL_FILE = "/tmp/quickbrowse-urls-%d"
+# The socket used to send remote commands:
+NAMED_PIPE = "/tmp/quickbrowse-%d"
 
 # How long can a tab name be?
 MAX_TAB_NAME = 22
@@ -299,6 +297,69 @@ class BrowserWindow(QMainWindow):
         # XXX Should check the screen size and see if it can be bigger.
         self.resize(self.width, self.height)
 
+        # Set up the listener for remote commands
+        # and the buffer where we'll store those commands:
+        self.cmdread = b''
+        self.set_up_listener()
+
+        # and set up a timer so we can check for reads on the pipe:
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_pipe)
+        self.timer.start(500)    # milliseconds
+
+    def set_up_listener(self):
+        # Each process has one BrowserWindow, and each BrowserWindow
+        # has one named pipe where it can accept commands.
+        self.pipe_name = NAMED_PIPE % 0000  # os.getpid()
+        if not os.path.exists(self.pipe_name):
+            os.mkfifo(self.pipe_name)
+
+        # For some reason, regular open() doesn't always work on named pipes
+        # and sometimes hangs. Use os.open instead.
+        self.cmdpipe = os.open(self.pipe_name, os.O_RDONLY | os.O_NONBLOCK)
+
+    def check_pipe(self):
+        # Loop reading all data available.
+        while True:
+            data = os.read(self.cmdpipe, 1024)
+            if not data:
+                if self.cmdread and self.cmdread.endswith(b'\n'):
+                    break
+                return
+            # There is data: add it to self.cmdread:
+            self.cmdread += data
+
+        # Commands end with newlines.
+        # Figure out how many commands we've read, if any.
+        # It's possible to read more than one command at once,
+        # or that we don't yet have all the data even for a single command.
+        cmdlines = self.cmdread.split(b'\n')
+        if self.cmdread.endswith(b'\n'):
+            self.cmdread = b''
+        else:
+            # Our last command is incomplete; we'll have to wait
+            # for the rest of the line to come through.
+            self.cmdread = cmdlines[-1]
+            cmdlines = cmdlines[:-1]
+
+        for cmd in cmdlines:
+            if not cmd:
+                continue
+            # Change it from bytes to string:
+            cmd = cmd.decode('utf-8')
+            if cmd.startswith('new-tab ') and len(cmd) > 8:
+                self.new_tab(cmd[8:])
+
+    @staticmethod
+    def send_command(cmd, url):
+        '''Send a command to a running quickbrowse process.
+           This will usually be called from a separate, new, process.
+        '''
+        pipe_name = NAMED_PIPE % 0000  # os.getpid()
+        pipeout = os.open(pipe_name, os.O_WRONLY)
+        os.write(pipeout, b'%s %s\n' % (cmd.encode('utf-8'),
+                                        url.encode('utf-8')))
+
     def init_chrome(self):
         # Set up the browser window chrome:
         self.setWindowTitle("Quickbrowse")
@@ -431,6 +492,10 @@ class BrowserWindow(QMainWindow):
 
         return webview
 
+    def closeEvent(self, event):
+        # Clean up
+        os.unlink(self.pipe_name)
+
     def close_tab(self, tabindex):
         self.tabwidget.removeTab(tabindex)
 
@@ -532,11 +597,6 @@ class BrowserWindow(QMainWindow):
         # self.webview.page().action(QWebEnginePage.Back).isEnabled())
         pass
 
-    def signal_handler(self, signal, frame):
-        with open(URL_FILE % os.getpid()) as url_fp:
-            for url in url_fp:
-                self.new_tab(url.strip())
-
     #
     # Slots
     #
@@ -569,7 +629,6 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
 sys.excepthook = excepthook
 
 if __name__ == '__main__':
-    SIGNAL = signal.SIGUSR1
     args = sys.argv[1:]
 
     def get_procname(procargs):
@@ -609,18 +668,17 @@ if __name__ == '__main__':
     if args and args[0] == "--new-tab":
         # Try to use an existing instance of quickbrowse
         # instead of creating a new window.
+        # XXX This should be in a try, and then fall through if no answer.
         urls = args[1:]
-        progname = get_procname(sys.argv)
-        pid = find_proc_by_name(progname)
-        if pid:
-            # Create the file of URLs:
-            with open(URL_FILE % pid, 'w') as url_fp:
-                for url in urls:
-                    print(url, file=url_fp)
-
-            os.kill(int(pid), SIGNAL)
+        try:
+            for url in urls:
+                print("Trying to send", url)
+                BrowserWindow.send_command("new-tab", url)
             sys.exit(0)
-        print("No existing %s process: starting a new one." % progname)
+        except FileNotFoundError as msg:
+            print("No existing %s process: starting a new one." % progname)
+            # Remove the --new-tab argument
+            args = args[1:]
 
     # Return control to the shell before creating the window:
     rc = os.fork()
@@ -633,19 +691,6 @@ if __name__ == '__main__':
     for url in args:
         win.new_tab(url)
     win.show()
-
-    # Handle SIGUSR1 signal so we can be signalled to open other tabs:
-    signal.signal(SIGNAL, win.signal_handler)
-
-    # The Qt main loop blocks the ability to listen for Unix signals.
-    # The solution to this is apparently to run a timer to block the
-    # Qt main loop every so often so signals have a chance to get through.
-    # XXX For a better solution using sockets:
-    # https://github.com/qutebrowser/qutebrowser/blob/v0.10.x/qutebrowser/misc/crashsignal.py#L304-L314
-    # http://doc.qt.io/qt-4.8/unix-signals.html
-    timer = QTimer()
-    timer.start(500)  # You may change this if you wish.
-    timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
 
     app.exec_()
 
