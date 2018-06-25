@@ -175,15 +175,19 @@ imageviewer3.py:
     via gi, so they can be used with Python 3.
 
 ipsearch:
-    Search for live hosts on the current net.
+    Search for live hosts on the current net, or hosts with a
+    particular port open..
     Useful for things like finding that Raspberry Pi you just booted.
+    Also has some useful network wrappers like ping, arp, fping,
+    list network interfaces and find current network.
 
 ipscan:
-    A Bourne shell (sh) version of ipsearch that uses nmap.
+    A Bourne shell (sh) net scanner/pi finder uses nmap.
 
 keyreader.py
-    Read characters one at a time (cbreak mode),
-    with or without blocking, with or without echo.
+    Read characters (keystrokes) one at a time (cbreak mode),
+    with or without blocking, with or without echo,
+    on Unix/Linux/Posix platforms.
 
 langgrep:
     Search (grep) for patterns only within scripts written in a
