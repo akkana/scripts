@@ -370,25 +370,24 @@ class BrowserWindow(QMainWindow):
            This will usually be called from a separate, new, process.
         '''
         # Start by finding the available CMD_PIPEs.
-        # We'll use the one that tests highest in string comparisons;
-        # usually that means the one most recently opened
-        # (unless process IDs have rolled over).
-        # XXX might be better to check mtime.
+        # We'll use the one with the most recent ctime.
         pipedir, sockbase = os.path.split(CMD_PIPE)
         # Split off any %d in sockbase
         if '%' in sockbase:
             sockbase = sockbase[:sockbase.find('%')]
         flist = os.listdir(pipedir)
         cmdsockname = ""  # This tests as less than any real string
+        last_ctime = 0
         for f in flist:
             if f.startswith(sockbase):
-                if f > cmdsockname:
-                    cmdsockname = f
+                sockname = os.path.join(pipedir, f)
+                this_ctime = os.path.getctime(sockname)
+                if this_ctime > last_ctime:
+                    cmdsockname = sockname
+                    last_ctime = this_ctime
 
         if not cmdsockname:
             raise IOError("No running quickbrowse process")
-
-        cmdsockname = os.path.join(pipedir, cmdsockname)
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
