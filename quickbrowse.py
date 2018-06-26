@@ -309,7 +309,7 @@ class BrowserWindow(QMainWindow):
     # command pipe (a Unix-domain socket) where it can accept commands.
     def set_up_listener(self):
         # Make sure the socket does not already exist
-        self.cmdsockname = CMD_PIPE % 0  # os.getpid()
+        self.cmdsockname = CMD_PIPE % os.getpid()
         try:
             os.unlink(self.cmdsockname)
         except OSError:
@@ -369,7 +369,27 @@ class BrowserWindow(QMainWindow):
         '''Send a command to a running quickbrowse process.
            This will usually be called from a separate, new, process.
         '''
-        cmdsockname = CMD_PIPE % 0  # os.getpid()
+        # Start by finding the available CMD_PIPEs.
+        # We'll use the one that tests highest in string comparisons;
+        # usually that means the one most recently opened
+        # (unless process IDs have rolled over).
+        # XXX might be better to check mtime.
+        pipedir, sockbase = os.path.split(CMD_PIPE)
+        # Split off any %d in sockbase
+        if '%' in sockbase:
+            sockbase = sockbase[:sockbase.find('%')]
+        flist = os.listdir(pipedir)
+        cmdsockname = ""  # This tests as less than any real string
+        for f in flist:
+            if f.startswith(sockbase):
+                if f > cmdsockname:
+                    cmdsockname = f
+
+        if not cmdsockname:
+            raise IOError("No running quickbrowse process")
+
+        cmdsockname = os.path.join(pipedir, cmdsockname)
+
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
         # Next line can raise socket.err, especially if there's no listener,
@@ -699,7 +719,7 @@ if __name__ == '__main__':
             for url in urls:
                 BrowserWindow.send_command("new-tab", url)
             sys.exit(0)
-        except socket.error as msg:
+        except Exception as e:
             print("No existing %s process: starting a new one." % progname)
             # Remove the --new-tab argument
             args = args[1:]
