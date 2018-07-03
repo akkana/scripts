@@ -189,6 +189,10 @@ keyreader.py
     with or without blocking, with or without echo,
     on Unix/Linux/Posix platforms.
 
+kitfox-patch
+    A simple shell script to update Firefox's browser/omni.ja file
+    with custom patches when a new version of Firefox comes out.
+
 langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).

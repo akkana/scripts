@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# kitfox: make a customized Firefox.
+# Unpack browser/omni.ja, apply patches, then package it back up.
+# For more details on the process, see:
+#  http://shallowsky.com/blog/tech/web/modifying-omni.ja.html
+
+# Either run this from the downloaded and unpacked Firefox directory,
+# or pass the path to that directory as the first argument.
+
+# You'll need to re-run this every time Firefox updates browser/omni.ja.
+# That doesn't necessarily happen in every Firefox update, but if
+# you include a harmless patch to the default URLbar message,
+# you can tell when it changes, which will tell you when you need
+# to re-run the script. (See "silly message" below.)
+
+FIREFOXDIR=$1
+if [[ x"$FIREFOXDIR" == "x" ]]; then
+  FIREFOXDIR=$(pwd)
+fi
+
+OMNITMPDIR=/tmp/omni
+
+BACKUP_OMNI=$FIREFOXDIR/browser-omni-backup.ja
+
+echo "Making directory $OMNITMPDIR ..."
+mkdir $OMNITMPDIR
+cd $OMNITMPDIR
+
+echo "Unzipping ..."
+unzip -q $FIREFOXDIR/browser/omni.ja
+
+echo "Making changes ..."
+
+########################################
+# PUT YOUR DESIRED CHANGE HERE.
+# XXX change this to use patch format.
+
+#
+# Put a silly message in the URLbar you see on empty tabs.
+# The point of this is that when it disappears, you know Firefox
+# has updated and you need to re-run this script.
+#
+sed -i 's/or enter address/or just twiddle your thumbs/' chrome/en-US/locale/browser/browser.dtd chrome/en-US/locale/browser/browser.properties
+
+#
+# Get rid of the reserved Ctrl-W bindings in text fields:
+#
+sed -i '/key_close/s/ reserved="true"//' chrome/browser/content/browser/browser.xul
+# End of patches
+########################################
+
+echo "Repackaging ..."
+# repackage omni.ja:
+zip -qr9XD /tmp/newomni.ja *
+
+cp $FIREFOXDIR/browser/omni.ja $BACKUP_OMNI
+cp /tmp/newomni.ja $FIREFOXDIR/browser/omni.ja
+
+echo "Copied new omni.ja into $FIREFOXDIR/browser/omni.ja."
+echo "Original omni.ja is backed up as $BACKUP_OMNI"
