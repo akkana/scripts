@@ -26,8 +26,8 @@ reload(mn)
 # Show methods in an object
 dir(obj)
 # Does a function exist in an object?
-if 'attr_name' in dir(obj):
 if hasattr(obj, 'attr_name'):
+if 'attr_name' in dir(obj):
 
 # Does a function exist in a module?
 hasattr(os, 'get_terminal_size'):
@@ -491,6 +491,15 @@ if 'foo' in sys.modules:
     myfoo = foo.Foo()
 else:
     myfoo = None
+
+########################################################
+# Import of runtime-specified modules and functions
+########################################################
+modulename = 'MyModule'
+functionname = 'TheFunction'
+
+themodule = __import__(modulename)
+val = getattr(themodule, functionname)()
 
 ########################################################
 # OS-specific stuff
