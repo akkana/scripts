@@ -822,6 +822,11 @@ plt.figure(1).canvas.mpl_connect('key_press_event',
                                      sys.exit(0) if e.key == 'ctrl+q'
                                      else None)
 
+# Set xtick labels to appear every 15 minutes
+ax.xaxis.set_major_locator(xlocator)
+# Format xtick labels as HH:MM
+ax.xaxis.set_major_formatter(xformatter)
+
 # Apply a function to a numpy array, returning another array
 def wraparound(x):
     if x > 12: return x-24
