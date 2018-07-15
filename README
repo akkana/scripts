@@ -265,6 +265,10 @@ podcopy:
     Remove characters in filenames that would cause problems on vfat
     filesystems, and ensure filenames are unique and files aren't dups.
 
+prettysoup:
+    Prettyprint a BeautifulSoup object. Customizable, and avoids
+    problems like BS4 prettify() adding spaces in the middle of words.
+
 pyclip:
     Read the X clipboard.
 

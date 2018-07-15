@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Convert Word files, either doc or docx, to HTML
 # using python-mammoth for .docx to HTML
@@ -12,9 +12,10 @@ import subprocess
 
 import mammoth
 from bs4 import BeautifulSoup
+import prettysoup
 
 def docx2html(infile, outfile):
-    with open(infile) as fp:
+    with open(infile, 'rb') as fp:
         mammout = mammoth.convert_to_html(fp)
     for m in mammout.messages:
         print("Mammoth %s: %s" % (m.type, m.message))
@@ -30,7 +31,9 @@ def docx2html(infile, outfile):
 def prettyprint_html(inhtml):
     # Prettyprint it
     soup = BeautifulSoup(inhtml, "lxml")
-    return soup.prettify().encode("utf-8")
+
+    return prettysoup.prettyprint(soup)
+    # return soup.prettify().encode("utf-8")
 
 def html2html(infile, outfile):
     with open(infile) as infp:
