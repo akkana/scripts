@@ -114,11 +114,50 @@ class LANLWeather(object):
                                                            startday.month,
                                                            self.tower))
             # See if this month and year is already cached.
+            datablob = None
             if os.path.exists(cachefile):
                 with open(cachefile) as fp:
                     datablob = fp.read()
                     print "Read from cache file", cachefile
-            else:
+                    lines = datablob.split('\n')
+                    # If the file ends with a newline (as it will),
+                    # split('\n') will give us a spurious empty final line.
+                    if not lines[-1].strip():
+                        del lines[-1]
+
+                    # But does it cover the entire month?
+                    filestart, fileend = self.get_start_end_dates(lines)
+
+                    # Is filestart > 1, or fileend < last day of month?
+                    last_day_of_month = (datetime.datetime(fileend.year,
+                                                           fileend.month%12 + 1,
+                                                           1)
+                                         - datetime.timedelta(days=1))
+
+                    # If the file is missing days from the given month,
+                    # re-fetch it to get the missing days --
+                    # but if it goes far enough to include today's date,
+                    # don't re-fetch even if it doesn't have all of today.
+                    # We can always fetch again tomorrow.
+                    if (filestart.day > 1 or
+                        (fileend.day < last_day_of_month.day
+                         and fileend.date() < datetime.date.today())):
+                        # Zero out datablob and lines so we'll fetch
+                        # the whole month again.
+                        print "Cache file only contained " \
+                              "%04d-%02d-%02d through " \
+                              "%04d-%02d-%02d" % (filestart.year,
+                                                  filestart.month,
+                                                  filestart.day,
+                                                  fileend.year,
+                                                  fileend.month,
+                                                  fileend.day)
+                        print "Fetching month %d-%d again" % (startday.year,
+                                                              startday.month)
+                        datablob = None
+                        lines = None
+
+            if not datablob:
                 print "Making request for", startday.year, startday.month
 
                 datablob = self.make_lanl_request(self.tower,
@@ -131,8 +170,10 @@ class LANLWeather(object):
                     outfile.write(datablob)
                     print("Saved to cache %s" % cachefile)
 
+                lines = datablob.split('\n')
+
             try:
-                self.parse_lanl_data(datablob)
+                self.parse_lanl_data(lines)
             except Exception, e:
                 print "Couldn't parse blob in", cachefile
                 print str(e)
@@ -213,12 +254,44 @@ class LANLWeather(object):
 
         return r.text
 
-    def parse_lanl_data(self, blob):
-        lines = blob.split('\n')
-
+    def get_fields_and_units(self, lines):
+        '''In LANL data, there's a bunch of boilerplate stuff in the first
+           four lines, so the fields don't come until the fifth line,
+           then the sixth line is units. So we can't use the normal
+           CSV reader. Return fields, units (two lists of str).
+        '''
         # Find the indices in the data for each key we're interested in.
         fields = lines[5].split('\t')
         units = lines[6].split('\t')
+        return fields, units
+
+    def get_start_end_dates(self, lines):
+        '''Do part of what parse_lanl_data does, only for the
+           first and last lines, and return two datetimes.
+        '''
+        fields, units = self.get_fields_and_units(lines)
+
+        # We'll need to know the indices for the time values.
+        year = fields.index('year')
+        month = fields.index('month')
+        day = fields.index('day')
+        hour = fields.index('hour')
+        minute = fields.index('minute')
+
+        l = lines[7].split('\t')
+        startdate = datetime.datetime(int(l[year]), int(l[month]), int(l[day]),
+                                      int(l[hour]), int(l[minute]), 0)
+        l = lines[-1].split('\t')
+        enddate = datetime.datetime(int(l[year]), int(l[month]), int(l[day]),
+                                    int(l[hour]), int(l[minute]), 0)
+
+        return startdate, enddate
+
+    def parse_lanl_data(self, lines):
+        '''Take a list of lines read either from a cache file
+           or a net request, parse them and add them to self.data.
+        '''
+        fields, units = self.get_fields_and_units(lines)
 
         # indices will be a list paralleling self.keys,
         # saving the index of each key in the data table we're reading.
@@ -324,7 +397,9 @@ class LANLWeatherPlots(LANLWeather):
             ws: Key used for Wind speeds (knots)
         Optional Input:
         """
-        # self.dates, self.data[ws]
+
+        # Loop over all dates we know about, building an average of the
+        # wind for that day of the year.
         avs = [0.0] * 366
         datapoints = [0] * 366
         for i, d in enumerate(self.dates):
@@ -335,8 +410,11 @@ class LANLWeatherPlots(LANLWeather):
             datapoints[day_of_year] += 1
 
         for d, dp in enumerate(datapoints):
-            avs[d] /= dp
-        days = [ datetime.date(2018,1,1) + datetime.timedelta(d)
+            if dp:
+                avs[d] /= dp
+
+        curyear = datetime.date.today().year
+        days = [ datetime.date(curyear, 1, 1) + datetime.timedelta(d)
                  for d, dp in enumerate(datapoints) ]
 
         plt.plot(days, avs, # '.',
@@ -401,14 +479,14 @@ class LANLWeatherPlots(LANLWeather):
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
 def main():
-    lwp = LANLWeatherPlots('ta54', [2014, 1, 1], datetime.datetime.now(),
+    lwp = LANLWeatherPlots('ta54', [2017, 1, 1], datetime.datetime.now(),
                            ["spd1", "dir1", "temp0"])
 
     lwp.get_data()
 
-    lwp.plot_seasonal_wind('spd1')
-    # lwp.plot_winds('spd1', 'dir1')
-    # lwp.plot_temp('temp0')
+    # lwp.plot_seasonal_wind('spd1')
+    lwp.plot_winds('spd1', 'dir1')
+    lwp.plot_temp('temp0')
 
     lwp.show()
 
