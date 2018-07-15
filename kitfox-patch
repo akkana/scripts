@@ -15,7 +15,7 @@
 # to re-run the script. (See "silly message" below.)
 
 FIREFOXDIR=$1
-if [[ x"$FIREFOXDIR" == "x" ]]; then
+if [ x"$FIREFOXDIR" == "x" ]; then
   FIREFOXDIR=$(pwd)
 fi
 
@@ -57,5 +57,5 @@ zip -qr9XD /tmp/newomni.ja *
 cp $FIREFOXDIR/browser/omni.ja $BACKUP_OMNI
 cp /tmp/newomni.ja $FIREFOXDIR/browser/omni.ja
 
-echo "Copied new omni.ja into $FIREFOXDIR/browser/omni.ja."
+echo "Copied new omni.ja into $FIREFOXDIR/browser/omni.ja"
 echo "Original omni.ja is backed up as $BACKUP_OMNI"
