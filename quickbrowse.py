@@ -11,6 +11,7 @@ import traceback
 import posixpath
 import socket
 import select
+import argparse
 
 from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
@@ -672,6 +673,17 @@ def excepthook(excType=None, excValue=None, tracebackobj=None, *,
 
 sys.excepthook = excepthook
 
+def parse_args():
+    """Parse commandline arguments."""
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-t', "--new-tab", dest="new_tab", default=False,
+                        action="store_true", help="Open URLs in a new tab")
+
+    parser.add_argument('url', nargs='+', help="URLs to open")
+
+    return parser.parse_args(sys.argv[1:])
+
 if __name__ == '__main__':
     args = sys.argv[1:]
 
@@ -709,19 +721,20 @@ if __name__ == '__main__':
                 pass
         return None
 
-    if args and args[0] == "--new-tab":
+    args = parse_args()
+
+    if args.new_tab:
         # Try to use an existing instance of quickbrowse
         # instead of creating a new window.
         # XXX This should be in a try, and then fall through if no answer.
-        urls = args[1:]
         try:
-            for url in urls:
-                BrowserWindow.send_command("new-tab", url)
+            for url in args.url:
+                if args.new_tab:
+                    BrowserWindow.send_command("new-tab", url)
+
             sys.exit(0)
         except Exception as e:
             print("No existing %s process: starting a new one." % progname)
-            # Remove the --new-tab argument
-            args = args[1:]
 
     # Return control to the shell before creating the window:
     rc = os.fork()
@@ -731,7 +744,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     win = BrowserWindow()
-    for url in args:
+    for url in args.url:
         win.new_tab(url)
     win.show()
 
