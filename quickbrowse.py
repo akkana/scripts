@@ -238,6 +238,8 @@ class BrowserView(QWebEngineView):
         tabname = self.title()[:MAX_TAB_NAME]
         self.browser_win.set_tab_text(tabname, self)
 
+        self.browser_win.focus_content()
+
     def load_progress(self, progress):
         self.browser_win.progress.setValue(progress)
 
@@ -505,7 +507,7 @@ class BrowserWindow(QMainWindow):
             self.browserviews.append(webview)
             self.tabwidget.addTab(webview, init_name)
 
-        else:
+        else:    # The normal case, an HTML page
             webview = BrowserView(self)
 
             # We need a QWebEnginePage in order to get linkHovered events,
@@ -535,6 +537,9 @@ class BrowserWindow(QMainWindow):
             webpage.linkHovered.connect(webview.link_hover)
 
         return webview
+
+    def focus_content(self):
+        self.browserviews[self.active_tab].setFocus()
 
     def closeEvent(self, event):
         # Clean up
@@ -680,7 +685,7 @@ def parse_args():
     parser.add_argument('-t', "--new-tab", dest="new_tab", default=False,
                         action="store_true", help="Open URLs in a new tab")
 
-    parser.add_argument('url', nargs='+', help="URLs to open")
+    parser.add_argument('url', nargs='*', help="URLs to open")
 
     return parser.parse_args(sys.argv[1:])
 
