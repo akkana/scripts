@@ -102,6 +102,7 @@ if __name__ == "__main__":
         print('''Usage: %s [-s] condition [condition ...]
 
 Search for files matching patterns in Tags or Keywords files.
+Will search recursively under the current directory unless -d is specified.
 
 Conditions can include three types of patterns:
   1. Starts with +: must be present (AND).
