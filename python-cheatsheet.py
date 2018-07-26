@@ -69,6 +69,21 @@ if isinstance(x, dict):
 mylist.remove("item")    # Removes the first instance of "item"
 mylist.pop(i)            # Removes and returns list[i]
 
+# Difference between is and ==:
+# is checked whether two things are the same object (reference equality),
+# == only tests for value equality.
+#
+# The place where this is most important is nan: (nan == nan) -> False
+# but (nan is nan) -> True.
+# However, in lists or tuples this breaks, [nan] == [nan] -> True
+#
+# Testing thing is None rather than thing == None is idiomatic;
+# testing thing == None supposedly allows a few non-None objects
+# to masquerade as None, but I haven't been able to find an example.
+# Of course, don't use "is" for lists, strings or other complex types,
+# or even for integers; it may work for small integers because python
+# caches them, but not for larger ones.
+
 ########################################################
 # Debugging and stack traces
 ########################################################
@@ -120,7 +135,6 @@ u'pi\xf1on'
 
 # Fix "UnicodeEncodeError: 'ascii' codec can't encode character":
 .encode('utf-8', "xmlcharrefreplace")
-
 
 # Split a long string over multiple lines in the source file
 url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
@@ -370,6 +384,21 @@ if (now - time_end).seconds < 7200:
 #
 datetime.datetime.strptime('2016-01-01', '%Y-%m-%d')
 
+# Same thing with decimal seconds:
+datetime.datetime.strptime('2016-01-01.234', '%Y-%m-%d.%f')
+
+# but unfortunately there's no way, with just the Python core,
+# to parse a date that might or might not have decimal seconds.
+# You have to strip it off in this way, which seems horrifying
+# but you'll see it recommended all over, and you'd better hope
+# the decimal point is where you expect it and not some other place
+# inside the string:
+timestr = '2016-01-01.234'
+if '.' in timestr:
+    d = datetime.datetime.strptime(timestr, '%Y-%m-%d.%f')
+else:
+    d = datetime.datetime.strptime(timestr, '%Y-%m-%d')
+
 # email.utils.parsedate returns a tuple.
 t = time.mktime(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
 (y, m, d, h, m, s, weekday, yearday, isdst) = t
@@ -383,6 +412,8 @@ secs_since_epoch = email.utils.mktime_tz(t2)
 
 #
 # Parse a date in unknown format into a datetime.datetime object
+# Unfortunately dateutil isn't part of the python core,
+# it's a separate package so it adds a dependency.
 #
 import dateutil.parser
 d = dateutil.parser.parse("2012-08-16 14:25:05.265739")
@@ -392,7 +423,7 @@ d = dateutil.parser.parse("6/15/2016 14:25 MDT")
 # that offers super-general date parsing like "an hour ago".
 
 #
-# Another of parsing using calendar but not dateutils:
+# Calendar.timedelta
 #
 import datetime
 import calendar
@@ -863,6 +894,13 @@ b'pi\xc3\xb1on'
 >>> str(b'pi\xc3\xb1on', 'utf-8')
 'piñon'
 >>>
+
+# Read or write bytes from a file:
+fp = open(filename, 'rb')   # or 'wb'
+
+# Write bytes to a file opened in string mode with .buffer
+if hasattr(sys.stdout, 'buffer')::
+    sys.stdout.buffer.write(b'abc')
 
 # Conditional depending on python version:
 if sys.version[:1] == '2':
