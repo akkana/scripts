@@ -101,6 +101,8 @@ class OppRetro(object):
         coarsemode = TimeDelta(1, format='jd')
         # but in fine mode, we'll go one hour at a time:
         finemode = TimeDelta(60*60, format='sec')
+        # and near opposition we'll go even finer for a few days:
+        superfinemode = TimeDelta(60 * 5, format='sec')
 
         timeslice = coarsemode
 
@@ -155,8 +157,22 @@ class OppRetro(object):
             #       mars.ra.hour, "dec", mars.dec.degree,
             #       "elongation", elongation)
             if last_elong > 180. and elongation <= 180.:
-                flags += OPPOSITION
-                opptime = cur_time
+                if timeslice == superfinemode:
+                    flags += OPPOSITION
+                    opptime = cur_time
+                    timeslice = finemode
+                    print("Opposition on", cur_time, ", switching back to fine")
+                    # XXX it would be nice not to go back to finemode
+                    # until after we've found closest approach.
+                    # But astropy randomly finds a closest approach
+                    # date weeks before the actual closest approach,
+                    # at the start of retrograde.
+                else:
+                    # Looks like opposition. But let's go back a day and
+                    # get a finer view of the time.
+                    print("Switching to superfine mode on", cur_time)
+                    timeslice = superfinemode
+                    cur_time -= TimeDelta(1, format='jd')
 
             if mars.distance >= last_dist and pre_closest:
                 flags += CLOSEST_APPROACH
