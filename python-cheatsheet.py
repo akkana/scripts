@@ -65,10 +65,6 @@ else:
 # because isinstance will work for derived classes.
 if isinstance(x, dict):
 
-# Remove items from a list: I always forget how to do this.
-mylist.remove("item")    # Removes the first instance of "item"
-mylist.pop(i)            # Removes and returns list[i]
-
 # Difference between is and ==:
 # is checked whether two things are the same object (reference equality),
 # == only tests for value equality.
@@ -76,6 +72,7 @@ mylist.pop(i)            # Removes and returns list[i]
 # The place where this is most important is nan: (nan == nan) -> False
 # but (nan is nan) -> True.
 # However, in lists or tuples this breaks, [nan] == [nan] -> True
+# You can also use math.isnan(x)
 #
 # Testing thing is None rather than thing == None is idiomatic;
 # testing thing == None supposedly allows a few non-None objects
@@ -211,8 +208,17 @@ buf.insert(2, 0xf7)
 # iterator, list and dictionary helpers
 ########################################################
 
+# Remove items from a list: I always forget how to do this.
+mylist.remove("item")    # Removes the first instance of "item"
+mylist.pop(i)            # Removes and returns list[i]
+
 # Delete an item from a dictionary:
 del thedic[key]
+
+# Insert an item into a list BEFORE the given index:
+l = ['a', 'b', 'c', 'd', 'e']
+l.insert(3, 'xxx')
+# --> ['a', 'b', 'c', 'xxx', 'd', 'e']
 
 # Comprehensions can be multiple:
 [ a*b+c for a in A for b in B for c in C ]
@@ -823,6 +829,30 @@ $ python -m cProfile -o profiling_results myscript.py
 or, from the cmdline:
 
 python -c 'import pstats; stats = pstats.Stats("profiling_results"); stats.sort_stats("tottime"); stats.print_stats(15)'
+
+################################################################
+# PyEphem
+################################################################
+# The documentation on angles is completely wrong and misleading.
+# Angles can only be created with degrees() or hours()
+# but the value passed in is either a string representing degrees
+# or hours, or else it's a float representing radians.
+
+>>> seven_from_float = ephem.degrees(7.)
+>>> seven_from_str = ephem.degrees('7')
+>>> print(seven_from_float, seven_from_str)
+401:04:13.6 7:00:00.0
+>>> print(seven_from_float.norm, seven_from_str)
+41:04:13.6 7:00:00.0
+>>> seven_from_radians = ephem.degrees(7 * math.pi / 180.)
+>>> print(seven_from_radians)
+7:00:00.0
+
+>>> seven_hours_from_radians = ephem.hours(7 * math.pi / 12)
+>>> print(seven_hours_from_radians)
+7:00:00.00
+>>> float(seven_hours_from_radians) * 12 / math.pi
+7.0
 
 ################################################################
 # Matplotlib tips
