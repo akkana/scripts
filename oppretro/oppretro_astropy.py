@@ -167,7 +167,7 @@ class OppRetro(object):
                 pre_closest = True
 
             if flags or self.save_all_points:
-                self.planettrack.append([cur_time,
+                self.planettrack.append([cur_time.datetime,
                                          mars.ra.radian, mars.dec.radian,
                                          mars.distance.km, flags])
 
@@ -194,7 +194,7 @@ class OppRetro(object):
                     point[IFLAGS] += MIDPOINT_RETRO
                     break
                 elif point[IDATE] > mid_retro_date:
-                    self.planettrack.insert(i, [mid_retro_date,
+                    self.planettrack.insert(i, [mid_retro_date.datetime,
                                                 mars.ra.radian, mars.dec.radian,
                                                 mars.distance.km,
                                                 MIDPOINT_RETRO])

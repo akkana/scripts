@@ -42,6 +42,13 @@ class OppRetro(object):
     def __init__(self, observer):
         if type(observer) is ephem.Observer:
             self.observer = observer
+        elif observer == "Los Alamos":
+            # Avoid problems from repeated city lookup
+            self.observer = ephem.Observer()
+            self.observer.name = "Los Alamos"
+            self.observer.lon = '-106:18.36'
+            self.observer.lat = '35:53.09'
+            self.observer.elevation = 2100
         else:
             self.observer = self.lookup_observer(observer)
 
@@ -126,7 +133,7 @@ class OppRetro(object):
                 pre_closest = True
 
             if flags or self.save_all_points:
-                self.planettrack.append([self.observer.date,
+                self.planettrack.append([self.observer.date.datetime(),
                                          float(self.planet.ra),
                                          float(self.planet.dec),
                                          self.planet.earth_distance,
@@ -148,8 +155,8 @@ class OppRetro(object):
                 if point[IDATE] == mid_retro_date:
                     point[IFLAGS] += MIDPOINT_RETRO
                     break
-                elif point[IDATE] > mid_retro_date:
-                    self.planettrack.insert(i, [mid_retro_date,
+                elif point[IDATE] > mid_retro_date.datetime():
+                    self.planettrack.insert(i, [mid_retro_date.datetime(),
                                                 float(self.planet.ra),
                                                 float(self.planet.dec),
                                                 self.planet.earth_distance,
@@ -170,7 +177,8 @@ class OppRetro(object):
                 #        point[1], point[2],
                 #        point[3] * 9.2956e7))
                 print("%20s %-19s  %-11.7f  %-10.7f %d" % \
-                      (self.flags_to_string(point[IFLAGS]), str(point[IDATE]),
+                      (self.flags_to_string(point[IFLAGS]),
+                       point[IDATE].strftime("%Y-%m-%d %H:%M"),
                        self.rads_to_hours(point[IRA]),
                        self.rads_to_degrees(point[IDEC]),
                        point[IDIST] * 9.2956e7))

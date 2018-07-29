@@ -15,6 +15,17 @@ from gi.repository import PangoCairo
 import math
 import sys
 
+# Import one or the other version of oppretro depending on
+# commandline arguments. Alas, this can't be done in __main__,
+# because that's executed after the class definitions that
+# depend on the oppretro.OppRetro class.
+if len(sys.argv) > 1 and sys.argv[1] == '-a':
+    print("Using AstroPy")
+    import oppretro_astropy as oppretro
+else:
+    print("Using PyEphem")
+    import oppretro_ephem as oppretro
+
 class OppRetroWindow(Gtk.Window, oppretro.OppRetro):
     def __init__(self, location, background=None):
         # Python doesn't let you use super() with multiple base
@@ -104,7 +115,9 @@ class OppRetroWindow(Gtk.Window, oppretro.OppRetro):
             y = self.dec2Y(point[oppretro.IDEC])
             # print("draw_dot", x, y)
             if point[oppretro.IFLAGS]:
-                self.draw_string(self.flags_to_string(point[oppretro.IFLAGS]),
+                self.draw_string(point[oppretro.IDATE].strftime('%Y-%m-%d')
+                                 + " " +
+                                 self.flags_to_string(point[oppretro.IFLAGS]),
                                  x, y, offsets=(1, 1), xspacing=10, yspacing=0)
                 self.draw_dot(x, y, 6)
             else:
@@ -197,13 +210,6 @@ if __name__ == '__main__':
 
     cityname = "Los Alamos, NM"
     # cityname = "Prague"
-
-    if len(sys.argv) > 1 and sys.argv[1] == '-a':
-        print("Using AstroPy")
-        import oppretro_astropy as oppretro
-    else:
-        print("Using PyEphem")
-        import oppretro_ephem as oppretro
 
     oppy = OppRetroWindow(cityname)
     oppy.find_opp_and_retro(start_date)
