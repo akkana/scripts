@@ -245,6 +245,11 @@ noteplayer.py:
     Spun off of play_chord.py: a more general pygame-based  note generator
     usable asynchronously, like from a Raspberry Pi piano keyboard.
 
+oppretro:
+    Several different programs to examine Mars' orbit, and also to
+    experiment with various astronomy libraries. See oppretro/README.md
+    for more details.
+
 pathmatch:
     Search your executable path to find programs matching a string.
     Like str<tab> except you can match patterns anywhere in the
