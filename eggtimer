@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import sys, os, time
-import Tkinter
+
+# Tkinter changed capitalization from Python 2 to Python 3.
+try:
+    import tkinter
+except ModuleNotFoundError:
+    import Tkinter as tkinter
 
 # Callback for key events:
 def keyEvent(event):
@@ -10,7 +17,7 @@ def keyEvent(event):
         sys.exit(0)
 
 def Usage():
-    print "Usage:", sys.argv[0], "minutes message"
+    print("Usage:", sys.argv[0], "minutes message")
     sys.exit(1)
 
 def showAlert(message):
@@ -18,12 +25,12 @@ def showAlert(message):
     # tkMessageBox.showwarning("hello", message)
 
     # Try to beep a bit, even though that doesn't work on some distros:
-    print ""
+    print("")
     # print message
 
-    root = Tkinter.Tk()
+    root = tkinter.Tk()
 
-    button = Tkinter.Button(root, text=message,
+    button = tkinter.Button(root, text=message,
                             bg="red", activebackground="red",
                             fg="white", activeforeground="white",
                             font=("Sans", 40, "bold"),
@@ -43,7 +50,7 @@ if __name__ == '__main__':
 
     try:
       sleeptime = float(sys.argv[1]) * 60
-    except ValueError, e:
+    except ValueError:
       Usage()
 
     if len(sys.argv) > 2:
@@ -51,7 +58,7 @@ if __name__ == '__main__':
     else:
       message = "Wake up!"
 
-    print "Sleeping for", sleeptime, "seconds with message:", message
+    print("Sleeping for", sleeptime, "seconds with message:", message)
 
     # Return control to the shell before sleeping:
     rc = os.fork()
