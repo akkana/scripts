@@ -4,7 +4,7 @@
 # Could be useful if recipient use a command-line emailer like mutt
 # that can't send such things.
 #
-# Copyright 2016 by Akkana. Share and enjoy under the GPLv2 or later.
+# Copyright 2016,2018 by Akkana. Share and enjoy under the GPLv2 or later.
 
 import sys, os
 
@@ -16,7 +16,10 @@ import smtplib
 
 from bs4 import BeautifulSoup
 
-def compose_email_msg(recipient, sender, html, text=None, subject=None):
+import argparse
+
+def compose_email_msg(recipients, sender, html, text=None,
+                      subject=None, cc=None, imagedir=None):
     """Compose an HTML email message which may include attached images.
        @param recipient Email address of the recipient
        @param sender Email address of the sender
@@ -32,19 +35,6 @@ def compose_email_msg(recipient, sender, html, text=None, subject=None):
        @return A MIME message object.
     """
     soup = BeautifulSoup(html, "lxml")
-
-    # Do we need to UTF-encode anything in the message?
-    # This clause would make sense if input was unicode,
-    # but it's actually bytes read in with fp.read().
-    # if contains_non_ascii_characters(html):
-    #     print "Encoded:", html.encode('utf-8')
-    #     print "."
-    #     html_mime = MIMEText(html.encode('utf-8'), 'html','utf-8')
-    # else:
-    #     html_mime = MIMEText(html, 'html')
-    # So for now, let's assume the bytes read in are always UTF-8
-    # and send them with that encoding:
-    html_mime = MIMEText(html, 'html','utf-8')
 
     # Attach MIME-encoded parts into message container.
     # According to RFC 2046, the last part of a multipart message,
@@ -65,11 +55,57 @@ def compose_email_msg(recipient, sender, html, text=None, subject=None):
     # Are there any embedded images? We aren't ready to use them now,
     # but we need to know whether to use MIME multipart/related.
     embedded_images = soup.findAll('img')
+
+    # If there are embedded images, rewrite their src tags before
+    # attaching the html part.
+    # imgnames is a dictionary of mime_name: pathname_on_disk
+    imgnames = {}
+    for tag in embedded_images:
+        src = tag.get("src")
+        if src.startswith("file://"):
+            src = src[7:]
+        if not src.startswith("/"):
+            if imagedir:
+                srcpath = os.path.join(imagedir, src)
+                if os.path.exists(srcpath):
+                    src = srcpath
+                else:
+                    print "Can't find", src, "in", imagedir, "leaving unchanged"
+                    continue
+            else:
+                print src, "isn't a local image; leaving unchanged"
+                continue
+
+        # Now src points to the file path of the image.
+        imgname = os.path.basename(src)
+        while imgname in imgnames:
+            imgname += '_'
+        # Now it's unique
+        imgnames[imgname] = src
+
+        # imgname is what will be used when attaching the image.
+        # So rewrite the HTML tag to use cid:imgname.
+        tag['src'] = 'cid:' + imgname
+
+    # Do we need to UTF-encode anything in the message?
+    # This clause would make sense if input was unicode,
+    # but it's actually bytes read in with fp.read().
+    # if contains_non_ascii_characters(html):
+    #     print "Encoded:", html.encode('utf-8')
+    #     print "."
+    #     html_mime = MIMEText(html.encode('utf-8'), 'html','utf-8')
+    # else:
+    #     html_mime = MIMEText(html, 'html')
+    # So for now, let's assume the bytes read in are always UTF-8
+    # and send them with that encoding:
+
     if embedded_images:
+        # If we have embedded images, then the image tags have been changed
+        # and we need to regenerate the HTML from the soup.
         html_part = MIMEMultipart('related')
-        html_part.attach(html_mime)
+        html_part.attach(MIMEText(str(soup), 'html','utf-8'))
     else:
-        html_part = html_mime
+        html_part = MIMEText(html, 'html','utf-8')
 
     # Attach the text and HTML parts.
     # Special case: text=True will ask BeautifulSoup to convert
@@ -88,7 +124,9 @@ def compose_email_msg(recipient, sender, html, text=None, subject=None):
 
     # Now the container is created, so we can add sender and recipient.
     msg['From'] = encode_header(sender)
-    msg['To'] = encode_header(recipient)
+    msg['To'] = ', '.join([encode_header(r) for r in recipients])
+    if cc:
+        msg['Cc'] = ', '.join([encode_header(r) for r in cc])
 
     # If a subject wasn't specified,
     # see if the HTML message already has a subject,
@@ -110,24 +148,14 @@ def compose_email_msg(recipient, sender, html, text=None, subject=None):
     # Now handle any images embedded in the HTML.
     # XXX We might want to get the findAll img list first,
     # because if there are no images, we can use MIME non-multipart.
-    imgnames = set()
-    for tag in embedded_images:
-        src = tag.get("src")
-        if src.startswith("file://"):
-            src = src[7:]
-        if not src.startswith("/"):
-            print src, "isn't a local image; leaving unchanged"
-            continue
+    for imgname in imgnames:
+        src = imgnames[imgname]
         fp = open(src, 'rb')
         msgImage = MIMEImage(fp.read())
         fp.close()
-        imgname = os.path.basename(src)
-        while imgname in imgnames:
-            imgnasender += '.'
 
         print "Attaching %s as <%s>" % (src, imgname)
         msgImage.add_header('Content-ID', '<%s>' % imgname)
-        imgnames.add(imgname)
         html_part.attach(msgImage)
 
     return msg
@@ -141,10 +169,11 @@ def encode_header(header_txt):
     else:
         return header_txt
 
-def send_msg(recipient, sender, msg, smtp_server,
+def send_msg(recipients, sender, msg, smtp_server,
              smtp_user=None, smtp_passwd=None, smtp_port=587):
     """Send a message via SMTP using the given relay server and account."""
 
+    print "Sending to recipients:", ', '.join(recipients)
     server = smtplib.SMTP(smtp_server, smtp_port)
     # server.set_debuglevel(1)
 
@@ -156,25 +185,56 @@ def send_msg(recipient, sender, msg, smtp_server,
     if smtp_user:
         server.login(smtp_user, smtp_passwd)
 
-    server.sendmail(sender, recipient, msg.as_string())
+    server.sendmail(sender, recipients, msg.as_string())
     server.quit()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print """Usage: %s [-t] to_address from_address htmlfile smtp_server [smtp_user smtp_password]
-    -t:    add a text part""" \
-              % os.path.basename(sys.argv[0])
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=\
+"""Send an HTML file as properly formatted mail, including any inline images.
 
-    args = sys.argv[1:]
-    if args[0] == "-t":
-        text_part = True
-        args = args[1:]
-    else:
-        text_part = False
-    recipient, sender, htmlfile, smtp_server, smtp_user, smtp_passwd = args
+Address lists may be comma separated""",
+                             formatter_class=argparse.RawTextHelpFormatter)
 
-    with open(htmlfile) as fp:
+    parser.add_argument('-c', '--cc', action="store", dest="cc",
+                        help='cc addresses')
+    parser.add_argument('-b', '--bcc', action="store", dest="bcc",
+                        help='Bcc addresses')
+    parser.add_argument('-s', '--subject', action="store", dest="subject",
+                        help='The Subject of the mail (otherwise will use HTML title)')
+    parser.add_argument('-t', '--text', action="store", dest="text_part",
+                        help='Optional text part')
+
+    parser.add_argument('-u', '--user', action="store", dest="smtp_user",
+                        help='SMTP username')
+    parser.add_argument('-p', '--password', action="store",
+                        dest="smtp_password", help='SMTP password')
+
+    parser.add_argument('to_addresses', help='The address the mail will be to')
+    parser.add_argument('from_address',
+                        help='The address the mail will be from')
+    parser.add_argument('html_file', help='The HTML file to send')
+    parser.add_argument('smtp_server', help='The SMTP server')
+
+    args = parser.parse_args()
+
+    with open(args.html_file) as fp:
         html = fp.read()
-    msg = compose_email_msg(recipient, sender, html, text_part)
-    send_msg(recipient, sender, msg, smtp_server, smtp_user, smtp_passwd, 587)
+
+    recipients = args.to_addresses.split(',')
+
+    if args.cc:
+        cc = args.cc.split(',')
+    else:
+        cc = []
+    if args.bcc:
+        bcc = args.bcc.split(',')
+    else:
+        bcc = []
+
+    msg = compose_email_msg(recipients, args.from_address, html, cc=args.cc,
+                            subject=args.subject, text=args.text_part,
+                            imagedir=os.path.dirname(
+                                os.path.realpath(args.html_file)))
+
+    send_msg(recipients + cc + bcc, args.from_address, msg,
+             args.smtp_server, args.smtp_user, args.smtp_password, 587)
