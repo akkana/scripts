@@ -363,6 +363,10 @@ def parse_args():
 # depending on a flag, it's not clear argparse can handle that.
 # See androidfiles.py for a sample workaround.
 
+# To allow for newlines in the help strings:
+parser = argparse.ArgumentParser(description="Long string\nwith newlines",
+                                 formatter_class=argparse.RawTextHelpFormatter)
+
 ########################################################
 # Dates and times
 ########################################################
