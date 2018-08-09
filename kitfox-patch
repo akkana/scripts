@@ -15,9 +15,19 @@
 # to re-run the script. (See "silly message" below.)
 
 FIREFOXDIR=$1
-if [ x"$FIREFOXDIR" == "x" ]; then
+if [ x"$FIREFOXDIR" = "x" ]; then
   FIREFOXDIR=$(pwd)
+else
+  # In zsh, $FIREFOXDIR:A would do this.
+  FIREFOXDIR=$(realpath $FIREFOXDIR)
 fi
+
+if [ ! -d "$FIREFOXDIR" ]; then
+  echo 'Usage: kitfoxpatch [FIREFOXDIR]'
+  exit 1
+fi
+
+echo Firefox dir is $FIREFOXDIR
 
 OMNITMPDIR=/tmp/omni
 
