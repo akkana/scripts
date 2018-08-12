@@ -15,11 +15,14 @@ class EpubBook:
     subjectTag = 'dc:subject'
     image_exts = [ ".jpg", ".jpeg", ".gif", ".png", ".svg", ".pdf" ]
 
-    def __init__(self):
-        self.filename = None
+    def __init__(self, filename=None):
         self.zip = None
         self.dom = None
         self.contentfile = None
+        if filename:
+            self.open(filename)
+        else:
+            self.filename = None
 
     def open(self, filename):
         '''Open an epub file and set up handles to the zip archive
