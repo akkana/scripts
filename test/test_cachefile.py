@@ -55,7 +55,7 @@ class CacheTests(unittest.TestCase):
         self.cache.get_data(test_date)
 
         self.assertEqual(self.cache.cachedir,
-                    os.path.expanduser('~/.config/test-cachefile'))
+                    os.path.expanduser('~/.cache/test-cachefile'))
 
         cachefile = os.path.join(self.cache.cachedir,
                                  test_date.strftime('%Y-%m-%d'))
@@ -107,6 +107,94 @@ class CacheTests(unittest.TestCase):
 2018-08-01 01:00:00,1,2
 2018-08-01 13:00:00,11,22
 ''')
+
+    def test_start_and_end_times(self):
+        # XXX Test day_start and day_end
+        # and test get_data() without start, end or both times
+        # and make sure it fetches data for the proper dates.
+        # Maybe make a class that returns date, year, month, day, hour, min, sec
+
+        midday = datetime.datetime(2018, 7, 15, 13, 0)
+        prevday = midday.replace(day = midday.day - 1)
+        nextday = midday.replace(day = midday.day + 1)
+        later = midday.replace(hour = 21)
+
+        # Test starttime only
+        starttime, endtime = self.cache.time_bounds(starttime=midday)
+        self.assertEqual(starttime.year, midday.year)
+        self.assertEqual(starttime.month, midday.month)
+        self.assertEqual(starttime.day, midday.day)
+        self.assertEqual(starttime.hour, midday.hour)
+        self.assertEqual(starttime.minute, 0)
+        self.assertEqual(endtime.year, midday.year)
+        self.assertEqual(endtime.month, midday.month)
+        self.assertEqual(endtime.day, midday.day)
+        self.assertEqual(endtime.hour, 23)
+        self.assertEqual(endtime.minute, 59)
+
+        # Test full day
+        starttime, endtime = self.cache.time_bounds(day=midday)
+        self.assertEqual(starttime.year, midday.year)
+        self.assertEqual(starttime.month, midday.month)
+        self.assertEqual(starttime.day, midday.day)
+        self.assertEqual(starttime.hour, 0)
+        self.assertEqual(starttime.minute, 0)
+        self.assertEqual(endtime.year, midday.year)
+        self.assertEqual(endtime.month, midday.month)
+        self.assertEqual(endtime.day, midday.day)
+        self.assertEqual(endtime.hour, 23)
+        self.assertEqual(endtime.minute, 59)
+
+        # Test endtime only
+        starttime, endtime = self.cache.time_bounds(endtime=midday)
+        self.assertEqual(starttime.year, midday.year)
+        self.assertEqual(starttime.month, midday.month)
+        self.assertEqual(starttime.day, midday.day)
+        self.assertEqual(starttime.hour, 0)
+        self.assertEqual(starttime.minute, 0)
+        self.assertEqual(endtime.year, midday.year)
+        self.assertEqual(endtime.month, midday.month)
+        self.assertEqual(endtime.day, midday.day)
+        self.assertEqual(endtime.hour, midday.hour)
+        self.assertEqual(endtime.minute, midday.minute)
+
+        # Test endtime on an earlier day
+        with self.assertRaises(ValueError):
+            starttime, endtime = self.cache.time_bounds(starttime=midday,
+                                                        endtime=prevday)
+
+        # Test endtime on a later day
+        with self.assertRaises(ValueError):
+            starttime, endtime = self.cache.time_bounds(starttime=midday,
+                                                        endtime=nextday)
+
+        # Test full day with now
+        starttime, endtime = self.cache.time_bounds(day=midday, now=midday)
+        self.assertEqual(starttime.year, midday.year)
+        self.assertEqual(starttime.month, midday.month)
+        self.assertEqual(starttime.day, midday.day)
+        self.assertEqual(starttime.hour, 0)
+        self.assertEqual(starttime.minute, 0)
+        self.assertEqual(endtime.year, midday.year)
+        self.assertEqual(endtime.month, midday.month)
+        self.assertEqual(endtime.day, midday.day)
+        self.assertEqual(endtime.hour, midday.hour)
+        self.assertEqual(endtime.minute, midday.minute)
+
+        # Test end time later than now
+        starttime, endtime = self.cache.time_bounds(starttime=midday,
+                                                    endtime=later,
+                                                    now=midday)
+        self.assertEqual(starttime.year, midday.year)
+        self.assertEqual(starttime.month, midday.month)
+        self.assertEqual(starttime.day, midday.day)
+        self.assertEqual(starttime.hour, midday.hour)
+        self.assertEqual(starttime.minute, midday.minute)
+        self.assertEqual(endtime.year, midday.year)
+        self.assertEqual(endtime.month, midday.month)
+        self.assertEqual(endtime.day, midday.day)
+        self.assertEqual(endtime.hour, midday.hour)
+        self.assertEqual(endtime.minute, midday.minute)
 
 
 if __name__ == '__main__':
