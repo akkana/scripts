@@ -156,26 +156,30 @@ class Cachefile:
         return day.replace(hour=23, minute=59, second=59, microsecond=0)
 
 
-    def time_bounds(self, starttime=None, endtime=None, now=None):
-        '''Given a starttime and endtime:
-           If no starttime, set it to the beginning of today.
+    def time_bounds(self, starttime=None, endtime=None, day=None, now=None):
+        '''If day is specified, return the beginning and end of that day.
+           Otherwise, if no starttime, set it to the beginning of today.
            If no endtime, set it to the end of today.
-           In either case, restrict the time range to a single day,
-           and don't allow anything beyond the current time, now.
+           In every case, restrict the time range to a single day,
+           and don't allow anything later than now.
            now can be specified because it may need to be set back by some
            amount, like 10 minutes, depending on how often the API updates.
         '''
         if not now:
             now = datetime.datetime.now()
 
-        if not starttime and not endtime:
+        if day:
+            starttime = self.day_start(day)
+            endtime = self.day_end(day)
+
+        elif not starttime and not endtime:
             # Set back to the beginning of the day:
             starttime = self.day_start(now)
             # and end now.
             endtime = now
 
         elif not starttime:
-            starttime = self.day_start(now)
+            starttime = self.day_start(endtime)
 
         elif not endtime:
             # If we're starting today, end now:
@@ -184,7 +188,17 @@ class Cachefile:
                 endtime = now
             # Else end at the end of the day we started:
             else:
-                endtime = self.day_end(now)
+                endtime = self.day_end(starttime)
+        elif starttime.year != endtime.year \
+             or starttime.month != endtime.month \
+             or starttime.day != endtime.day:
+            raise ValueError("time_bounds: %s and %s must start and end on the same day" % (endtime, starttime))
+
+        if starttime > endtime:
+            raise ValueError("endtime %s can't be earlier than starttime %s"
+                             % (endtime, starttime))
+        if endtime > now:
+            endtime = now
 
         return starttime, endtime
 
@@ -197,6 +211,7 @@ class Cachefile:
            endtime defaults to now, or the end of the day of starttime.
         '''
 
+        # XXX This limits it to one day, but get_data should allow for more.
         starttime, endtime = self.time_bounds(starttime, endtime)
 
         data = []
@@ -236,7 +251,7 @@ class Cachefile:
             if new_data:
                 self.write_cache_file(new_data)
 
-            data += new_data
+                data += new_data
 
             # Next day.
             starttime += datetime.timedelta(days=1)
