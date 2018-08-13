@@ -66,12 +66,17 @@ birdcodes.py:
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
 
-chatsounds.py:
-    An xchat Python script to handle nick (and other special-case) sounds.
-    Also a rare example of an xchat Python script.
+cachefile.py:
+    A general class for cases where you need to fetch data from some
+    slow process, like a web API, and cache it locally for speedier access.
+    Caches in CSV format.
 
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
+
+chatsounds.py:
+    An xchat Python script to handle nick (and other special-case) sounds.
+    Also a rare example of an xchat Python script.
 
 check-monitors
     A trivial shell script to probe for connected monitors and
