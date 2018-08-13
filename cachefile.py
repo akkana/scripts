@@ -33,8 +33,8 @@ class Cachefile:
 
         else:
             self.cachedir = None
-            # cachedir can be in ~/.config/cachedir, or /var/cache/cachedir
-            userdir = os.path.expanduser('~/.config')
+            # cachedir can be in ~/.cache/cachedir, or /var/cache/cachedir
+            userdir = os.path.expanduser('~/.cache')
             for d in [ userdir, '/var/cache' ]:
                 dpath = os.path.join(d, cachedir)
                 if os.path.exists(dpath):
@@ -86,6 +86,7 @@ class Cachefile:
 
         except PermissionError:
             print("Can't update temp file %s, it's locked" % tmpfile)
+            os.system("ls -la " + self.cachedir)
 
 
     def open_cache_file(self, cachefile):
@@ -133,7 +134,7 @@ class Cachefile:
         return cachefile, data
 
 
-    def fetch_one_day_data(day):
+    def fetch_one_day_data(self, day):
         '''fetch_data, undefined in this base class, should fetch
            one day's data using whatever web or other API is appropriate.
            Override it in your derived class.
@@ -141,6 +142,51 @@ class Cachefile:
         raise RuntimeError("Don't know how to fetch: "
                            "override fetch_data in subclasses")
         pass
+
+
+    def day_start(self, day):
+        '''Given a datetime, return the beginning of that day as a datetime.
+        '''
+        return day.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+    def day_end(self, day):
+        '''Given a datetime, return the beginning of that day as a datetime.
+        '''
+        return day.replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+    def time_bounds(self, starttime=None, endtime=None, now=None):
+        '''Given a starttime and endtime:
+           If no starttime, set it to the beginning of today.
+           If no endtime, set it to the end of today.
+           In either case, restrict the time range to a single day,
+           and don't allow anything beyond the current time, now.
+           now can be specified because it may need to be set back by some
+           amount, like 10 minutes, depending on how often the API updates.
+        '''
+        if not now:
+            now = datetime.datetime.now()
+
+        if not starttime and not endtime:
+            # Set back to the beginning of the day:
+            starttime = self.day_start(now)
+            # and end now.
+            endtime = now
+
+        elif not starttime:
+            starttime = self.day_start(now)
+
+        elif not endtime:
+            # If we're starting today, end now:
+            if starttime.year == now.year and starttime.month == now.month \
+               and starttime.day == now.day:
+                endtime = now
+            # Else end at the end of the day we started:
+            else:
+                endtime = self.day_end(now)
+
+        return starttime, endtime
 
 
     def get_data(self, starttime=None, endtime=None):
@@ -151,23 +197,7 @@ class Cachefile:
            endtime defaults to now, or the end of the day of starttime.
         '''
 
-        now = datetime.datetime.now()
-        if not starttime and not endtime:
-            # Set back to the beginning of the day:
-            starttime = now.replace(hour=0, minute=0,
-                                    second=0, microsecond=0)
-            endtime = now
-
-        elif not starttime:
-            starttime = endtime.replace(hour=0, minute=0,
-                                        second=0, microsecond=0)
-
-        elif not endtime:
-            if starttime.year == now.year and starttime.month == now.month \
-               and starttime.day == now.day:
-                endtime = now
-            else:
-                endtime = starttime.replace(hour=23, minute=59, second=59)
+        starttime, endtime = self.time_bounds(starttime, endtime)
 
         data = []
 
@@ -190,7 +220,7 @@ class Cachefile:
 
             new_data = self.fetch_one_day_data(starttime)
             if self.verbose:
-                print("Fetched data from cache file", cachefile)
+                print("Fetched data from API", cachefile)
 
             # If the data is new, re-write the cache file,
             # protecting it with chmod though that still allows
