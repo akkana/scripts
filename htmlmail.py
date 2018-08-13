@@ -223,11 +223,11 @@ Address lists may be comma separated""",
     recipients = args.to_addresses.split(',')
 
     if args.cc:
-        cc = args.cc.split(',')
+        cc = [ s.strip() for s in args.cc.split(',') ]
     else:
         cc = []
     if args.bcc:
-        bcc = args.bcc.split(',')
+        bcc = [ s.strip() for s in args.bcc.split(',') ]
     else:
         bcc = []
 
