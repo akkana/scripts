@@ -211,12 +211,9 @@ class Cachefile:
            endtime defaults to now, or the end of the day of starttime.
         '''
 
-        # XXX This limits it to one day, but get_data should allow for more.
-        starttime, endtime = self.time_bounds(starttime, endtime)
-
         data = []
 
-        # Loop over days:
+        # Loop over days, fetching one day's data at a time:
         while True:
             cachefile, cached_data = self.read_cache_file(starttime)
 
@@ -231,27 +228,29 @@ class Cachefile:
                 data += cached_data
                 if self.verbose:
                     print("We already have enough cached. Hooray!")
-                break
 
-            new_data = self.fetch_one_day_data(starttime)
-            if self.verbose:
-                print("Fetched data from API", cachefile)
-
-            # If the data is new, re-write the cache file,
-            # protecting it with chmod though that still allows
-            # for race conditions.
-
-            # What's considered new?
-            if cached_data:
-                lastcache = cached_data[-1][self.TIME]
             else:
-                lastcache = endtime.replace(hour=0, minute=0,
-                                            second=0, microsecond=0)
+                if not endtime:
+                    endtime = self.day_end(starttime)
+                new_data = self.fetch_one_day_data(starttime)
+                if self.verbose:
+                    print("Fetched data from API", cachefile)
 
-            if new_data:
-                self.write_cache_file(new_data)
+                # If the data is new, re-write the cache file,
+                # protecting it with chmod though that still allows
+                # for race conditions.
 
-                data += new_data
+                # What's considered new?
+                if cached_data:
+                    lastcache = cached_data[-1][self.TIME]
+                else:
+                    lastcache = endtime.replace(hour=0, minute=0,
+                                                second=0, microsecond=0)
+
+                if new_data:
+                    self.write_cache_file(new_data)
+
+                    data += new_data
 
             # Next day.
             starttime += datetime.timedelta(days=1)

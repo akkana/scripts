@@ -23,6 +23,14 @@ class TestCache(Cachefile):
                      {  'time': datetime.datetime(2018, 8, 1, 13, 0, 0),
                         'int': 99, 'str': "Goodbye", 'float': 1000. }
                    ]
+        elif day.year == 2018 and day.month == 2:
+            data = []
+            for hour in range(24):
+                data.append( { 'time': datetime.datetime(2018, 2, day.day,
+                                                         hour, 0, 0),
+                               'int': hour, 'str': "Hello, world",
+                               'float': day.day+ hour/100 })
+            return data
 
     def clean_cachedir(self):
         '''Remove all cache files from the cachedir.
@@ -68,6 +76,27 @@ class CacheTests(unittest.TestCase):
 2018-08-01 13:00:00,99,Goodbye,1000.0
 ''')
 
+    def test_multiple_days(self):
+        starttime = datetime.datetime(2018, 2, 10, 0, 0)
+        endtime   = datetime.datetime(2018, 2, 12, 12, 0)
+        data = self.cache.get_data(starttime, endtime)
+
+        # Make sure we got data from the full range:
+        self.assertEqual(data[0],
+                         {'time': datetime.datetime(2018, 2, 10, 0, 0),
+                          'int': 0,
+                          'str': 'Hello, world',
+                          'float': 10.0})
+        self.assertEqual(data[32],
+                         {'time': datetime.datetime(2018, 2, 11, 8, 0),
+                          'int': 8,
+                          'str': 'Hello, world',
+                          'float': 11.08})
+        self.assertEqual(data[-1],
+                         {'time': datetime.datetime(2018, 2, 12, 23, 0),
+                          'int': 23,
+                          'str': 'Hello, world',
+                          'float': 12.23})
 
     def test_file_locking(self):
         # test_date = datetime.datetime(2018, 8, 1, 12, 0)
