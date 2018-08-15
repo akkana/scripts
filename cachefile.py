@@ -63,7 +63,8 @@ class Cachefile:
             os.makedirs(self.cachedir)
 
         cachefile = os.path.join(self.cachedir,
-                                 day_data[-1][self.TIME].strftime('%Y-%m-%d'))
+                                 day_data[-1][self.TIME].strftime('%Y-%m-%d')
+                                 + ".csv")
 
         # Write to a temporary copy then move it into place.
         # This is deliberately not unique -- it'll be chmodded
@@ -118,7 +119,10 @@ class Cachefile:
         if not day:
             day = datetime.datetime.now()
 
-        cachefile = os.path.join(self.cachedir, day.strftime('%Y-%m-%d'))
+        cachefile = os.path.join(self.cachedir,
+                                 day.strftime('%Y-%m-%d') + ".csv")
+        if self.verbose:
+            print("Trying to read cache file", cachefile)
         data = []
         try:
             with open(cachefile) as csvfp:
@@ -139,9 +143,8 @@ class Cachefile:
            one day's data using whatever web or other API is appropriate.
            Override it in your derived class.
         '''
-        raise RuntimeError("Don't know how to fetch: "
-                           "override fetch_data in subclasses")
-        pass
+        raise NotImplementedError("Don't know how to fetch: "
+                                  "override fetch_data in subclasses")
 
 
     def day_start(self, day):
