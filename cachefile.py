@@ -15,17 +15,32 @@
 #     to appropriate types, e.g. int, float, datetime etc.
 # self.DATE: the name for the date field (default 'date').
 
+### Some tweaks to make it work with Python2, for web servers without 3:
+from __future__ import print_function
+
+try:
+    PermissionError
+except NameError:
+    PermissionError = OSError
+
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = OSError
+
+### end Python2 tweaks
+
 import datetime
 import csv
 import os
 
-class Cachefile:
+class Cachefile(object):
     def __init__(self, cachedir):
         self.TIME = 'time'
 
         self.verbose = True
 
-        self.keys = None
+        self.fieldnames = None
         self.writer = None
 
         if cachedir.startswith('/'):
@@ -49,8 +64,8 @@ class Cachefile:
         '''Write (or overwrite) the whole cache file for the given day
            Otherwise, will overwrite the whole file.
         '''
-        if not self.keys:
-            self.keys = day_data[0].keys()
+        if not self.fieldnames:
+            self.fieldnames = list(day_data[0].keys())
 
         # Make sure the data doesn't span more than one day.
         if day_data[0][self.TIME].day != day_data[-1][self.TIME].day:
@@ -93,10 +108,21 @@ class Cachefile:
     def open_cache_file(self, cachefile):
         # To avoid race conditions, use os.open to create the file
         # with a mode so that no one else can write to it.
-        fp = open(os.open(cachefile,
-                          os.O_CREAT | os.O_WRONLY, 0o444), 'w')
+        fd = os.open(cachefile, os.O_CREAT | os.O_WRONLY, 0o444)
 
-        self.writer = csv.DictWriter(fp, fieldnames=self.keys)
+        # In Python3, open() will take an integer file descriptor.
+        # In Python2, that fails with
+        # TypeError: coercing to Unicode: need string or buffer, int found
+        # but there's os.fdopen.
+        try:
+            fp = open(fd, 'w')
+        except TypeError:
+            fp = os.fdopen(fd, 'w')
+
+        # In Python2, CSV adds \r as part of the  line terminator
+        # even on Unix, which breaks the automated tests.
+        self.writer = csv.DictWriter(fp, fieldnames=self.fieldnames,
+                                     lineterminator='\n')
         self.writer.writeheader()
 
         return fp

@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 
+# Tests for cachefile.py
+
+### Some tweaks to make it work with Python2, for web servers without 3:
+from __future__ import print_function
+
+try:
+    PermissionError
+except NameError:
+    PermissionError = OSError
+
+### end Python2 tweaks
+
 import unittest
 
 import os
@@ -8,8 +20,8 @@ import datetime
 from cachefile import Cachefile
 
 class TestCache(Cachefile):
-    # def __init__(self, cachedir):
-    #     super(TestCache, self).__init__(cachedir)
+    def __init__(self, cachedir):
+        super(TestCache, self).__init__(cachedir)
 
     def apply_types(self, row):
         row[self.TIME] = self.parse_time(row[self.TIME])
@@ -30,14 +42,14 @@ class TestCache(Cachefile):
                 data.append( { 'time': datetime.datetime(2018, 2, day.day,
                                                          hour, 0, 0),
                                'int': hour, 'str': "Hello, world",
-                               'float': day.day+ hour/100 })
+                               'float': day.day + hour/100. })
             return data
         else:
             morning = self.day_start(day)
             return [ { 'time': morning + datetime.timedelta(hours=2),
-                       'int': 42, 'str': "Hello, world", 'float':.001 },
+                       'int': 42, 'str': "Hello, world", 'float': .001 },
                      {  'time': morning + datetime.timedelta(hours=14),
-                        'int': 99, 'str': "Goodbye", 'float': 1000. }
+                        'int': 99, 'str': "Goodbye", 'float': 1000.5 }
                    ]
 
     def clean_cachedir(self):
@@ -59,17 +71,21 @@ class CacheTests(unittest.TestCase):
 
     # executed prior to each test
     def setUp(self):
-        # self.cache.clean_cachedir()
+        self.cache.clean_cachedir()
         pass
 
     # executed after each test
     def tearDown(self):
-        # self.cache.clean_cachedir()
+        self.cache.clean_cachedir()
         pass
 
 
     def test_cache_just_starttime(self):
         # Make sure cachefile is created
+
+        # Python2 csv.DictWriter doesn't preserve field order.
+        self.cache.fieldnames = [ 'time', 'int', 'str', 'float' ]
+
         test_date = datetime.datetime(2018, 8, 1, 12, 0)
         self.cache.get_data(test_date)
 
@@ -82,6 +98,7 @@ class CacheTests(unittest.TestCase):
 
         with open(cachefile) as fp:
             file_contents = fp.read()
+
         self.assertEqual(file_contents, '''time,int,str,float
 2018-08-01 01:00:00,42,"Hello, world",0.001
 2018-08-01 13:00:00,99,Goodbye,1000.0
@@ -92,7 +109,6 @@ class CacheTests(unittest.TestCase):
         now = datetime.datetime.now()
         data = self.cache.get_data()
         for d in data:
-            print("d:", d)
             self.assertEqual(d['time'].year,   now.year)
             self.assertEqual(d['time'].month,  now.month)
             self.assertEqual(d['time'].day,    now.day)
@@ -135,7 +151,7 @@ class CacheTests(unittest.TestCase):
     def test_file_locking(self):
         # test_date = datetime.datetime(2018, 8, 1, 12, 0)
         # self.cache.get_data(test_date)
-        self.cache.keys = [ "time", "one", "two" ]
+        self.cache.fieldnames = [ "time", "one", "two" ]
 
         cachefile = "/tmp/cachetest"
         try:
