@@ -12,6 +12,7 @@ class TestCache(Cachefile):
     #     super(TestCache, self).__init__(cachedir)
 
     def apply_types(self, row):
+        row[self.TIME] = self.parse_time(row[self.TIME])
         row['int'] = int(row['int'])
         row['float'] = float(row['float'])
 
@@ -31,6 +32,13 @@ class TestCache(Cachefile):
                                'int': hour, 'str': "Hello, world",
                                'float': day.day+ hour/100 })
             return data
+        else:
+            morning = self.day_start(day)
+            return [ { 'time': morning + datetime.timedelta(hours=2),
+                       'int': 42, 'str': "Hello, world", 'float':.001 },
+                     {  'time': morning + datetime.timedelta(hours=14),
+                        'int': 99, 'str': "Goodbye", 'float': 1000. }
+                   ]
 
     def clean_cachedir(self):
         '''Remove all cache files from the cachedir.
@@ -51,14 +59,17 @@ class CacheTests(unittest.TestCase):
 
     # executed prior to each test
     def setUp(self):
-        self.cache.clean_cachedir()
+        # self.cache.clean_cachedir()
+        pass
 
     # executed after each test
     def tearDown(self):
-        self.cache.clean_cachedir()
+        # self.cache.clean_cachedir()
+        pass
 
 
-    def test_cache(self):
+    def test_cache_just_starttime(self):
+        # Make sure cachefile is created
         test_date = datetime.datetime(2018, 8, 1, 12, 0)
         self.cache.get_data(test_date)
 
@@ -66,7 +77,7 @@ class CacheTests(unittest.TestCase):
                     os.path.expanduser('~/.cache/test-cachefile'))
 
         cachefile = os.path.join(self.cache.cachedir,
-                                 test_date.strftime('%Y-%m-%d'))
+                                 test_date.strftime('%Y-%m-%d') + ".csv")
         assert os.path.exists(cachefile)
 
         with open(cachefile) as fp:
@@ -75,6 +86,21 @@ class CacheTests(unittest.TestCase):
 2018-08-01 01:00:00,42,"Hello, world",0.001
 2018-08-01 13:00:00,99,Goodbye,1000.0
 ''')
+
+    def test_cache_no_times(self):
+        # Test fetching with no time specified
+        now = datetime.datetime.now()
+        data = self.cache.get_data()
+        for d in data:
+            print("d:", d)
+            self.assertEqual(d['time'].year,   now.year)
+            self.assertEqual(d['time'].month,  now.month)
+            self.assertEqual(d['time'].day,    now.day)
+
+        cachefile = os.path.join(self.cache.cachedir,
+                                 now.strftime('%Y-%m-%d') + ".csv")
+        assert os.path.exists(cachefile)
+
 
     def test_multiple_days(self):
         starttime = datetime.datetime(2018, 2, 10, 0, 0)
@@ -97,6 +123,14 @@ class CacheTests(unittest.TestCase):
                           'int': 23,
                           'str': 'Hello, world',
                           'float': 12.23})
+
+        # and that we cached data for all those days:
+        assert os.path.exists(os.path.join(self.cache.cachedir,
+                                           '2018-02-10.csv'))
+        assert os.path.exists(os.path.join(self.cache.cachedir,
+                                           '2018-02-11.csv'))
+        assert os.path.exists(os.path.join(self.cache.cachedir,
+                                           '2018-02-12.csv'))
 
     def test_file_locking(self):
         # test_date = datetime.datetime(2018, 8, 1, 12, 0)

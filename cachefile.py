@@ -128,10 +128,10 @@ class Cachefile:
             with open(cachefile) as csvfp:
                 reader = csv.DictReader(csvfp)
                 for row in reader:
-                    self.apply_types(row)
                     # csv.DictReader reads everything as strings. Convert back.
+                    self.apply_types(row)
                     data.append(row)
-        except FileNotFoundError:
+        except (FileNotFoundError, OSError, IOError):
             # File isn't there yet, first run of the day?
             pass
 
@@ -157,6 +157,23 @@ class Cachefile:
         '''Given a datetime, return the beginning of that day as a datetime.
         '''
         return day.replace(hour=23, minute=59, second=59, microsecond=0)
+
+
+    @staticmethod
+    def parse_time(timestr):
+        try:
+            return datetime.datetime.strptime(timestr, '%Y-%m-%d %H:%M')
+        except ValueError:
+            pass
+
+        try:
+            return datetime.datetime.strptime(timestr, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            pass
+
+        # If those didn't work, and this doesn't either,
+        # go ahead and throw a ValueError.
+        return datetime.datetime.strptime(timestr, '%Y-%m-%d %H:%M:%S.%f')
 
 
     def time_bounds(self, starttime=None, endtime=None, day=None, now=None):
@@ -216,6 +233,14 @@ class Cachefile:
 
         data = []
 
+        if not endtime:
+            if starttime:
+                endtime = self.day_start(starttime)
+            else:
+                endtime = datetime.datetime.now()
+        if not starttime:
+            starttime = self.day_start(endtime)
+
         # Loop over days, fetching one day's data at a time:
         while True:
             cachefile, cached_data = self.read_cache_file(starttime)
@@ -233,8 +258,6 @@ class Cachefile:
                     print("We already have enough cached. Hooray!")
 
             else:
-                if not endtime:
-                    endtime = self.day_end(starttime)
                 new_data = self.fetch_one_day_data(starttime)
                 if self.verbose:
                     print("Fetched data from API", cachefile)
