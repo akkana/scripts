@@ -175,7 +175,31 @@ s = s.replace("\u00A0"," ")
 sep = re.compile('[,\s]+')
 sep.split('HB42,SJR1, HR67 SB3')
 
-###########
+############################
+# Frustrations at exceptions when printing,
+# when Python (even Python 3) wants to convert to ascii rather than
+# the system encoding:
+# I need a test case for this, so save one next time it happens!
+# Otherwise, ignore this section, they're just notes to help debug
+# next time I hit this problem.
+
+# New in Python 3.7:
+sys.stdout.reconfigure(errors='surrogateescape')
+# In 3.6, you can get a similar effect with an env variable:
+PYTHONIOENCODING=utf-8:surrogateescape
+
+# In Python2, this might also help:
+sys.setdefaultencoding('utf8')
+# though it's frowned upon:
+# https://stackoverflow.com/questions/3828723/why-should-we-not-use-sys-setdefaultencodingutf-8-in-a-py-script/34378962#34378962
+# You'd think it would use the system locale by default for printing,
+# and quite a few pages claim UTF-8 is the default, but that doesn't
+# seem to be true: even in Python 3 I frequently see exceptions
+# indicating that for some bizarre reason python3 is trying to
+# convert to ascii for printing. And in python3, sys.getdefaultencoding()
+# is already utf-8 so that doesn't explain the ascii codec exceptions.
+
+#############################
 # All the ways of formatting numbers, from https://stackoverflow.com/a/2962966
 
 # String concatenation:
@@ -220,9 +244,15 @@ l = ['a', 'b', 'c', 'd', 'e']
 l.insert(3, 'xxx')
 # --> ['a', 'b', 'c', 'xxx', 'd', 'e']
 
-# Comprehensions can be multiple:
+# List comprehensions can be multiple:
 [ a*b+c for a in A for b in B for c in C ]
 # though itertools.product is arguably cleaner for math problems like that.
+
+# There are dict comprehensions too though the syntax is more fiddly:
+>>> { key: value for key, value in [ (1, 11), (2, 22), (3, 33) ] }
+{1: 11, 2: 22, 3: 33}
+>>> { key: value for key, value in zip( [1, 2, 3], [11, 22, 33] ) }
+{1: 11, 2: 22, 3: 33}
 
 # Pairwise loops with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
@@ -383,6 +413,13 @@ three_months_from_now = today + relativedelta(months=3)
 # months gives you how many months relative to the current one.
 # For differences of just days or weeks, datetime.timedelta works.
 
+# Beginning of today:
+datetime.datetime.now().replace(hour=0, minute=0,
+                                second=0, microsecond=0)
+
+# Earliest and latest dates:
+datetime.datetime.min, datetime.datetime.max
+
 # Subtracting datetimes gives a datetime.timedelta, and that's also
 # a good way to add or subtract time from a datetime.
 now = datetime.datetime.now()
@@ -499,6 +536,16 @@ for t in soup.findAll(style=True)
 soup.findAll(lambda tag: 'style' in tag.attrs)
 
 ########################################################
+# Handling cookies with Requests
+########################################################
+
+# To handle cookies with requests, ignore the Requests documentation
+# that says to use a RequestCookieJar: that's apparently only for
+# setting cookies, not fetching them. Instead, use a Session:
+session = requests.Session()
+r = session.get(url)
+
+########################################################
 # Some handy utility classes
 ########################################################
 
@@ -517,6 +564,15 @@ proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
 while True:
     line = proc.stdout.readline()
     print("line: %s" % line)
+
+########################################################
+# CGI: how to tell if something is run as a CGI or locally
+########################################################
+if 'REQUEST_METHOD' in os.environ:
+    print("Run as CGI", file=sys.stderr)
+    form = cgi.FieldStorage()
+else:
+    print("Run locally")
 
 ########################################################
 # Conditional import and testing imported libraries
@@ -887,17 +943,28 @@ plt.figure(1).canvas.mpl_connect('key_press_event',
                                      sys.exit(0) if e.key == 'ctrl+q'
                                      else None)
 
-# Set xtick labels to appear every 15 minutes
-ax.xaxis.set_major_locator(xlocator)
-# Format xtick labels as HH:MM
-ax.xaxis.set_major_formatter(xformatter)
-
 # Apply a function to a numpy array, returning another array
 def wraparound(x):
     if x > 12: return x-24
     return x
 vwraparound = np.vectorize(wraparound)
 wrapped_arr = vwraparound(orig_arr)
+
+# Dates on X axis rotated a bit, so they don't overwrite each other:
+fig.autofmt_xdate()
+
+# Label X axis with hours and minutes, on the hour:
+hours = mdates.HourLocator(interval = 1)
+h_fmt = mdates.DateFormatter('%H:%M')
+ax.xaxis.set_major_locator(hours)
+ax.xaxis.set_major_formatter(h_fmt)
+
+# XXX This is incomplete.
+# Set xtick labels to appear every 15 minutes
+ax.xaxis.set_major_locator(xlocator)
+# Format xtick labels as HH:MM
+ax.xaxis.set_major_formatter(xformatter)
+
 
 ################################################################
 # Python3 differences
@@ -916,9 +983,13 @@ print("Hello, world", end='', file=sys.stderr)
 # and you can just pass encoding as a second argument when you
 # coerce between str and byte, no need to remember encode/decode.
 
-# Encode/decode in Python3:
->>> str(b'string of bytes')
+# Encode/decode in Python3: this has changed! don't use str() any more!
+>>> b'string of bytes'.decode()
 'string of bytes'
+>>> b'string of bytes'.decode('utf-8')
+'string of bytes'
+>>> str(b'string of bytes')
+"b'string of bytes'"
 >>> str(b'string of bytes', 'utf-8')
 'string of bytes'
 >>> bytes('piñon', 'utf-8')
