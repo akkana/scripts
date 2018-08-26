@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Some Python routines to pull and push Android files via ADB,
 # on Android KitKat and late that won't let you mount the filesystem
@@ -8,14 +8,13 @@
 # androidsd:/relative/path and it will try to find the SD card
 # if it's mounted as /storage/nnnn-nnnn.
 #
-# Note: this isn't well tested at all. It works well enough on my
-# own personal phone (Galaxy S5 running Marshmallow) but I have
-# no way of testing it on other Android hardware,
-# and Google seems to love to change everything completely with every release.
+# Note: this isn't well tested at all and is super brittle.
+# Be sure to test it on small directories before using it for
+# any major copies.
 # I'm happy to take patches or bug reports if you use it on other
 # Android devices, and I'd love to hear where it does and doesn't work.
 #
-# Copyright 2017 by Akkana; share and enjoy under the GPL v2 or later.
+# Copyright 2017,2018 by Akkana; share and enjoy under the GPL v2 or later.
 
 import sys, os
 import subprocess
@@ -37,7 +36,7 @@ def strip_schema(path):
     if path.startswith("androidsd:"):
         sdcards = find_sdcards()
         if not sdcards:
-            raise RuntimeError, "Can't access Android device"
+            raise RuntimeError("Can't access Android device")
         return '/storage/' + sdcards[0] + '/' + path[10:]
 
     return path
@@ -47,7 +46,7 @@ def find_sdcards():
     proc = subprocess.Popen(["adb", "shell", "ls", "/storage"],
                             shell=False,
                             stdout=subprocess.PIPE)
-    stdout_lines = proc.communicate()[0].split('\n')
+    stdout_lines = proc.communicate()[0].decode().split('\n')
     sdpat = re.compile('[0-9A-F]{4}-[0-9A-F]{4}')
     for line in stdout_lines:
         m = sdpat.search(line)
@@ -57,6 +56,9 @@ def find_sdcards():
     return sdcards
 
 def list_dir(path, **kwargs):
+    '''Recursively list either a local or remote directory.
+       Return a list of paths relative to the original directory.
+    '''
     if is_android(path):
         return list_android_dir(strip_schema(path), **kwargs)
     else:
@@ -77,7 +79,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         args = ["adb", "shell", "ls", "-l", path]
 
     proc = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
-    stdout_lines = proc.communicate()[0].split('\n')
+    stdout_lines = proc.communicate()[0].decode().split('\n')
     file_list = []
     cur_subdir = ''
     for line in stdout_lines:
@@ -140,20 +142,25 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
-    # print "list_local_dir", path, sorted, sizes, recursive
+    path = os.path.normpath(path)
     lenpath = len(path)
     if recursive:
         file_list = []
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
-            # print "root", root
             for f in files:
+                # Get rid of anything like ./ at the beginning
                 f = os.path.normpath(f)
 
                 if root == '.':
                     file_list.append(f)
                 else:
-                    file_list.append(os.path.join(root, f))
+                    # Include the necessary part of the file's path,
+                    # but omit the root we started from.
+                    fpath = os.path.join(root, f)
+                    if path.startswith('/'):
+                        fpath = fpath[lenpath+1:]
+                    file_list.append(fpath)
 
     else:
         file_list = os.listdir(path)
@@ -167,17 +174,14 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     # Get the size for each file.
     sizelist = []
     for filename in file_list:
-        filepath = os.path.normpath(filename)
-        # print root, path, filename
-        # print "filepath:", filepath
+        filepath = os.path.join(path, filename)
         if os.path.isdir(filepath):
             sizelist.append((filename, 0))
         else:
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
-                # print "Got the size for", filepath
             except OSError:
-                print "OSError on", filepath, "path was", path
+                print("OSError on", filepath, "path was", path)
                 sizelist.append((filename, 0))
                 sys.exit(0)
 
@@ -259,7 +263,7 @@ def mkdir(d):
     if is_android(d):
         mkdir_on_android(strip_schema(d))
     else:
-        os.mkdir(d)
+        os.makedirs(d, exist_ok=True)
 
 def remove(f):
     if is_android(f):
@@ -268,17 +272,26 @@ def remove(f):
         os.unlink(f)
 
 def find_basename_size_match(pair, pairlist):
-    '''Take the basename of the given pair's first elemtn, and see if it matches
+    '''Given a pair (pathname, size) and a list of pairs, take the basename
+       of the given pair's first elemend, and see if it matches
        the basename of the first element of any of the pairs in pairlist.
        If so, compare the sizes (second element), and if they match,
        return the index of the match in pairlist. Else return -1.
+       If there's more than one match, be safe and return -1:
+       in that case we can't rely on size.
     '''
     base = os.path.basename(pair[0])
+    match = None
+    num_matches = 0
     for i, p in enumerate(pairlist):
         if os.path.basename(p[0]) == base:
             if p[1] == pair[1]:
-                return i
-            return -1
+                match = i
+                num_matches += 1
+    if num_matches == 1:
+        return match
+    elif num_matches > 1:
+        print("Multiple matches for", base)
     return -1
 
 def sync(src, dst, dryrun=True):
@@ -343,7 +356,7 @@ def sync(src, dst, dryrun=True):
             # The file exists on both src and dst
             if src_ls[isrc][1] != dst_ls[idst][1]:
                 # the files have different sizes, need to sync.
-                updates.append(ls_src[isrc][0])
+                updates.append(src_ls[isrc][0])
             isrc += 1
             idst += 1
             continue
@@ -442,6 +455,10 @@ def sync(src, dst, dryrun=True):
         if d.endswith('/.'):
             d = d[:-2]
 
+        if not is_android(d) and os.path.exists(d):
+            continue
+        # XXX Should check our file list to see if it exists if it's android.
+
         print("mkdir " + d)
         if not dryrun:
             mkdir(d)
@@ -465,7 +482,7 @@ def sync(src, dst, dryrun=True):
             remove(rm)
 
     # Finally, the updates.
-    print("\n\nCopying up files that are new or changed")
+    print("\n\nCopying files that are new or changed")
     srclen = len(src)
 
     # Special case: if we're syncing from ./ it will have been stripped
@@ -476,12 +493,11 @@ def sync(src, dst, dryrun=True):
     if src.startswith('./'):
         srclen -= 2
     for up in updates:
-        # At this point, up is the full path in src.
-        # Translate it to its dst path.
-        dstup = dst + up[srclen:]
-        print("Updating %s -> %s" % (up, dstup))
+        srcup = src + up
+        dstup = dst + up
+        print("Updating %s:\n  <- %s\n  -> %s" % (up, srcup, dstup))
         if not dryrun:
-            copyfile(up, dstup)
+            copyfile(srcup, dstup)
 
     if dryrun:
         print("\nThat's what we would have done, if this wasn't a dry run")
@@ -520,8 +536,8 @@ def parse_args():
 
     # I can't find a way to get argparse to handle this.
     if args.sync and len(args.paths) != 2:
-        print "-s must have exactly 2 parameters, src and dst\n"
-        print Usage()
+        print("-s must have exactly 2 parameters, src and dst\n")
+        print(Usage())
         sys.exit(2)
 
     return args
@@ -529,7 +545,7 @@ def parse_args():
 def main():
 
     args = parse_args()
-    # print args
+    # print(args)
 
     if args.sync:
         sync(args.paths[0], args.paths[1], dryrun=args.dryrun)
@@ -551,4 +567,4 @@ if __name__ == "__main__":
     try:
         main()
     except RuntimeError as e:
-        print str(e)
+        print(str(e))
