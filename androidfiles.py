@@ -16,6 +16,8 @@
 #
 # Copyright 2017,2018 by Akkana; share and enjoy under the GPL v2 or later.
 
+# XXX TO DO: Fix detection of empty directories and call rmdir.
+
 import sys, os
 import subprocess
 import posixpath
@@ -158,7 +160,13 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
                     # Include the necessary part of the file's path,
                     # but omit the root we started from.
                     fpath = os.path.join(root, f)
-                    if path.startswith('/'):
+
+                    # This is a bit tricky. fpath includes root
+                    # which includes the original path, and we need to
+                    # remove that part of it in the file list;
+                    # but if the original path was ., the ./ isn't
+                    # in fpath because os.normpath() removed it.
+                    if path != '.':
                         fpath = fpath[lenpath+1:]
                     file_list.append(fpath)
 
@@ -180,8 +188,9 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
         else:
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
-            except OSError:
+            except OSError as e:
                 print("OSError on", filepath, "path was", path)
+                print(e)
                 sizelist.append((filename, 0))
                 sys.exit(0)
 
