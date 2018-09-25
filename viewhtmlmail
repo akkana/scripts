@@ -10,9 +10,10 @@
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
 #
-# Copyright 2013 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Copyright 2013-2018 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 # Changes:
 #   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
+#   Antonio Terceiro 2018: Allow piping directly from mutt.
 
 # To use it from mutt, put the following lines in your .muttrc:
 # macro  index  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
