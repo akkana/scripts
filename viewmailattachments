@@ -32,8 +32,9 @@ USE_WVHTML_FOR_DOC = False
 BROWSER_ARGS = []
 
 # How many seconds do we need to wait for unoconv?
-# It defaults to 6, but on a 64-bit machine that's not enough.
-UNOCONV_STARTUP_TIME = "10"
+# It defaults to 6, but on a 64-bit machine that's not nearly enough.
+# Even 10 often isn't enough.
+UNOCONV_STARTUP_TIME = "14"
 
 # Does the browser need a one-time argument for bringing up an initial window,
 # like Firefox's -private-window -new-instance ?
@@ -45,28 +46,31 @@ USE_QUICKBROWSE = True
 if USE_QUICKBROWSE:
     BROWSER = "quickbrowse"
 
-    # Browser argument to precede new tabs:
+    # Arguments for calling the browser on the index page:
     BROWSER_FIRST_ARGS = []
+    # Browser argument to precede new tabs:
     BROWSER_ARGS = [ "--new-tab" ]
 
-    # Will the browser block when first run until its window is closed?
-    # If so, we have to run it in the background.
+    # Quickbrowse normally backgrounds itself, so we don't have to.
     BROWSER_BACKGROUND = False
 
-    # Should we convert PDF to HTML? Depends on BROWSER:
-    # Firefox has a built-in PDF viewer, but quickbrowse doesn't.
+    # If you have qpdfhtml installed, no need to convert PDF.
+    # Otherwise, set this to True.
     CONVERT_PDF_TO_HTML = False
 
 else:    # Firefox in private browsing mode
     BROWSER = "firefox"
 
-    # Not clear what to do here: Firefox has a built-in PDF viewer,
-    # but for some mime types it can't figure out that it should use it.
+    # For the index page, bring up a new, private window:
     BROWSER_FIRST_ARGS = [ "-P", "Default", "-private-window", "-new-instance" ]
+    # Subsequent tabs should be tabs in the private window
     BROWSER_ARGS = [ "-P", "Default", "-private-window" ]
     # Firefox doesn't run in the background.
     BROWSER_BACKGROUND = True
 
+    # Not clear what to do here: Firefox has a built-in PDF viewer,
+    # but for some mime types it can't figure out that it should use it,
+    # and there's no way to find out from outside the process.
     CONVERT_PDF_TO_HTML = False
 
 # End global prefs
