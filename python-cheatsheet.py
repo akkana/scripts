@@ -235,6 +235,8 @@ buf.insert(2, 0xf7)
 # Remove items from a list: I always forget how to do this.
 mylist.remove("item")    # Removes the first instance of "item"
 mylist.pop(i)            # Removes and returns list[i]
+# There's no single call to remove ALL instances of an item,
+# so you have to use a list comprehension to do that.
 
 # Delete an item from a dictionary:
 del thedic[key]
