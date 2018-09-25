@@ -507,6 +507,7 @@ def sync(src, dst, dryrun=True):
         print("Updating %s:\n  <- %s\n  -> %s" % (up, srcup, dstup))
         if not dryrun:
             copyfile(srcup, dstup)
+            print()
 
     if dryrun:
         print("\nThat's what we would have done, if this wasn't a dry run")
