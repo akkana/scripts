@@ -37,7 +37,7 @@ echo "Making directory $OMNITMPDIR ..."
 mkdir $OMNITMPDIR
 cd $OMNITMPDIR
 
-echo "Unzipping ..."
+echo "Unzipping in $OMNITMPDIR ..."
 unzip -q $FIREFOXDIR/browser/omni.ja
 
 echo "Making changes ..."
