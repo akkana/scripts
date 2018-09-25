@@ -172,5 +172,11 @@ def view_html_message(f, tmpdir):
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
-    for f in sys.argv[1:]:
-        view_html_message(f, tmpdir)
+    if len(sys.argv) > 1:
+        for f in sys.argv[1:]:
+            view_html_message(f, tmpdir)
+    else:
+        stdin = '%s/.stdin' % tmpdir
+        with open(stdin, 'w') as f:
+            f.write(sys.stdin.read())
+        view_html_message(stdin, tmpdir)
