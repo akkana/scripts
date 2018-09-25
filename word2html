@@ -67,7 +67,8 @@ def doc2html(infile, outfile):
 if __name__ == "__main__":
     if len(sys.argv) < 2 or len(sys.argv) > 3 \
        or sys.argv[1] == "-h" or sys.argv[1] == "--help":
-        print("Usage: %s infile.docx [outfile.html]")
+        print("Usage: %s infile.docx [outfile.html]"
+              % os.path.basename(sys.argv[0]))
         sys.exit(1)
     infile = sys.argv[1]
     base, ext = os.path.splitext(infile)
