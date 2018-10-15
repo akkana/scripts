@@ -15,10 +15,10 @@ phoneletters = [ '',
                  'ghi', 'jkl', 'mno',
                  'pqrs', 'tuv', 'wxyz' ]
 
-# Possible optimization: store different wordlists for different
-# string lengths, so we can immediately eliminate all words that
-# aren't the same length as a given phone number.
-Wordlist = []
+# Use a set for the word list to eliminate dups.
+# There are some dups in /usr/share/dict/words,
+# where one is capitalized and the other isn't.
+Wordlist = set()
 
 WORDLIST = '/usr/share/dict/words'
 # WORDLIST = '/tmp/words'
@@ -28,7 +28,9 @@ def read_word_list():
         for line in fp:
             if "'" in line:
                 continue
-            Wordlist.append(line.strip().lower())
+            line = line.strip().lower()
+            #     Wordlist.append(line)
+            Wordlist.add(line)
 
     # print("Word list:", Wordlist)
 
@@ -67,11 +69,13 @@ def find_dups(matchlen):
     if matchwords:
         print("%s = %s" % (lastnum, ' '.join(matchwords)))
 
-def find_words(phonenum):
-    '''Takes either a string of digits, or a list of numbers'''
+def find_words(phonenum, single_word=True):
+    '''Takes either a string of digits, or a list of numbers.
+       If single_word is true, only allow a single word of the same length
+    '''
 
     digits = []
-    retwords = []
+    matchwords = []
 
     # Translate them all to ints
     for digit in phonenum:
@@ -83,25 +87,27 @@ def find_words(phonenum):
 
     numlen = len(digits)
 
-    # for i, digit in enumerate(digits):
-    #     print(phoneletters[digit], '', end='')
-    # print()
-
     for word in Wordlist:
-        if len(word) != numlen:
+        # If we're only matching a single word, lengths must be the same:
+        if single_word and len(word) != numlen:
+            continue
+        # Even if we're matching multiple words, the word length can't
+        # be greater than the number length:
+        if len(word) > numlen:
             continue
         # print("Checking", word)
+
         matches = True
         for i, digit in enumerate(digits):
             # print("digit", digit, "phoneletters[digit]", phoneletters[digit],
             #       "word[i]", word[i])
             if word[i] not in phoneletters[digit]:
                 matches = False
-                continue
+                break
         if matches:
-            retwords.append(word)
+            matchwords.append(word)
 
-    return retwords
+    return matchwords
 
 if __name__ == '__main__':
     read_word_list()
