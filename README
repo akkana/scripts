@@ -260,6 +260,10 @@ pathmatch:
     Like str<tab> except you can match patterns anywhere in the
     string, not just at the beginning.
 
+phonewords.py:
+    Map phone numbers to words, or vice versa. Find phone numbers
+    that map to more than one word.
+
 pisoothe:
     Play sound samples (e.g. soothing white or pink noise samples)
     in a loop, reacting to key events for volume control or to skip
