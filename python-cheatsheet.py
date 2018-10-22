@@ -981,26 +981,30 @@ from __future__ import print_function
 # print without a newline and to a file:
 print("Hello, world", end='', file=sys.stderr)
 
-# All strings in python3 are automatically unicode,
-# and you can just pass encoding as a second argument when you
-# coerce between str and byte, no need to remember encode/decode.
-
-# Encode/decode in Python3: this has changed! don't use str() any more!
+# encode/decode between bytes and str:
 >>> b'string of bytes'.decode()
 'string of bytes'
+
 >>> b'string of bytes'.decode('utf-8')
 'string of bytes'
+
+>>> 'piñon'.encode('utf-8')
+b'pi\xc3\xb1on'
+
+# For a while, you could just pass encoding as a second argument
+# in type coercion; This has changed in more recent python3,
+# so don't use it any more.
+# I don't know the limits, but it's probably best not to use things like:
 >>> str(b'string of bytes')
 "b'string of bytes'"
 >>> str(b'string of bytes', 'utf-8')
 'string of bytes'
->>> bytes('piñon', 'utf-8')
-b'pi\xc3\xb1on'
 >>> str(b'pi\xc3\xb1on')
 "b'pi\\xc3\\xb1on'"
 >>> str(b'pi\xc3\xb1on', 'utf-8')
 'piñon'
->>>
+>>> bytes('piñon', 'utf-8')
+b'pi\xc3\xb1on'
 
 # Read or write bytes from a file:
 fp = open(filename, 'rb')   # or 'wb'
@@ -1008,6 +1012,9 @@ fp = open(filename, 'rb')   # or 'wb'
 # Write bytes to a file opened in string mode with .buffer
 if hasattr(sys.stdout, 'buffer')::
     sys.stdout.buffer.write(b'abc')
+
+# Also, you can specify encoding when opening a file:
+open(path, encoding="utf-8")
 
 # Conditional depending on python version:
 if sys.version[:1] == '2':
