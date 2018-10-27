@@ -1,8 +1,8 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
-# Utilities for reading epub books.
+# Utilities viewing and modifying the tags inside epub books.
 #
-# Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Copyright 2015,2018 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
 from __future__ import print_function
 
@@ -107,8 +107,17 @@ class EpubBook:
                 # epubtag.py micromegas.epub
                 # See http://stackoverflow.com/questions/492483/setting-the-correct-encoding-when-piping-stdout-in-python
                 # matches.append(el.childNodes[0].wholeText)
-                matches.append(el.childNodes[0].wholeText.encode('utf-8',
-                                                        'backslashreplace'))
+
+                # In Python2, el.childNodes[0].wholeText is type unicode,
+                # and has to be encoded into utf-8 to do anything useful
+                # with it, like print it.
+                # In Python3, el.childNodes[0].wholeText is type str,
+                # and if you call encode on it it turns into bytes
+                # which you can't do anything useful with. Argh.
+                wholetext = el.childNodes[0].wholeText
+                if type(wholetext) is not str:
+                    wholetext = wholetext.encode('utf-8', 'backslashreplace')
+                matches.append(wholetext)
             else:
                 print("Empty", elname, "tag")
 
@@ -208,7 +217,7 @@ class EpubBook:
             if not parent:
                 raise RuntimeError("No metadata tag! Bailing.")
 
-        # We'll want to add the new subject tags after the last one.
+        # Add the new subject tags after the last one.
         if elements:
             last_tag_el = elements[-1]
         else:
@@ -281,8 +290,22 @@ class EpubBook:
                 # we just parsed! So the best we can do is force
                 # it to UTF-8, barring re-opening the file and
                 # parsing the first line manually. So crazy!
-                encoding = 'UTF-8'
-                ozf.writestr(info, self.dom.toxml(encoding=encoding))
+                # Even worse, if there's a nonascii character in the metadata,
+                # in Python 2 self.dom.toxml(encoding='utf-8') will die with
+                # "UnicodeDecodeError: 'ascii' codec can't decode byte"
+                # apparently ignoring the encoding passed in.
+                # It's probably possible to fix this -- but in Python 3
+                # it doesn't happen, so let's just catch it and warn.
+                try:
+                    ozf.writestr(info, self.dom.toxml(encoding='utf-8'))
+                except UnicodeDecodeError as e:
+                    print("""
+******
+Python 2 minidom has trouble encoding non-ASCII characters")
+"You'd be better off using Python 3 for this book
+******
+""")
+                    raise(e)
 
                 # toprettyxml keeps the old whitespace and also adds
                 # additional new whitespace ... including trailing
@@ -296,7 +319,11 @@ class EpubBook:
                 #                                      'xmlcharrefreplace'))
             else:
                 # For every other file, just copy directly.
-                ozf.writestr(info, self.zip.read(info.filename))
+                try:
+                    ozf.writestr(info, self.zip.read(info.filename))
+                except OSError as e:
+                    print("Exception on filename", info.filename)
+                    print(e)
 
         ozf.close()
 
@@ -590,6 +617,8 @@ Options:
 
             book.parse_contents()
 
+            needs_save = False
+
             if imagedir != None:
                 if extract_images == "cover":
                     coverfile, zipname = book.extract_cover_image(imagedir)
@@ -603,16 +632,18 @@ Options:
             if new_title:
                 book.set_title(new_title)
                 print("Set title to", new_title, "in", f)
-                book.save_changes()
+                needs_save = True
 
             if delete_tags:
                 book.delete_tags()
+                needs_save = True
 
             if tags:
                 print(f, ": old tags:", book.get_tags())
                 book.add_tags(tags)
+                needs_save = True
 
-            if tags or delete_tags:
+            if needs_save:
                 book.save_changes()
 
             print(book.info_string(brief))
