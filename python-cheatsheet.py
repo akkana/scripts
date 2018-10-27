@@ -200,6 +200,12 @@ sys.setdefaultencoding('utf8')
 # is already utf-8 so that doesn't explain the ascii codec exceptions.
 
 #############################
+# Speaking of exception frustrations: here's how to print a traceback
+# from the current exception. Curiously, you don't need to pass in the
+# actual exception.
+traceback.format_exc()
+
+#############################
 # All the ways of formatting numbers, from https://stackoverflow.com/a/2962966
 
 # String concatenation:
