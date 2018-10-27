@@ -1,26 +1,107 @@
 #!/usr/bin/env python
 
 import re
+import sys
 
-try:
+# First try with GTK
+s = None
+
+def get_selection_gtk2():
+    # print("Trying GTK2")
     import gtk
 
     primary = gtk.clipboard_get(gtk.gdk.SELECTION_PRIMARY)
-    if not primary.wait_is_text_available() :
-        sys.exit(0)
-    s = primary.wait_for_text()
+    if not primary.wait_is_text_available():
+        return ''
+    return primary.wait_for_text()
 
-except:
-    from PyQt5.QtCore import QApplication
+def get_selection_gtk3():
+    # print("Trying gi.repository Gtk")
+        import gi
+        gi.require_version('Gtk', '3.0')
+        from gi.repository import Gtk, Gdk
 
-    qc = QApplication.clipboard()
-    s = qc.text(c.Selection)
+        primary = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
+        if not primary.wait_is_text_available():
+            sys.exit(0)
+        return primary.wait_for_text()
+
+def get_selection_qt():
+    print("Trying Qt")
+    # In Python2 QApplication is inPyQt5. QtCore
+    # from PyQt5.QtCore import QApplication
+
+    # In Python3 QApplication is in QtWidgets
+    from PyQt5.QtWidgets import QApplication
+
+    app = QApplication(sys.argv)
+    qc = app.clipboard()
+    return qc.text(qc.Selection)
     # Use qc.Clipboard if you want the clipboard selection
 
-# If it's a LinkedIn URL, fix their stupid errors:
-if re.search('(www\.)*linkedin.com/', s, flags=re.IGNORECASE):
-    s = s.replace("&amp;", "&") + "&count=1000&paginationToken="
+def get_selection_tk():
+    try:
+        # Python 3 import:
+        import tkinter
+    except ImportError:
+        # Python 2 import:
+        import Tkinter as tkinter
 
-# eliminate newlines, and any spaces immediately following a newline:
-print(re.sub(r'[\r\n]+ *', '', s))
+    tk = tkinter.Tk()
+    tk.withdraw()
+    s = tk.selection_get()
+
+    # In Tk, you have to create a window to get the selection,
+    # but you don't have to show it.
+    tk.update() # Stops a few errors (clipboard text unchanged, command line program unresponsive, window not destroyed).
+    tk.destroy()
+
+    return s
+
+def fix_links(s):
+    # If it's a LinkedIn URL, fix their stupid errors:
+    if re.search('(www\.)*linkedin.com/', s, flags=re.IGNORECASE):
+        s = s.replace("&amp;", "&") + "&count=1000&paginationToken="
+
+    # eliminate newlines, and any spaces immediately following a newline:
+    return re.sub(r'[\r\n]+ *', '', s)
+
+def get_selection():
+    debug = False
+
+    if debug:
+        import traceback
+
+    # The order in which to try toolkits:
+    tries = [
+        ("GTK2", get_selection_gtk2),
+        ("GTK3", get_selection_gtk3),
+        ("Tk",   get_selection_tk),
+        ("Qt",   get_selection_qt),
+    ]
+
+    selection_string = None
+    for t in tries:
+        try:
+            selection_string = t[1]()
+            if debug:
+                print("Success with %s" % t[0])
+        except Exception as e:
+            if debug:
+                print(traceback.format_exc())
+                print("^^^^^^ Couldn't use %s" % t[0])
+
+        if selection_string != None:
+            break
+
+    if selection_string == None:
+        print("Nothing worked, sorry")
+        sys.exit(1)
+    else:
+        print(selection_string)
+        sys.exit(0)
+
+if __name__ == '__main__':
+    get_selection()
+
 
