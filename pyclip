@@ -59,10 +59,9 @@ def get_selection_tk():
     return s
 
 def fix_links(s):
-    # If it's a LinkedIn URL, fix their stupid errors:
-    if re.search('(www\.)*linkedin.com/', s, flags=re.IGNORECASE):
-        s = s.replace("&amp;", "&") + "&count=1000&paginationToken="
-
+    '''When running this to paste URLs, it's helpful to stitch together
+       multiple lines.
+    '''
     # eliminate newlines, and any spaces immediately following a newline:
     return re.sub(r'[\r\n]+ *', '', s)
 
