@@ -17,7 +17,7 @@ from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
-     QWebEngineProfile
+     QWebEngineProfile, QWebEngineSettings
 from PyQt5.QtCore import QAbstractNativeEventFilter
 
 # Use qpdfview for PDFs if it's available:
@@ -111,6 +111,8 @@ class BrowserView(QWebEngineView):
             super(BrowserView, self).__init__()
 
         self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
+
+        QWebEngineSettings.globalSettings().setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
 
         self.browser_win = browserwin
 
@@ -258,6 +260,8 @@ class BrowserPage(QWebEnginePage):
         self.browser_window = browser_window
         super(BrowserPage, self).__init__(profile)
 
+        self.fullScreenRequested.connect(self.fullscreen_requested)
+
     def acceptNavigationRequest(self, url, navtype, isMainFrame):
         # isMainFrame is false for a link in an iframe.
         # navtype is something like QWebEnginePage.NavigationTypeLinkClicked:
@@ -272,6 +276,13 @@ class BrowserPage(QWebEnginePage):
             return False
 
         return True
+
+    def fullscreen_requested(self, request):
+        request.accept()
+        if request.toggleOn():
+            self.browser_window.showFullScreen()
+        else:
+            self.browser_window.showNormal()
 
 class BrowserWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -464,6 +475,8 @@ class BrowserWindow(QMainWindow):
         QShortcut("Alt+Left", self, activated=self.go_back)
         QShortcut("Alt+Right", self, activated=self.go_forward)
 
+        QShortcut("Esc", self, activated=self.unfullscreen)
+
     def eventFilter(self, object, event):
         '''Handle button presses in the tab bar'''
 
@@ -644,6 +657,14 @@ class BrowserWindow(QMainWindow):
     def unzoom(self):
         if 'unzoom' in dir(self.browserviews[self.active_tab]):
             self.browserviews[self.active_tab].unzoom()
+
+    def unfullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+
+            # Some pages, like YouTube, want to know when the browser comes
+            # out of fullscreen mode so it can adjust its chrome.
+            self.browserviews[self.active_tab].page().triggerAction(QWebEnginePage.ExitFullScreen)
 
     def update_buttons(self):
         # TODO: To enable/disable buttons, check e.g.
