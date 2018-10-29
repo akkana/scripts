@@ -262,6 +262,10 @@ class BrowserPage(QWebEnginePage):
 
         self.fullScreenRequested.connect(self.fullscreen_requested)
 
+    # Override all the chatty JS warnings:
+    def javaScriptConsoleMessage(level, message, lineNumber, sourceID):
+        pass
+
     def acceptNavigationRequest(self, url, navtype, isMainFrame):
         # isMainFrame is false for a link in an iframe.
         # navtype is something like QWebEnginePage.NavigationTypeLinkClicked:
@@ -688,33 +692,33 @@ class BrowserWindow(QMainWindow):
     def reload(self):
         self.browserviews[self.active_tab].reload()
 
-#
-# PyQt is super crashy. Any little error, like an extra argument in a slot,
-# causes it to kill Python with a core dump.
-# Setting sys.excepthook works around this behavior, and execution continues.
-#
-def excepthook(excType=None, excValue=None, tracebackobj=None, *,
-               message=None, version_tag=None, parent=None):
-    # print("exception! excValue='%s'" % excValue)
-    # logging.critical(''.join(traceback.format_tb(tracebackobj)))
-    # logging.critical('{0}: {1}'.format(excType, excValue))
-    traceback.print_exception(excType, excValue, tracebackobj)
+def run_browser():
 
-sys.excepthook = excepthook
+    #
+    # PyQt is super crashy. Any little error, like an extra argument in a slot,
+    # causes it to kill Python with a core dump.
+    # Setting sys.excepthook works around this behavior,
+    # and execution continues.
+    #
+    def excepthook(excType=None, excValue=None, tracebackobj=None, *,
+                   message=None, version_tag=None, parent=None):
+        # print("exception! excValue='%s'" % excValue)
+        # logging.critical(''.join(traceback.format_tb(tracebackobj)))
+        # logging.critical('{0}: {1}'.format(excType, excValue))
+        traceback.print_exception(excType, excValue, tracebackobj)
 
-def parse_args():
-    """Parse commandline arguments."""
-    parser = argparse.ArgumentParser()
+    sys.excepthook = excepthook
 
-    parser.add_argument('-t', "--new-tab", dest="new_tab", default=False,
-                        action="store_true", help="Open URLs in a new tab")
+    def parse_args():
+        """Parse commandline arguments."""
+        parser = argparse.ArgumentParser()
 
-    parser.add_argument('url', nargs='*', help="URLs to open")
+        parser.add_argument('-t', "--new-tab", dest="new_tab", default=False,
+                            action="store_true", help="Open URLs in a new tab")
 
-    return parser.parse_args(sys.argv[1:])
+        parser.add_argument('url', nargs='*', help="URLs to open")
 
-if __name__ == '__main__':
-    args = sys.argv[1:]
+        return parser.parse_args(sys.argv[1:])
 
     def get_procname(procargs):
         '''Return the program name: either the first commandline argument,
@@ -779,3 +783,40 @@ if __name__ == '__main__':
 
     app.exec_()
 
+def run_main_quietly():
+    # Suppress stderr, because QtWebEngine, DBus etc.print so much
+    # warning chatter.
+    # https://stackoverflow.com/questions/5081657/how-do-i-prevent-a-c-shared-library-to-print-on-stdout-in-python
+    from contextlib import contextmanager
+
+    @contextmanager
+    def stderr_redirected(to=os.devnull):
+        '''
+        import os
+
+        with stderr_redirected(to=filename):
+            print("from Python")
+            os.system("echo non-Python applications are also supported")
+        '''
+        fd = sys.stderr.fileno()
+
+        def _redirect_stderr(to):
+            sys.stderr.close() # + implicit flush()
+            os.dup2(to.fileno(), fd) # fd writes to 'to' file
+            sys.stderr = os.fdopen(fd, 'w') # Python writes to fd
+
+        with os.fdopen(os.dup(fd), 'w') as old_stderr:
+            with open(to, 'w') as file:
+                _redirect_stderr(to=file)
+            try:
+                yield # allow code to be run with the redirected stderr
+            finally:
+                _redirect_stderr(to=old_stderr) # restore stdout.
+                                                # buffering and flags such as
+                                                # CLOEXEC may be different
+
+    with stderr_redirected():
+        run_browser()
+
+if __name__ == '__main__':
+    run_main_quietly()

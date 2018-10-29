@@ -96,6 +96,13 @@ print >>sys.stderr, "foo"
 # and in python3:
 print('foo', file=sys.stderr)
 
+# Suppress stdout and stderr chatter:
+sys.stdout = open(os.devnull, "w")
+sys.stderr = open(os.devnull, "w")
+# This only works for chatter that comes from Python libraries, though.
+# For an example that can suppress underlying C libraries,
+# see run_main_quietly() at the end of quickbrowse.py.
+
 # Prettyprinting
 import pprint
 pprint.pprint(obj)
