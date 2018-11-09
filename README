@@ -166,7 +166,11 @@ gquickbrowse:
     Minimal browser: an older version of quickbrowse written in
     python2-webkit-GTK, now orphaned and no longer available on newer
     releases. If you don't pass an argument but there's anything in
-    the X selection when you run it, it will browse to that URL first.
+    the X selection when you run it, it will use that as initial argument.
+
+grebook.sh:
+    A shell script adapted from one by mosh on Stack Exchange
+    to grep in un-DRMed epub (and presumably also mobi) ebooks.
 
 htmlmail.py:
     Compose and send HTML mail, including image attachments.
