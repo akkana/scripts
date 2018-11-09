@@ -901,9 +901,15 @@ $ python -m cProfile -o profiling_results myscript.py
 >>> stats.sort_stats("tottime")
 >>> stats.print_stats(15)
 
-or, from the cmdline:
+# or, from the cmdline:
 
 python -c 'import pstats; stats = pstats.Stats("profiling_results"); stats.sort_stats("tottime"); stats.print_stats(15)'
+
+# Or,
+
+import sys, pstats
+p = pstats.Stats(filename)
+p.sort_stats('time').print_stats(30)
 
 ################################################################
 # PyEphem
