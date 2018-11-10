@@ -3,7 +3,9 @@
 # Decode From and Subject lines spammers encode in other charsets
 # to try to hide them from spam filters. (RFC 2047 encoding.)
 # Use in conjunction with programs like procmail or spamassassin,
-# instead of something like formail
+# instead of something like formail.
+
+from __future__ import print_function
 
 import sys, os
 import email
@@ -53,13 +55,13 @@ def decode_and_split(piece, header_wanted):
         pieces = email.utils.parseaddr(thispiece)
         if pieces[0] or pieces[1]:
             if Debug:
-                print "formataddr says: '%s'" % \
-                    email.utils.formataddr(map(decode_piece, pieces)).strip()
+                print("formataddr says: '%s'" % \
+                      email.utils.formataddr(map(decode_piece, pieces)).strip())
             return header_wanted + ' ' + \
                 email.utils.formataddr(map(decode_piece,
                                            pieces)).strip()
         else:
-            print >>sys.stderr, "parseaddr failed on", thispiece
+            print("parseaddr failed on", thispiece, file=sys.stderr)
 
     return thispiece
 
@@ -68,7 +70,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         fil = sys.stdin
     else:
         fil = open(filename)
-    print "All?", all
+    print("All?", all)
 
     if not casematch:
         header_wanted = header_wanted.lower()
@@ -84,7 +86,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
             testline = line.lower()
 
         if Debug:
-            print "line:", line
+            print("line:", line)
 
         # Are we looking for continuation lines?
         if output:
@@ -97,7 +99,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
 
             # It's not a continuation line. Print output, and either
             # exit, or clear output and go back to looking for headers.
-            print output
+            print(output)
             if all:
                 output = ''
             else:
@@ -108,28 +110,28 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         # build up our string:
         for header_wanted in headers:
             # if Debug:
-            #     print "=== looking for", header_wanted
+            #     print("=== looking for", header_wanted)
 
             if testline.startswith(header_wanted):
                 found_something = True
                 if Debug:
-                    print "\nFound something:", line
+                    print("\nFound something:", line)
                 output = decode_and_split(line.strip(), header_wanted)
                 break    # No need to look for other headers on this line
 
     if output:
         if Debug:
-            print "final output:",
-        print output.strip()
+            print("final output:", end='')
+        print(output.strip())
 
     # If we get here, we never matched a header,
     # or ended with a continuation line.
     if not found_something:
-        print "No such header", header_wanted, "in", filename
+        print("No such header", header_wanted, "in", filename)
         return
 
 if sys.argv[1] == '-h' or sys.argv[1] == '--help':
-    print Usage
+    print(Usage)
     sys.exit(1)
 
 # A -a argument means don't stop at the first header,
