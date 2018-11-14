@@ -172,6 +172,10 @@ grebook.sh:
     A shell script adapted from one by mosh on Stack Exchange
     to grep in un-DRMed epub (and presumably also mobi) ebooks.
 
+grebook.py:
+    A Python version of grebook, mainly useful to show how to implement
+    a multi-stage command pipeline in Python.
+
 htmlmail.py:
     Compose and send HTML mail, including image attachments.
 
