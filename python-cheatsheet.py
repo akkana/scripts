@@ -571,14 +571,34 @@ r = session.get(url)
 # with both 2 and 3, use pipes.quote().
 
 ########################################################
-# Read lines from a subprocess as they appear:
+# subprocess
 ########################################################
+# Read lines from a subprocess as they appear:
 import subprocess
 
 proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
 while True:
     line = proc.stdout.readline()
     print("line: %s" % line)
+
+# Chain a multi-command pipeline:
+p1 = subprocess.Popen([args1],
+                      shell=False, stdout=subprocess.PIPE)
+
+p2 = subprocess.Popen([args2],
+                      shell=False, stdin=p1.stdout, stdout=subprocess.PIPE)
+p1.stdout.close()
+
+p3 = subprocess.Popen([args3],
+                      shell=False, stdin=p2.stdout, stdout=subprocess.PIPE)
+p2.stdout.close()
+
+p4 = subprocess.Popen([args4].
+                      shell=False, stdin=p3.stdout, stdout=subprocess.PIPE)
+p3.stdout.close()
+
+output = p4.communicate()[0]
+
 
 ########################################################
 # CGI: how to tell if something is run as a CGI or locally
