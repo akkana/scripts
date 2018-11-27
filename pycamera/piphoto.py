@@ -16,6 +16,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+# 
+
 #
 # Take a still photo. If a USB camera is attached (/dev/video0), use it,
 # else if a PiCam is attached (/dev/fb0), use that instead,
@@ -49,6 +51,16 @@ class PiCamera:
                 print "Using picamera module"
             else:
                 print "Using raspistill"
+
+    def camera_present(self):
+        '''Is there a Pi camera module plugged in and accessible?
+        '''
+        camdet = subprocess.check_output(["vcgencmd","get_camera"])
+        # Returns something like: supported=0 detected=0
+        # Strip the newline and check only the last character:
+        if int(camdet.strip()[-1]):
+            return True
+        return False
 
     def take_still(self, outfile='/tmp/still.jpg',
                    res=[640, 480], format=None):
