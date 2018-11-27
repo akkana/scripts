@@ -82,12 +82,13 @@ class KeyReader :
             inp, outp, err = select.select([sys.stdin], [], [])
         try:
             return sys.stdin.read()
-        except IOError as e:
-            # print("IOError:", e)
+        except (IOError, TypeError) as e:
             return None
 
 def main():
-    keyreader = KeyReader(echo=False, block=True)
+    import time
+    do_block = True
+    keyreader = KeyReader(echo=False, block=do_block)
     while True:
         key = keyreader.getch()
         if key == 'q':
@@ -97,6 +98,9 @@ def main():
             print("-%s-" % key)
         else:
             print("None")
+
+        if not do_block:
+            time.sleep(.2)
 
 if __name__ == '__main__':
     main()
