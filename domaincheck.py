@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 
 import sys
-import whois
+
+try:
+    import whois
     # python-whois from pypi, not whois from pypi or python-whois from debian
     # https://bitbucket.org/richardpenman/pywhois
+except:
+    print("Couldn't import whois. Try: pip3 install python-whois")
+    sys.exit(1)
+
 import datetime
 from dateutil.relativedelta import relativedelta
 
