@@ -39,13 +39,27 @@ def get_brightness():
     print("No Brightness line in xrandr --verbose!")
     sys.exit(1)
 
-def set_brightness(new_brightness):
+def set_brightness(new_brightness, adjust_gamma=True):
+    '''Set the brightness.
+       If adjust_gamma is True, then adjust the color balance
+       to get redder as the screen gets dimmer, for evening use.
+    '''
     args = [ XRANDR ]
+
     if monitor:
         args.append("--output")
         args.append(monitor)
+
     args.append("--brightness")
     args.append(str(new_brightness))
+
+    if adjust_gamma:
+        red = 1.0
+        blue = new_brightness
+        green = (red + blue) / 2
+        args.append("--gamma")
+        args.append('%0.2f:%0.2f:%0.2f' % (red, green, blue))
+
     subprocess.call(args)
 
 def Usage():
