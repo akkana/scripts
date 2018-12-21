@@ -224,6 +224,9 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+mnist.py:
+    A simple example of a neural net using keras/tensorflow.
+
 moonpos:
     Predict when the moon (or another body) will be at a specified
     altitude and azimuth during a specified time window
