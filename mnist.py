@@ -109,11 +109,17 @@ else:
 x_train_images = x_train.reshape(-1, 28, 28)
 
 def key_press(e):
-    '''Exit on ctrl-q. q without ctrl dismisses this plot and shows
+    '''Exit on ctrl-q. Any other key dismisses this plot and shows
        the next one.
     '''
-    if e.key == 'ctrl+q':
+    if e.key == 'ctrl+q' or e.key == 'q':
         sys.exit(0)
+
+    # Matplotlib has no way to distinguish printable keys
+    # from unprintables like Shift. Try to guess by taking
+    # only keys with one-letter strings:
+    if len(e.key) == 1:
+        plt.close()
 
 # Loop: choose random images from the dataset.
 # Show the image and a bar chart of what the model predicts.
