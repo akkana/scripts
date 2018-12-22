@@ -18,6 +18,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
+from __future__ import print_function
+
 class WebCam:
 
     def __init__(self, verbose=False):
@@ -35,10 +37,10 @@ class WebCam:
         '''
         # Do we have a USB camera for which we can use fswebcam?
         if not self.has_camera():
-            raise SystemError, "Can't find either a USB camera or a Pi camera!"
+            raise SystemError("Can't find either a USB camera or a Pi camera!")
 
         if self.verbose:
-            print "Taking photo with fswebcam ..."
+            print("Taking photo with fswebcam ...")
 
         if format:
             format = format.lower()
@@ -67,7 +69,7 @@ class WebCam:
                 # the png compression level makes almost no difference
             args.append(outfile)
             if self.verbose:
-                print "Calling check_output", args
+                print("Calling check_output", args)
             image_data = StringIO.StringIO()
             image_data.write(subprocess.check_output(args))
             image_data.seek(0)
@@ -75,10 +77,10 @@ class WebCam:
         else:
             args.append(outfile)
             if self.verbose:
-                print "Calling", args
+                print("Calling", args)
             rv = subprocess.call(args)
 
-        print "fswebcam failed! Error code %d" % rv
+        print("fswebcam failed! Error code %d" % rv)
 
     def take_video(still=True, outfile='/tmp/still.jpg',
                             seconds=10, format=None):
@@ -94,20 +96,20 @@ class WebCam:
         # so check whether the target file already exists.
         if os.path.exists(outfile):
             if self.verbose:
-                print outfile, "already exists. Removing it!"
+                print(outfile, "already exists. Removing it!")
             os.unlink(outfile)
 
         args = ['avconv', '-f', 'video4linux2', '-i', '/dev/video0',
                    '-s', '%dx%d' % tuple(res), '-t', str(seconds),
                    outfile]
         if self.verbose:
-            print args
+            print(args)
         rv = subprocess.call(args)
 
 
         if not rv:
             return
 
-        print "avconv failed! Error code %d" % rv
+        print("avconv failed! Error code %d" % rv)
 
 

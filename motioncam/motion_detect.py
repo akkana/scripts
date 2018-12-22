@@ -6,7 +6,7 @@
 # Uses code originally from brainflakes in this thread:
 # www.raspberrypi.org/phpBB3/viewtopic.php?f=43&t=45235
 
-# Copyright (C) 2014 Akkana Peck <akkana@shallowsky.com>
+# Copyright (C) 2014-2018 Akkana Peck <akkana@shallowsky.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+from __future__ import print_function
 
 import os, sys
 import time
@@ -57,9 +59,10 @@ class MotionDetector:
                  ........
                  ........
 
-               "." is a street or a house,
-               "X" are trees which move like crazy when the wind is blowing,
-               to prevent constant photos, your setting might look like this:
+               "." is something static like a street, fence, house.
+               "X" are trees which move like crazy when the wind is blowing.
+               To prevent the blowing trees from triggering motion alerts,
+               your setting might look like this:
 
                testBorders = [ [[1,50],[1,75]], [[51,100],[26,75]] ]
                area y=1 to 25 not scanned in x=51 to 100
@@ -117,7 +120,7 @@ class MotionDetector:
             if len(full_res) == 2:
                 self.full_res = full_res
             else:
-                self.full_res = map(int, full_res.split('x'))
+                self.full_res = list(map(int, full_res.split('x')))
         else:
             self.full_res = None
 
@@ -127,19 +130,19 @@ class MotionDetector:
         # for the regular low-res test images vs. the high-res snaps.
         cams = pycamera.find_cameras(self.verbose)
         if not cams or len(cams) < 1:
-            print "No cameras available"
+            print("No cameras available")
             sys.exit(0)
         if self.verbose:
-            print "Cameras available:"
+            print("Cameras available:")
             for cam in cams:
-                print ' ', str(cam.__class__)
+                print(' ', str(cam.__class__))
 
         self.hicam = cams[0]
         self.locam = cams[-1]
         if self.verbose:
-            print "High-res camera:", str(self.hicam.__class__)
+            print("High-res camera:", str(self.hicam.__class__))
             if self.sensitivity:
-                print " Low-res camera:", str(self.locam.__class__)
+                print(" Low-res camera:", str(self.locam.__class__))
 
         # Find a crop rectangle that includes all the test borders.
         # XXX Should move crop functionality to piphoto.py
@@ -170,7 +173,7 @@ class MotionDetector:
                                       res=full_res, format='jpg')
                 im = Image.open(tmpfile)
                 self.full_res = im.size
-                print "Using full resolution of %d x %d" % self.full_res
+                print("Using full resolution of %d x %d" % self.full_res)
                 img_data = None
                 im = None
                 convX = self.full_res[0] / self.test_res[0]
@@ -179,19 +182,19 @@ class MotionDetector:
                                              (bottom-top)*convY,
                                              left*convX, top*convY)
                 if self.verbose:
-                    print "Cropping to test borders", self.crop
+                    print("Cropping to test borders", self.crop)
             else:
-                print "Not cropping: problem finding borders of test area:", \
-                    left, right, top, bottom
+                print("Not cropping: problem finding borders of test area:", \
+                    left, right, top, bottom)
                 self.crop = False
         else:
             self.crop = crop    # Should be either False, or a specifier
             if self.verbose:
                 if self.crop:
-                    print "Cropping to", self.crop
+                    print("Cropping to", self.crop)
                 else:
-                    print "Not cropping"
-                print
+                    print("Not cropping")
+                print()
 
         # Use a temp file, or keep data in memory?
         # The gphoto class has no way yet to save to memory,
@@ -205,7 +208,7 @@ class MotionDetector:
         if self.pir or self.rangefinder:
             import RPi.GPIO as GPIO
             if self.verbose:
-                print "Cleaning up GPIO"
+                print("Cleaning up GPIO")
             GPIO.cleanup()
 
     def loop(self, secs=1):
@@ -226,7 +229,7 @@ class MotionDetector:
            whether there's anything worth taking a picture of.
         '''
         if self.verbose:
-            print ""    # Blank line so we can tell when each step starts
+            print("")    # Blank line so we can tell when each step starts
         if self.sensitivity:
             if self.use_tmp_file:
                 tmpfile = "/tmp/still.jpg"
@@ -238,7 +241,7 @@ class MotionDetector:
                 im = Image.open(img_data)
 
             different, debugimg = self.compare_images(im)
-            print "Different?", different
+            print("Different?", different)
 
             if img_data:
                 img_data.close()
@@ -248,10 +251,10 @@ class MotionDetector:
                 return
 
         if self.rangefinder:
-            print "It's different. Checking the rangefinder ..."
+            print("It's different. Checking the rangefinder ...")
             dist = self.rangefinder.average_distance_in(samples=5)
             if self.verbose:
-                print "Distance:", dist
+                print("Distance:", dist)
                 sys.stdout.flush()
             # Use a range limit of 100 inches -- the rangefinder
             # can't reliably see distances much greater than that anyway.
@@ -260,7 +263,7 @@ class MotionDetector:
                 return
 
         if self.pir:
-            print "It's different. Checking the PIR ..."
+            print("It's different. Checking the PIR ...")
             if not self.pir.poll():
                 return
 
@@ -286,7 +289,7 @@ class MotionDetector:
         # But check for that every time, since the network might go down.
         snapdir = self.get_outdir()
         if not snapdir:
-            print "Not snapping full resolution, couldn't get output dir"
+            print("Not snapping full resolution, couldn't get output dir")
             return None
 
         now = datetime.datetime.now()
@@ -295,6 +298,43 @@ class MotionDetector:
              now.year, now.month, now.day,
              now.hour, now.minute, now.second)
         return os.path.join(snapdir, snapfile)
+
+    def crop_photo(self, filename=None, image_data=None):
+        '''Crop an image in a filename, or from memory.
+           Crop to self.crop.
+           Return image data.
+        '''
+        try:
+            if (filename):
+                p = subprocess.Popen(["/usr/bin/jpegtran",
+                                      "-crop", self.crop,
+                                      filename],
+                                     shell=False,
+                                     stdout=subprocess.PIPE)
+                return p.communicate()[0]
+
+            if not image_data:
+                raise(RuntimeError("Nothing to crop!"))
+
+            # Crop image_data in memory.
+            p = subprocess.Popen(['/usr/bin/jpegtran',
+                                  '-crop', self.crop],
+                                 shell=False,
+                                 stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE)
+
+            # Better to use communicate() than write()
+            img_data = p.communicate(input=image_data)[0]
+            # Or use img_data.read() instead of getvalue --
+            # not clear if there's any efficiency difference since
+            # we have to keep the whole string in mem either way.
+            p.stdin.close()
+            return img_data
+
+        except RuntimeError:
+            print("Couldn't run jpegtran."
+                  " Maybe apt-get install libjpeg-turbo-progs")
+            sys.exit(1)
 
     def snap_full_res(self):
         # XXX May want to save the first image with a fileroot of "first".
@@ -307,44 +347,27 @@ class MotionDetector:
             # jpegtran can only write to stdout so we'll have to
             # write it to the file ourselves.
             if self.verbose:
-                print "Cropping"
+                print("Cropping")
             if self.use_tmp_file:
                 tmpfile = "/tmp/still.jpg"
                 img_data = self.hicam.take_still(outfile=tmpfile,
                                                  res=self.full_res,
                                                  format='jpg')
-                p = subprocess.Popen(["/usr/bin/jpegtran",
-                                      "-crop", self.crop,
-                                      tmpfile],
-                                     shell=False,
-                                     stdout=subprocess.PIPE)
-                img_data = p.communicate()[0]
+                img_data = self.crop_photo(filename=tmpfile)
             else:
                 img_data = self.hicam.take_still(outfile='-',
                                                  res=self.full_res,
                                                  format='jpg')
-                # img_data is a StringIO instance.
-                # But Popen can't take a StringIO as input;
-                # instead, have to write the data into a pipe.
-                p = subprocess.Popen(['/usr/bin/jpegtran',
-                                      '-crop', self.crop],
-                                     shell=False,
-                                     stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE)
-                # Better to use communicate() than write()
-                img_data = p.communicate(input=img_data.getvalue())[0]
-                # Or use img_data.read() instead of getvalue --
-                # not clear if there's any efficiency difference since
-                # we have to keep the whole string in mem either way.
-                p.stdin.close()
-            snapout = open(snappath, 'w')
+                img_data = self.crop_photo(image_data=img_data.getvalue())
+
+            snapout = open(snappath, 'wb')
             snapout.write(img_data)
             snapout.close()
             p = None
-            print "Saved high-res cropped still", snappath
+            print("Saved high-res cropped still", snappath)
         else:
             self.hicam.take_still(outfile=snappath, res=self.full_res)
-            print "Saving high-res to", snappath
+            print("Saving high-res to", snappath)
 
         sys.stdout.flush()
 
@@ -384,8 +407,8 @@ class MotionDetector:
 
         changed_pixels = 0
         for piece in self.test_borders:
-            for x in xrange(piece[0][0]-1, piece[0][1]):
-                for y in xrange(piece[1][0]-1, piece[1][1]):
+            for x in range(piece[0][0]-1, piece[0][1]):
+                for y in range(piece[1][0]-1, piece[1][1]):
                     # Just check green channel as it's the highest quality
                     pixdiff = abs(bufnew[x,y][1] - self.bufold[x,y][1])
                     if pixdiff > threshold:
@@ -399,14 +422,14 @@ class MotionDetector:
             # Draw blue borders around the test areas no matter what,
             # and add white borders if something has changed.
             for piece in self.test_borders:
-                for x in xrange(piece[0][0]-1, piece[0][1]):
+                for x in range(piece[0][0]-1, piece[0][1]):
                     debug_buf[x, piece[1][0]-1] = (0, 0, 255)
                     debug_buf[x, piece[1][1]-1] = (0, 0, 255)
                     if changed:
                         if piece[1][0] > 1:
                             debug_buf[x, piece[1][0]-2] = (255, 255, 255)
                             debug_buf[x, piece[1][1]] = (255, 255, 255)
-                for y in xrange(piece[1][0]-1, piece[1][1]):
+                for y in range(piece[1][0]-1, piece[1][1]):
                     debug_buf[piece[0][0]-1, y] = (0, 0, 255)
                     debug_buf[piece[0][1]-1, y] = (0, 0, 255)
                     if changed:
@@ -417,15 +440,15 @@ class MotionDetector:
         self.bufold = bufnew
 
         if changed:
-            print "=====================", changed_pixels, "pixels changed"
+            print("=====================", changed_pixels, "pixels changed")
 
             if self.save_debug_image:
-                print "Saving debug image to", self.get_snap_path("debug")
+                print("Saving debug image to", self.get_snap_path("debug"))
                 debugimage.save(self.get_snap_path("debug"))
 
         elif self.verbose:
-            print changed_pixels, "pixels changed, not enough\t",
-            print str(datetime.datetime.now())
+            print(changed_pixels, "pixels changed, not enough\t", end=' ')
+            print(str(datetime.datetime.now()))
 
         return changed, debugimage
 
@@ -439,7 +462,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="""Monitor a camera and snap photos when something has changed.
 
-Copyright 2014 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
+Copyright 2014-2018 by Akkana Peck; share and enjoy under the GPL v2 or later.""",
                          formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument("-s", "--sensitivity", type=int,
@@ -489,36 +512,36 @@ Assumes pins 23 for trigger, 24 for echo.""")
     parser.add_argument("remotedir", nargs='?')
 
     args = parser.parse_args()
-    print args
-    print
-    print "Crop:", args.crop
+    print(args)
+    print()
+    print("Crop:", args.crop)
 
     def resparse(res_str, default_res=None):
         if not res_str:
             return default_res
         try:
-            parsed_res = map(int, res_str.split('x'))
+            parsed_res = list(map(int, res_str.split('x')))
         except ValueError:
-            print res_str, ": Please specify resolution as WxH"
+            print(res_str, ": Please specify resolution as WxH")
             sys.exit(1)
         if len(parsed_res) != 2:
-            print "Please specify resolution as WxH"
+            print("Please specify resolution as WxH")
             sys.exit(1)
         return parsed_res
 
     test_res = resparse(args.resolution, [320, 240])
     if args.rangefinder:
-        print "Using a rangefinder on pins 23 and 24 instead of test image"
+        print("Using a rangefinder on pins 23 and 24 instead of test image")
     elif args.pir:
-        print "Using pir sensor on pin %d instead of test image" % args.pir
+        print("Using pir sensor on pin %d instead of test image" % args.pir)
     else:
-        print "Using test resolution of", test_res
+        print("Using test resolution of", test_res)
 
     full_res = resparse(args.fullres, None)
     if full_res:
-        print "Saving stills using full resolution of", full_res
+        print("Saving stills using full resolution of", full_res)
     else:
-        print "Will try to use full resolution of camera for saved stills"
+        print("Will try to use full resolution of camera for saved stills")
 
     if args.borders:
         test_borders = []
@@ -527,11 +550,11 @@ Assumes pins 23 for trigger, 24 for echo.""")
         for b in border_list:
             match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', b)
             if not match:
-                print "Couldn't parse", b, ": please specify borders as WxH+X+Y"
+                print("Couldn't parse", b, ": please specify borders as WxH+X+Y")
                 sys.exit(1)
-            match = map(int, match.groups())
+            match = list(map(int, match.groups()))
             if len(match) != 4:
-                print "Need four items, WxH+X+Y, in", b
+                print("Need four items, WxH+X+Y, in", b)
                 sys.exit(1)
             # Now match is (w, h, x, y).
             # We need to turn that into [[x0, x1], [y0, y1]].
@@ -539,35 +562,35 @@ Assumes pins 23 for trigger, 24 for echo.""")
             # XXX code uses 1 as its array boundary. Fix this!
             test_borders.append([[match[2], match[2]+match[0]],
                                  [match[3], match[3]+match[1]]])
-        print "Using test borders:", test_borders
+        print("Using test borders:", test_borders)
     else:
         # test_borders = [ [ [60, 200], [125, 190] ] ]
         test_borders = None
         if args.verbose:
-            print "No test region, using full image"
+            print("No test region, using full image")
 
     # If a crop region is specified, make sure it at least parses.
-    print "args.crop is", args.crop
+    print("args.crop is", args.crop)
     if args.crop == None:
         args.crop = '-'
     elif args.crop and args.crop != '-':
         match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', args.crop)
         if not match:
-            print "Crop %s must be in format WxH[+X+Y], or just -" % args.crop
+            print("Crop %s must be in format WxH[+X+Y], or just -" % args.crop)
             sys.exit(1)
     # else it's False, meaning don't crop
 
     if args.verbose:
-        print
-        print "Parameters:"
+        print()
+        print("Parameters:")
         for param in ('sensitivity', 'threshold', 'resolution', 'fullres',
                       'pir',
                       'borders', 'crop', 'verbose', 'localdir', 'remotedir'):
             if vars(args)[param]:
-                print '  %s: %s' % (param, vars(args)[param])
+                print('  %s: %s' % (param, vars(args)[param]))
             else:
-                print '  %s not specified' % param
-        print
+                print('  %s not specified' % param)
+        print()
 
     md = MotionDetector(test_res=test_res,
                         pir=args.pir, rangefinder=args.rangefinder,
@@ -582,5 +605,5 @@ Assumes pins 23 for trigger, 24 for echo.""")
         md.loop(1)
 
     except KeyboardInterrupt:
-        print "Interrupt: exiting"
+        print("Interrupt: exiting")
         md.cleanup()

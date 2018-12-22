@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import os, sys
 import subprocess
 import datetime
@@ -58,27 +60,27 @@ class Gphoto :
                      "--list-config",
                      "capture=on"]
             config = subprocess.check_output(args)
-        except subprocess.CalledProcessError, e:
-            print "list-config exited with status", e.returncode
+        except subprocess.CalledProcessError as e:
+            print("list-config exited with status", e.returncode)
             config = e.output
-            print "output was: <START>",
-            print config
-            print "<END>"
+            print("output was: <START>", end=' ')
+            print(config)
+            print("<END>")
         for line in config.split('\n'):
             if line.startswith('/main/settings/capture'):
                 has_capture = True
                 break
-            else: print line, "isn't capture"
+            else: print(line, "isn't capture")
         if not has_capture:
             raise NotImplementedError
         
     def take_still(self, outfile=None, res=None, zoom=None):
         if res:
-            print "Warning: gphoto wrapper ignoring resolution", res
+            print("Warning: gphoto wrapper ignoring resolution", res)
 
         # gphoto2 can only take photos to files on the same filesystem
         # as the current working directory.
-        print
+        print()
         # So if outfile points to another filesystem, we need to
         # change directory to that filesystem.
         if outfile and outfile != '-':
@@ -86,21 +88,21 @@ class Gphoto :
                 outdir = os.path.split(outfile)[0]
                 if os.stat(outdir).st_dev != os.stat(os.getcwd()).st_dev:
                     if self.verbose:
-                        print outfile, "is not on the same filesystem as", \
-                            os.getcwd()
-                        print "Changing directory to", outdir
+                        print(outfile, "is not on the same filesystem as", \
+                            os.getcwd())
+                        print("Changing directory to", outdir)
                         os.chdir(outdir)
                         # XXX should we change back afterward?
 
             # gphoto2 will also prompt if the target file already exists,
             # so we have to rename or remove it.
-            print "Checking whether", outfile, "exists already"
+            print("Checking whether", outfile, "exists already")
             if os.path.exists(outfile):
                 if self.verbose:
-                    print "Renaming", outfile, "to", outfile + ".bak"
+                    print("Renaming", outfile, "to", outfile + ".bak")
                 os.rename(outfile, outfile + ".bak")
         else:
-            print "Not checking, outfile =", outfile
+            print("Not checking, outfile =", outfile)
 
         if not outfile:
             now = datetime.datetime.now()
@@ -109,7 +111,7 @@ class Gphoto :
             # gphoto2 can handle date formatting, but in that case
             # we'd have no idea what the actual filename was
             # so we couldn't do anything with it later.
-        print "outfile is now", outfile
+        print("outfile is now", outfile)
 
         args = [ "/usr/bin/gphoto2", "--set-config", "syncdatetime=1",
                  "--set-config", "capturetarget=sdram" ]
@@ -123,14 +125,14 @@ class Gphoto :
         args.append(outfile)
 
         if self.verbose:
-            print "Calling:", args
+            print("Calling:", args)
 
         rv = subprocess.call(args)
 
 if __name__ == '__main__':
     gphoto = Gphoto(verbose=True)
     if not gphoto.has_camera():
-        print "No camera connected!"
+        print("No camera connected!")
         sys.exit(0)
     gphoto.take_still()
     gphoto.take_still(zoom=10)

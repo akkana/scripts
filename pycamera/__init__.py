@@ -1,7 +1,10 @@
+#!/usr/bin/env python
+
 # Copyright 2014 by Akkana Peck: share and enjoy under the GPL v2 or later.
 
 '''picamera: find and use cameras of various types.
-   A pyphoto object will have the following methods:
+
+   A pycamera object will have the following methods:
    __init__(verbose)    # Set verbose to True for chatter on stdout
    take_still(outfile=None)
                         # If outfile is not specified, a name will be
@@ -29,7 +32,7 @@ def has_picamera():
     # but the Pi doesn't seem to have it unless a pi cam is connected.
     return os.uname()[4].startswith("arm") and os.path.exists('/dev/fb0')
 
-import gphoto
+from . import gphoto
 def has_gphoto_camera():
     return gphoto.has_camera()
 
@@ -45,11 +48,11 @@ def find_cameras(verbose=False):
         cameras.append(gphoto.Gphoto(verbose=verbose))
 
     if has_webcamera():
-        import webcam
+        from . import webcam
         cameras.append(webcam.WebCam(verbose=verbose))
 
     if has_picamera():
-        import piphoto
+        from . import piphoto
         cameras.append(piphoto.PiCamera(verbose=verbose))
 
     return cameras

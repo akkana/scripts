@@ -16,18 +16,18 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-# 
-
 #
 # Take a still photo. If a USB camera is attached (/dev/video0), use it,
 # else if a PiCam is attached (/dev/fb0), use that instead,
 # else throw an exception.
 #
 
+from __future__ import print_function
+
 import os, sys
 import subprocess
 import time
-import StringIO
+# import StringIo
 import io
 from PIL import Image
 
@@ -48,9 +48,9 @@ class PiCamera:
         self.use_picamera = use_picamera
         if self.verbose:
             if use_picamera:
-                print "Using picamera module"
+                print("Using picamera module")
             else:
-                print "Using raspistill"
+                print("Using raspistill")
 
     def camera_present(self):
         '''Is there a Pi camera module plugged in and accessible?
@@ -76,10 +76,9 @@ class PiCamera:
            and return the buffer in a format suitable for PIL.
         '''
         if not os.path.exists('/usr/bin/raspistill'):
-            raise SystemError, \
-                "Neither python-picamera nor raspistill is installed"
+            raise SystemError("Neither python-picamera nor raspistill is installed")
         if self.verbose:
-            print "Taking photo with raspistill"
+            print("Taking photo with raspistill")
         args = ['/usr/bin/raspistill', '-n', '-o', outfile]
         if res:
             args.append('-w')
@@ -91,7 +90,7 @@ class PiCamera:
         #     args.append('-sh')
         #     args.append('100')
         if self.verbose:
-            print "Calling:", args
+            print("Calling:", args)
 
         # If the outfile is specified as -, we want raw data.
         # PIL expects bmp data, apparently.
@@ -99,21 +98,21 @@ class PiCamera:
             args.append('-e')
             if format:
                 if self.verbose:
-                    print "Using", format, "format"
+                    print("Using", format, "format")
                 args.append(format)
             else:
                 if self.verbose:
-                    print "No format specified, falling back to BMP"
+                    print("No format specified, falling back to BMP")
                 args.append('bmp')   # should compare png performance
 
-            image_data = StringIO.StringIO()
+            image_data = io.StringIO()
             image_data.write(subprocess.check_output(args))
             image_data.seek(0)
             return image_data
 
         rv = subprocess.call(args)
         if rv:
-            raise SystemError, "raspistill exited with %d" % rv
+            raise SystemError("raspistill exited with %d" % rv)
         return
 
     def take_still_picamera(self, outfile='/tmp/still.jpg',
@@ -123,10 +122,15 @@ class PiCamera:
            Does not support outfile = '-'.
         '''
         if self.verbose:
-            print "Taking photo with picamera module"
+            print("Res:", res)
+            if res:
+                res_str = "%dx%d" % tuple(res)
+            else:
+                res_str = "(unknown res)"
+            print("Taking %s photo with picamera module" % res_str)
 
-        with picamera.PiCamera() as camera:
-            camera.resolution = res
+        with picamera.PiCamera(resolution=res) as camera:
+            # camera.resolution = res
             camera.start_preview()
             # Camera warm-up time
             time.sleep(2)
@@ -146,7 +150,7 @@ class PiCamera:
                    res=[640, 480], format=None):
         '''This routine is untested and probably broken.'''
         if self.verbose:
-            print "Taking photo with picamera module"
+            print("Taking photo with picamera module")
         with self.camera as camera:
             camera.resolution = res
             camera.start_preview()
@@ -164,17 +168,16 @@ class PiCamera:
                    res=[640, 480], format=None):
         '''This routine is untested and probably broken.'''
         if not self.has_camera():
-            raise SystemError, "Can't find either a USB camera or a Pi camera!"
+            raise SystemError("Can't find either a USB camera or a Pi camera!")
 
         if not os.path.exists('/usr/bin/raspivid'):
-            raise SystemError, \
-                "Neither python-picamera nor raspivid is installed"
+            raise SystemError("Neither python-picamera nor raspivid is installed")
         if self.verbose:
-            print "Taking video with raspivid"
+            print("Taking video with raspivid")
         rv = subprocess.call(['raspivid', '-o', filename,
                               '-t', '10000'])
         if rv:
-            raise SystemError, "raspivid exited with %d" % rv
+            raise SystemError("raspivid exited with %d" % rv)
         return
 
 if __name__ == '__main__':
@@ -188,7 +191,7 @@ if __name__ == '__main__':
                          help="Take video for s seconds, instead of a still")
     (options, args) = optparser.parse_args()
 
-    print "Seconds:", options.seconds
+    print("Seconds:", options.seconds)
 
     if options.seconds:
         take_video(seconds=options.seconds, verbose=options.verbose)
