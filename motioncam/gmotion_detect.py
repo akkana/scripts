@@ -19,12 +19,24 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-import gtk, gobject, glib
+from __future__ import print_function
+
+from gi import pygtkcompat
+pygtkcompat.enable()
+pygtkcompat.enable_gtk(version='3.0')
+
+# import gtk, gobject, glib
+import gtk, glib
+
 import gc
 import os
 import sys
 from PIL import Image
-import RPi.GPIO as GPIO
+
+try:
+    import RPi.GPIO as GPIO
+except:
+    pass
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
@@ -54,7 +66,7 @@ class MotionDetectorViewer() :
 
         self.use_tmp_file = True
 
-        self.win = gtk.Window(gtk.WINDOW_TOPLEVEL)
+        self.win = gtk.Window()
         self.win.set_border_width(10)
 
         # Unfortunately delete and destroy events don't work on the RPi.
@@ -63,16 +75,29 @@ class MotionDetectorViewer() :
         self.win.connect("delete_event", self.quit)
         self.win.connect("destroy", self.quit)
 
+        vbox = gtk.VBox(spacing=3)
+        self.win.add(vbox)
+
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.set_size_request(self.width, self.height)
-        self.win.add(self.drawing_area)
+        #self.win.add(self.drawing_area)
+        vbox.pack_start(self.drawing_area)
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
                                      # gtk.gdk.POINTER_MOTION_MASK |
                                      # gtk.gdk.POINTER_MOTION_HINT_MASK |
                                      gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK )
-        self.drawing_area.connect("expose-event", self.expose_handler)
+
+        try:
+            # GTK2:
+            self.drawing_area.connect("expose-event", self.expose_handler)
+        except TypeError:
+            # Python3/GI GTK3:
+            self.drawing_area.connect('size-allocate', self.on_size_allocate)
+            self.width = self.height = 0
+            self.drawing_area.connect('draw', self.expose3)
+
         self.drawing_area.connect("button_press_event", self.button_press)
         self.drawing_area.connect("button_release_event", self.button_release)
         self.drawing_area.connect("motion_notify_event", self.drag_handler)
@@ -80,10 +105,12 @@ class MotionDetectorViewer() :
         # Just for testing, temporarily
         self.num = 0
 
-        gobject.timeout_add(self.millisecs, self.idle_handler,
-                            self.drawing_area)
+        glib.timeout_add(self.millisecs, self.idle_handler,
+                         self.drawing_area)
 
+        # GTK2: X GC
         self.gc = None
+
         self.redgc = None
         self.pixbuf = None
         self.imgwidth = None
@@ -92,7 +119,11 @@ class MotionDetectorViewer() :
         self.drag_start_x = None
         self.drag_start_y = None
 
-        self.win.show_all()
+        try:
+            self.win.show_all()
+        except:
+            print("Couldn't show window: exiting")
+            sys.exit(1)
 
         # And the motion detecting parts,
         # which are infinitely simpler than the GTK garbage:
@@ -112,17 +143,37 @@ class MotionDetectorViewer() :
     # them all optional. We don't need them anyway.
     # Also, this is sometimes called twice (or, on the Pi, not at all).
     def quit(self, widget=None, event=None):
-        print "Quitting"
-        gtk.main_quit()
+        print("Quitting")
+        # Supposedly, return True if you don't want to close the window,
+        # False if you do. In practice, neither one actually exits;
+        # they just close the window and execution continues in such
+        # a way that ctrl-C doesn't work and ctrl-\ and a core dump
+        # is the only option.
+        # return False
+
+        # On the Pi, this crashes Python and dumps core:
+        # gtk.main_quit()
+
+        # This isn't what you're supposed to do, but it's the only
+        # way I've found to actually exit without dumping core.
+        sys.exit(0)
+
+    def on_size_allocate(self, _unused, allocation):
+        self.width = allocation.width
+        self.height = allocation.height
+
+    def expose3(self, _unused, _ctx):
+        self.expose_handler(self.drawing_area, None)
 
     def expose_handler(self, widget, event):
-        #print "Expose"
-
-        if not self.gc :
-            self.gc = widget.window.new_gc()
-            self.redgc = widget.window.new_gc()
-            self.redgc.set_rgb_fg_color(gtk.gdk.Color(65535, 0, 0))
-            self.redgc.line_width = 5
+        if not self.gc:
+            try:
+                self.gc = widget.window.new_gc()
+                self.redgc = widget.window.new_gc()
+                self.redgc.set_rgb_fg_color(gtk.gdk.Color(65535, 0, 0))
+                self.redgc.line_width = 5
+            except:
+                pass
             #x, y, self.imgwidth, self.imgheight = self.get_allocation()
 
             # Have we had load_image called, but we weren't ready for it?
@@ -133,7 +184,7 @@ class MotionDetectorViewer() :
         self.show_image()
 
     def button_press(self, widget, event):
-        print "Button press for button", event.button
+        print("Button press for button", event.button)
         if event.button != 1 :
             return False
         # For some reason, button press events give float arguments
@@ -143,12 +194,12 @@ class MotionDetectorViewer() :
         return True
 
     def button_release(self, widget, event):
-        print "Button release for button", event.button
+        print("Button release for button", event.button)
         x = int(event.x)
         y = int(event.y)
         self.md.test_borders = [[[self.drag_start_x, x],
                                  [self.drag_start_y, y]]]
-        print "Reset test borders to", self.md.test_borders
+        print("Reset test borders to", self.md.test_borders)
         self.drag_start_x = None
         self.drag_start_y = None
         return True
@@ -161,15 +212,15 @@ class MotionDetectorViewer() :
            Image can be a PIL Image or a filename.
            Return True for success, False for error.
         '''
-        print "load_image", img
+        print("load_image", img)
         self.cur_img = img
         if not img:
-            print "No image to load, returning"
+            print("No image to load, returning")
             return
 
         # Is this a PIL Image? Does it have a mode attribute?
         if hasattr(img, 'mode'):
-            print "Displaying the image already in memory"
+            print("Displaying the image already in memory")
             has_alpha = img.mode == 'RGBA'
             newpb = gtk.gdk.pixbuf_new_from_data(
                 img.tobytes(),          # data
@@ -182,7 +233,7 @@ class MotionDetectorViewer() :
                 )
         # If it's not an image, assume it's a file.
         else:
-            print "Reading an image in from", img
+            print("Reading an image in from", img)
             newpb = gtk.gdk.pixbuf_new_from_file(img)
 
         # Clean up memory from any existing pixbuf.
@@ -193,9 +244,9 @@ class MotionDetectorViewer() :
         try :
             self.pixbuf = newpb
 
-        except glib.GError, e :
-            print "glib error -- couldn't load"
-            print e
+        except glib.GError as e :
+            print("glib error -- couldn't load")
+            print(e)
             self.pixbuf = None
 
         # garbage collect the old pixbuf, if any, and the one we just read in:
@@ -211,31 +262,49 @@ class MotionDetectorViewer() :
                                                 self.width, self.height)
 
     def show_image(self):
-        if not self.gc:
-            print "No GC!"
-            return
-
         if not self.pixbuf:
-            print "No pixbuf!"
+            print("No pixbuf!")
             return
 
-        self.drawing_area.window.draw_pixbuf(self.gc, self.pixbuf, 0, 0, 0, 0)
+        # GTK2?
+        if self.gc:
+            self.drawing_area.window.draw_pixbuf(self.gc, self.pixbuf,
+                                                 0, 0, 0, 0)
+            return
+
+        # GTK3: all drawing is done through a Cairo context, cr.
+        # It has to be created fresh each time.
+        cr = self.drawing_area.get_window().cairo_create()
+
+        # GTK3 pixbuf drawing seems to be almost completely undocumented.
+        # The last two args of cairo_set_source_pixbuf are the point
+        # on the canvas matching the (0, 0) point of the pixmap.
+        gtk.gdk.cairo_set_source_pixbuf(cr, self.pixbuf, 0, 0)
+
+        # Then these are the coordinates of the rectangle to draw
+        # on the canvas.
+        cr.rectangle(0, 0, self.width, self.height)
+
+        # Some examples use paint() instead of fill();
+        # I can't find any documentation explaining the difference,
+        # but using paint() adds black borders around the images.
+        cr.fill()
 
     # This is the function that actually takes and compares photos
     # every few seconds and does all the work.
     def idle_handler(self, widget):
-        print
+        print()
         changed = False
         debugimage = None
 
         if not changed:
             if self.use_tmp_file:
                 tmpfile = "/tmp/still.jpg"
-                print "Snapping to", tmpfile
+                print("Snapping to", tmpfile)
                 self.md.locam.take_still(outfile=tmpfile, res=self.test_res)
                 im = Image.open(tmpfile)
             else:   # keep it all in memory, no temp files
-                print "Snapping to memory"
+                print("Snapping to memory")
                 img_data = self.md.locam.take_still(outfile='-',
                                                     res=self.test_res)
                 im = Image.open(img_data)
@@ -244,13 +313,21 @@ class MotionDetectorViewer() :
 
         def red_frame():
             diff = 10
-            self.drawing_area.window.draw_rectangle(self.redgc, False,
-                                                    diff, diff,
-                                                    self.width-diff*2,
-                                                    self.height-diff*2)
+            if self.redgc:
+                self.drawing_area.window.draw_rectangle(self.redgc, False,
+                                                        diff, diff,
+                                                        self.width-diff*2,
+                                                        self.height-diff*2)
+            else:    # cairo way
+                cr = self.drawing_area.get_window().cairo_create()
+                cr.set_source_rgb(1., 0., 0.)
+                cr.rectangle(float(diff), float(diff),
+                             float(self.width-diff*2),
+                             float(self.height-diff*2))
+                cr.stroke()
 
         if changed:
-            print "**** They're different!"
+            print("**** They're different!")
             red_frame()
             self.md.snap_full_res()
 
@@ -272,7 +349,7 @@ if __name__ == '__main__':
     test_borders = [ [ [50, 270], [40, 200] ] ]
     localdir = os.path.expanduser('~/snapshots')
     if not os.path.exists(localdir):
-        print localdir, "doesn't exist, can't save any snapshots"
+        print(localdir, "doesn't exist, can't save any snapshots")
         sys.exit(1)
     remotedir = os.path.expanduser('~/moontrade/snapshots')
     #full_res = [3648, 2736]
@@ -292,6 +369,7 @@ if __name__ == '__main__':
     try:
         md.run()
     except KeyboardInterrupt:
-        print "Bye"
-        GPIO.cleanup()
+        print("Bye")
+        if 'GPIO' in sys.modules:
+            GPIO.cleanup()
 
