@@ -476,6 +476,10 @@ wordview:
     Convert a doc or docx file to html, and call a new firefox window on it.
     Predecessor to (and simpler than) viewmailattachments.
 
+wpnet.py:
+    A wrapper to make it easier to use wpa_cli to manage known wireless
+    networks.
+
 xbright:
     Adjust brightness of an X11 display up or down using xrandr.
 
