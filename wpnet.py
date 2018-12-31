@@ -9,6 +9,7 @@ import subprocess
 import os, sys
 import argparse
 import getpass
+import urllib.request
 import time
 
 verbose=True
@@ -121,6 +122,66 @@ def get_wireless_ifaces():
 
     return ifaces
 
+def show_browser_if_redirect():
+    """Try to fetch a test URL. If we're redirected to some other URL
+       (probably a stupid login page), pop up a browser.
+    """
+
+    # Alas, there's no universal page everyone can use.
+    # So make one on your own website, or find a trusted page,
+    # and put that URL in ~/.config/netscheme/testurl
+    testurl = None
+    testurlfile = os.path.expanduser("~/.config/netscheme/testurl")
+    if os.path.exists(testurlfile):
+        with open(testurlfile) as tufile:
+            testurl = tufile.read().strip()
+        with open(testurlfile + ".out") as tufile:
+            content_from_file = tufile.read()
+    if not testurl:
+        print("No test URL set; not checking for redirects")
+        return
+
+    content_from_web = ''
+    print("Trying to fetch test URL", testurl)
+
+    try:
+        response = urllib.request.urlopen(testurl, timeout=100)
+
+        # Were we redirected? In theory response.geturl() will tell us that,
+        # but in practice, it doesn't, so we have to fetch the content
+        # of a page and compare it to the expected value.
+        content_from_web = response.read().decode('utf-8')
+
+    # Lots of ways this can fail.
+    # e.g. ValueError, "unknown url type"
+    # or BadStatusLine: ''
+    except Exception as e:
+        print("Couldn't fetch test URL %s: probably redirected." % testurl, e)
+        content_from_web = ''
+
+    if content_from_web == content_from_file:
+        print("Looks like we're really connected -- no redirect")
+        return
+
+    print("Couldn't make a test connection -- probably redirected.")
+
+    # Don't want to run the browser as root, so de-escalate privilege.
+    # os.getuid(), os.geteuid() and psutil.uids() are all zero under sudo,
+    # but sudo helpfully leaves us an env variable we can use.
+    orig_uid = os.getenv("SUDO_UID")
+    if orig_uid:
+        print("De-escalating back to UID", orig_uid)
+        orig_uid = int(orig_uid)
+        os.setuid(orig_uid)
+
+    print("Calling quickbrowse", testurl)
+    try:
+        subprocess.call(["quickbrowse", testurl])
+    except Exception as e:
+        print("Problem starting a browser", e)
+        raise e
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-k', "--known", dest="known",
@@ -221,6 +282,7 @@ if __name__ == '__main__':
             print("Enabling network", connect_to)
         run_as_root(["wpa_cli", "enable_network", str(known_index)])
         start_dhcp(iface)
+        show_browser_if_redirect()
         sys.exit(0)
 
     # New network, hasn't been stored yet. But it is seen.
@@ -278,5 +340,8 @@ if __name__ == '__main__':
     run_as_root(["wpa_cli", "save_config"])
     if verbose:
         print("Saved configuration")
+
+    show_browser_if_redirect()
+
     sys.exit(0)
 
