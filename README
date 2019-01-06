@@ -224,6 +224,11 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+mbsyncd:
+    isync/mbsync is a good IMAP sync program, but for some bizarre reason
+    it doesn't offer a daemon mode where it syncs regularly forever.
+    So mbsyncd is a daemon wrapper for mbsync.
+
 mnist.py:
     A simple example of a neural net using keras/tensorflow.
 
