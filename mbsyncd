@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+# mbsync seems to work well but, weirdly, doesn't have a daemon mode
+# (surely 95% of users will want to run it that way?)
+# Here's a wrapper for it that forks into background
+# and runs forever, printing the time each time.
+
+from __future__ import print_function
+
+import time
+import subprocess
+import os, sys
+
+# Change this to whereever you want the log:
+logfile = "~/.mutt/mbsync.log"
+
+def Usage():
+    print("Usage: %s [seconds]" % os.path.basename(sys.argv[0]))
+    sys.exit(1)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 2:
+        Usage()
+
+    if len(sys.argv) == 2:
+        try:
+            secs = int(sys.argv[1])
+        except:
+            Usage()
+    else:
+        secs = 120
+
+    rc = os.fork()
+    if rc:
+        sys.exit(0)
+
+    logfp = open(os.path.expanduser(logfile), 'w')
+    print("mbsync daemon, ouput to %s" % logfile)
+
+    while True:
+        subprocess.call(["date"], stdout=logfp, stderr=logfp)
+
+        # mbsync suppresses its summary when stdout isn't a tty,
+        # and there's no way to request a summary.
+        # So nothing will go to the log; but if output isn't redirected,
+        # it will print its summary to the terminal every time.
+        subprocess.call(["mbsync", "-a"], stdout=logfp, stderr=logfp)
+
+        time.sleep(secs)
