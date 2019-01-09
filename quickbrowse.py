@@ -12,6 +12,8 @@ import posixpath
 import socket
 import select
 import argparse
+import tempfile
+import shutil
 
 from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
@@ -312,6 +314,18 @@ class BrowserWindow(QMainWindow):
         # print("Profile initially off the record?",
         #       self.profile.isOffTheRecord())
 
+        # "Off the record" doesn't mean much: QtWebEngine still
+        # stores cache and maybe persistent cookies.
+        # Here are some other attempts at privacy that might help a little:
+        # self.cachedir = tempfile.mkdtemp()
+        # self.profile.setCachePath(self.cachedir)
+        # self.profile.setPersistentStoragePath(self.cachedir)
+        # self.profile.setPersistentCookiesPolicy(self.profile.NoPersistentCookies);
+        # but even with all those, QtWebEngine still stores a bunch of crap in
+        # .local/share/quickbrowse/QtWebEngine/Default/
+        # But we can prevent that by lying about $HOME:
+        os.environ["HOME"] = tempfile.mkdtemp()
+
         self.init_tab_name_len = 40
 
         self.init_chrome()
@@ -565,6 +579,10 @@ class BrowserWindow(QMainWindow):
         # Clean up
         if self.cmdsockname:
             os.unlink(self.cmdsockname)
+        if os.environ["HOME"].startswith('/tmp/') and \
+           os.getenv('USER') not in os.environ["HOME"]:
+            print("Cleaning up: removing %s" % os.environ["HOME"])
+            shutil.rmtree(os.environ["HOME"])
 
     def close_tab(self, tabindex):
         self.tabwidget.removeTab(tabindex)
