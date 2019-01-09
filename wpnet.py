@@ -211,21 +211,94 @@ if __name__ == '__main__':
         known = []
 
         # Print the ones we have saved already:
-        format = "%-20s %7s   %s"
-        print(format % ("SSID", "Signal", "Known index"))
-        print(format % ("----", "------", "-----------"))
+        format = "%-20s %7s %4s  %s"
+        print(format % ("SSID", "Signal", "#", "Encryption"))
+        print(format % ("----", "------", "--", "----------"))
 
         for i in sorted(known_nets):
             if known_nets[i] in aps:
                 print(format % (known_nets[i],
-                                accesspoints[known_nets[i]]['signal'], i))
+                                accesspoints[known_nets[i]]['signal'],
+                                i,
+                                accesspoints[known_nets[i]]['flags']))
                 known.append(known_nets[i])
+
+        '''
+Sample flags:
+SSID                  Signal    #  Encryption
+----                  ------   --  ----------
+
+LAC-Wireless             -86       [WPA2-EAP-CCMP][ESS]
+Historical               -84       [WPA-PSK-TKIP][WPA2-PSK-CCMP+TKIP][ESS]
+LAC PUBLIC               -85       [ESS]
+Public-LAC               -90       [ESS]
+NMC-Main                 -79       [WPA2-PSK-CCMP][ESS]
+
+<iridum>- sudo wpa_cli scan_results                                           ~
+Selected interface 'wlp2s0'
+bssid / frequency / signal level / flags / ssid
+58:bf:ea:92:ba:c0       2437    -48     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+24:01:c7:3a:90:a0       2462    -73     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+24:01:c7:3a:a9:f0       2412    -75     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+6c:70:9f:de:4d:7c       2462    -84     [WPA-PSK-TKIP][WPA2-PSK-CCMP+TKIP][ESS]Historical
+58:bf:ea:92:ba:c2       2437    -56     [ESS]   LAC PUBLIC
+24:01:c7:3a:91:b0       2462    -64     [ESS]   Public-LAC
+24:01:c7:3a:a2:80       2412    -65     [ESS]   Public-LAC
+24:01:c7:3a:90:a2       2462    -70     [ESS]   LAC PUBLIC
+24:01:c7:3a:a4:60       2462    -74     [ESS]   Public-LAC
+24:01:c7:3a:a9:f2       2412    -76     [ESS]   LAC PUBLIC
+6c:99:89:0d:43:80       2412    -84     [ESS]   Public-LAC
+24:01:c7:3a:a4:52       2437    -88     [ESS]   LAC PUBLIC
+24:01:c7:3a:a4:50       2437    -87     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+64:ae:0c:1e:fd:32       2412    -87     [ESS]   LAC PUBLIC
+24:01:c7:3a:4c:40       2462    -87     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+24:01:c7:3a:81:d0       2462    -87     [ESS]   Public-LAC
+24:01:c7:3a:a1:90       2437    -87     [ESS]   Public-LAC
+24:01:c7:3a:a2:10       2412    -92     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+50:60:28:28:aa:21       2412    -83     [WPA2-PSK-CCMP][ESS]    NMC-Main
+24:01:c7:3a:a2:92       2462    -94     [ESS]   LAC PUBLIC
+24:01:c7:3a:4c:42       2462    -88     [ESS]   LAC PUBLIC
+64:ae:0c:1e:fd:30       2412    -89     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+24:01:c7:3a:a2:90       2462    -90     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
+50:60:28:28:aa:20       2412    -82     [WPA2-PSK-CCMP][ESS]    NMC-Guest
+
+Selected interface 'wlp2s0'
+
+
+https://askubuntu.com/questions/541704/how-can-one-use-wpa-cli-to-connect-to-a-wpa-network-without-a-password
+
+> scan
+OK
+CTRL-EVENT-SCAN-RESULTS 
+> scan_results 
+bssid / frequency / signal level / flags / ssid
+f8:d1:11:23:c2:2f       2412    76      [ESS]   BAYINET
+f8:d1:11:23:c1:e9       2412    47      [ESS]   BAYINET
+> add_network
+0
+> set_network 0 ssid "Public-LAC"
+OK
+> set_network 0 key_mgmt NONE
+OK
+> enable_network 0
+OK
+CTRL-EVENT-SCAN-RESULTS
+Trying to associate with f8:d1:11:23:c2:2f (SSID='BAYINET' freq=2412 MHz)
+Association request to the driver failed
+Associated with f8:d1:11:23:c2:2f
+CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id_str=]
+> quit
+
+'''
 
         # Print the ones we don't know:
         print()
         for ap in aps:
             if ap not in known:
-                print(format % (ap, accesspoints[ap]['signal'], ''))
+                print(format % (ap,
+                                accesspoints[ap]['signal'],
+                                '',
+                                accesspoints[ap]['flags']))
         sys.exit(0)
 
     if args.known:
@@ -290,7 +363,7 @@ if __name__ == '__main__':
         print(connect_to, "must be a new network")
     thisap = accesspoints[connect_to]
 
-    out, err = run_as_root(["wpa_cli", "add_network", connect_to])
+    out, err = run_as_root(["wpa_cli", "add_network"])
     # The last (second) line of the output is the new network number.
     # But split('\n') gives a bogus empty final line.
     # To be safer, try iterating to find a line that's just a single number.
@@ -312,32 +385,53 @@ if __name__ == '__main__':
     if verbose:
         print("new netnum:", netnum_str)
 
-    run_as_root(["wpa_cli", "set_network", netnum_str, "ssid",
+    def check_fail(out, err, errmsg=None):
+        if 'FAIL' in out or 'FAIL' in err:
+            if errmsg:
+                print("Error:", errmsg)
+            print("==== FAIL: out")
+            print(out)
+            print("==== FAIL: err")
+            print(err)
+            sys.exit(1)
+
+    out, err = run_as_root(["wpa_cli", "set_network", netnum_str, "ssid",
                  '"%s"' % connect_to])
+    check_fail(out, err, "Set network")
 
     if 'WPA' in thisap['flags'] or 'PSK' in thisap['flags']:
         password = getpass.getpass("Password: ")
 
-    out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
-                            "psk", '"%s"' % password])
-    if 'FAIL' in out:
-        print("Couldn't set password:\n")
-        print(out)
-        print(err)
-        sys.exit(1)
+        out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
+                                "psk", '"%s"' % password])
+        check_fail(out, err, "Set password")
+    else:
+        print("Trying to connect to %s with no password" % connect_to)
+        out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
+                                "key_mgmt", "NONE"])
+        check_fail(out, err, "Set key management")
 
     if verbose:
         print("Enabling network", netnum_str)
     out, err = run_as_root(["wpa_cli", "enable_network", connect_to])
-    if 'FAIL' in out:
-        print("Couldn't enable network")
-        sys.exit(1)
+    check_fail(out, err, "Enable network")
 
     start_dhcp(iface)
 
+    # XXX It starts dhcp, then jumps straight to checking for redirect.
+    # I never see "Saving configuration" and it never saves.
+    # Why?
+    # Possibly because while testing, the running wpa_supplicant
+    # saw the ssid as known so we called show_browser_if_redirect()
+    # from the known clause instead of from here.
+    # Hopefully next time I get to test, that won't happen.
+    if not verbose:
+        print("Somehow verbose got set to False!")
+        verbose = True
     if verbose:
         print("Saving configuration")
-    run_as_root(["wpa_cli", "save_config"])
+    out, err = run_as_root(["wpa_cli", "save_config"])
+    check_fail("Save configuration")
     if verbose:
         print("Saved configuration")
 
