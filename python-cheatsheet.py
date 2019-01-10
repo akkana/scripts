@@ -412,6 +412,9 @@ def parse_args():
 parser = argparse.ArgumentParser(description="Long string\nwith newlines",
                                  formatter_class=argparse.RawTextHelpFormatter)
 
+# Print usage:
+parser.print_help()
+
 ########################################################
 # Dates and times
 ########################################################
