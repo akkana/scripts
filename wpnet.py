@@ -14,6 +14,37 @@ import time
 
 verbose=True
 
+'''
+Commands this script runs:
+
+** Get the wireless interface:
+iw dev
+
+** Start the daemon:
+wpa_supplicant -B -i $iface -c /etc/wpa_supplicant/wpa_supplicant.conf
+
+** List known networks:
+wpa_cli list_networks
+
+** List available networks:
+wpa_cli scan
+wpa_cli scan_results
+
+** Define a new SSID:
+wpa_cli set_network $ID
+wpa_cli add_network
+  (prints new $ID. Then:)
+
+** Connect to a new open SSID:
+wpa_cli set_network $ID ssid $SSID key_mgmt NONE
+** Connect to a new WPA SSID:
+wpa_cli set_network $ID ssid $SSID psk $PASSWORD
+
+wpa_cli enable_network $ID
+wpa_cli save_config
+
+'''
+
 def run_as_root(cmdargs):
     '''Run cmdargs inside sudo, unless we're already root.
        return (stdout, stderr) as strings.
@@ -238,29 +269,9 @@ NMC-Main                 -79       [WPA2-PSK-CCMP][ESS]
 Selected interface 'wlp2s0'
 bssid / frequency / signal level / flags / ssid
 58:bf:ea:92:ba:c0       2437    -48     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-24:01:c7:3a:90:a0       2462    -73     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-24:01:c7:3a:a9:f0       2412    -75     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
 6c:70:9f:de:4d:7c       2462    -84     [WPA-PSK-TKIP][WPA2-PSK-CCMP+TKIP][ESS]Historical
 58:bf:ea:92:ba:c2       2437    -56     [ESS]   LAC PUBLIC
 24:01:c7:3a:91:b0       2462    -64     [ESS]   Public-LAC
-24:01:c7:3a:a2:80       2412    -65     [ESS]   Public-LAC
-24:01:c7:3a:90:a2       2462    -70     [ESS]   LAC PUBLIC
-24:01:c7:3a:a4:60       2462    -74     [ESS]   Public-LAC
-24:01:c7:3a:a9:f2       2412    -76     [ESS]   LAC PUBLIC
-6c:99:89:0d:43:80       2412    -84     [ESS]   Public-LAC
-24:01:c7:3a:a4:52       2437    -88     [ESS]   LAC PUBLIC
-24:01:c7:3a:a4:50       2437    -87     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-64:ae:0c:1e:fd:32       2412    -87     [ESS]   LAC PUBLIC
-24:01:c7:3a:4c:40       2462    -87     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-24:01:c7:3a:81:d0       2462    -87     [ESS]   Public-LAC
-24:01:c7:3a:a1:90       2437    -87     [ESS]   Public-LAC
-24:01:c7:3a:a2:10       2412    -92     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-50:60:28:28:aa:21       2412    -83     [WPA2-PSK-CCMP][ESS]    NMC-Main
-24:01:c7:3a:a2:92       2462    -94     [ESS]   LAC PUBLIC
-24:01:c7:3a:4c:42       2462    -88     [ESS]   LAC PUBLIC
-64:ae:0c:1e:fd:30       2412    -89     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-24:01:c7:3a:a2:90       2462    -90     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
-50:60:28:28:aa:20       2412    -82     [WPA2-PSK-CCMP][ESS]    NMC-Guest
 
 Selected interface 'wlp2s0'
 
