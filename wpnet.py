@@ -31,9 +31,9 @@ wpa_cli scan
 wpa_cli scan_results
 
 ** Define a new SSID:
-wpa_cli set_network $ID
 wpa_cli add_network
   (prints new $ID. Then:)
+NOT : wpa_cli set_network $ID
 
 ** Connect to a new open SSID:
 wpa_cli set_network $ID ssid $SSID key_mgmt NONE
@@ -43,6 +43,20 @@ wpa_cli set_network $ID ssid $SSID psk $PASSWORD
 wpa_cli enable_network $ID
 wpa_cli save_config
 
+
+WORKED:
+
+  wpa_supplicant -B -i wlp2s0  -c /etc/wpa_supplicant/wpa_supplicant.conf
+  wpa_cli list_networks
+  wpa_cli scan
+  wpa_cli scan_results
+  wpa_cli add_network
+  wpa_cli set_network 1    (this gave an error, I think)
+  wpa_cli set_network 1 ssid '"LAC-Public Library"'
+  wpa_cli set_network 1 key_mgmt NONE
+     (idiot bash lost this command, probably enable?)
+  wpa_cli save_config
+  dhclient -v wlp2s0
 '''
 
 def run_as_root(cmdargs):
@@ -53,7 +67,7 @@ def run_as_root(cmdargs):
         cmdargs = ["sudo"] + cmdargs
 
     if verbose:
-        print("** Run:", ' '.join(cmdargs))
+        print("\n** Run:", ' '.join(cmdargs))
     proc = subprocess.Popen(cmdargs, shell=False,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     # proc.communicate() returns bytes, so change them to strings:
@@ -90,7 +104,7 @@ def start_dhcp(iface):
         print("Starting dhcp")
     # Can't use run_as_root here because the output takes time
     # and the usr might want to see it, especially if it fails.
-    subprocess.call(['sudo', 'dhclient', '-v', iface])
+    return subprocess.call(['sudo', 'dhclient', '-v', iface])
 
 def get_available_accesspoints(iface):
     aps = {}
@@ -117,15 +131,11 @@ def get_available_accesspoints(iface):
     return aps
 
 def get_known_networks():
+    start_wpa_supplicant(iface)
     networks = {}
     out, err = run_as_root(["wpa_cli", "list_networks"])
     stdout_lines = out.split('\n')
 
-    '''
-Selected interface 'wlp2s0'
-network id / ssid / bssid / flags
-0       clink   any     [CURRENT]
-    '''
     for line in stdout_lines:
         line = line.strip()
         if not line:
@@ -364,9 +374,15 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
 
         if verbose:
             print("Enabling network", connect_to)
+
         run_as_root(["wpa_cli", "enable_network", str(known_index)])
-        start_dhcp(iface)
-        show_browser_if_redirect()
+
+        if start_dhcp(iface):
+            print("DHCP failed")
+
+        else:
+            show_browser_if_redirect()
+
         sys.exit(0)
 
     # New network, hasn't been stored yet. But it is seen.
@@ -405,6 +421,10 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
             print("==== FAIL: err")
             print(err)
             sys.exit(1)
+        print("==== SUCCESS: out")
+        print(out)
+        print("==== SUCCESS: err")
+        print(err)
 
     out, err = run_as_root(["wpa_cli", "set_network", netnum_str, "ssid",
                  '"%s"' % connect_to])
@@ -422,29 +442,27 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
                                 "key_mgmt", "NONE"])
         check_fail(out, err, "Set key management")
 
+    print("Waiting a little ...", end='')
+    time.sleep(5)
+    print()
+
     if verbose:
         print("Enabling network", netnum_str)
-    out, err = run_as_root(["wpa_cli", "enable_network", connect_to])
+    out, err = run_as_root(["wpa_cli", "enable_network", netnum_str])
     check_fail(out, err, "Enable network")
 
-    start_dhcp(iface)
+    print("Waiting a little ...", end='')
+    time.sleep(5)
+    print()
 
-    # XXX It starts dhcp, then jumps straight to checking for redirect.
-    # I never see "Saving configuration" and it never saves.
-    # Why?
-    # Possibly because while testing, the running wpa_supplicant
-    # saw the ssid as known so we called show_browser_if_redirect()
-    # from the known clause instead of from here.
-    # Hopefully next time I get to test, that won't happen.
-    if not verbose:
-        print("Somehow verbose got set to False!")
-        verbose = True
     if verbose:
         print("Saving configuration")
     out, err = run_as_root(["wpa_cli", "save_config"])
-    check_fail("Save configuration")
+    check_fail(out, err, "Save configuration")
     if verbose:
-        print("Saved configuration")
+        print(out, err, "Saved configuration")
+
+    start_dhcp(iface)
 
     show_browser_if_redirect()
 
