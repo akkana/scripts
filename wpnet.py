@@ -130,6 +130,19 @@ def get_available_accesspoints(iface):
                     }
     return aps
 
+def get_current():
+    '''
+<iridum>- sudo wpa_cli list_networks                          ~/src/billtracker
+Selected interface 'wlp2s0'
+network id / ssid / bssid / flags
+0       clink   any
+1       LAC-Public Library      any     [CURRENT]
+2       CommunityLab    any     [DISABLED]
+3       COAFreeWireless any
+4       LAC-Public Library      any
+'''
+    pass
+
 def get_known_networks():
     start_wpa_supplicant(iface)
     networks = {}
@@ -140,7 +153,7 @@ def get_known_networks():
         line = line.strip()
         if not line:
             continue
-        words = line.split()
+        words = line.split('\t')
         if words[0].isdigit():
             networks[int(words[0])] = words[1]
 
@@ -249,13 +262,13 @@ if __name__ == '__main__':
         aps = accesspoints.keys()
 
         known_nets = get_known_networks()
-        known = []
 
         # Print the ones we have saved already:
         format = "%-20s %7s %4s  %s"
         print(format % ("SSID", "Signal", "#", "Encryption"))
         print(format % ("----", "------", "--", "----------"))
 
+        known = []
         for i in sorted(known_nets):
             if known_nets[i] in aps:
                 print(format % (known_nets[i],
@@ -311,7 +324,6 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
 > quit
 
 '''
-
         # Print the ones we don't know:
         print()
         for ap in aps:
