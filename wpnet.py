@@ -12,7 +12,7 @@ import getpass
 import urllib.request
 import time
 
-verbose=True
+verbose=False
 
 '''
 Commands this script runs:
@@ -191,7 +191,7 @@ def show_browser_if_redirect():
             testurl = tufile.read().strip()
         with open(testurlfile + ".out") as tufile:
             content_from_file = tufile.read()
-    if not testurl:
+    if verbose and not testurl:
         print("No test URL set; not checking for redirects")
         return
 
@@ -236,46 +236,26 @@ def show_browser_if_redirect():
         raise e
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-k', "--known", dest="known",
-                        action="store_true", help="List known networks")
-    parser.add_argument('-a', "--available", dest="available",
-                        action="store_true", help="Show available accesspoints")
-    parser.add_argument('connect_to', nargs='?',
-                        help="The essid or numeric specifier to connect to")
+def show_available_networks():
+    accesspoints = get_available_accesspoints(iface)
 
-    args = parser.parse_args(sys.argv[1:])
+    aps = accesspoints.keys()
 
-    ifaces = get_wireless_ifaces()
-    if not ifaces:
-        print("No wireless interface, sorry")
-        sys.exit(1)
-    if len(ifaces) > 1:
-        print("Multiple wireless interfaces:", ' '.join(get_wireless_ifaces()))
-        print("Using", ifaces[0])
-    iface = ifaces[0]
+    known_nets = get_known_networks()
 
-    if args.available:
-        accesspoints = get_available_accesspoints(iface)
+    # Print the ones we have saved already:
+    format = "%-20s %7s %4s  %s"
+    print(format % ("SSID", "Signal", "#", "Encryption"))
+    print(format % ("----", "------", "--", "----------"))
 
-        aps = accesspoints.keys()
-
-        known_nets = get_known_networks()
-
-        # Print the ones we have saved already:
-        format = "%-20s %7s %4s  %s"
-        print(format % ("SSID", "Signal", "#", "Encryption"))
-        print(format % ("----", "------", "--", "----------"))
-
-        known = []
-        for i in sorted(known_nets):
-            if known_nets[i] in aps:
-                print(format % (known_nets[i],
-                                accesspoints[known_nets[i]]['signal'],
-                                i,
-                                accesspoints[known_nets[i]]['flags']))
-                known.append(known_nets[i])
+    known = []
+    for i in sorted(known_nets):
+        if known_nets[i] in aps:
+            print(format % (known_nets[i],
+                            accesspoints[known_nets[i]]['signal'],
+                            i,
+                            accesspoints[known_nets[i]]['flags']))
+            known.append(known_nets[i])
 
         '''
 Sample flags:
@@ -324,68 +304,55 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
 > quit
 
 '''
-        # Print the ones we don't know:
-        print()
-        for ap in aps:
-            if ap not in known:
-                print(format % (ap,
-                                accesspoints[ap]['signal'],
-                                '',
-                                accesspoints[ap]['flags']))
-        sys.exit(0)
+    # Print the ones we don't know:
+    print()
+    for ap in aps:
+        if ap not in known:
+            print(format % (ap,
+                            accesspoints[ap]['signal'],
+                            '',
+                            accesspoints[ap]['flags']))
 
-    if args.known:
-        known_nets = get_known_networks()
-        for i in sorted(known_nets.keys()):
-            print('%3d: %s' % (i, known_nets[i]))
-        sys.exit(0)
-
-    # If no flags specified, then we should have one arg,
-    # either a numeric specifier or an essid.
-    if not args.connect_to:
-        parser.print_help()
-        sys.exit(1)
-
-    connect_to = args.connect_to
+def connect_to(to_ap):
     if verbose:
-        print("Connecting to", connect_to)
+        print("Connecting to", to_ap)
     accesspoints = get_available_accesspoints(iface)
     aps = list(accesspoints.keys())
     known_nets = get_known_networks()
     known = [ known_nets[i] for i in known_nets ]
     known_index = None
 
-    if connect_to not in aps:
+    if to_ap not in aps:
         # But maybe it's a number for a known network?
-        if connect_to.isdigit():
-            known_index = int(connect_to)
+        if to_ap.isdigit():
+            known_index = int(to_ap)
             if known_index not in known_nets:
                 print("No network %d known" % known_index)
                 sys.exit(1)
-            connect_to = known_nets[known_index]
-            if connect_to not in aps:
+            to_ap = known_nets[known_index]
+            if to_ap not in aps:
                 print("Network %d, '%s', not visible" % (known_index,
-                                                         connect_to))
+                                                         to_ap))
                 sys.exit(1)
         else:
-            print("'%s' isn't visible" % connect_to)
+            print("'%s' isn't visible" % to_ap)
             sys.exit(1)
 
-    # Now connect_to is an SSID that's known.
-    if connect_to in known:
+    # Now to_ap is an SSID that's known.
+    if to_ap in known:
         if verbose:
-            print("Great, we see", connect_to, "and we know it already")
+            print("Great, we see", to_ap, "and we know it already")
 
         if known_index == None:
             for i in known_nets:
-                if known_nets[i] == connect_to:
+                if known_nets[i] == to_ap:
                     known_index = i
                     break
         if known_index == None:
-            print("Internal error, lost track of SSID %s" % connect_to)
+            print("Internal error, lost track of SSID %s" % to_ap)
 
         if verbose:
-            print("Enabling network", connect_to)
+            print("Enabling network", to_ap)
 
         run_as_root(["wpa_cli", "enable_network", str(known_index)])
 
@@ -399,8 +366,8 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
 
     # New network, hasn't been stored yet. But it is seen.
     if verbose:
-        print(connect_to, "must be a new network")
-    thisap = accesspoints[connect_to]
+        print(to_ap, "must be a new network")
+    thisap = accesspoints[to_ap]
 
     out, err = run_as_root(["wpa_cli", "add_network"])
     # The last (second) line of the output is the new network number.
@@ -439,7 +406,7 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
         print(err)
 
     out, err = run_as_root(["wpa_cli", "set_network", netnum_str, "ssid",
-                 '"%s"' % connect_to])
+                 '"%s"' % to_ap])
     check_fail(out, err, "Set network")
 
     if 'WPA' in thisap['flags'] or 'PSK' in thisap['flags']:
@@ -449,23 +416,28 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
                                 "psk", '"%s"' % password])
         check_fail(out, err, "Set password")
     else:
-        print("Trying to connect to %s with no password" % connect_to)
+        if verbose:
+            print("Trying to connect to %s with no password" % to_ap)
         out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
                                 "key_mgmt", "NONE"])
         check_fail(out, err, "Set key management")
 
-    print("Waiting a little ...", end='')
+    if verbose:
+        print("Waiting a little ...", end='')
     time.sleep(5)
-    print()
+    if verbose:
+        print()
 
     if verbose:
         print("Enabling network", netnum_str)
     out, err = run_as_root(["wpa_cli", "enable_network", netnum_str])
     check_fail(out, err, "Enable network")
 
-    print("Waiting a little ...", end='')
+    if verbose:
+        print("Waiting a little ...", end='')
     time.sleep(5)
-    print()
+    if verbose:
+        print()
 
     if verbose:
         print("Saving configuration")
@@ -480,3 +452,42 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
 
     sys.exit(0)
 
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-k', "--known", dest="known",
+                        action="store_true", help="List known networks")
+    parser.add_argument('-a', "--available", dest="available",
+                        action="store_true", help="Show available accesspoints")
+    parser.add_argument('connect_to', nargs='?',
+                        help="The essid or numeric specifier to connect to")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    ifaces = get_wireless_ifaces()
+    if not ifaces:
+        print("No wireless interface, sorry")
+        sys.exit(1)
+    if len(ifaces) > 1:
+        print("Multiple wireless interfaces:", ' '.join(get_wireless_ifaces()))
+        print("Using", ifaces[0])
+    iface = ifaces[0]
+
+    if args.available:
+        show_available_networks()
+        sys.exit(0)
+
+    if args.known:
+        known_nets = get_known_networks()
+        for i in sorted(known_nets.keys()):
+            print('%3d: %s' % (i, known_nets[i]))
+        sys.exit(0)
+
+    # If no flags specified, then we should have one arg,
+    # either a numeric specifier or an essid.
+    if not args.connect_to:
+        parser.print_help()
+        sys.exit(1)
+
+    connect_to(args.connect_to)
