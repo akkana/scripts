@@ -426,7 +426,7 @@ Latest sunset: %s
             # When is the moon on the meridian today?
             # Remember, it's self.sun even if it really is the moon.
             self.observer.date = ephem.now()
-            self.observer.date = ephem.Date('6/13/2005')
+            # self.observer.date = ephem.Date('6/13/2005')
             transit = self.observer.next_transit(self.sun)
 
             # For testing, try replacing 30 with, say, 5000 to see the
