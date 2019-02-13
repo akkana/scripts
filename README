@@ -370,6 +370,12 @@ sinkto:
     email folders etc. to a laptop when preparing for or returning
     from a trip, or just for keeping several machines in sync.
 
+skyalignments.py:
+    Starting from points in a GPX file, find all combinations of
+    those points that line up with the rising or setting of the sun
+    or full moon around solstices and equinoxes. Meant to show how
+    easy it is for alignments to happen accidentally.
+
 speedtestserver:
     A mini http server that can introduce delays or other glitches
     that are useful for testing http download clients.
