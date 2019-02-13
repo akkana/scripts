@@ -45,7 +45,10 @@ def doc2html(infile, outfile):
     base, ext = os.path.splitext(infile)
     docxfile = base + ".docx"
     try:
-        rv = subprocess.call(["unoconv", "-f", "docx", "-o", docxfile, infile])
+        # Unoconv always fails the first time: it takes too long for its
+        # server to start up, so it needs a longer timeout:
+        # https://github.com/dagwieers/unoconv/issues/415
+        rv = subprocess.call(["unoconv", "-f", "docx", "-T", "10", "-o", docxfile, infile])
     except OSError:
         rv = 1
     if not rv:
