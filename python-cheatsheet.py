@@ -63,7 +63,7 @@ else:
 
 # Is something a dict? Use isinstance rather than type()
 # because isinstance will work for derived classes.
-if isinstance(x, dict):
+if isinstance(x, dict)
 
 # Difference between is and ==:
 # is checked whether two things are the same object (reference equality),
@@ -81,12 +81,19 @@ if isinstance(x, dict):
 # or even for integers; it may work for small integers because python
 # caches them, but not for larger ones.
 
+# Update an object from a dictionary, obj.something = d['something']
+for k in d:
+    setattr(obj, k, d[k])
+
 ########################################################
 # Debugging and stack traces
 ########################################################
 
 # Print a stack trace -- how did we get here?
 traceback.print_stack()
+
+# Print a traceback after an exception:
+print(traceback.format_exc())
 
 # Equivalent of verbose mode in a shell: print each line before executing.
 python -m trace --trace /tmp/foo.py
@@ -676,7 +683,7 @@ def roundall(numbers):
     return map(int, map(round, numbers))
 
 #
-# sorting + lambda examples.
+# sorting + lambda examples
 #
 # The cmp function is obsolete.
 # Instead, use a key function,
@@ -1056,7 +1063,7 @@ if hasattr(sys.stdout, 'buffer')::
     sys.stdout.buffer.write(b'abc')
 
 # Also, you can specify encoding when opening a file:
-open(path, encoding="utf-8")
+open(path, "w", encoding="utf-8")
 
 # Conditional depending on python version:
 if sys.version[:1] == '2':
