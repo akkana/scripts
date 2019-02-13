@@ -175,12 +175,12 @@ def send_msg(recipients, sender, msg, smtp_server,
 
     print "Sending to recipients:", ', '.join(recipients)
     server = smtplib.SMTP(smtp_server, smtp_port)
-    # server.set_debuglevel(1)
+    server.set_debuglevel(1)
 
     # In case the server does TLS. Not sure if we need the ehlo lines.
-    # server.ehlo()
-    # server.starttls()
-    # server.ehlo()
+    server.ehlo()
+    server.starttls()
+    server.ehlo()
 
     if smtp_user:
         server.login(smtp_user, smtp_passwd)
