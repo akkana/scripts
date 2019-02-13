@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import sys, os
 import subprocess
+import re
 
 def grep_ebook(pat, filename):
 
@@ -11,19 +12,21 @@ def grep_ebook(pat, filename):
     p1 = subprocess.Popen(['unzip', '-p', filename,
                            '*.htm*', '*.xml', '*.opf'],
                           shell=False, stdout=subprocess.PIPE)
-    # get rid of small html <b>tags
-    p2 = subprocess.Popen(['perl', '-lpe', 's![<][^>]{1,200}?[>]!!g;'],
-                          shell=False, stdin=p1.stdout, stdout=subprocess.PIPE)
-    p1.stdout.close()
+
+    output = p1.communicate()[0]
+    p1 = re.sub('[<][^>]{1,200}?[>]', '', output)
+
+    
+
+
 
     # keep some context around matches
     p3 = subprocess.Popen(['grep', '-Piaso', '.{0,30}%s.{0,30}' % pat],
-                          shell=False, stdin=p2.stdout,stdout=subprocess.PIPE)
-    p2.stdout.close()
+                          shell=False, stdin=output, stdout=subprocess.PIPE)
 
     # color the matches (doesn't work for me)
     p4 = subprocess.Popen(['grep', '-Pi', '--color', pat],
-                          shell=False, stdin=p3.stdout,stdout=subprocess.PIPE)
+                          shell=False, stdin=p3.stdout, stdout=subprocess.PIPE)
     p3.stdout.close()
 
     output = p4.communicate()[0]
