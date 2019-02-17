@@ -12,7 +12,7 @@ import getpass
 import urllib.request
 import time
 
-verbose=False
+verbose = False
 
 '''
 To run this as a normal user, not under sudo:
@@ -95,10 +95,11 @@ def start_wpa_supplicant(iface):
         if verbose:
             print("wpa_supplicant is already running")
         return
+    args = ['sudo', 'wpa_supplicant', '-B', '-i', iface,
+            '-c', '/etc/wpa_supplicant/wpa_supplicant.conf']
     if verbose:
-        print("Starting wpa_supplicant ...", end='')
-    subprocess.call(['sudo', 'wpa_supplicant', '-B', '-i', iface,
-                     '-c', '/etc/wpa_supplicant/wpa_supplicant.conf'])
+        print("Starting wpa_supplicant:", ' '.join(args), end='')
+    subprocess.call(args)
     time.sleep(5)
 
 def is_wpa_running():
@@ -148,7 +149,7 @@ def get_available_accesspoints(iface):
 
 def get_current():
     '''
-<iridum>- sudo wpa_cli list_networks                          ~/src/billtracker
+<iridum>- sudo wpa_cli list_networks
 Selected interface 'wlp2s0'
 network id / ssid / bssid / flags
 0       clink   any
@@ -235,9 +236,10 @@ def show_browser_if_redirect():
 
     print("Couldn't make a test connection -- probably redirected.")
 
-    # Don't want to run the browser as root, so de-escalate privilege.
+    # Don't want to run a browser as root, so figure out if we're root
+    # and if so, de-escalate privilege.
     # os.getuid(), os.geteuid() and psutil.uids() are all zero under sudo,
-    # but sudo helpfully leaves us an env variable we can use.
+    # but sudo helpfully sets an env variable we can use.
     orig_uid = os.getenv("SUDO_UID")
     if orig_uid:
         print("De-escalating back to UID", orig_uid)
@@ -284,7 +286,7 @@ LAC PUBLIC               -85       [ESS]
 Public-LAC               -90       [ESS]
 NMC-Main                 -79       [WPA2-PSK-CCMP][ESS]
 
-<iridum>- sudo wpa_cli scan_results                                           ~
+<iridum>- wpa_cli scan_results                                           ~
 Selected interface 'wlp2s0'
 bssid / frequency / signal level / flags / ssid
 58:bf:ea:92:ba:c0       2437    -48     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
@@ -489,6 +491,12 @@ if __name__ == '__main__':
         print("Multiple wireless interfaces:", ' '.join(get_wireless_ifaces()))
         print("Using", ifaces[0])
     iface = ifaces[0]
+    if not iface:
+        print("No interface!")
+        sys.exit(1)
+
+    if verbose:
+        print("Interface:", iface)
 
     if args.available:
         show_available_networks()
