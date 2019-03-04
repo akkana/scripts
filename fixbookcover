@@ -77,7 +77,10 @@ class BookCoverFixer:
         self.book.save_changes()
         self.book.close()
 
-# A GTK-based GUI window for doing this:
+#
+# A GTK-based GUI window for doing this.
+# imageviewer.ImageViewerWindow inherits from gtk.DrawingArea.
+#
 class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
     def __init__(self, booklist):
         super(BookCoverFixerWindow, self).__init__(None, 300, 400)
@@ -99,9 +102,9 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
         skip_btn.connect("clicked", self.next_book)
         self.main_vbox.pack_start(hbox)
 
-        self.set_key_handler(self.key_press_event)
+        self.connect("key-press-event", self.key_press_event)
 
-        self.expose_id = self.win.connect("expose-event", self.expose_handler)
+        self.expose_id = self.connect("expose-event", self.expose_handler)
 
     def do_fix(self, w=None):
         if self.do_btn.get_label() == self.add_title_label:
@@ -153,7 +156,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
         self.next_book()
         # We only want it the first time. The realize handler doesn't work
         # because it fires before the window actually exists.
-        self.win.disconnect(self.expose_id)
+        self.disconnect(self.expose_id)
 
     def key_press_event(self, widget, event, imagewin):
         '''Handle a key press event anywhere in the window'''
