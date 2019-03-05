@@ -34,7 +34,7 @@ class BookCoverFixer:
             self.localcover = None
             self.coverzipname = None
 
-    def extracted_ok(self):
+    def has_cover(self):
         return (self.book and self.localcover and self.coverzipname)
 
     def cleanup_tmp(self):
@@ -43,37 +43,63 @@ class BookCoverFixer:
 
     def add_title_to_cover(self):
         '''Actually do the fix'''
-        # Get the image's size
-        im = Image.open(self.localcover)
-        width, height = im.size
-        im.close()
-
-        # New cover file should be in the same directory.
-        self.newcoverfile = os.path.join(os.path.dirname(self.localcover),
-                                    "new%s" % os.path.basename(self.localcover))
 
         # XXX figure out how to do this with imagemagick python bindings.
         # ImageMagick doesn't use the pretty font names with spaces in them;
         # use convert -list font to find out what font names it understands.
         # It doesn't understand aliases like "Serif", alas.
         # Times-New-Roman-Bold is fairly safe.
-        subprocess.call(["convert", "-background", "none",
-                         "-fill", "black", "-stroke", "red",
-                         "-gravity", "center",
-                         "-size", "%dx%d" % (width, height/2),
+        #
+        # XXX Would be nice to add ', '.join(self.book.get_authors())
+        # in a smaller font, lower on the page.
+        if self.has_cover():
+            # New cover file should be in the same directory.
+            self.newcoverfile = os.path.join(os.path.dirname(self.localcover),
+                                  "new%s" % os.path.basename(self.localcover))
+            # Get the image's size
+            im = Image.open(self.localcover)
+            width, height = im.size
+            im.close()
+            subprocess.call(["convert", "-background", "none",
+                             "-fill", "black", "-stroke", "red",
+                             "-gravity", "center",
+                             "-size", "%dx%d" % (width, height),
+                             "-font", "Times-New-Roman-Bold",
+                             'caption:%s' % ', '.join(self.book.get_titles()),
+                             self.localcover, "+swap",
+                             "-composite", self.newcoverfile])
+            print("Changed cover to %s" % self.newcoverfile)
+            return self.newcoverfile
+
+        # XXX Adding a new cover doesn't work yet.
+        # I haven't figured out what I need to add to content.opf;
+        # I've tried adding the relevant parts in metadata,
+        # manifest, guide and spine and none of it works.
+        print("WARNING: Adding new covers doesn't work yet")
+        return None
+
+        self.newcoverfile = "/tmp/cover.jpg"
+        width, height = (480, 640)
+        subprocess.call(["convert",
+                         "-size", "%dx%d" % (width, height),
+                         "-background", "white",
+                         "-fill", "black", "-gravity", "center",
                          "-font", "Times-New-Roman-Bold",
-                         'caption:%s by %s' % \
-                             (', '.join(self.book.get_titles()),
-                              ', '.join(self.book.get_authors())),
-                         self.localcover, "+swap", "-gravity", "center",
-                         "-composite", self.newcoverfile])
-        print("Wrote new cover to %s" % self.newcoverfile)
+                         "caption:%s" % ', '.join(self.book.get_titles()),
+                         "-flatten", self.newcoverfile])
+
         return self.newcoverfile
 
     def save_changes(self):
         print("Saving changes, supposedly")
         print("Replacing %s with %s" % (self.coverzipname, self.newcoverfile))
-        self.book.replace_file(self.coverzipname, self.newcoverfile)
+        if self.has_cover():
+            self.book.replace_file(self.coverzipname, self.newcoverfile)
+        else:
+            XXX
+            metadata = self.book.dom.getElementsByTagName("metadata")[0]
+            manifest = self.book.dom.getElementsByTagName("manifest")[0]
+
         self.book.save_changes()
         self.book.close()
 
@@ -115,7 +141,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
             self.next_book()
 
     def add_title_to_cover(self):
-        if not self.fixer.extracted_ok():
+        if not self.fixer.has_cover():
             print("Eek, book wasn't initialized!")
         else:
             newcover = self.fixer.add_title_to_cover()
@@ -142,7 +168,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
         else:
             title = self.booklist[self.bookindex]
 
-        if self.fixer.extracted_ok():
+        if self.fixer.has_cover():
             self.new_image(self.fixer.localcover)
             self.viewer.draw_text("%s (unmodified)" % title)
             self.do_btn.set_sensitive(True)
@@ -173,5 +199,13 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
             return
 
 if __name__ == "__main__":
+    fixer = BookCoverFixer()
+    for arg in (sys.argv[1:]):
+        fixer.extract_cover(arg)
+        fixer.add_title_to_cover()
+        fixer.save_changes()
+
+    sys.exit(0)
+
     win = BookCoverFixerWindow(sys.argv[1:])
     win.run()
