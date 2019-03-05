@@ -9,97 +9,104 @@ import re
 import psutil
 from pprint import pprint
 import sys
+import time
 
-def read_sensors():
-    '''Read and parse the output of lm-sensors' sensors -j
-       Returns a dictionary.
-    '''
-    proc = subprocess.Popen(["/usr/bin/sensors", "-j"], shell=False,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # proc.communicate() returns bytes, so change them to strings:
-    return (json.loads(proc.communicate()[0].decode()))
-
-def fetch_temps(sensors):
-    # temps will be a list of quads: (name, input, max, crit)
+def fetch_temps():
     temps = []
-
-    # I don't understand the partitioning sensors uses, hence the unclear names:
+    sensors = psutil.sensors_temperatures()
     for thing in sensors:
-        for dev in sensors[thing]:
-            # print("dev:", dev, type(sensors[thing][dev]))
-            if type(sensors[thing][dev]) is str:
-                continue
-            # sensors can't use consistent keys: it uses things like
-            # temp1_input, temp3_max etc. Sheesh.
-            tinput = 0
-            tmax = 0
-            tcrit = 0
-            for key in sensors[thing][dev]:
-                # print("key:", key)
-                if re.match('temp[0-9]+_input', key):
-                    tinput = float(sensors[thing][dev][key])
-                    # print("Set input to", tinput)
-                elif re.match('temp[0-9]+_max', key):
-                    tmax = float(sensors[thing][dev][key])
-                elif re.match('temp[0-9]+_crit', key):
-                    tcrit = float(sensors[thing][dev][key])
+        for piece in sensors[thing]:
+            tcurrent = piece.current
+            tmax = piece.high
+            tcrit = piece.critical
 
-            if not tinput or (not tmax and not tcrit):
+            if not tcurrent or (not tmax and not tcrit):
                 continue
             if not tmax:
                 tmax = tcrit
             elif not tcrit:
                 tcrit = tmax
-            temps.append((dev, tinput, tmax, tcrit))
+            temps.append((thing, tcurrent, tmax, tcrit))
 
+    print(temps)
     return temps
 
+# import random
 def overtemp(temps):
     '''Are any of the temperatures excessive?
     '''
+    # if random.randint(0, 5) == 0:
+    #     return True
+
     for quad in temps:
         if quad[1] > quad[2]:
             return True
     return False
 
-def proclist():
-    # Unfortunately there doesn't seem to be any way to get CPU percentage.
-    # process.cpu_percent() always returns 0.0, even for VLC showing a
-    # scaled video, or for Firefox.
-    # We can get the cumulative CPU times; but that's not all that
-    # helpful because it penalizes processes that have been running
-    # for a long time.
-    # MIght be able to do something with process.create_time(), though.
-    procs = []
-    for process in psutil.process_iter():
-        # This doesn't work, even very active processes can
-        # show up as 'sleeping'.
-        if True or process.status() == 'running':
-            procs.append((process.name(), sum(process.cpu_times())))
+def hoglist(delay=3):
+    '''Return a list of processes using a nonzero CPU percentage
+       during the interval specified by delay (seconds),
+       sorted so the biggest hog is first.
+    '''
+    proccesses = list(psutil.process_iter())
+    for proc in proccesses:
+        proc.cpu_percent(None)    # non-blocking; throw away first bogus value
 
-        # as_dict() is the easiest way to find out what's available.
-        if 'vlc' in process.name():
-            pd = process.as_dict()
-            pd['memory_maps'] = 'xxx'
-            pd['threads'] = 'xxx'
-            pd['environ'] = 'xxx'
-            pprint(pd)
-        print(process.name(), process.status(), process.cpu_percent())
+    print("Sleeping ...")
+    sys.stdout.flush()
+    time.sleep(delay)
+    print()
+
+    procs = []
+    for proc in proccesses:
+        # Even on simple things like name(), psutil may fail with NoSuchProcess
+        try:
+            percent = proc.cpu_percent(None)
+            if percent:
+                procs.append((proc.name(), percent, proc))
+        except psutil._exceptions.NoSuchProcess:
+            continue
 
     procs.sort(key=lambda x: x[1], reverse=True)
     return procs
 
+def slowdown(proc):
+    print("\07\07Suspending process %d, '%s'" % (proc.pid, proc.name()))
+    proc.suspend()
+
+def check_and_slow(verbose=True):
+    immune = [ 'Xorg', 'kworker', 'kthread', 'openbox', 'watchdog' ]
+    temps = fetch_temps()
+
+    if verbose:
+        print("Temps")
+        for quad in temps:
+            print("%15s: %f (%f max, %f crit)" % quad)
+
+    if overtemp(temps):
+        print("Yikes! Overtemp!")
+
+        hogs = hoglist()
+        if verbose:
+            print("Procs")
+            for p in hogs:
+                print("%20s: %5.2f" % (p[0], p[1]))
+
+        # Slow down anything over 80%;
+        # if none, then slow down the single biggest disk hog.
+        if hogs[0][1] > .8:
+            for h in hogs:
+                if h[1] > .9:
+                    slowdown(h[2])
+                else:
+                    break
+        else:
+            slowdown(hogs[0][2])
+
+    elif verbose:
+        print("Not overtemp")
+
 if __name__ == '__main__':
-    j = read_sensors()
-    # pprint(j)
-    temps = fetch_temps(j)
-
-    print("Temps")
-    for quad in temps:
-        print("%15s: %f (%f max, %f crit)" % quad)
-
-    procs = proclist()
-    print("Procs")
-    for p in procs[:10]:
-        print("%15s: %ds" % p)
-
+    while True:
+        check_and_slow()
+        time.sleep(3)
