@@ -338,6 +338,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
     def extract_cover_image(self, outdir=''):
         '''Extract just an image named cover.*.
            Return (newfilename, filename_in_zip_archive)
+           or (None, None) if it can't find anything.
         '''
         '''
         Notes on covers: the epub format doesn't actually specify how to make
@@ -422,7 +423,6 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         Some URLs suggesting best practices:
         https://www.safaribooksonline.com/blog/2009/11/20/best-practices-in-epub-cover-images/
         http://wiki.mobileread.com/wiki/Ebook_Covers
-        http://www.chickensinenvelopes.net/2013/01/setting-a-cover-image-on-an-epub-ebook/
         '''
 
         coverimg = None
@@ -463,6 +463,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
                     coverimg = href
 
         if not coverimg:
+            print("No cover image")
             return None, None
 
         infp = None
@@ -483,7 +484,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
             return None, None
 
         outfilename = os.path.join(outdir, base)
-        outfp = open(outfilename, 'w')
+        outfp = open(outfilename, 'wb')
         outfp.write(infp.read())
         infp.close()
         outfp.close()
