@@ -2,18 +2,21 @@
 
 # Utilities viewing and modifying the tags inside epub books.
 #
-# Copyright 2015,2018 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Copyright 2015,2018,2019 by Akkana Peck.
+# Share and enjoy under the GPL v2 or later.
 
 from __future__ import print_function
 
-import os, sys
+import os
+import sys
 import zipfile
 import xml.dom.minidom
+
 
 class EpubBook:
     # class constants:
     subjectTag = 'dc:subject'
-    image_exts = [ ".jpg", ".jpeg", ".gif", ".png", ".svg", ".pdf" ]
+    image_exts = [".jpg", ".jpeg", ".gif", ".png", ".svg", ".pdf"]
 
     def __init__(self, filename=None):
         self.zip = None
@@ -204,7 +207,7 @@ class EpubBook:
         '''
         tags, elements, parent = self.get_matches(self.subjectTag)
 
-        lowertags = [ s.lower() for s in tags ]
+        lowertags = [s.lower() for s in tags]
 
         # If we didn't see a dc:subject, we still need a parent,
         # the <metadata> tag.
@@ -231,12 +234,13 @@ class EpubBook:
                 continue
 
             # Make the new node:
-            #newnode = tag.cloneNode(False)
+            # newnode = tag.cloneNode(False)
             newnode = self.dom.createElement(self.subjectTag)
 
             # Suddenly all the parsers insist on seeing this element
             # in the new dc: tags, which didn't seem to be needed before.
-            newnode.setAttribute("xmlns:dc", "http://purl.org/dc/elements/1.1/")
+            newnode.setAttribute("xmlns:dc",
+                                 "http://purl.org/dc/elements/1.1/")
 
             # Make a text node inside it:
             textnode = self.dom.createTextNode(new_tag)
@@ -360,10 +364,12 @@ Python 2 minidom has trouble encoding non-ASCII characters")
             <meta content="cover" name="cover"/>
         </metadata>
         <manifest>
-            <item href="Images/cover_image.jpg" id="cover" media-type="image/jpeg"/>
+            <item href="Images/cover_image.jpg"
+                  id="cover" media-type="image/jpeg"/>
         </manifest>
         <guide>
-            <reference href="Text/titlepage.xhtml" title="Title Page" type="cover"/>
+            <reference href="Text/titlepage.xhtml"
+                       title="Title Page" type="cover"/>
         </guide>
 
         A StoryBundle book has:
@@ -383,10 +389,13 @@ Python 2 minidom has trouble encoding non-ASCII characters")
             <meta content="cover-image" name="cover"/>
         </metadata>
         <manifest>
-            <item href="OEBPS/images/bookname_epub3_001_cvi.jpg" id="coverimg" media-type="image/jpeg" properties="cover-image"/>
+            <item href="OEBPS/images/bookname_epub3_001_cvi.jpg"
+                  id="coverimg" media-type="image/jpeg"
+                  properties="cover-image"/>
         </manifest>
         <guide>
-            <reference href="OEBPS/bookname_epub3_cvi_r1.xhtml" title="Cover" type="cover"/>
+            <reference href="OEBPS/bookname_epub3_cvi_r1.xhtml"
+                       title="Cover" type="cover"/>
         </guide>
 
         What O'Reilly says to have:
@@ -394,8 +403,10 @@ Python 2 minidom has trouble encoding non-ASCII characters")
             <meta name="cover" content="cover-image" />
         </metadata>
         <manifest>
-            <item id="cover" href="cover.html" media-type="application/xhtml+xml"/>
-            <item id="cover-image" href="the_cover.jpg" media-type="image/jpeg"/>
+            <item id="cover" href="cover.html"
+                  media-type="application/xhtml+xml"/>
+            <item id="cover-image" href="the_cover.jpg"
+                  media-type="image/jpeg"/>
         </manifest>
         <guide>
             <reference href="cover.html" type="cover" title="Cover"/>
@@ -406,8 +417,10 @@ Python 2 minidom has trouble encoding non-ASCII characters")
              <meta name="cover" content="cover-image"/>
         </metadata>
         <manifest>
-             <item id="cover" href="the-cover-filename.xhtml" media-type="application/xhtml+xml"/>
-             <item id="cover-image" href="the_cover.jpg" media-type="image/jpeg"/>
+             <item id="cover" href="the-cover-filename.xhtml"
+                   media-type="application/xhtml+xml"/>
+             <item id="cover-image" href="the_cover.jpg"
+                   media-type="image/jpeg"/>
         </manifest>
         <guide>
             <reference type="cover" href="the-cover-filename.xhtml" />
@@ -515,7 +528,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
                 infp.close()
                 outfp.close()
 
-# main
+
 if __name__ == "__main__":
     def Usage():
         progname = os.path.basename(sys.argv[0])
@@ -531,8 +544,8 @@ Options:
     -t: add tags (otherwise, just print existing tags)
     -d: delete existing tags before adding new ones
     -b: print only one line for each book (useful with grep)
-    -i [dir]: extract images into given directory (default .)""" \
-            % (progname, progname, progname))
+    -i [dir]: extract images into given directory (default .)"""
+              % (progname, progname, progname))
         sys.exit(0)
 
     # optparse can't handle multiple arguments of the same type
@@ -590,19 +603,20 @@ Options:
         # If we're here, the argument doesn't start with '-'.
         # It might still be the imagedir argument to -i, though.
         if imagedir == './':
-            if  os.path.isdir(arg):
+            if os.path.isdir(arg):
                 imagedir = arg
                 continue
-            elif not arg.endswith('.epub') :
-                print("Argument after -i should be a directory if it's not an EPUB book\n")
+            elif not arg.endswith('.epub'):
+                print("Argument after -i should be a directory "
+                      "if it's not an EPUB book\n")
                 Usage()
 
-        if not add_tags :    # still adding files
+        if not add_tags:    # still adding files
             if os.access(arg, os.R_OK):
                 epubfiles.append(arg)
             else:
                 print("Can't read", arg, "-- skipping")
-        else :               # done adding files, adding tags now
+        else:               # done adding files, adding tags now
             tags.append(arg)
 
     if not epubfiles:
@@ -620,7 +634,7 @@ Options:
 
             needs_save = False
 
-            if imagedir != None:
+            if imagedir is not None:
                 if extract_images == "cover":
                     coverfile, zipname = book.extract_cover_image(imagedir)
                     if coverfile:
