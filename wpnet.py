@@ -12,9 +12,15 @@ import getpass
 import urllib.request
 import time
 
-verbose=False
+verbose = False
 
 '''
+To run this as a normal user, not under sudo:
+edit /etc/wpa_supplicant/wpa_supplicant.conf
+and add a line like:
+ctrl_interface_group=adm
+using whatever group you think should have network permissions.
+
 Commands this script runs:
 
 ** Get the wireless interface:
@@ -73,16 +79,27 @@ def run_as_root(cmdargs):
     # proc.communicate() returns bytes, so change them to strings:
     return ( b.decode() for b in proc.communicate() )
 
+def run_cmd(cmdargs):
+    '''Run and return (stdout, stderr) as strings.
+    '''
+    if verbose:
+        print("\n** Run:", ' '.join(cmdargs))
+    proc = subprocess.Popen(cmdargs, shell=False,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # proc.communicate() returns bytes, so change them to strings:
+    return ( b.decode() for b in proc.communicate() )
+
 def start_wpa_supplicant(iface):
     # https://wiki.archlinux.org/index.php/WPA_supplicant
     if is_wpa_running():
         if verbose:
             print("wpa_supplicant is already running")
         return
+    args = ['sudo', 'wpa_supplicant', '-B', '-i', iface,
+            '-c', '/etc/wpa_supplicant/wpa_supplicant.conf']
     if verbose:
-        print("Starting wpa_supplicant ...", end='')
-    subprocess.call(['sudo', 'wpa_supplicant', '-B', '-i', iface,
-                     '-c', '/etc/wpa_supplicant/wpa_supplicant.conf'])
+        print("Starting wpa_supplicant:", ' '.join(args), end='')
+    subprocess.call(args)
     time.sleep(5)
 
 def is_wpa_running():
@@ -102,15 +119,15 @@ def is_wpa_running():
 def start_dhcp(iface):
     if verbose:
         print("Starting dhcp")
-    # Can't use run_as_root here because the output takes time
+    # Can't use run_cmd here because the output takes time
     # and the usr might want to see it, especially if it fails.
     return subprocess.call(['sudo', 'dhclient', '-v', iface])
 
 def get_available_accesspoints(iface):
     aps = {}
     start_wpa_supplicant(iface)
-    run_as_root(["wpa_cli", "scan"])
-    out, err = run_as_root(["wpa_cli", "scan_results"])
+    run_cmd(["wpa_cli", "scan"])
+    out, err = run_cmd(["wpa_cli", "scan_results"])
     stdout_lines = out.split('\n')
     for line in stdout_lines:
         if not line or line.startswith('Selected') \
@@ -132,7 +149,7 @@ def get_available_accesspoints(iface):
 
 def get_current():
     '''
-<iridum>- sudo wpa_cli list_networks                          ~/src/billtracker
+<iridum>- sudo wpa_cli list_networks
 Selected interface 'wlp2s0'
 network id / ssid / bssid / flags
 0       clink   any
@@ -146,7 +163,7 @@ network id / ssid / bssid / flags
 def get_known_networks():
     start_wpa_supplicant(iface)
     networks = {}
-    out, err = run_as_root(["wpa_cli", "list_networks"])
+    out, err = run_cmd(["wpa_cli", "list_networks"])
     stdout_lines = out.split('\n')
 
     for line in stdout_lines:
@@ -219,9 +236,10 @@ def show_browser_if_redirect():
 
     print("Couldn't make a test connection -- probably redirected.")
 
-    # Don't want to run the browser as root, so de-escalate privilege.
+    # Don't want to run a browser as root, so figure out if we're root
+    # and if so, de-escalate privilege.
     # os.getuid(), os.geteuid() and psutil.uids() are all zero under sudo,
-    # but sudo helpfully leaves us an env variable we can use.
+    # but sudo helpfully sets an env variable we can use.
     orig_uid = os.getenv("SUDO_UID")
     if orig_uid:
         print("De-escalating back to UID", orig_uid)
@@ -268,7 +286,7 @@ LAC PUBLIC               -85       [ESS]
 Public-LAC               -90       [ESS]
 NMC-Main                 -79       [WPA2-PSK-CCMP][ESS]
 
-<iridum>- sudo wpa_cli scan_results                                           ~
+<iridum>- wpa_cli scan_results                                           ~
 Selected interface 'wlp2s0'
 bssid / frequency / signal level / flags / ssid
 58:bf:ea:92:ba:c0       2437    -48     [WPA2-EAP-CCMP][ESS]    LAC-Wireless
@@ -354,7 +372,7 @@ def connect_to(to_ap):
         if verbose:
             print("Enabling network", to_ap)
 
-        run_as_root(["wpa_cli", "enable_network", str(known_index)])
+        run_cmd(["wpa_cli", "enable_network", str(known_index)])
 
         if start_dhcp(iface):
             print("DHCP failed")
@@ -369,7 +387,7 @@ def connect_to(to_ap):
         print(to_ap, "must be a new network")
     thisap = accesspoints[to_ap]
 
-    out, err = run_as_root(["wpa_cli", "add_network"])
+    out, err = run_cmd(["wpa_cli", "add_network"])
     # The last (second) line of the output is the new network number.
     # But split('\n') gives a bogus empty final line.
     # To be safer, try iterating to find a line that's just a single number.
@@ -405,20 +423,20 @@ def connect_to(to_ap):
         print("==== SUCCESS: err")
         print(err)
 
-    out, err = run_as_root(["wpa_cli", "set_network", netnum_str, "ssid",
+    out, err = run_cmd(["wpa_cli", "set_network", netnum_str, "ssid",
                  '"%s"' % to_ap])
     check_fail(out, err, "Set network")
 
     if 'WPA' in thisap['flags'] or 'PSK' in thisap['flags']:
         password = getpass.getpass("Password: ")
 
-        out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
+        out, err = run_cmd(["wpa_cli", "set_network", netnum_str,
                                 "psk", '"%s"' % password])
         check_fail(out, err, "Set password")
     else:
         if verbose:
             print("Trying to connect to %s with no password" % to_ap)
-        out, err = run_as_root(["wpa_cli", "set_network", netnum_str,
+        out, err = run_cmd(["wpa_cli", "set_network", netnum_str,
                                 "key_mgmt", "NONE"])
         check_fail(out, err, "Set key management")
 
@@ -430,7 +448,7 @@ def connect_to(to_ap):
 
     if verbose:
         print("Enabling network", netnum_str)
-    out, err = run_as_root(["wpa_cli", "enable_network", netnum_str])
+    out, err = run_cmd(["wpa_cli", "enable_network", netnum_str])
     check_fail(out, err, "Enable network")
 
     if verbose:
@@ -441,7 +459,7 @@ def connect_to(to_ap):
 
     if verbose:
         print("Saving configuration")
-    out, err = run_as_root(["wpa_cli", "save_config"])
+    out, err = run_cmd(["wpa_cli", "save_config"])
     check_fail(out, err, "Save configuration")
     if verbose:
         print(out, err, "Saved configuration")
@@ -473,6 +491,12 @@ if __name__ == '__main__':
         print("Multiple wireless interfaces:", ' '.join(get_wireless_ifaces()))
         print("Using", ifaces[0])
     iface = ifaces[0]
+    if not iface:
+        print("No interface!")
+        sys.exit(1)
+
+    if verbose:
+        print("Interface:", iface)
 
     if args.available:
         show_available_networks()
