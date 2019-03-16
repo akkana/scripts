@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # langgrep: grep for a pattern but only in files written in the
 # specified language (as specified by the shebang line).
@@ -18,6 +18,12 @@ import string, os, sys
 import subprocess
 import shlex
 
+# Use XDG for the config and cache directories if it's available:
+try:
+    import xdg.BaseDirectory
+except:
+    pass
+
 def Usage():
     print("langgrep lang [grepflags] pattern [files]")
     print(" e.g. langgrep python -w find")
@@ -25,23 +31,90 @@ def Usage():
     sys.exit(0)
 
 
+def extra_dirs_by_lang(lang):
+    '''See if there's a lang.conf file that lists extra files by language.
+       It should have absolute paths to directories, one per line.
+       Return a list of extra dirs.
+    '''
+    #
+    # Read the config file
+    #
+    if 'XDG_CONFIG_HOME' in os.environ:
+        confighome = os.environ['XDG_CONFIG_HOME']
+    elif 'xdg.BaseDirectory' in sys.modules:
+        confighome = xdg.BaseDirectory.xdg_config_home
+    else:
+        confighome = os.path.join(os.environ['HOME'], '.config')
+
+    confdir = os.path.join(confighome, 'langgrep')
+    configfile = os.path.join(confdir, '%s.conf' % lang)
+    # print("configfile:", configfile)
+
+    extradirs = []
+    try:
+        with open(configfile) as cf:
+            for line in cf:
+                line = line.strip()
+                if line and not line.startswith('#') and os.path.exists(line):
+                    extradirs.append(line)
+    except:
+        pass
+
+    # print(extradirs)
+    return extradirs
+
+
+file_endings = {
+    'python' : [ '.py', 'py3' ],
+    'javascript' : [ '.js' ],
+    'js' : [ '.js' ],
+    'php' : [ '.php' ],
+    'c' : [ '.c', '.h' ],
+    'c++' : [ '.cpp', '.c++', '.h' ],
+    'java' : [ '.java' ],
+    'ruby' : [ '.rb' ],
+    'perl' : [ '.pl', 'perl' ],
+    'sh' : [ '.sh' ],
+    'bash' : [ '.bash' ],
+    'zsh' : [ '.zsh' ],
+    'csh' : [ '.csh' ],
+}
+
+languages_with_shebang = [ 'python', 'perl', 'sh', 'ruby', 'perl',
+                           'bash', 'zsh', 'csh', 'tcsh' ]
+
 def check_file_lang(filename, lang):
-    if lang.startswith("python") and filename.endswith(".py"):
-        return True
+    '''Try to guess whether a file is a given programming language.
+       Use file extensions, shebangs.
+    '''
+
     if os.path.isdir(filename) or not os.path.exists(filename):
         return False
-    try:
-        f = open(filename, 'rb')
-        firstline = f.readline()
-        f.close()
-    except IOError as e:
-        print("IOError", e)
-        #print "exc_info is", sys.exc_info()
-        sys.exit(1)
-        return False
 
-    if firstline[0:2] == "#!" and firstline.find(lang) >= 0:
-        return True
+    if lang in file_endings:
+        for ending in file_endings[lang]:
+            if filename.endswith(ending):
+                return True
+
+    # Don't waste time looking for shebangs in every file
+    # for languages where that's not relevant:
+    if lang in languages_with_shebang:
+        try:
+            f = open(filename, 'r')
+            firstline = f.readline()
+            f.close()
+        except IOError as e:
+            print("IOError", e)
+            # print "exc_info is", sys.exc_info()
+            sys.exit(1)
+            return False
+        except UnicodeDecodeError as e:
+            # print(filename, "seems to be a binary file")
+            return False
+
+        if firstline[0:2] == "#!" and lang in firstline:
+            return True
+
     return False
 
 
@@ -76,18 +149,26 @@ def langgrep(lang, pattern, grepargs, files):
         # Otherwise lines are so long they're confusing.
         if not pout:
             continue
-        for line in pout.decode("utf-8").split('\n'):
+        # for line in pout.decode("utf-8").split('\n'):
+        for line in pout.decode().split('\n'):
             # For some reason the split is giving us every other line empty
             if not line:
                 continue
+
+            # If there's a super long line, it's not part of my code
+            # and won't be easy to read, so omit it:
+            if len(line) > 160:
+                continue
+
             colon = line.find(":")
             pathparts = line[:colon].split('/')
             if len(pathparts) < 2 or pathparts[-2] == "bin":
                 path = pathparts[-1]
             else:
                 path = '/'.join(pathparts[-2:])
-            s = "%s%s" % (path, line[colon:])
-            print(s.encode('utf-8', "backslashreplace"))
+            s = "%s%s" % (os.path.basename(path), line[colon:])
+            # print(s.encode('utf-8', "backslashreplace"))
+            print(s)
 
 
 def parse_args():
@@ -128,8 +209,13 @@ if __name__ == '__main__':
         if not files:
             files = find_files_in_dir(lang,
                                       os.path.join(os.getenv("HOME"), "bin"))
+            for d in extra_dirs_by_lang(lang):
+                files = files.union(find_files_in_dir(lang, d))
 
-            langgrep(lang, pattern, grepargs, files)
+        # print("files:", '\n'.join(files))
+
+        langgrep(lang, pattern, grepargs, files)
+
         # Try to catch ctrl-C and print a nicer message.
         # This doesn't work, though:
         # subprocess.call just terminates the whole process.
