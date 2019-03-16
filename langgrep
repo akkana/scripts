@@ -3,7 +3,7 @@
 # langgrep: grep for a pattern but only in files written in the
 # specified language (as specified by the shebang line).
 #
-# Copyright 2009 by Akkana Peck.
+# Copyright 2009, 2019 by Akkana Peck.
 # Please share, modify and enjoy under the terms of the GPL v2
 # or, at your option, any later GPL version.
 #
@@ -19,9 +19,11 @@ import subprocess
 import shlex
 
 def Usage():
-    print("langgrep lang [grepflags] pattern files")
-    print(" e.g. langgrep python -w find *")
+    print("langgrep lang [grepflags] pattern [files]")
+    print(" e.g. langgrep python -w find")
+    print("If no files are specified, will search in ~/bin")
     sys.exit(0)
+
 
 def check_file_lang(filename, lang):
     if lang.startswith("python") and filename.endswith(".py"):
@@ -42,74 +44,95 @@ def check_file_lang(filename, lang):
         return True
     return False
 
-# main()
-if len(sys.argv) < 3:
-    Usage()
-lang = sys.argv[1]
 
-# After the language, any flag argument plus the grep pattern
-# gets appended to args -- these will be the grep args.
-patindex = 0
-for i in range(2, len(sys.argv)):
-    if sys.argv[i][0] != '-':
-        patindex = i+1
-        break
-args = sys.argv[2:patindex]
-
-# Now args are the arguments passed to grep;
-# the file list, if any, is sys.argv[patindex+1:]
-# If no file list, use ~/bin/*
-if patindex >= len(sys.argv):
+def find_files_in_dir(lang, direc):
+    '''Return a set of files that are the right language under the given dir.
+    '''
     files = set()
 
-    # Look nonrecursively at ~/bin/*
-    bindir = os.path.join(os.getenv("HOME"), "bin")
-    for f in os.listdir(bindir):
-        files.add(os.path.join(bindir, f))
+    for root, dirs, fs in os.walk(direc, followlinks=True):
+        for f in fs:
+            filename = os.path.join(root, f)
+            if check_file_lang(filename, lang):
+                files.add(os.path.join(root, filename))
 
-    # If language is python, also look in $PYTHONPATH, recursively.
-    if lang == "python":
-        pypathdir = os.path.join(bindir, "pythonpath")
-        if os.path.exists(pypathdir):
-            for root, dirs, fs in os.walk(pypathdir, followlinks=True):
-                for f in fs:
-                    if f.endswith(".py"):
-                        files.add(os.path.join(root, f))
+    return files
 
-else:
-    files = sys.argv[patindex:]
 
-try:
+def langgrep(lang, pattern, grepargs, files):
     filelist = list(files)
     filelist.sort()
+
     for fil in filelist:
-        if check_file_lang(fil, lang):
-            arglist = ['grep', '-H']
-            arglist.extend(args)
-            arglist.append(fil)
-            proc = subprocess.Popen(arglist,
-                                    shell=False, stdout=subprocess.PIPE)
-            pout = proc.communicate()[0]
+        arglist = ['grep', '-H']
+        arglist.extend(grepargs)
+        arglist.append(pattern)
+        arglist.append(fil)
+        proc = subprocess.Popen(arglist,
+                                shell=False, stdout=subprocess.PIPE)
+        pout = proc.communicate()[0]
 
-            # Go through the output removing all but the last dir of the path.
-            # Otherwise lines are so long they're confusing.
-            if not pout:
+        # Go through the output removing all but the last dir of the path.
+        # Otherwise lines are so long they're confusing.
+        if not pout:
+            continue
+        for line in pout.decode("utf-8").split('\n'):
+            # For some reason the split is giving us every other line empty
+            if not line:
                 continue
-            for line in pout.decode("utf-8").split('\n'):
-                # For some reason the split is giving us every other line empty
-                if not line:
-                    continue
-                colon = line.find(":")
-                pathparts = line[:colon].split('/')
-                if len(pathparts) < 2 or pathparts[-2] == "bin":
-                    path = pathparts[-1]
-                else:
-                    path = '/'.join(pathparts[-2:])
-                s = "%s%s" % (path, line[colon:])
-                print(s.encode('utf-8', "backslashreplace"))
+            colon = line.find(":")
+            pathparts = line[:colon].split('/')
+            if len(pathparts) < 2 or pathparts[-2] == "bin":
+                path = pathparts[-1]
+            else:
+                path = '/'.join(pathparts[-2:])
+            s = "%s%s" % (path, line[colon:])
+            print(s.encode('utf-8', "backslashreplace"))
 
-# Try to catch ctrl-C and print a nicer message. This doesn't work, though:
-# subprocess.call just terminates the whole process.
-except KeyboardInterrupt as e:
-    print("Interrupt!")
-    sys.exit(1)
+
+def parse_args():
+    '''Usage: langgrep lang [grepflags] pattern files
+       Returns: (lang, pattern, grepargs, files)
+    '''
+    if len(sys.argv) < 3:
+        Usage()
+
+    lang = sys.argv[1]
+
+    # After the language, any flag argument plus the grep pattern
+    # gets appended to args -- these will be the grep args.
+    patindex = 0
+
+    grepargs = []
+    pattern = None
+    files = []
+
+
+    for arg in sys.argv[2:]:
+        if not pattern:
+            if arg.startswith('-'):
+                grepargs.append(arg)
+            else:
+                pattern = arg
+            continue
+
+        files.append(arg)
+
+    return (lang, pattern, grepargs, files)
+
+
+if __name__ == '__main__':
+    try:
+        lang, pattern, grepargs, files = parse_args()
+
+        if not files:
+            files = find_files_in_dir(lang,
+                                      os.path.join(os.getenv("HOME"), "bin"))
+
+            langgrep(lang, pattern, grepargs, files)
+        # Try to catch ctrl-C and print a nicer message.
+        # This doesn't work, though:
+        # subprocess.call just terminates the whole process.
+    except KeyboardInterrupt as e:
+        print("Interrupt!")
+        sys.exit(1)
