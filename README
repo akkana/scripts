@@ -467,6 +467,10 @@ weather/noaatemps.py:
     Display and plot weather means for a set of stations,
     by downloading NOAA data files.
 
+weather/plotgoes.py:
+    An example of how to fetch NOAA GOES-16 data from AWS and plot
+    it on a matplotlib Basemap map. Useful mainly as an example.
+
 weather/weatherwin:
     Display a window showing temperature and today's forecast
     for several cities at once.
@@ -498,3 +502,11 @@ xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
     the xlrd package to parse the spreadsheet.
 
+
+--------
+Testing:
+--------
+
+Only a few of the scripts have tests. Run tests with:
+
+python3 -m unittest discover
