@@ -473,9 +473,10 @@ weather/noaatemps.py:
     Display and plot weather means for a set of stations,
     by downloading NOAA data files.
 
-weather/plotgoes.py:
-    An example of how to fetch NOAA GOES-16 data from AWS and plot
-    it on a matplotlib Basemap map. Useful mainly as an example.
+weather/awsgoes.py:
+    An example of how to fetch NOAA GOES-16 data from AWS anonymously,
+    and plot it on a matplotlib Basemap map.
+    Useful mainly as an example.
 
 weather/weatherwin:
     Display a window showing temperature and today's forecast
