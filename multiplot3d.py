@@ -23,7 +23,7 @@ def gen_data(xbins, numplots):
         plotpoints = []
         y = random.randint(0, 5)
         for x in range(xbins):
-            y += random.uniform(-1, 1)
+            y += random.uniform(-.8, 1)
             ymin = min(ymin, y)
             ymax = max(ymax, y)
             plotpoints.append((x, y))
@@ -62,7 +62,6 @@ def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
         rainbow = iter(cm.rainbow(numpy.linspace(0, 1, len(verts))))
         for v in verts:
             c = next(rainbow)
-            print("color", c)
             edgecolors.append(c)
             c[-1] = .5
             facecolors.append(c)
@@ -90,8 +89,21 @@ def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
 
 
 if __name__ == '__main__':
-    data, ymin, ymax = gen_data(50, 5)
-    draw_3d(data, ymin, ymax)
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', "--color", dest="colors", default=False,
+                        action="store_true", help="Plot in multiple colors")
+    parser.add_argument('-x', action="store", dest="xbins",
+                        type=int, default=50,
+                        help='Number of points on the X axis')
+    parser.add_argument('-n', action="store", dest="numplots",
+                        type=int, default=5,
+                        help='Number of plots')
+    args = parser.parse_args(sys.argv[1:])
+
+    data, ymin, ymax = gen_data(args.xbins, args.numplots)
+    draw_3d(data, ymin, ymax, colors=args.colors)
     plt.show()
 
 
