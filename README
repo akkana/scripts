@@ -246,6 +246,10 @@ mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
 
+multiplot3d.py:
+    3D plots in matplotlib of a sequence of functions are so poorly
+    documented, it took me ages to get one working. Here's a simple example.
+
 mpcdemo.py:
     A tiny demo of how to use multiprocess communication in the
     multiprocessing module to start a worker thread and pass messages
