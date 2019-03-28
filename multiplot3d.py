@@ -14,7 +14,7 @@ from matplotlib import colors as mcolors
 
 import random
 
-def gen_data(xbins, numplots):
+def gen_data(xbins, numplots, lintest=False):
     '''Generate a list of random histograms'''
     data = []
     ymin = 9999999999999
@@ -23,14 +23,17 @@ def gen_data(xbins, numplots):
         plotpoints = []
         y = random.randint(0, 5)
         for x in range(xbins):
-            y += random.uniform(-.8, 1)
+            # Optional: instead of random data, make each plot a constant
+            # to make it easier to tell which plot is which.
+            if lintest:
+                y = plot
+            else:
+                y += random.uniform(-.8, 1)
             ymin = min(ymin, y)
             ymax = max(ymax, y)
             plotpoints.append((x, y))
         data.append(plotpoints)
     return data, ymin, ymax
-
-from matplotlib.pyplot import cm
 
 def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
     '''Given verts as a list of plots, each plot being a list
@@ -52,19 +55,22 @@ def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
         p.append((p[-1][0], zeroline))
 
     if colors:
-        # Make facecolors and edgecolors be a list of as many colors
-        # as there are plots, i.e. len(verts) colors.
-        # base_hue = mcolors.rgb_to_hsv(
-        # mcolors.hsv_to_rgb(hsv)
-        # basecolors = ['g', 'b', 'y', 'c', 'm' ]
+        # All the matplotlib color sampling examples I can find,
+        # like cm.rainbow/linspace, make adjacent colors similar,
+        # the exact opposite of what most people would want.
+        # So cycle hue manually.
+        hue = 0
+        huejump = .27
         facecolors = []
         edgecolors = []
-        rainbow = iter(cm.rainbow(numpy.linspace(0, 1, len(verts))))
         for v in verts:
-            c = next(rainbow)
+            hue = (hue + huejump) % 1
+            c = mcolors.hsv_to_rgb([hue, 1, 1])
+                                    # random.uniform(.8, 1),
+                                    # random.uniform(.7, 1)])
             edgecolors.append(c)
-            c[-1] = .5
-            facecolors.append(c)
+            # Make the facecolor translucent:
+            facecolors.append(mcolors.to_rgba(c, alpha=.7))
     else:
         facecolors = (1, 1, 1, .8)
         edgecolors = (0, 0, 1, 1)
@@ -92,6 +98,9 @@ if __name__ == '__main__':
     import argparse
     import sys
     parser = argparse.ArgumentParser()
+    parser.add_argument('-l', "--lintest", dest="lintest", default=False,
+                        action="store_true",
+                        help="Ultra simple sample data for testing")
     parser.add_argument('-c', "--color", dest="colors", default=False,
                         action="store_true", help="Plot in multiple colors")
     parser.add_argument('-x', action="store", dest="xbins",
@@ -102,8 +111,15 @@ if __name__ == '__main__':
                         help='Number of plots')
     args = parser.parse_args(sys.argv[1:])
 
-    data, ymin, ymax = gen_data(args.xbins, args.numplots)
+    data, ymin, ymax = gen_data(args.xbins, args.numplots, lintest=args.lintest)
     draw_3d(data, ymin, ymax, colors=args.colors)
     plt.show()
 
+'''
+1st green: 150, 100, 100 = .59, 1, 1    matplotlib hue .17 -> 0.   1.   0.04
+2nd green: 152, 100, 94  = .60, 1, .94             hue .34 -> 0.   0.94 1.
 
+1st green claims [0.   1.   0.04], GIMP says 0 1 . 5
+2dn green claims [0.   0.94 1.  ], GIMP says 0 .94 .5
+
+'''
