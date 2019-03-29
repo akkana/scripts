@@ -83,6 +83,9 @@ def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
 
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1, projection='3d')
+
+    plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
+
     ax.add_collection3d(poly, zs=zs, zdir='y')
 
     ax.set_xlabel('X')
