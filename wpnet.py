@@ -3,6 +3,12 @@
 # A wrapper script to make it easier to use wpa_cli to connect.
 # https://wiki.archlinux.org/index.php/WPA_supplicant#Connecting_with_wpa_cli
 # was very helpful.
+#
+# For extending this to eth0, browse /etc/dhcpcd.conf
+# and /usr/share/dhcpcd/hooks/10-wpa_supplicant on raspbian,
+# where dhcpcd is the master and is in charge of stopping
+# and starting wpa_supplicant.
+#
 # Copyright 2018 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
 import subprocess
