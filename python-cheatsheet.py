@@ -459,6 +459,9 @@ datetime.datetime.strptime('2016-01-01', '%Y-%m-%d')
 # Same thing with decimal seconds:
 datetime.datetime.strptime('2016-01-01.234', '%Y-%m-%d.%f')
 
+# datetime to Unix timestamp:
+time.mktime(d.timetuple())
+
 # but unfortunately there's no way, with just the Python core,
 # to parse a date that might or might not have decimal seconds.
 # You have to strip it off in this way, which seems horrifying
