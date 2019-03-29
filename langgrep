@@ -18,11 +18,13 @@ import string, os, sys
 import subprocess
 import shlex
 
+
 # Use XDG for the config and cache directories if it's available:
 try:
     import xdg.BaseDirectory
 except:
     pass
+
 
 def Usage():
     print("langgrep lang [grepflags] pattern [files]")
@@ -83,6 +85,7 @@ file_endings = {
 languages_with_shebang = [ 'python', 'perl', 'sh', 'ruby', 'perl',
                            'bash', 'zsh', 'csh', 'tcsh' ]
 
+
 def check_file_lang(filename, lang):
     '''Try to guess whether a file is a given programming language.
        Use file extensions, shebangs.
@@ -118,57 +121,58 @@ def check_file_lang(filename, lang):
     return False
 
 
+# Keep track of filepaths already seen, so as not to repeat them.
+filepaths = set()
+
 def find_files_in_dir(lang, direc):
-    '''Return a set of files that are the right language under the given dir.
+    '''Generator: iterate over a set of files that are the right language
+       under the given dir.
     '''
-    files = set()
 
     for root, dirs, fs in os.walk(direc, followlinks=True):
         for f in fs:
             filename = os.path.join(root, f)
             if check_file_lang(filename, lang):
-                files.add(os.path.join(root, filename))
+                filepath = os.path.join(root, filename)
+                if filepath not in filepaths:
+                    filepaths.add(filepath)
+                    yield filepath
 
-    return files
 
+def langgrep(lang, pattern, grepargs, fil):
+    arglist = ['grep', '-H']
+    arglist.extend(grepargs)
+    arglist.append(pattern)
+    arglist.append(fil)
+    proc = subprocess.Popen(arglist,
+                            shell=False, stdout=subprocess.PIPE)
+    pout = proc.communicate()[0]
 
-def langgrep(lang, pattern, grepargs, files):
-    filelist = list(files)
-    filelist.sort()
+    # Go through the output removing all but the last dir of the path.
+    # Otherwise lines are so long they're confusing.
+    if not pout:
+        return
 
-    for fil in filelist:
-        arglist = ['grep', '-H']
-        arglist.extend(grepargs)
-        arglist.append(pattern)
-        arglist.append(fil)
-        proc = subprocess.Popen(arglist,
-                                shell=False, stdout=subprocess.PIPE)
-        pout = proc.communicate()[0]
-
-        # Go through the output removing all but the last dir of the path.
-        # Otherwise lines are so long they're confusing.
-        if not pout:
+    # for line in pout.decode("utf-8").split('\n'):
+    for line in pout.decode().split('\n'):
+        # For some reason the split is giving us every other line empty
+        if not line:
             continue
-        # for line in pout.decode("utf-8").split('\n'):
-        for line in pout.decode().split('\n'):
-            # For some reason the split is giving us every other line empty
-            if not line:
-                continue
 
-            # If there's a super long line, it's not part of my code
-            # and won't be easy to read, so omit it:
-            if len(line) > 160:
-                continue
+        # If there's a super long line, it's not part of my code
+        # and won't be easy to read, so omit it:
+        if len(line) > 160:
+            continue
 
-            colon = line.find(":")
-            pathparts = line[:colon].split('/')
-            if len(pathparts) < 2 or pathparts[-2] == "bin":
-                path = pathparts[-1]
-            else:
-                path = '/'.join(pathparts[-2:])
-            s = "%s%s" % (os.path.basename(path), line[colon:])
-            # print(s.encode('utf-8', "backslashreplace"))
-            print(s)
+        colon = line.find(":")
+        pathparts = line[:colon].split('/')
+        if len(pathparts) < 2 or pathparts[-2] == "bin":
+            path = pathparts[-1]
+        else:
+            path = '/'.join(pathparts[-2:])
+        s = "%s%s" % (os.path.basename(path), line[colon:])
+        # print(s.encode('utf-8', "backslashreplace"))
+        print(s)
 
 
 def parse_args():
@@ -188,7 +192,6 @@ def parse_args():
     pattern = None
     files = []
 
-
     for arg in sys.argv[2:]:
         if not pattern:
             if arg.startswith('-'):
@@ -207,14 +210,19 @@ if __name__ == '__main__':
         lang, pattern, grepargs, files = parse_args()
 
         if not files:
-            files = find_files_in_dir(lang,
-                                      os.path.join(os.getenv("HOME"), "bin"))
+            for filepath in find_files_in_dir(lang,
+                                          os.path.join(os.getenv("HOME"),
+                                                       "bin")):
+                langgrep(lang, pattern, grepargs, filepath)
+
             for d in extra_dirs_by_lang(lang):
-                files = files.union(find_files_in_dir(lang, d))
+                for filepath in find_files_in_dir(lang, d):
+                    langgrep(lang, pattern, grepargs, filepath)
 
         # print("files:", '\n'.join(files))
 
-        langgrep(lang, pattern, grepargs, files)
+        for fil in files:
+            langgrep(lang, pattern, grepargs, fil)
 
         # Try to catch ctrl-C and print a nicer message.
         # This doesn't work, though:
