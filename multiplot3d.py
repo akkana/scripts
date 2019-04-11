@@ -25,7 +25,10 @@ def gen_data(xbins, numplots, lintest=False):
         for x in range(xbins):
             # Optional: instead of random data, make each plot a constant
             # to make it easier to tell which plot is which.
-            if lintest:
+            # Even if lintest isn't set, make the last 20% of the
+            # data predictable, to test whether matplotlib3d is
+            # re-ordering the plots (it isn't).
+            if lintest or x > xbins * .8:
                 y = plot
             else:
                 y += random.uniform(-.8, 1)
@@ -33,6 +36,7 @@ def gen_data(xbins, numplots, lintest=False):
             ymax = max(ymax, y)
             plotpoints.append((x, y))
         data.append(plotpoints)
+
     return data, ymin, ymax
 
 def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
