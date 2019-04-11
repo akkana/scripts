@@ -157,6 +157,9 @@ fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
 
+geojsonmap.py:
+    How to plot a geojson file of polygons exported from QGIS.
+
 gitbranchsync.py:
     Display git branches and what they're tracking,
     check whether a repository needs pushing upstream,
