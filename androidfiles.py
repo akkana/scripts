@@ -303,6 +303,53 @@ def find_basename_size_match(pair, pairlist):
         print("Multiple matches for", base)
     return -1
 
+def make_sync_changes(newdirs, moves, removes, updates, dryrun):
+    '''Print the sync changes, and, if dryrun is false, actually make them.
+    '''
+    if newdirs:
+        if dryrun:
+            print("\n\nMaking needed directories")
+        for d in newdirs:
+            if dryrun:
+                print("mkdir " + d)
+            else:
+                mkdir(d)
+    else:
+        print("No new directories to make.")
+
+    if moves:
+        if dryrun:
+            print("\n\nMoving files that changed location but not size")
+        for pair in moves:
+            if dryrun:
+                print("%s -> %s" % (mvsrc, mvdst))
+            else:
+                move(*pair)
+    else:
+        print("No files need moving.")
+
+    if removes:
+        if dryrun:
+            print("\n\nRemoving files that are no longer needed on the dst")
+        for rm in removes:
+            if dryrun:
+                print(rm)
+            else:
+                remove(rm)
+    else:
+        print("No files need removing.")
+
+    if updates:
+        if dryrun:
+            print("\n\nCopying files that are new or changed")
+        for pair in updates:
+            if dryrun:
+                print(" %s ->\n   %s" % pair)
+            else:
+                copyfile(*pair)
+    else:
+        print("No files need updating.")
+
 def sync(src, dst, dryrun=True):
     '''Synchronize recursively (like rsync -av --size-only)
        between two locations, e.g. a local directory and an android one.
@@ -323,6 +370,7 @@ def sync(src, dst, dryrun=True):
     updates = []
     removes = []
     moves = []
+    newdirs = []
 
     while True:
         if isrc >= len(src_ls) and idst >= len(dst_ls):
@@ -455,7 +503,6 @@ def sync(src, dst, dryrun=True):
         dst += '/'
 
     # Make all needed directories:
-    print("\n\nMaking needed directories")
     for d in dstdirs:
         d = dst + d
 
@@ -468,30 +515,23 @@ def sync(src, dst, dryrun=True):
             continue
         # XXX Should check our file list to see if it exists if it's android.
 
-        print("mkdir " + d)
-        if not dryrun:
-            mkdir(d)
+        newdirs.append(d)
 
-    # Do the moves:
-    print("\n\nMoving files that changed location but not size")
-    for movepair in moves:
+    # Add the full paths to the move pairs.
+    briefmoves = moves
+    moves = []
+    for movepair in briefmoves:
         # These are both paths on the dst.
-        mvsrc = dst + movepair[0]
-        mvdst = dst + movepair[1]
-        print("%s -> %s" % (mvsrc, mvdst))
-        if not dryrun:
-            move(mvsrc, mvdst)
+        moves.append((dst + movepair[0], dst + movepair[1]))
 
-    # Then the removes, to make room for the new stuff:
-    print("\n\nRemoving files that are no longer needed on the dst")
-    for rm in removes:
+    # Then the full paths for the removes.
+    briefremoves = removes
+    removes = []
+    for rm in briefremoves:
         rm = dst + rm
-        print(rm)
-        if not dryrun:
-            remove(rm)
+        removes.append(rm)
 
     # Finally, the updates.
-    print("\n\nCopying files that are new or changed")
     srclen = len(src)
 
     # Special case: if we're syncing from ./ it will have been stripped
@@ -501,16 +541,32 @@ def sync(src, dst, dryrun=True):
     # change only the src->dst paths.
     if src.startswith('./'):
         srclen -= 2
-    for up in updates:
-        srcup = src + up
-        dstup = dst + up
-        print("Updating %s:\n  <- %s\n  -> %s" % (up, srcup, dstup))
-        if not dryrun:
-            copyfile(srcup, dstup)
-            print()
+    briefupdates = updates
+    updates = []
+    for up in briefupdates:
+        updates.append((src + up, dst + up))
 
+    #
+    # Finally, all the lists are made.
+    # Call make_sync_changes, first to print the proposed changes
+    # and then to do them (if not a dryrun).
+    #
+
+    make_sync_changes(newdirs, moves, removes, updates, dryrun=True)
     if dryrun:
-        print("\nThat's what we would have done, if this wasn't a dry run")
+        print("\nThat's would have changed, if this wasn't a dry run.")
+        return
+
+    if not newdirs and not moves and not removes and not updates:
+        print("Nothing to do.")
+        return
+
+    ans = input("Make changes? (y) ")
+    if ans.lower().startswith('n'):
+        return
+
+    make_sync_changes(newdirs, moves, removes, updates, dryrun=False)
+
 
 def Usage():
     progname = os.path.basename(sys.argv[0])
