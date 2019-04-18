@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -11,6 +11,11 @@ import requests
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
+# LANL hasn't bothered to get their TLS certificate right.
+# Disable the endless warnings:
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # LANL error messages, like "System Unavailable", are unfortunately
 # served as HTML rather than something more easily parseable.
@@ -37,10 +42,13 @@ class LANLWeather(object):
         self.tower = tower
         self.keys = keys
 
-        if not hasattr(start, 'year'):
-            self.start = datetime.date(*start)
+        print("start:", start, type(start))
+        print("end:", end, type(end))
+
+        if hasattr(start, 'year'):
+            self.start = datetime.date(start.year, start.month, start.day)
         else:
-            self.start = datetime.date(start)
+            self.start = datetime.date(*start)
 
         if not hasattr(end, 'year'):
             self.end = datetime.date(*end)
@@ -118,7 +126,7 @@ class LANLWeather(object):
             if os.path.exists(cachefile):
                 with open(cachefile) as fp:
                     datablob = fp.read()
-                    print "Read from cache file", cachefile
+                    print("Read from cache file", cachefile)
                     lines = datablob.split('\n')
                     # If the file ends with a newline (as it will),
                     # split('\n') will give us a spurious empty final line.
@@ -144,53 +152,71 @@ class LANLWeather(object):
                          and fileend.date() < datetime.date.today())):
                         # Zero out datablob and lines so we'll fetch
                         # the whole month again.
-                        print "Cache file only contained " \
+                        print("Cache file only contained " \
                               "%04d-%02d-%02d through " \
                               "%04d-%02d-%02d" % (filestart.year,
                                                   filestart.month,
                                                   filestart.day,
                                                   fileend.year,
                                                   fileend.month,
-                                                  fileend.day)
-                        print "Fetching month %d-%d again" % (startday.year,
-                                                              startday.month)
+                                                  fileend.day))
+                        print("Fetching month %d-%d again" % (startday.year,
+                                                              startday.month))
                         datablob = None
                         lines = None
 
             if not datablob:
-                print "Making request for", startday.year, startday.month
+                print("Making request for", startday.year, startday.month)
 
                 datablob = self.make_lanl_request(self.tower,
                                                   startday.year, startday.month)
 
+                # Don't save to cache quite yet: it may not be actual CSV.
+                # But make sure the directory is there.
                 if not os.path.exists(self.cachedir):
                     os.makedirs(self.cachedir)
 
-                with open(cachefile, "w") as outfile:
-                    outfile.write(datablob)
-                    print("Saved to cache %s" % cachefile)
-
+            try:
                 lines = datablob.split('\n')
 
-            try:
                 self.parse_lanl_data(lines)
-            except Exception, e:
-                print "Couldn't parse blob in", cachefile
-                print str(e)
+
+                # Now, if parsing worked without errors, it's okay to
+                # save to a cached CSV file.
+                if not os.path.exists(cachefile):
+                    with open(cachefile, "w") as outfile:
+                        outfile.write(datablob)
+                        print(("Saved to cache %s" % cachefile))
+
+            except Exception as e:
+                print("Couldn't parse blob in", cachefile)
+                print(str(e))
+
+                # Save an error file
+                htmlfilename = cachefile + '.html'
+                with open(htmlfilename, "w") as htmlfile:
+                    htmlfile.write(datablob)
+                    print("Saved original file to", htmlfilename)
 
                 # Try to parse the error message
-                with open(cachefile) as fp:
-                    soup = BeautifulSoup(fp, 'lxml')
-                    # pagecontent = soup.find('div', { 'id': 'pagecontent' })
-                    pagecontent = soup.find(id='pagecontent')
-                    print("HTML Error: %s" % pagecontent.text)
-                os.unlink(cachefile)
+                soup = BeautifulSoup(datablob, 'lxml')
+                pagecontent = soup.find(id='pagecontent')
+                try:
+                    print(("HTML Error: %s" % pagecontent.text))
+                except:
+                    print("No error message but no data either")
+
+                try:
+                    os.unlink(cachefile)
+                except:
+                    print("Nothing to unlink")
 
                 sys.exit(1)
 
             startday += relativedelta(months=1)
             if to_date(startday) > to_date(self.end):
                 break
+
 
     def make_lanl_request(self, tower, year, month):
         '''Make a data request for 15-minute data to the LANL weather machine.
@@ -218,39 +244,54 @@ class LANLWeather(object):
             # set it to the last day of the previous (original) month:
             endtime -= datetime.timedelta(days=1)
 
-        print "make lanl request:", year, month, "01 00:00 to", \
+        print("make lanl request:", year, month, "01 00:00 to", \
             endtime.year, endtime.month, endtime.day, \
-            endtime.hour, endtime.minute
+            endtime.hour, endtime.minute)
 
-        request_data = { 'tower': tower,
-                         'format': 'tab',
-                         'type': '15',
-                         'access': 'extend',
-                         'SUBMIT_SIGNALS': 'Download Data',
+        request_data = [
+            ('tower', tower),
+            ('format', 'tab'),
+            ('type', '15'),
+            ('access', 'extend'),
+            ('SUBMIT_SIGNALS', 'Download Data'),
 
-                         'startyear': '%04d' % year,
-                         'startmonth': '%02d' % month,
-                         'startday': '01',
-                         'starthour': '00',
-                         'startminute': '00',
+            ('startyear', '%04d' % year),
+            ('startmonth', '%02d' % month),
+            ('startday', '01'),
+            ('starthour', '00'),
+            ('startminute', '00'),
 
-                         'endyear': '%04d' % endtime.year,
-                         'endmonth': '%02d' % endtime.month,
-                         'endday': '%02d' % endtime.day,
-                         'endhour':  '%02d' % endtime.hour,
-                         'endminute': '%02d' % endtime.minute
-        }
+            ('endyear', '%04d' % endtime.year),
+            ('endmonth', '%02d' % endtime.month),
+            ('endday', '%02d' % endtime.day),
+            ('endhour',  '%02d' % endtime.hour),
+            ('endminute', '%02d' % endtime.minute),
+        ]
 
-        # request_data['checkbox'] = ','.join(self.keys)
         # Request everything, not just the keys we're plotting,
         # so we have everything cached for later.
-        request_data['checkbox'] = ','.join(LANLWeather.request_keys)
+        for key in LANLWeather.request_keys:
+            request_data.append(('checkbox', key))
 
-        # r = requests.post('http://environweb.lanl.gov/weathermachine/data_request_green_weather.asp', data = request_data)
-        r = requests.post('http://www.weather.lanl.gov/data_request_green_weather.asp', data = request_data)
+        # print("request data:", request_data)
+
+        headers = {
+            'User-Agent': 'LANL Weather Fetcher 0.9',
+            'Referer': 'https://www.weather.lanl.gov/data_request_green_weather.asp',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+
+        # Need verify=False in the request: www.weather.lanl.gov
+        # has SSL set up improperly, among its many other problems.
+        # r = requests.post('http://www.weather.lanl.gov/'
+        #                   'data_request_green_weather.asp',
+        #                   data=request_data, headers=headers, verify=False)
+        r = requests.post('https://www.weather.lanl.gov/data_request_green_weather.asp',
+                          headers=headers, # cookies=cookies,
+                          data=request_data, verify=False)
 
         if not r.text:
-            raise RuntimeError, "Empty response!"
+            raise RuntimeError("Empty response!")
 
         return r.text
 
@@ -300,7 +341,7 @@ class LANLWeather(object):
         for i, k in enumerate(self.keys):
             idx = fields.index(k)
             if idx <= 0:
-                raise IndexError, k + " is not in dataset"
+                raise IndexError(k + " is not in dataset")
             indices.append(idx)
 
             # initialize a vector of values for that key, if not already there:
@@ -322,7 +363,7 @@ class LANLWeather(object):
             d = datetime.datetime(int(l[year]), int(l[month]), int(l[day]),
                                   int(l[hour]), int(l[minute]), 0)
             if self.dates and d <= self.dates[-1]:
-                print "WARNING! Dates out of order,", d, "<=", self.dates[-1]
+                print("WARNING! Dates out of order,", d, "<=", self.dates[-1])
             self.dates.append(d)
             for i, k in enumerate(self.keys):
                 idx = indices[i]
@@ -479,7 +520,8 @@ class LANLWeatherPlots(LANLWeather):
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
 def main():
-    lwp = LANLWeatherPlots('ta54', [2017, 1, 1], datetime.datetime.now(),
+    lwp = LANLWeatherPlots('ta54', [2016, 1, 1],
+                           datetime.datetime.now(),
                            ["spd1", "dir1", "temp0"])
 
     lwp.get_data()
@@ -492,3 +534,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
