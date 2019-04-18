@@ -519,18 +519,53 @@ class LANLWeatherPlots(LANLWeather):
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
+
 def main():
-    lwp = LANLWeatherPlots('ta54', [2016, 1, 1],
-                           datetime.datetime.now(),
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', "--start", dest="start_date", default=None,
+                        help="Start date, YYYY-MM-DD, "
+                             "default beginning of end year",
+                        type=lambda s: datetime.datetime.strptime(s,
+                                                                  '%Y-%m-%d'))
+    parser.add_argument('-e', "--end", dest="end_date", default=None,
+                        help="End date, YYYY-MM-DD, "
+                             "default yesterday",
+                        type=lambda s: datetime.datetime.strptime(s,
+                                                                  '%Y-%m-%d'))
+    # Types of plots
+    parser.add_argument('-w', "--seasonal_wind", dest="seasonal_wind",
+                        default=False,
+                        help="Plot seasonal winds",
+                        action="store_true")
+    args = parser.parse_args(sys.argv[1:])
+    print("args:", args)
+
+    if not args.end_date:
+        args.end_date = datetime.datetime.now()
+
+    if not args.start_date:
+        args.start_date = datetime.datetime(args.end_date.year, 1, 1)
+
+    if args.end_date <= args.start_date:
+        print("Error: start date", args.start_date,
+              "must be earlier than end date", args.end_date)
+        sys.exit(1)
+
+    lwp = LANLWeatherPlots('ta54', args.start_date, args.end_date,
                            ["spd1", "dir1", "temp0"])
 
     lwp.get_data()
 
-    # lwp.plot_seasonal_wind('spd1')
-    lwp.plot_winds('spd1', 'dir1')
-    lwp.plot_temp('temp0')
+    if args.seasonal_wind:
+        lwp.plot_seasonal_wind('spd1')
+    else:
+        lwp.plot_winds('spd1', 'dir1')
+        lwp.plot_temp('temp0')
 
     lwp.show()
+
 
 if __name__ == '__main__':
     main()
