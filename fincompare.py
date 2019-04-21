@@ -27,47 +27,114 @@ import sys, os
 import time
 import datetime
 import math
-import numpy
+import numpy as np
 
 # http://blog.mafr.de/2012/03/11/time-series-data-with-matplotlib/
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-# matplotlib and mpl_finance can no longer read Yahoo data.
 # # from matplotlib.finance import quotes_historical_yahoo_ohlc as yahoo
 # from mpl_finance import quotes_historical_yahoo_ohlc as yahoo
+# matplotlib and mpl_finance can no longer read Yahoo data.
 # They're supposed to be replaced by the pandas datareader,
 # but unfortunately it can't read the data reliably either.
 # Some possible alternatives are mentioned at
 # http://www.financial-hacker.com/bye-yahoo-and-thank-you-for-the-fish/
-import pandas_datareader as pdr
-import pandas as pd
+# For now, alphavantage seems to be a good replacement.
+
+#import csv
+import json
+import requests
 
 outlog = ''
 errlog = ''
 
-# Yahoo data will randomly and unpredictably fail, but waiting a while
-# between fetches helps. Adjust the timeout as needed.
-timeout = 7
 
-# Separate reading the finance data into a separate routine,
-# since these web APIs change and need to be adjusted so often.
-first_time = True
+# Separate reading the finance data into separate routines,
+# since these web APIs change or disappear so often.
 def read_finance_data(ticker, start_date, end_date):
-    global first_time
-    if first_time:
-        first_time = False
-    else:
-        print("(waiting %d secs) " % timeout, end='', file=sys.stderr)
-        sys.stderr.flush()
-        time.sleep(timeout)
+    '''Return a dict,
+       'dates': [list of datetime.date objects],
+       'vals' : [list of floats]
+    '''
+    return read_finance_data_alphavantage(ticker, start_date, end_date)
 
-    print("Fetching", ticker, "data", file=sys.stderr)
-    fdata = pdr.DataReader(ticker,
-                           data_source='yahoo',
-                           start=start_date, end= end_date,
-                           retry_count= 10)
-    return fdata
+
+def read_finance_data_alphavantage(ticker, start_date, end_date):
+    cachedir = os.path.expanduser("~/.cache/fincompare")
+    cachefile = os.path.join(cachedir, ticker + ".json")
+
+    if os.path.exists(cachefile):
+        print("Reading from cache file", cachefile)
+        modtime = datetime.date.fromtimestamp(os.stat(cachefile).st_mtime)
+        now = datetime.date.today()
+        if (now - modtime) < datetime.timedelta(days=2):
+            # Close enough, use the cache file.
+            with open(cachefile) as fp:
+                datadict = json.load(fp)
+    else:
+        key = os.getenv("ALPHAVANTAGE_KEY")
+        if not key:
+            raise RuntimeError("No Alphavantage key")
+
+        # Adding &outputsize=compact gives only last 100 points;
+        # &outputsize=full gives 20+ years historical data.
+        outputsize = 'full'
+
+        url = 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=%s&outputsize=%s&apikey=%s' % (ticker, outputsize, key)
+        print("Requesting", url)
+
+        r = requests.get(url)
+        if r.status_code != 200:
+            r.raise_for_status()
+        with open(cachefile, 'w') as fp:
+            print("Saving in cachefile", cachefile)
+            fp.write(r.text)
+        datadict = json.loads(r.text)
+
+    if not datadict:
+        return None
+
+    # If you exceed the API limits (5/minute, 550/day) you still
+    # get a response, but it's JSON with a long freetext error message.
+    try:
+        vals = datadict['Time Series (Daily)']
+    except KeyError:
+        if 'Note' not in datadict:
+            raise RuntimeError("Unknown problem with query, saved in %s"
+                               % cachefile)
+        if 'API call frequency' in datadict['Note']:
+            # Hit the limit.
+            os.unlink(cachefile)
+            print("Hit the API frequency limit. Try again in 1 minute...",
+                  end='')
+            sys.stdout.flush()
+            for i in range(60):
+                print(".", end='')
+                sys.stdout.flush()
+                time.sleep(1)
+            print("Should work now.")
+            sys.exit(0)
+
+    retvals = { 'dates': [], 'vals': [] }
+    d = start_date
+    while d <= end_date:
+        dstr = d.strftime('%Y-%m-%d')
+        try:
+            daydata = vals[dstr]
+            adjclose = daydata["5. adjusted close"]
+            retvals['dates'].append(d)
+            retvals['vals'].append(float(adjclose))
+        except Exception as e:
+            # That day isn't there -- maybe a weekend or holiday
+            # retvals.append(0.)
+            # print(str(e))
+            pass
+
+        d += datetime.timedelta(days=1)
+
+    return retvals
+
 
 start = None
 initial = None
@@ -81,8 +148,8 @@ initial = None
 imported_modules = {}
 
 # Parse arguments:
-if len(sys.argv) < 2:
-    print("Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % sys.argv[0])
+if len(sys.argv) < 2 or sys.argv[1] == '-h' or sys.argv[1] == '--help':
+    print("Usage: %s [-iinitialval] [-sstarttime] fund [fund fund ...]" % os.path.basename(sys.argv[0]))
     print("No spaces between -i or -s and their values!")
     print("e.g. fincompare -i200000 -s2008-1-1 FMAGX FIRPX")
     sys.exit(1)
@@ -103,7 +170,7 @@ else:
                 print(e)
         elif f.startswith('-s'):
             # Parse the start time:
-            start = datetime.datetime.strptime(f[2:], '%Y-%m-%d')
+            start = datetime.datetime.strptime(f[2:], '%Y-%m-%d').date()
         elif f.startswith('-i'):
             print("Trying initial from '%s'" % f[2:])
             initial = int(f[2:])
@@ -151,22 +218,23 @@ def plot_funds(tickerlist, initial, start, end):
     #                        asobject=True)
     for i, ticker in enumerate(tickerlist):
         try:
-            fund_data = read_finance_data(ticker, start, end)['Adj Close']
-        except:
+            fund_data = read_finance_data(ticker, start, end)
+        except Exception as e:
             errlog += "Couldn't read %s\n" % ticker
+            # raise e
             continue
 
-        # Guard against failures of quotes_historical_yahoo;
-        # without this check you'll see more uncatchable RuntimeWarnings.
-        if fund_data[0] == 0:
-            print(ticker, ": First adjusted close is 0!")
-            continue
+        # Find the first nonzero value.
+        # This may not be the first value, if the beginning of the
+        # year was a weekend and thus a non-trading day.
+        firstval = fund_data['vals'][0]
+        lastval = fund_data['vals'][-1]
 
         # Calculate effective daily-compounded interest rate
-        fixed_pct = fund_data[-1]/fund_data[0] - 1.
+        fixed_pct = lastval/firstval - 1.
 
         Rcc = daysinyear / numdays * \
-            numpy.log(fund_data[-1] / fund_data[0])
+            np.log(lastval / firstval)
 
         # Convert CC return to daily-compounded return:
         Rdaily = daysinyear * (math.exp(Rcc / daysinyear) - 1.)
@@ -181,12 +249,15 @@ def plot_funds(tickerlist, initial, start, end):
                                                fixed_pct*100)
 
         # Normalize to the initial investment:
-        fund_data *= initial / fund_data[0]
+        fund_data['vals'] = [ initial * v/firstval for v in fund_data['vals'] ]
+
+        np.set_printoptions(threshold=sys.maxsize)
+        # print(ticker, "data:", fund_data['vals'])
 
         # and plot
-        # ax1.plot_date(x=fund_data['date'], y=fund_data,
-        #               fmt=pick_color(i), label=ticker)
-        ax1.plot(fund_data, label=ticker)
+        ax1.plot_date(x=fund_data['dates'], y=fund_data['vals'],
+                      fmt=pick_color(i), label=ticker)
+        # ax1.plot(fund_data, label=ticker)
 
 for i, f in enumerate(imported_modules.keys()):
     # XXX This will overwrite any -i and -s.
@@ -201,9 +272,9 @@ for i, f in enumerate(imported_modules.keys()):
 if not initial:
     initial = 100000
 if not start:
-    start = datetime.datetime(2011, 1, 1)
+    start = datetime.date(2011, 1, 1)
 
-end = datetime.datetime.now()
+end = datetime.date.today()
 
 # Baseline at the initial investment:
 plt.axhline(y=initial, color='k')
@@ -240,7 +311,7 @@ def press(event):
 fig = plt.figure(1)
 fig.canvas.mpl_connect('key_press_event', press)
 
-ax1.set_title("Investment options")
+# ax1.set_title("Investment options")
 
 # This is intended for grouping muultiple plots, but it's also the only
 # way I've found to get rid of all the extra blank space around the outsides
