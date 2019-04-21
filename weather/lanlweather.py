@@ -42,9 +42,6 @@ class LANLWeather(object):
         self.tower = tower
         self.keys = keys
 
-        print("start:", start, type(start))
-        print("end:", end, type(end))
-
         if hasattr(start, 'year'):
             self.start = datetime.date(start.year, start.month, start.day)
         else:
@@ -98,6 +95,7 @@ class LANLWeather(object):
                'ta6', 'ta49', 'ta53', 'ta54',
                'ncom',       # North Community
              ]
+
 
     def get_data(self):
         '''Get data from cache if possible. If it's not cached,
@@ -295,6 +293,7 @@ class LANLWeather(object):
 
         return r.text
 
+
     def get_fields_and_units(self, lines):
         '''In LANL data, there's a bunch of boilerplate stuff in the first
            four lines, so the fields don't come until the fifth line,
@@ -327,6 +326,7 @@ class LANLWeather(object):
                                     int(l[hour]), int(l[minute]), 0)
 
         return startdate, enddate
+
 
     def parse_lanl_data(self, lines):
         '''Take a list of lines read either from a cache file
@@ -396,6 +396,7 @@ class LANLWeatherPlots(LANLWeather):
         self.ax1 = None
         self.ax3 = None
 
+
     def show(self):
         # Various desperate attempts to trim spurious whitespace:
 
@@ -431,6 +432,7 @@ class LANLWeatherPlots(LANLWeather):
 
         plt.show()
 
+
     def plot_seasonal_wind(self, ws):
         """
         Plot wind speed by season, averaging over all available years.
@@ -464,6 +466,7 @@ class LANLWeatherPlots(LANLWeather):
         plt.ylabel('Date (ignore year)')
         plt.ylabel('Wind speed average for day')
         plt.legend(loc='upper left')
+
 
     def plot_winds(self, ws, wd):
         """
@@ -500,6 +503,7 @@ class LANLWeatherPlots(LANLWeather):
         labs = [l.get_label() for l in lns]
         axtwin.legend(lns, labs, loc='upper center',
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
+
 
     def plot_temp(self, temp, plot_range=None):
         self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
@@ -539,6 +543,7 @@ def main():
                         default=False,
                         help="Plot seasonal winds",
                         action="store_true")
+
     args = parser.parse_args(sys.argv[1:])
     print("args:", args)
 
@@ -560,6 +565,7 @@ def main():
 
     if args.seasonal_wind:
         lwp.plot_seasonal_wind('spd1')
+
     else:
         lwp.plot_winds('spd1', 'dir1')
         lwp.plot_temp('temp0')
