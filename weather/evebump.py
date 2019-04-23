@@ -105,7 +105,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 
 
-def plot_curves_by_date(dates, val_list, label_list):
+def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
 
     fig = plt.figure(figsize=(12, 8))   # width, height in inches
 
@@ -161,6 +161,10 @@ def plot_curves_by_date(dates, val_list, label_list):
         if (vals < 0).any():
             ax.axhline(color='k', linewidth=.5)
 
+        if bumpdates:
+            for bumpdate in bumpdates:
+                ax.axvline(x=bumpdate, color='r', linewidth=1)
+
     fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
 
     plt.show()
@@ -180,14 +184,26 @@ def plot_raw_data(start_time, end_time):
     dvals = np.gradient(vals)
     d2vals = np.gradient(dvals)
 
+    # Draw lines where we found bumps
+    bumpdays, bumphours = find_bump_times(dates, vals, dvals, None)
+    # Convert to a list of datetimes:
+    bumpdates = []
+    for i, bumpday in enumerate(bumpdays):
+        bumphour = int(bumphours[i])
+        bumpmin = int((bumphours[i] - bumphour) * 60)
+        bumpdates.append(datetime.datetime.combine(bumpday,
+                                                   datetime.time(bumphour,
+                                                                 bumpmin)))
+
     plot_curves_by_date(dates,
                         # [vals],
                         [vals, dvals],
                         # [vals, dvals, d2vals],
-                        ["Temperatures", "Derivative", "2nd Derivative"])
+                        ["Temperatures", "Derivative", "2nd Derivative"],
+                        bumpdates)
 
 
-def find_bump_times(dates, vals, dvals, start_time):
+def find_bump_times(dates, vals, dvals, start_time=None):
     '''Find bump times for each day within the data passed in,
        subject to the given start time.
        start_time is a datetime.time; don't consider anything
@@ -195,11 +211,12 @@ def find_bump_times(dates, vals, dvals, start_time):
        Return (list_of_dates, list_of_floats)
        where the floats are hours (e.g. 20.05 for a bump at 8:30 pm).
     '''
-    # Make sure start_time is just a time, not a datetime
-    if hasattr(start_time, 'time'):
-        start_time = start_time.time()
+    if not start_time:
+        start_time = datetime.time(17)
 
-    print("All dates:", dates)
+    # Make sure start_time is just a time, not a datetime
+    elif hasattr(start_time, 'time'):
+        start_time = start_time.time()
 
     dates_ret = []
     bump_hours = []
@@ -213,7 +230,7 @@ def find_bump_times(dates, vals, dvals, start_time):
 
         # Find the slice for cur_day from start_time to midnight.
         day = d.date()
-        print(d, "(cur_day", cur_day, ")")
+        # print(d, "(cur_day", cur_day, ")")
         if day < cur_day:    # shouldn't happen
             print(dates)
             raise RuntimeError("Dates must be out of order!")
@@ -221,13 +238,13 @@ def find_bump_times(dates, vals, dvals, start_time):
         if day == cur_day:
             if start_idx == None:
                 if d.time() >= start_time:
-                    print("Starting a day at", d)
+                    # print("Starting a day at", d)
                     start_idx = i
             continue
 
         if day > cur_day:
             end_idx = i
-            print("Ending a day at", dates[i])
+            # print("Ending a day at", dates[i])
             bump = find_bump_time(dates[start_idx:end_idx],
                                   vals[start_idx:end_idx],
                                   dvals[start_idx:end_idx],
@@ -235,16 +252,15 @@ def find_bump_times(dates, vals, dvals, start_time):
             if bump:
                 dates_ret.append(cur_day)
                 bump_hours.append(bump)
-                print("Found a bump on", cur_day)
-            else:
-                print("No bump on", cur_day)
+            #     print("Found a bump on", cur_day)
+            # else:
+            #     print("No bump on", cur_day)
             cur_day = day
 
             # Starting a new day, so reset the indices.
             start_idx = None
             end_idx = None
 
-    print("Done with all the dates")
     return dates_ret, bump_hours
 
 
@@ -303,11 +319,10 @@ def plot_evebumps(start_day, end_day):
     # First derivative of temperature:
     dvals = np.gradient(vals)
 
-    bumpdays, bumphours = find_bump_times(dates, vals, dvals,
-                                          datetime.time(17))
+    bumpdays, bumphours = find_bump_times(dates, vals, dvals)
 
-    print("bumpdays:", bumpdays)
-    print("bumphours:", bumphours)
+    # print("bumpdays:", bumpdays)
+    # print("bumphours:", bumphours)
 
     plot_curves_by_date(bumpdays, [ bumphours ], [ "Evebumps" ])
 
