@@ -137,7 +137,7 @@ def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
                 return d.strftime("%b %d %H:%M")
 
             if d.hour == 0:
-                return d.strftime("%b %d\n%H:%M")
+                return d.strftime("%m/%d %H:%M")
             return d.strftime("%H:%M")
 
         # Major ticks once a day:
@@ -164,6 +164,22 @@ def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
         if bumpdates:
             for bumpdate in bumpdates:
                 ax.axvline(x=bumpdate, color='r', linewidth=1)
+                #           label=str(bumpdate.time()))
+                # axvline supposedly takes a lebel= parameter,
+                # but in practice it doesn't do anything with it.
+                # text() is another way, but it doesn't wrap to the plot
+                # and if it overflows, then it messes up tight_layout
+                # and we end up with the X axis labels being unreadable.
+                # ax.text(x=bumpdate, y=80, s=bumpdate.strftime("%H:%M"),
+                #         alpha=0.7, color='r')
+                # annotate() gets around that.
+                # xy, the "point to annotate", is meaningless since we're
+                # annotating a vline, but it's required.
+                ax.annotate(bumpdate.strftime("%H:%M"),
+                            xy=(bumpdate, 50),
+                            xytext=(bumpdate, 80),
+                            clip_on=True)
+                            # bbox={'facecolor':'red', 'clip_on':True})
 
     fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
 
