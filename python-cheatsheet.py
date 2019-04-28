@@ -1031,6 +1031,9 @@ plt.figure(1).canvas.mpl_connect('key_press_event',
                                      sys.exit(0) if e.key == 'ctrl+q'
                                      else None)
 
+# Highlight the X axis, or any other horizontal or vertical line:
+ax.axvline(x=42, color='r', linewidth=1)
+
 # Apply a function to a numpy array, returning another array
 def wraparound(x):
     if x > 12: return x-24
@@ -1041,17 +1044,10 @@ wrapped_arr = vwraparound(orig_arr)
 # Dates on X axis rotated a bit, so they don't overwrite each other:
 fig.autofmt_xdate()
 
-# Label X axis with hours and minutes, on the hour:
-hours = mdates.HourLocator(interval = 1)
-h_fmt = mdates.DateFormatter('%H:%M')
-ax.xaxis.set_major_locator(hours)
-ax.xaxis.set_major_formatter(h_fmt)
-
-# XXX This is incomplete.
-# Set xtick labels to appear every 15 minutes
-ax.xaxis.set_major_locator(xlocator)
-# Format xtick labels as HH:MM
-ax.xaxis.set_major_formatter(xformatter)
+#
+# Custom ticks and labels for dates:
+# see plot_curves_by_date() in weather/evebump.py
+#
 
 
 ################################################################
