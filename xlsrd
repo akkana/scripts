@@ -27,13 +27,13 @@ def print_sheet(sheetname, sh):
             val = sh.cell(rownum, colnum).value
             if hasattr(val, 'decode'):
                 val = val.decode('utf-8')
-            print "Val", val
+            print("Val", val)
 
             # This gets lots of null strings, so filter them out:
             if not val:
                 continue
 
-            #print "type:", type(val), val
+            #print("type:", type(val), val)
             slen = len(str(val))
             #if slen > maxlen: slen = maxlen
             if slen > maxstr[colnum]:
