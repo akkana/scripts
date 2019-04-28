@@ -9,11 +9,17 @@
 
 # Perhaps better is the worldcat API, though it requires signing up for a key.
 # http://web.archive.org/web/20100616012651/http://worldcat.org/devnet/wiki/BasicAPIDetails
+# But the WorldCat search API implies that you have to be a library
+# to get an API key:
+# https://www.oclc.org/developer/develop/web-services/worldcat-search-api.en.html
 #
 # Or maybe scrape the Library of Congress search pages;
 # the LOC has APIs for seemingly everything *except* books,
 # Typical LOC search page URL by author:
 # https://catalog.loc.gov/vwebv/search?searchArg=connie+willis&searchCode=GKEY%5E*&searchType=1&limitTo=none&fromYear=&toYear=&limitTo=LOCA%3Dall&limitTo=PLAC%3Dall&limitTo=TYPE%3Dam&limitTo=LANG%3DENG&recCount=100&filter=Y
+# They also have DMARC requests but they're only free up to 2013,
+# anything more recent requires buying a license for DMARC downloads
+# for something like $7k.
 
 import requests
 import json
