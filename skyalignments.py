@@ -6,18 +6,44 @@ import xml.dom.minidom
 import math
 import sys
 from pprint import pprint
+import argparse
 
 
-def find_rise_set(observer, body):
-    start_time = observer.date
-    observer.date = observer.previous_setting(body)
-    body.compute(observer)
-    setting = body.az
-    observer.date = start_time
-    observer.date = observer.next_rising(body)
-    body.compute(observer)
-    rising = body.az
-    return { 'rise': rising / ephem.degree, 'set': setting / ephem.degree }
+def nearest_time(targettime, t1, t2):
+    '''Given a target datetime and two other datetimes,
+       return the time closer to the target.
+    '''
+    d1 = abs(targettime - t1)
+    d2 = abs(targettime - t2)
+    if d1 <= d2:
+        return d1
+    return d2
+
+
+def find_rise_set(observer, obj, d=None):
+    '''Given an object (like Sun or Moon), find its rising and setting time
+       closest to the given date d, either preceding or following it,
+       for the observer's location.
+       If date isn't specified, use the observer's date.
+    '''
+    if d:
+        observer.date = d
+    prevrise = observer.previous_rising(obj)
+    nextrise = observer.next_rising(obj)
+    prevset = observer.previous_setting(obj)
+    nextset = observer.next_setting(obj)
+
+    risetime = nearest_time(observer.date, prevrise, nextrise)
+    observer.date = risetime
+    obj.compute(observer)
+    rise_az = obj.az
+    settime = nearest_time(observer.date, prevset, nextset)
+    observer.date = settime
+    obj.compute(observer)
+    set_az = obj.az
+
+    return { 'rise': rise_az / ephem.degree,
+             'set': set_az / ephem.degree }
 
 
 def find_azimuths(observer):
@@ -79,7 +105,7 @@ def find_alignments(observer, waypoints, year=None):
     observer.date = ephem.next_solstice(observer.date)
     azimuths['winter solstice'] = find_azimuths(observer)
 
-    pprint(azimuths)
+    # pprint(azimuths)
 
     # How many degrees is close enough?
     DEGREESLOP = 2.
@@ -112,6 +138,7 @@ def read_track_file_GPX(filename):
 
     dom = xml.dom.minidom.parse(filename)
     first_segment_name = None
+    observer = None
 
     # Handle waypoints
     waypts = dom.getElementsByTagName("wpt")
@@ -134,9 +161,11 @@ def read_track_file_GPX(filename):
             name = "Point %d" % pointno
 
         waypoints.append([ name, lat, lon, ele ])
+        if name.lower() == "observer":
+            observer = pt
 
-    pprint(waypoints)
-    return waypoints
+    # pprint(waypoints)
+    return observer, waypoints
 
 
 def get_DOM_text(node, childname=None):
@@ -159,14 +188,59 @@ def get_DOM_text(node, childname=None):
 
 
 if __name__ == '__main__':
-    filename = sys.argv[1]
-    waypoints = read_track_file_GPX(filename)
+    parser = argparse.ArgumentParser(description=""
+        """Find alignments between latitude/longitude coordinate pairs
+and the sun. moon, and other objects on special dates such as
+solstices and equinoxes.
+
+Observer location may be specified either with -o lat,lon,ele or by
+naming one of the GPX waypoints 'Observer'; otherwise the first
+waypoint in the first file will be taken as the observer location.
+
+When specifying location on the command line, latitude and longitude
+are in decimal degrees. Elevation is optional; it will be assumed to be
+meters unless followed by the letter f,
+e.g. -o 34.8086585,-103.2011914,1650f""",
+                                     formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-o', '--observer', action="store", dest="observer",
+                        help='Observer location (lat,lon[,ele])')
+    parser.add_argument('gpxfiles', nargs='+', help='GPX files of waypoints')
+    args = parser.parse_args(sys.argv[1:])
+
+    if args.observer:
+        floats = args.observer.split(',')
+        lat = float(floats[0].strip())
+        lon = float(floats[1].strip())
+        if len(floats) > 2:
+            if floats[2].endswith('f'):    # ends with f, convert feet to meters
+                ele = float(floats[2][:-1].strip()) * 0.3048
+            elif floats[2].endswith('m'):  # ends with m, already meters
+                ele = float(floats[2][:-1].strip())
+            else:                          # assume meters
+                ele = float(floats[2].strip())
+        else:
+            ele = 0.
+        observerPoint = [ 'Observer', lat, lon, ele ]
+    else:
+        observerPoint = None
+
+    waypoints = []
+    for filename in args.gpxfiles:
+        obs, wp = read_track_file_GPX(filename)
+        if wp:
+            waypoints += wp
+        else:
+            print("No waypoints in", filename)
+        if obs:
+            observerPoint = obs
+
     if not waypoints:
-        print("No waypoints in", filename)
+        parser.print_help()
         sys.exit(1)
 
-    print("First waypoint:", waypoints[0])
-    observerPoint = waypoints[0]
+    if not observerPoint:
+        print("First waypoint:", waypoints[0])
+        observerPoint = waypoints[0]
 
     observer = ephem.Observer()
     # Observer will take degrees as a string, but if you pass it floats
