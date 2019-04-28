@@ -84,6 +84,29 @@ for k in d:
     setattr(obj, k, d[k])
 
 ########################################################
+# One-liners
+########################################################
+# Python gives unclear errors if you try to make a one-liner that
+# includes multiple lines plus a loop or conditional.
+# Because the loop is a compound statement which can't be included
+# on the same line with a "small statement" according to Python's grammar:
+# https://docs.python.org/reference/grammar.html
+
+# Ways of getting around this:
+
+# Pass the program as stdin:
+echo 'import time\nl = range(10)\nfor i in l: print(i)' | python
+
+# Use ANSI quoting n bash, zsh or ksh along with \n:
+python -c $'import time\nl = range(10)\nfor i in l: print(i)\n'
+
+# More POSIX compliant: use command substitution:
+python -c "$(printf %b 'import sys\nfor r in range(10): print("%d:" % r)')"
+
+# You can also sometimes rewrite loops with list comprehensions or map()
+# to turn them into small statements.
+
+########################################################
 # Debugging and stack traces
 ########################################################
 
@@ -362,7 +385,7 @@ import argparse
 
 def parse_args():
     """Parse commandline arguments."""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Do some stuff")
 
     # Boolean flag
     parser.add_argument('-c', "--check", dest="check", default=False,
@@ -371,6 +394,13 @@ def parse_args():
     # Without type=, will store a string.
     parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
                         help='Beta parameter (default: 2)')
+
+    # Date
+    parser.add_argument('-s', "--start", dest="start_date", default=None,
+                        help="Start date, YYYY-MM-DD, "
+                             "default beginning of this year",
+                        type=lambda s: datetime.datetime.strptime(s,
+                                                                  '%Y-%m-%d'))
 
     # Flag that takes multiple arguments, with different names for each arg.
     # Note that this is also a way around the problem of passing
@@ -386,9 +416,11 @@ def parse_args():
 
     # single positional argument
     parser.add_argument('url', help='The URL to open')
-
-    # or, multiple arguments
     parser.add_argument('urls', nargs='?', default='http://localhost/',
+                        help="URLs to open")
+
+    # or, multiple arguments requiring at least one
+    parser.add_argument('urls', nargs='+', default='http://localhost/',
                         help="URLs to open")
 
     args = parser.parse_args(sys.argv[1:])
@@ -459,6 +491,10 @@ datetime.datetime.strptime('2016-01-01.234', '%Y-%m-%d.%f')
 
 # datetime to Unix timestamp:
 time.mktime(d.timetuple())
+
+# Unix timestamp to datetime:
+datetime.datetime.fromtimestamp(1553010256)
+datetime.datetime.utcfromtimestamp(1553010256)
 
 # but unfortunately there's no way, with just the Python core,
 # to parse a date that might or might not have decimal seconds.
@@ -989,7 +1025,7 @@ plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
 # like ax.axis('tight') or plt.axis('tight'), prevent set_?lib
 # and tight_layout from working.
 
-# Exit on key q
+# Exit on key q (this now seems to be the default)
 plt.figure(1).canvas.mpl_connect('key_press_event',
                                  lambda e:
                                      sys.exit(0) if e.key == 'ctrl+q'
