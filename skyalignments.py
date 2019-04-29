@@ -33,17 +33,23 @@ def find_rise_set(observer, obj, d=None):
     prevset = observer.previous_setting(obj)
     nextset = observer.next_setting(obj)
 
-    risetime = nearest_time(observer.date, prevrise, nextrise)
-    observer.date = risetime
-    obj.compute(observer)
-    rise_az = obj.az
-    settime = nearest_time(observer.date, prevset, nextset)
-    observer.date = settime
-    obj.compute(observer)
-    set_az = obj.az
+    riseset_ret = {}
 
-    return { 'rise': rise_az / ephem.degree,
-             'set':   set_az / ephem.degree }
+    # Rise time
+    observer.date = nearest_time(observer.date, prevrise, nextrise)
+    obj.compute(observer)
+    riseset_ret['rise'] = { 'az':   obj.az / ephem.degree,
+                            'time': observer.date
+                          }
+
+    # Set time
+    observer.date = nearest_time(observer.date, prevset, nextset)
+    obj.compute(observer)
+    riseset_ret['set'] = { 'az':   obj.az / ephem.degree,
+                           'time': observer.date
+                         }
+
+    return riseset_ret
 
 
 def find_azimuths(observer):
@@ -124,24 +130,28 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
     # any of them correspond to any of the astronomical angles.
     matches = []
     for wp1 in observer_points:
-        print("Checking observer", wp1)
+        print("\nChecking observer", wp1)
         for wp2 in waypoints:
             if wp1 == wp2:
                 continue
             angle = angle_between(wp1, wp2)
-            print("  ... against", wp2, angle)
 
             # Does that angle match any of our astronomical ones?
-            for season in azimuths:
-                for body in azimuths[season]:
-                    for event in azimuths[season][body]:
-                        if abs(azimuths[season][body][event] - angle) < DEGREESLOP:
-                            matches.append([wp1[0], wp2[0],
-                                            azimuths[season][body][event],
-                                            '%s %s%s' % (season, body, event)])
+            for season in azimuths:  # vernal equinox, etc.
+                for body in azimuths[season]:  # sun, full moon
+                    for event in azimuths[season][body]:  # rise, set
+                        event_az = azimuths[season][body][event]['az']
+                        if abs(event_az - angle) < DEGREESLOP:
+                            matches.append({
+                                'observer': wp1[0],
+                                'target':   wp2[0],
+                                'event':    '%s %s%s' % (season, body, event),
+                                'azimuth':  event_az,
+                                'slop':     event_az - angle,
+                                'time':     azimuths[season][body][event]['time'].datetime()
+                            })
 
-    print("Matches:")
-    pprint(matches)
+    return matches
 
 
 def read_track_file_GPX(filename):
@@ -201,6 +211,11 @@ def get_DOM_text(node, childname=None):
     return None
 
 
+def save_alignments_as_GPX(alignments):
+    '''Given a list of alignments [[observername, targetname, bearing, event]]
+    '''
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=""
         """Find alignments between latitude/longitude coordinate pairs
@@ -219,6 +234,10 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
     # Specify an observer:
     parser.add_argument('-o', '--observer', action="store", dest="observer",
                         help='Observer location (lat,lon[,ele])')
+
+    # Specify an observer name:
+    parser.add_argument('-n', '--observername', action="store",
+                        dest="observername", help='Observer name')
 
     # Don't use an observer, check angles between all pairs of points:
     parser.add_argument('-a', "--all", dest="allpoints", default=False,
@@ -275,11 +294,18 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
         observer.elevation = observer_point[3]
     else:
         observer.elevation = 500.0  # meters
-    observer.name = "%s %f, %f, %dm" % (observer_point[0],
-                                       observer.lon / ephem.degree,
-                                       observer.lat / ephem.degree,
-                                       observer.elevation)
+    if args.observername:
+        observer.name = args.observername
+    else:
+        observer.name = "%s %f, %f, %dm" % (observer_point[0],
+                                            observer.lon / ephem.degree,
+                                            observer.lat / ephem.degree,
+                                            observer.elevation)
     print(observer)
     print()
 
-    find_alignments(observer, waypoints, allpoints=args.allpoints)
+    alignments = find_alignments(observer, waypoints, allpoints=args.allpoints)
+    print("\nFound Alignments from %s:" % observer.name)
+    pprint(alignments)
+    # save_alignments_as_GPX(alignments)
+
