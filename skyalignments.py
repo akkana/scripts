@@ -10,14 +10,14 @@ import argparse
 
 
 def nearest_time(targettime, t1, t2):
-    '''Given a target datetime and two other datetimes,
+    '''Given a target ephem.time and two other datetimes,
        return the time closer to the target.
     '''
     d1 = abs(targettime - t1)
     d2 = abs(targettime - t2)
     if d1 <= d2:
-        return d1
-    return d2
+        return t1
+    return t2
 
 
 def find_rise_set(observer, obj, d=None):
@@ -43,7 +43,7 @@ def find_rise_set(observer, obj, d=None):
     set_az = obj.az
 
     return { 'rise': rise_az / ephem.degree,
-             'set': set_az / ephem.degree }
+             'set':   set_az / ephem.degree }
 
 
 def find_azimuths(observer):
@@ -82,7 +82,7 @@ def angle_between(wp1, wp2):
     return (360. - math.atan2(y, x) / ephem.degree) % 360
 
 
-def find_alignments(observer, waypoints, year=None):
+def find_alignments(observer, waypoints, year=None, allpoints=False):
     '''Find all the alignments with solstice/equinox sun/moon rise/set.
        Returns a dict: { 'vernal equinox': { 'moon': { 'rise': 94.17... } } }
        of azimuth angles in decimal degrees
@@ -105,19 +105,31 @@ def find_alignments(observer, waypoints, year=None):
     observer.date = ephem.next_solstice(observer.date)
     azimuths['winter solstice'] = find_azimuths(observer)
 
-    # pprint(azimuths)
+    pprint(azimuths)
 
     # How many degrees is close enough?
     DEGREESLOP = 2.
 
+    # If allpoints is set, check angles among all pairs of points.
+    # Otherwise, only check angles from observer to other points.
+    if allpoints:
+        observer_points = waypoints
+    else:
+        observer_points = [ [ observer.name,
+                              observer.lat / ephem.degree,
+                              observer.lon / ephem.degree,
+                              observer.elevation ] ]
+
     # Now go through all the angles between waypoints and see if
     # any of them correspond to any of the astronomical angles.
     matches = []
-    for wp1 in waypoints:
+    for wp1 in observer_points:
+        print("Checking observer", wp1)
         for wp2 in waypoints:
             if wp1 == wp2:
                 continue
             angle = angle_between(wp1, wp2)
+            print("  ... against", wp2, angle)
 
             # Does that angle match any of our astronomical ones?
             for season in azimuths:
@@ -125,6 +137,7 @@ def find_alignments(observer, waypoints, year=None):
                     for event in azimuths[season][body]:
                         if abs(azimuths[season][body][event] - angle) < DEGREESLOP:
                             matches.append([wp1[0], wp2[0],
+                                            azimuths[season][body][event],
                                             '%s %s%s' % (season, body, event)])
 
     print("Matches:")
@@ -160,9 +173,10 @@ def read_track_file_GPX(filename):
             pointno += 1
             name = "Point %d" % pointno
 
-        waypoints.append([ name, lat, lon, ele ])
         if name.lower() == "observer":
-            observer = pt
+            observer = [ 'Observer', lat, lon, ele ]
+        else:
+            waypoints.append([ name, lat, lon, ele ])
 
     # pprint(waypoints)
     return observer, waypoints
@@ -202,8 +216,16 @@ are in decimal degrees. Elevation is optional; it will be assumed to be
 meters unless followed by the letter f,
 e.g. -o 34.8086585,-103.2011914,1650f""",
                                      formatter_class=argparse.RawTextHelpFormatter)
+    # Specify an observer:
     parser.add_argument('-o', '--observer', action="store", dest="observer",
                         help='Observer location (lat,lon[,ele])')
+
+    # Don't use an observer, check angles between all pairs of points:
+    parser.add_argument('-a', "--all", dest="allpoints", default=False,
+                        action="store_true",
+                        help="Don't use an observer, check angles "
+                              "between all pairs of points")
+
     parser.add_argument('gpxfiles', nargs='+', help='GPX files of waypoints')
     args = parser.parse_args(sys.argv[1:])
 
@@ -220,9 +242,9 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                 ele = float(floats[2].strip())
         else:
             ele = 0.
-        observerPoint = [ 'Observer', lat, lon, ele ]
+        observer_point = [ 'Observer', lat, lon, ele ]
     else:
-        observerPoint = None
+        observer_point = None
 
     waypoints = []
     for filename in args.gpxfiles:
@@ -232,29 +254,32 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
         else:
             print("No waypoints in", filename)
         if obs:
-            observerPoint = obs
+            observer_point = obs
 
     if not waypoints:
         parser.print_help()
         sys.exit(1)
 
-    if not observerPoint:
-        print("First waypoint:", waypoints[0])
-        observerPoint = waypoints[0]
+    if not observer_point:
+        print("Using first waypoint for observer:", waypoints[0])
+        observer_point = waypoints[0]
+        if not args.allpoints:
+            waypoints = waypoints[1:]
 
     observer = ephem.Observer()
     # Observer will take degrees as a string, but if you pass it floats
     # it expects radians, though that's undocumented.
-    observer.lat = observerPoint[1] * ephem.degree
-    observer.lon = observerPoint[2] * ephem.degree
-    if len(observerPoint) > 3:
-        observer.elevation = observerPoint[3]
+    observer.lat = observer_point[1] * ephem.degree
+    observer.lon = observer_point[2] * ephem.degree
+    if len(observer_point) > 3:
+        observer.elevation = observer_point[3]
     else:
         observer.elevation = 500.0  # meters
-    observer.name = "%s %f, %f, %f" % (observerPoint[0],
-                                       observer.lon, observer.lat,
+    observer.name = "%s %f, %f, %dm" % (observer_point[0],
+                                       observer.lon / ephem.degree,
+                                       observer.lat / ephem.degree,
                                        observer.elevation)
     print(observer)
     print()
 
-    find_alignments(observer, waypoints)
+    find_alignments(observer, waypoints, allpoints=args.allpoints)
