@@ -73,19 +73,17 @@ def find_azimuths(observer):
     return riseset
 
 
-def angle_between(wp1, wp2):
-    '''Bearing from one waypoint to another.
-       Waypoints are [name, lat, lon, ele]
-    '''
+def bearing_to(wp1, wp2):
     # https://www.movable-type.co.uk/scripts/latlong.html
-    # https://stackoverflow.com/questions/3932502/calculate-angle-between-two-latitude-longitude-points
+    # Don't trust any code you find for this: test it extensively;
+    # most posted bearing finding code is bogus.
     lat1, lon1 = wp1[1], wp1[2]
     lat2, lon2 = wp2[1], wp2[2]
-    dlon = lon2 - lon1
-    y = math.sin(dlon) * math.cos(lat2)
-    x = math.cos(lat1) * math.sin(lat2) \
-        - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
-    return (360. - math.atan2(y, x) / ephem.degree) % 360
+    y = math.sin(lon2 - lon1) * math.cos(lat2)
+    x = math.cos(lat1) * math.sin(lat2) - \
+        math.sin(lat1) * math.cos(lat2) * math.cos(lon2-lon1)
+    brng = math.atan2(y, x) / ephem.degree
+    return (360 - brng) % 360
 
 
 def find_alignments(observer, waypoints, year=None, allpoints=False):
@@ -119,6 +117,7 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
     # If allpoints is set, check angles among all pairs of points.
     # Otherwise, only check angles from observer to other points.
     if allpoints:
+        print("Looking for alignments among all points")
         observer_points = waypoints
     else:
         observer_points = [ [ observer.name,
@@ -134,7 +133,8 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
         for wp2 in waypoints:
             if wp1 == wp2:
                 continue
-            angle = angle_between(wp1, wp2)
+            angle = bearing_to(wp1, wp2)
+            print("  ... vs", wp2, angle)
 
             # Does that angle match any of our astronomical ones?
             for season in azimuths:  # vernal equinox, etc.
@@ -154,8 +154,38 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
     return matches
 
 
-def read_track_file_GPX(filename):
-    """Read a GPX track file. Ignore tracks.
+def read_waypoint_file_CSV(filename):
+    """Read a CSV waypoint file. Ignore tracks.
+       Return a list of [name, lat, lon, ele] floats for waypoints.
+    """
+    import csv
+
+    points = []
+    observer = None
+    with open(filename) as csvfp:
+        reader = csv.DictReader(csvfp)
+        for row in reader:
+            # Each row is an OrderedDict
+            try:
+                if 'elevation' in row:
+                    ele = float(row['elevation'])
+                else:
+                    ele = 0
+                point = [ row['name'],
+                          float(row['latitude']), float(row['latitude']),
+                          ele ]
+            except ValueError:
+                print("ValueError on", row)
+            if row['name'].lower() == "observer":
+                observer = point
+            else:
+                points.append(point)
+
+    return observer, points
+
+
+def read_waypoint_file_GPX(filename):
+    """Read a GPX waypoint file. Ignore tracks.
        Return a list of [name, lat, lon, ele] floats for waypoints.
     """
 
@@ -179,6 +209,7 @@ def read_track_file_GPX(filename):
             ele = 500    # meters
 
         name = get_DOM_text(pt, "name")
+        print("    { 'name': '%s', 'lat': %f, 'lon': %f }," % (name, lat, lon))
         if not name:
             pointno += 1
             name = "Point %d" % pointno
@@ -245,7 +276,8 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                         help="Don't use an observer, check angles "
                               "between all pairs of points")
 
-    parser.add_argument('gpxfiles', nargs='+', help='GPX files of waypoints')
+    parser.add_argument('waypointfiles', nargs='+',
+                        help='GPX or CSV files containing waypoints')
     args = parser.parse_args(sys.argv[1:])
 
     if args.observer:
@@ -266,8 +298,14 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
         observer_point = None
 
     waypoints = []
-    for filename in args.gpxfiles:
-        obs, wp = read_track_file_GPX(filename)
+    for filename in args.waypointfiles:
+        if filename.lower().endswith('gpx'):
+            obs, wp = read_waypoint_file_GPX(filename)
+        elif filename.lower().endswith('csv'):
+            obs, wp = read_waypoint_file_CSV(filename)
+        else:
+            print("Unknown file type %s: skipping" % filename)
+            continue
         if wp:
             waypoints += wp
         else:
@@ -298,14 +336,18 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
         observer.name = args.observername
     else:
         observer.name = "%s %f, %f, %dm" % (observer_point[0],
-                                            observer.lon / ephem.degree,
                                             observer.lat / ephem.degree,
+                                            observer.lon / ephem.degree,
                                             observer.elevation)
     print(observer)
     print()
 
     alignments = find_alignments(observer, waypoints, allpoints=args.allpoints)
-    print("\nFound Alignments from %s:" % observer.name)
-    pprint(alignments)
-    # save_alignments_as_GPX(alignments)
+    if alignments:
+        print("\nFound Alignments from %s:" % observer.name)
+        pprint(alignments)
+        # save_alignments_as_GPX(alignments)
+
+    else:
+        print("Couldn't find any alignments with %s" % observer.name)
 
