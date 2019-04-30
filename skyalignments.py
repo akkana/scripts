@@ -87,16 +87,17 @@ def bearing_to(wp1, wp2):
     return math.degrees(math.atan2(y, x)) % 360
 
 
-def find_alignments(observer, waypoints, year=None, allpoints=False):
+def find_alignments(observer, waypoints, year, allpoints=False):
     '''Find all the alignments with solstice/equinox sun/moon rise/set.
        Returns a dict: { 'vernal equinox': { 'moon': { 'rise': 94.17... } } }
        of azimuth angles in decimal degrees
     '''
     azimuths = {}
 
-    if not year:
-        year = datetime.now().year
-    start_date = ephem.Date('1/1/%d' % year)
+    # start_date = ephem.Date('%d/1/1' % year)
+    print("Year", year, type(year))
+    start_date = ephem.Date((year, 1, 1))
+    # date= ephem.date((-59000,1,1))
 
     observer.date = ephem.next_equinox(start_date)
     azimuths['vernal equinox'] = find_azimuths(observer)
@@ -110,7 +111,7 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
     observer.date = ephem.next_solstice(observer.date)
     azimuths['winter solstice'] = find_azimuths(observer)
 
-    pprint(azimuths)
+    # pprint(azimuths)
 
     # How many degrees is close enough?
     DEGREESLOP = 2.
@@ -145,11 +146,11 @@ def find_alignments(observer, waypoints, year=None, allpoints=False):
                         if abs(event_az - angle) < DEGREESLOP:
                             matches.append({
                                 'observer': wp1[0],
-                                'target':   wp2[0],
-                                'event':    '%s %s%s' % (season, body, event),
-                                'azimuth':  event_az,
-                                'slop':     event_az - angle,
-                                'time':     azimuths[season][body][event]['time'].datetime()
+                                'target': wp2[0],
+                                'event': '%s %s%s' % (season, body, event),
+                                'azimuth': event_az,
+                                'slop': event_az - angle,
+                                'time': azimuths[season][body][event]['time']
                             })
 
     return matches
@@ -210,7 +211,7 @@ def read_waypoint_file_GPX(filename):
             ele = 500    # meters
 
         name = get_DOM_text(pt, "name")
-        print("    { 'name': '%s', 'lat': %f, 'lon': %f }," % (name, lat, lon))
+        # print("  { 'name': '%s', 'lat': %f, 'lon': %f }," % (name, lat, lon))
         if not name:
             pointno += 1
             name = "Point %d" % pointno
@@ -271,6 +272,10 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
     parser.add_argument('-n', '--observername', action="store",
                         dest="observername", help='Observer name')
 
+    # Different year from now:
+    parser.add_argument('-y', '--year', action="store", type=int,
+                        dest="year", help='Year')
+
     # Don't use an observer, check angles between all pairs of points:
     parser.add_argument('-a', "--all", dest="allpoints", default=False,
                         action="store_true",
@@ -297,6 +302,12 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
         observer_point = [ 'Observer', lat, lon, ele ]
     else:
         observer_point = None
+
+    if args.year:
+        year = args.year
+    else:
+        year = datetime.now().year
+
 
     waypoints = []
     for filename in args.waypointfiles:
@@ -340,13 +351,22 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                                             observer.lat / ephem.degree,
                                             observer.lon / ephem.degree,
                                             observer.elevation)
-    print(observer)
-    print()
+    # print(observer)
 
-    alignments = find_alignments(observer, waypoints, allpoints=args.allpoints)
+    alignments = find_alignments(observer, waypoints,
+                                 year=year, allpoints=args.allpoints)
     if alignments:
-        print("\nFound Alignments from %s:" % observer.name)
-        pprint(alignments)
+        # pprint(alignments)
+        cur_observer = None
+        for a in alignments:
+            if a['observer'] != cur_observer:
+                cur_observer = a['observer']
+                print("\nFrom %s:" % cur_observer)
+
+            print("%s, %s at %s (az %d +/- %.2f)"
+                  % ( a['event'], a['target'],
+                      a['time'],
+                      a['azimuth'], a['slop']))
         # save_alignments_as_GPX(alignments)
 
     else:
