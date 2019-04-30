@@ -77,13 +77,14 @@ def bearing_to(wp1, wp2):
     # https://www.movable-type.co.uk/scripts/latlong.html
     # Don't trust any code you find for this: test it extensively;
     # most posted bearing finding code is bogus.
-    lat1, lon1 = wp1[1], wp1[2]
-    lat2, lon2 = wp2[1], wp2[2]
+    # print("bearing from waypoints:", wp1, wp2)
+    lat1, lon1 = math.radians(wp1[1]), math.radians(wp1[2])
+    lat2, lon2 = math.radians(wp2[1]), math.radians(wp2[2])
     y = math.sin(lon2 - lon1) * math.cos(lat2)
     x = math.cos(lat1) * math.sin(lat2) - \
         math.sin(lat1) * math.cos(lat2) * math.cos(lon2-lon1)
-    brng = math.atan2(y, x) / ephem.degree
-    return (360 - brng) % 360
+
+    return math.degrees(math.atan2(y, x)) % 360
 
 
 def find_alignments(observer, waypoints, year=None, allpoints=False):
