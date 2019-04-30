@@ -150,7 +150,9 @@ def find_alignments(observer, waypoints, year, allpoints=False):
                                 'event': '%s %s%s' % (season, body, event),
                                 'azimuth': event_az,
                                 'slop': event_az - angle,
-                                'time': azimuths[season][body][event]['time']
+                                'time': azimuths[season][body][event]['time'],
+                                'latitude': wp2[1],
+                                'longitude': wp2[2],
                             })
 
     return matches
@@ -244,10 +246,52 @@ def get_DOM_text(node, childname=None):
     return None
 
 
-def save_alignments_as_GPX(alignments):
+def save_alignments_as_GPX(observer, alignments, filename):
     '''Given a list of alignments [[observername, targetname, bearing, event]]
     '''
+    with open(filename, 'w') as outfp:
+        print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<gpx version="1.1" creator="SkyAlignments~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+<trk>''', file=outfp)
 
+        for a in alignments:
+            if (a['latitude'] == observer.lat and
+                a['longitude'] == observer.lon):
+                continue
+            print('''  <trkseg>
+    <name>%s, %s</name>
+    <trkpt lat="%f" lon="%f">
+      <time>%s</time>
+      <name>%s</name>
+    </trkpt>
+    <trkpt lat="%f" lon="%f">
+      <time>%s</time>
+      <name>%s, %s</name>
+    </trkpt>
+  </trkseg>''' % (a['target'], a['event'],
+                  math.degrees(observer.lat), math.degrees(observer.lon),
+                 str(a['time']), "observer",
+                   a['latitude'], a['longitude'], str(a['time']),
+                   a['target'], a['event']),
+                  file=outfp)
+
+        print("</trk>", file=outfp)
+
+        # Apparently naming trksegs doesn't do anything, at least in pytopo.
+        # Set waypoints too.
+        for a in alignments:
+            if (a['latitude'] == observer.lat and
+                a['longitude'] == observer.lon):
+                continue
+            print('''  <wpt lat="%f" lon="%f">
+    <time>%s</time>
+    <name>%s, %s</name>
+  </wpt>''' % (a['latitude'], a['longitude'], str(a['time']),
+               a['target'], a['event']),
+                  file=outfp)
+
+        print("</gpx>", file=outfp)
+        print("Saved alignments to", filename)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=""
@@ -275,6 +319,10 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
     # Different year from now:
     parser.add_argument('-y', '--year', action="store", type=int,
                         dest="year", help='Year')
+
+    # Output GPX file:
+    parser.add_argument('-s', '--outfile', action="store",
+                        dest="outfile", help='Save GPX to output file')
 
     # Don't use an observer, check angles between all pairs of points:
     parser.add_argument('-a', "--all", dest="allpoints", default=False,
@@ -367,7 +415,9 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                   % ( a['event'], a['target'],
                       a['time'],
                       a['azimuth'], a['slop']))
-        # save_alignments_as_GPX(alignments)
+
+        if args.outfile:
+            save_alignments_as_GPX(observer, alignments, args.outfile)
 
     else:
         print("Couldn't find any alignments with %s" % observer.name)
