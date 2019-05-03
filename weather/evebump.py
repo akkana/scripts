@@ -158,8 +158,13 @@ def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
         ax.tick_params(which='minor', length=3, color='r')
 
         ax.legend(loc='upper right')
-        if (vals < 0).any():
-            ax.axhline(color='k', linewidth=.5)
+
+        # Are there any negative temperatures in vals?
+        # If so, highlight the temp=0 axis so it's easier to see.
+        for v in vals:
+            if v < 0:
+                ax.axhline(color='k', linewidth=.5)
+                break
 
         if bumpdates:
             for bumpdate in bumpdates:
