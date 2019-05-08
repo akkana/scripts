@@ -249,6 +249,12 @@ mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
 
+mpl_smart_dates.py:
+    A smart date locator (ticker) and formatter for matplotlib
+    that can autoadjust according to the amount of time the axis
+    spans. Matplotlib's AutoDateLocator does this for major ticks,
+    but doesn't offer the option of minor ticks.
+
 multiplot3d.py:
     3D plots in matplotlib of a sequence of functions are so poorly
     documented, it took me ages to get one working. Here's a simple example.
