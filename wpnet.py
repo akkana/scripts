@@ -419,15 +419,19 @@ def connect_to(to_ap):
         if 'FAIL' in out or 'FAIL' in err:
             if errmsg:
                 print("Error:", errmsg)
-            print("==== FAIL: out")
-            print(out)
-            print("==== FAIL: err")
-            print(err)
+            if out:
+                print("==== FAIL: out")
+                print(out)
+            if err:
+                print("==== FAIL: err")
+                print(err)
             sys.exit(1)
-        print("==== SUCCESS: out")
-        print(out)
-        print("==== SUCCESS: err")
-        print(err)
+        if out or err:
+            print("SUCCESS:")
+        if out:
+            print(out)
+        if err:
+            print(err)
 
     out, err = run_cmd(["wpa_cli", "set_network", netnum_str, "ssid",
                  '"%s"' % to_ap])
