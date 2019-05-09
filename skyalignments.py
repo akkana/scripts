@@ -3,6 +3,7 @@
 import ephem
 from datetime import datetime
 import xml.dom.minidom
+import json
 import math
 import sys
 from pprint import pprint
@@ -246,8 +247,30 @@ def get_DOM_text(node, childname=None):
     return None
 
 
+def save_alignments_as_JSON(observer, alignments, filename):
+    '''Given a list of alignments,
+       save a JSON file that can be plotted in various ways.
+    '''
+    print("Saving as JSON")
+    out = []
+    for a in alignments:
+        out.append({ 'observer_name': observer.name,
+                     'event': a['event'],
+                     'observer_lat': math.degrees(observer.lat),
+                     'observer_lon': math.degrees(observer.lon),
+                     'target_name': a['target'],
+                     'target_lat': a['latitude'],
+                     'target_lon': a['longitude'],
+                    })
+
+    with open(filename, 'w') as outfp:
+        outfp.write(json.dumps(out))
+
+
 def save_alignments_as_GPX(observer, alignments, filename):
-    '''Given a list of alignments [[observername, targetname, bearing, event]]
+    '''Given a list of alignments,
+       save them as a GPX file with tracks between observer and each target,
+       and a waypoint for each target.
     '''
     with open(filename, 'w') as outfp:
         print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
@@ -320,9 +343,13 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
     parser.add_argument('-y', '--year', action="store", type=int,
                         dest="year", help='Year')
 
+    # Output JSON file:
+    parser.add_argument('-j', '--writejson', action="store",
+                        dest="writejson", help='Save JSON to output file')
+
     # Output GPX file:
-    parser.add_argument('-s', '--outfile', action="store",
-                        dest="outfile", help='Save GPX to output file')
+    parser.add_argument('-g', '--writegpx', action="store",
+                        dest="writegpx", help='Save GPX to output file')
 
     # Don't use an observer, check angles between all pairs of points:
     parser.add_argument('-a', "--all", dest="allpoints", default=False,
@@ -416,8 +443,11 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                       a['time'],
                       a['azimuth'], a['slop']))
 
-        if args.outfile:
-            save_alignments_as_GPX(observer, alignments, args.outfile)
+        if args.writejson:
+            save_alignments_as_JSON(observer, alignments, args.writejson)
+
+        if args.writegpx:
+            save_alignments_as_GPX(observer, alignments, args.writegpx)
 
     else:
         print("Couldn't find any alignments with %s" % observer.name)
