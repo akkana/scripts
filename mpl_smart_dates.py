@@ -41,12 +41,12 @@ class smart_time_locator(mticker.Locator):
         # translate to datetime.datetime
         dmin = mdates.num2date(imin)
         dmax = mdates.num2date(imax)
-        # print("dmin", dmin, ", dmax", dmax)
+        print("dmin", dmin, ", dmax", dmax)
         # delta = mdates.relativedelta(dmax, dmin)
         delta = dmax - dmin
         if dmin > dmax:
             delta = -delta
-        # print("delta:", delta)
+        print("delta:", delta)
 
         # Defaults: XXX move these to fallback at end of this function
         # once all the other cases are fleshed out.
@@ -59,6 +59,7 @@ class smart_time_locator(mticker.Locator):
         # Let's not worry about subseconds.
         days = delta.days
         years = days / 365.2422
+        print("days", days, "years", years)
         if years > 50:
             print("Argh, can't deal with 50+ years yet!")
             return ticks
@@ -116,10 +117,14 @@ class smart_time_locator(mticker.Locator):
                 daydelta = datetime.timedelta(hours=12)
             ticks = []
             while d <= dmax:
-                ticks.append(mdates.date2num(d))
+                d_ord = mdates.date2num(d)
+                ticks.append(d_ord)
+                if not self.minor:
+                    if d.hour == 0:
+                        self.labeldict[d_ord] = d.strftime("%b %d %H:%M")
+                    else:
+                        self.labeldict[d_ord] = d.strftime("%H:%M")
                 d += daydelta
-            ticks.append(imax)
-            # XXX Add formatting
 
             return ticks
 
@@ -179,38 +184,6 @@ class smart_time_locator(mticker.Locator):
             return 'KeyError'
 
 
-# class smart_time_formatter:
-#     def __init__(self, locator):
-#         # Save the smart locator, which hopefully will remember its
-#         # current setting, axis limits etc.
-#         self.locator = locator
-
-#     def __call__(self, d, pos=None):
-#         '''Custom matplotlib formatter:
-#            show the time of day except at midnight, when the date is shown.
-#            d is whatever units the locator returns; for dates, that has
-#            to be ordinal floats, so use num2date() to turn into datetime.
-#            As far as I can tell, this will be called for every tick the
-#            locator specifies, and returns a string to be displayed.
-#         '''
-#         # Empirically, pos is the X position (in some unkmnown coordinates)
-#         # when setting up axis tics. It's zero when moving the mouse around
-#         # interactively. So we can use pos t tell the difference
-#         # between locating and labeling, though this is undocumented
-#         # and may change at some point.
-#         # print("daytime_formatter:", d, type(d))
-#         d = mdates.num2date(d)
-
-#         if pos == None:
-#             # pos==None is when you're moving the mouse interactively;
-#             # always want an indicator for that.
-#             return d.strftime("%b %d %H:%M")
-
-#         if d.hour == 0:
-#             return d.strftime("%m/%d %H:%M")
-#         return d.strftime("%H:%M")
-
-
 def smart_times_on_xaxis(ax):
     '''Call this function, passing in the Axis object,
        to get Major and minor formatter/locators for labeling any plot
@@ -263,46 +236,64 @@ def smart_times_on_xaxis(ax):
 if __name__ == '__main__':
     import datetime
     import matplotlib.pyplot as plt
+    import sys, os
 
-    def plot_vs_dates(xvals, ax):
-        yvals = [ i % 5 - 1 for i in range(len(xvals)) ]
+    def Usage():
+        print('''Usage: %s start_date end_date interval
+dates in format like 2017-01-01T00:00
+interval may be day, hour, min, sec
 
-        ax.plot_date(x=xvals, y=yvals, ls='-', marker=None)
+(working)
+Half month by day: 2017-01-01T00:00 2017-01-16T00:00 day
+Two months by day: 2017-01-01T00:00 2017-03-01T00:00 day
+One week by hour:  2017-01-01T00:00 2017-01-08T00:00 hour
 
-        smart_times_on_xaxis(ax)
+(ticks not yet working)
+One year by day:        2017-01-01T00:00 2018-01-01T00:00 day
+Two days by seconds:    2017-01-01T00:00 2017-01-02T00:00 sec
 
+(neither test nor ticks working)
+Three years by month:   2017-01-01T00:00 2020-01-01T00:00 month
+Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
+''' % (os.path.basename(sys.argv[0])))
+        sys.exit(1)
+
+    if len(sys.argv) < 4:
+        Usage()
+
+    start = datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M')
+    end = datetime.datetime.strptime(sys.argv[2], '%Y-%m-%dT%H:%M')
+    interval = sys.argv[3]
+    print(start, end, interval)
+    if interval == 'sec':
+        delta = datetime.timedelta(seconds=1)
+    elif interval == 'min':
+        delta = datetime.timedelta(minutes=1)
+    elif interval == 'hour':
+        delta = datetime.timedelta(hours=1)
+    elif interval == 'day':
+        delta = datetime.timedelta(days=1)
+    elif interval == 'month':
+        delta = datetime.timedelta(months=1)
+    else:
+        print('Unknown interval "%s"' % interval)
+        Usage()
+
+    xvals = []
+    d = start
+    while d < end:
+        xvals.append(d)
+        d += delta
 
     fig = plt.figure(figsize=(10, 6))   # width, height in inches
+    ax = fig.add_subplot(1, 1, 1)       # nrows, ncols, plotnum
 
-    # One week, by hour
-    # xvals = []
-    # start = datetime.datetime(2017, 1, 1)
-    # for i in range(7 * 24):
-    #     xvals.append(start + datetime.timedelta(hours=i))
+    yvals = [ i % 5 - 1 for i in range(len(xvals)) ]
 
-    # Half a month, by day
-    # xvals = []
-    # start = datetime.datetime(2017, 1, 1)
-    # for i in range(31):
-    #     xvals.append(start + datetime.timedelta(hours=i*24))
+    ax.plot_date(x=xvals, y=yvals, ls='-', marker=None)
 
-    # Two months, by day
-    start = datetime.datetime(2017, 1, 1)
-    xvals = [ start + datetime.timedelta(hours=i*24) for i in range(60) ]
-    ax = fig.add_subplot(1, 1, 1)   # nrows, ncols, plotnum
-    plot_vs_dates(xvals, ax)
-
-    # # One year, by week
-    # xvals = []
-    # start = datetime.datetime(2017, 1, 1)
-    # for i in range(52):
-    #     xvals.append(start + datetime.timedelta(hours=i*24*7))
-
-    # # One year, by day
-    # xvals = []
-    # start = datetime.datetime(2017, 1, 1)
-    # for i in range(365):
-    #     xvals.append(start + datetime.timedelta(hours=i*24))
+    smart_times_on_xaxis(ax)
 
     fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
     plt.show()
+
