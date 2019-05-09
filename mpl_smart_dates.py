@@ -50,10 +50,12 @@ class smart_time_locator(mticker.Locator):
 
         # Defaults: XXX move these to fallback at end of this function
         # once all the other cases are fleshed out.
-        ticks = [imin, (imax-imin)/2, imax]
-        self.labeldict = {}
-        for t in ticks:
-            self.labeldict[t] = mdates.num2date(t).strftime("%b %d %H:%M")
+        def default_ticks(imin, imax):
+            ticks = [imin, (imax-imin)/2, imax]
+            labeldict = {}
+            for t in ticks:
+                labeldict[t] = mdates.num2date(t).strftime("%b %-d %H:%M")
+            return ticks, labeldict
 
         # timedelta has only days, seconds, microseconds.
         # Let's not worry about subseconds.
@@ -62,6 +64,7 @@ class smart_time_locator(mticker.Locator):
         print("days", days, "years", years)
         if years > 50:
             print("Argh, can't deal with 50+ years yet!")
+            ticks, self.labeldict = default_ticks(imin, imax)
             return ticks
 
         if years >= 3:
@@ -82,12 +85,15 @@ class smart_time_locator(mticker.Locator):
             d = dmin.replace(day=1)
             ticks = []
             while d <= dmax:
-                ticks.append(d)
-                print("Appending", d)
+                d_ord = mdates.date2num(d)
+                ticks.append(d_ord)
+                if not self.minor:
+                    if d.month == 1:
+                        self.labeldict[d_ord] = d.strftime("%Y %b %-d")
+                    else:
+                        self.labeldict[d_ord] = d.strftime("%b %-d")
                 d = nextmonth(d)
-                print("next month:", d)
-            ticks.append(imax)
-            # XXX Add formatting
+
             return ticks
 
         if days > 7:
@@ -102,7 +108,7 @@ class smart_time_locator(mticker.Locator):
                    or d.day == 1 or d == dmin:
                     ticks.append(d_ord)
                     if not self.minor:
-                        self.labeldict[d_ord] = d.strftime("%b %d")
+                        self.labeldict[d_ord] = d.strftime("%b %-d")
                 d += daydelta
 
             return ticks
@@ -121,7 +127,7 @@ class smart_time_locator(mticker.Locator):
                 ticks.append(d_ord)
                 if not self.minor:
                     if d.hour == 0:
-                        self.labeldict[d_ord] = d.strftime("%b %d %H:%M")
+                        self.labeldict[d_ord] = d.strftime("%b %-d %H:%M")
                     else:
                         self.labeldict[d_ord] = d.strftime("%H:%M")
                 d += daydelta
@@ -139,13 +145,19 @@ class smart_time_locator(mticker.Locator):
             hourdelta = datetime.timedelta(hours=1)
             ticks = []
             while d <= dmax:
-                ticks.append(d)
+                d_ord = mdates.date2num(d)
+                ticks.append(d_ord)
+                if not self.minor:
+                    if d.hour == 0:
+                        self.labeldict[d_ord] = d.strftime("%b %-d %H:%M")
+                    else:
+                        self.labeldict[d_ord] = d.strftime("%H:%M")
                 d += hourdelta
-            ticks.append(imax)
-            # XXX Add formatting
+
             return ticks
 
-        print("I'm confused")
+        print("I'm confused!")
+        ticks, self.labeldict = default_ticks(imin, imax)
         return ticks
 
     def formatter(self, time_ord, pos=None):
@@ -244,15 +256,15 @@ dates in format like 2017-01-01T00:00
 interval may be day, hour, min, sec
 
 (working)
-Half month by day: 2017-01-01T00:00 2017-01-16T00:00 day
-Two months by day: 2017-01-01T00:00 2017-03-01T00:00 day
-One week by hour:  2017-01-01T00:00 2017-01-08T00:00 hour
+Half month by day:   2017-01-01T00:00 2017-01-16T00:00 day
+Two months by day:   2017-01-01T00:00 2017-03-01T00:00 day
+One week by hour:    2017-01-01T00:00 2017-01-08T00:00 hour
+Two years by day:    2017-01-01T00:00 2019-01-01T00:00 day
+Two days by seconds: 2017-01-01T00:00 2017-01-02T00:00 sec
 
 (ticks not yet working)
-One year by day:        2017-01-01T00:00 2018-01-01T00:00 day
-Two days by seconds:    2017-01-01T00:00 2017-01-02T00:00 sec
 
-(neither test nor ticks working)
+(neither test command parsing nor ticks working)
 Three years by month:   2017-01-01T00:00 2020-01-01T00:00 month
 Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
 ''' % (os.path.basename(sys.argv[0])))
