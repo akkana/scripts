@@ -164,38 +164,8 @@ def smart_times_on_xaxis(ax):
     ax.tick_params(which='minor', length=5, color='r')
 
 
-if __name__ == '__main__':
-    import datetime
-    import matplotlib.pyplot as plt
-    import sys, os
+def test_interval(start, end, interval, desc):
 
-    def Usage():
-        print('''Usage: %s start_date end_date interval
-dates in format like 2017-01-01T00:00
-interval may be day, hour, min, sec
-
-(working)
-Half month by day:   2017-01-01T00:00 2017-01-16T00:00 day
-Two months by day:   2017-01-01T00:00 2017-03-01T00:00 day
-One week by hour:    2017-01-01T00:00 2017-01-08T00:00 hour
-Two years by day:    2017-01-01T00:00 2019-01-01T00:00 day
-One day by seconds:  2017-01-01T00:00 2017-01-02T00:00 sec
-
-(ticks not yet working)
-Three days by minutes: 2017-01-01T00:00 2017-01-04T00:00 min
-
-(neither test command parsing nor ticks working)
-Three years by month:   2017-01-01T00:00 2020-01-01T00:00 month
-Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
-''' % (os.path.basename(sys.argv[0])))
-        sys.exit(1)
-
-    if len(sys.argv) < 4:
-        Usage()
-
-    start = datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M')
-    end = datetime.datetime.strptime(sys.argv[2], '%Y-%m-%dT%H:%M')
-    interval = sys.argv[3]
     print(start, end, interval)
     if interval == 'sec':
         delta = datetime.timedelta(seconds=1)
@@ -222,10 +192,71 @@ Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
 
     yvals = [ i % 5 - 1 for i in range(len(xvals)) ]
 
-    ax.plot_date(x=xvals, y=yvals, ls='-', marker=None)
+    ax.plot_date(x=xvals, y=yvals, ls='-', marker=None, label=desc)
 
     smart_times_on_xaxis(ax)
 
+    if desc:
+        plt.legend(loc='upper right')
+
     fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
     plt.show()
+
+
+if __name__ == '__main__':
+    import datetime
+    import matplotlib.pyplot as plt
+    import sys, os
+
+    def Usage():
+        print('''Usage: %s start_date end_date interval
+dates in format like 2017-01-01T00:00
+interval may be day, hour, min, sec
+
+(working)
+Half month by day:   2017-01-01T00:00 2017-01-16T00:00 day
+Two months by day:   2017-01-01T00:00 2017-03-01T00:00 day
+One week by hour:    2017-01-01T00:00 2017-01-08T00:00 hour
+Two years by day:    2017-01-01T00:00 2019-01-01T00:00 day
+One day by seconds:  2017-01-01T00:00 2017-01-02T00:00 sec
+
+(ticks not yet working)
+Three days by minutes: 2017-01-01T00:00 2017-01-04T00:00 min
+
+(neither test command parsing nor ticks working)
+Three years by month:   2017-01-01T00:00 2020-01-01T00:00 month
+Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
+''' % (os.path.basename(sys.argv[0])))
+        sys.exit(1)
+
+    if len(sys.argv) == 2 and sys.argv[1] == '-h':
+        Usage()
+
+    if len(sys.argv) < 4:
+        tests = [
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2017, 1, 16),
+              'day', 'Half month by day' ],
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2017, 3, 1),
+              'day', 'Two months by day' ],
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2017, 1, 8),
+              'hour', 'One week by hour' ],
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2019, 1, 1),
+              'day', 'Two years by day' ],
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2017, 1, 2),
+              'sec', 'One day by seconds' ],
+        ]
+        for testdata in tests:
+            print('========', testdata[-1])
+            test_interval(*testdata)
+
+    else:
+        start = datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M')
+        end = datetime.datetime.strptime(sys.argv[2], '%Y-%m-%dT%H:%M')
+        interval = sys.argv[3]
+        test_interval(start, end, interval, None)
 
