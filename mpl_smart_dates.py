@@ -164,58 +164,11 @@ def smart_times_on_xaxis(ax):
     ax.tick_params(which='minor', length=5, color='r')
 
 
-def test_interval(start, end, interval, desc):
-
-    if interval[0].isdigit():
-        import re
-        match = re.match('(\d+)(.+)', interval)
-        mult = int(match.group(1))
-        interval = match.group(2)
-    else:
-        mult = 1
-
-    if interval == 'sec':
-        delta = datetime.timedelta(seconds=mult)
-    elif interval == 'min':
-        delta = datetime.timedelta(minutes=mult)
-    elif interval == 'hour':
-        delta = datetime.timedelta(hours=mult)
-    elif interval == 'day':
-        delta = datetime.timedelta(days=mult)
-    elif interval == 'month':
-        delta = datetime.timedelta(months=mult)
-    else:
-        print('Unknown interval "%s"' % interval)
-        Usage()
-
-    print("Accumulating data by:", delta)
-
-    xvals = []
-    d = start
-    while d < end:
-        xvals.append(d)
-        d += delta
-
-    fig = plt.figure(figsize=(10, 6))   # width, height in inches
-    ax = fig.add_subplot(1, 1, 1)       # nrows, ncols, plotnum
-
-    yvals = [ i % 5 - 1 for i in range(len(xvals)) ]
-
-    ax.plot_date(x=xvals, y=yvals, ls='-', marker=None, label=desc)
-
-    smart_times_on_xaxis(ax)
-
-    if desc:
-        plt.legend(loc='upper right')
-
-    fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
-    plt.show()
-
-
 if __name__ == '__main__':
     import datetime
     import matplotlib.pyplot as plt
     import sys, os
+
 
     def Usage():
         print('''Usage: %s start_date end_date interval
@@ -238,6 +191,56 @@ Three years by month:   2017-01-01T00:00 2020-01-01T00:00 month
 Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
 ''' % (os.path.basename(sys.argv[0])))
         sys.exit(1)
+
+
+    def test_interval(start, end, interval, desc):
+        '''Test smart dates for one interval. Produce and show a graph.
+        '''
+        if interval[0].isdigit():
+            import re
+            match = re.match('(\d+)(.+)', interval)
+            mult = int(match.group(1))
+            interval = match.group(2)
+        else:
+            mult = 1
+
+        if interval == 'sec':
+            delta = datetime.timedelta(seconds=mult)
+        elif interval == 'min':
+            delta = datetime.timedelta(minutes=mult)
+        elif interval == 'hour':
+            delta = datetime.timedelta(hours=mult)
+        elif interval == 'day':
+            delta = datetime.timedelta(days=mult)
+        elif interval == 'month':
+            delta = datetime.timedelta(months=mult)
+        else:
+            print('Unknown interval "%s"' % interval)
+            Usage()
+
+        print("Accumulating data by:", delta)
+
+        xvals = []
+        d = start
+        while d < end:
+            xvals.append(d)
+            d += delta
+
+        fig = plt.figure(figsize=(10, 6))   # width, height in inches
+        ax = fig.add_subplot(1, 1, 1)       # nrows, ncols, plotnum
+
+        yvals = [ i % 5 - 1 for i in range(len(xvals)) ]
+
+        ax.plot_date(x=xvals, y=yvals, ls='-', marker=None, label=desc)
+
+        smart_times_on_xaxis(ax)
+
+        if desc:
+            plt.legend(loc='upper right')
+
+        fig.tight_layout(pad=1.0, w_pad=10.0, h_pad=.5)
+        plt.show()
+
 
     if len(sys.argv) == 2 and sys.argv[1] == '-h':
         Usage()
