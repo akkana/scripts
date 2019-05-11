@@ -166,20 +166,29 @@ def smart_times_on_xaxis(ax):
 
 def test_interval(start, end, interval, desc):
 
-    print(start, end, interval)
+    if interval[0].isdigit():
+        import re
+        match = re.match('(\d+)(.+)', interval)
+        mult = int(match.group(1))
+        interval = match.group(2)
+    else:
+        mult = 1
+
     if interval == 'sec':
-        delta = datetime.timedelta(seconds=1)
+        delta = datetime.timedelta(seconds=mult)
     elif interval == 'min':
-        delta = datetime.timedelta(minutes=1)
+        delta = datetime.timedelta(minutes=mult)
     elif interval == 'hour':
-        delta = datetime.timedelta(hours=1)
+        delta = datetime.timedelta(hours=mult)
     elif interval == 'day':
-        delta = datetime.timedelta(days=1)
+        delta = datetime.timedelta(days=mult)
     elif interval == 'month':
-        delta = datetime.timedelta(months=1)
+        delta = datetime.timedelta(months=mult)
     else:
         print('Unknown interval "%s"' % interval)
         Usage()
+
+    print("Accumulating data by:", delta)
 
     xvals = []
     d = start
@@ -211,7 +220,8 @@ if __name__ == '__main__':
     def Usage():
         print('''Usage: %s start_date end_date interval
 dates in format like 2017-01-01T00:00
-interval may be day, hour, min, sec
+interval may be day, hour, min, sec and may be preceded by
+an integer, e.g. 15min.
 
 (working)
 Half month by day:   2017-01-01T00:00 2017-01-16T00:00 day
@@ -248,7 +258,7 @@ Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
               'day', 'Two years by day' ],
             [ datetime.datetime(2017, 1, 1),
               datetime.datetime(2017, 1, 2),
-              'sec', 'One day by seconds' ],
+              '15sec', 'One day by 15-second intervals' ],
         ]
         for testdata in tests:
             print('========', testdata[-1])
