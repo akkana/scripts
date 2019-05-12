@@ -15,6 +15,61 @@ def nextmonth(d):
     return d.replace(day=1, month=month, year=year)
 
 
+def default_formatter(d_ord, pos=None):
+    return mdates.num2date(d_ord).strftime("%Y %b %d %H:%M:%S")
+
+
+def year_formatter(d_ord, pos=None):
+    d = mdates.num2date(d_ord)
+
+    if pos == None:
+        return d.strftime("%Y %b %d")
+
+    return d.strftime("%Y")
+
+
+def month_formatter(d_ord, pos=None):
+    d = mdates.num2date(d_ord)
+
+    if pos == None:
+        return d.strftime("%Y %b %d")
+
+    if d.month == 1:
+        return d.strftime("%Y %b %-d")
+    else:
+        return d.strftime("%b %-d")
+
+
+def day_formatter(d_ord, pos=None):
+    d = mdates.num2date(d_ord)
+
+    if pos == None:
+        return d.strftime("%Y %b %d %H:%M")
+
+    return d.strftime("%b %-d")
+
+
+def halfday_formatter(d_ord, pos=None):
+    d = mdates.num2date(d_ord)
+
+    if pos == None:
+        return d.strftime("%Y %b %d %H:%M")
+
+    return d.strftime("%b %-d %H:%M")
+
+
+def hour_formatter(d_ord, pos=None):
+    d = mdates.num2date(d_ord)
+
+    if pos == None:
+        return d.strftime("%Y %b %d %H:%M:%S")
+
+    if d.hour == 0:
+        return d.strftime("%b %-d %H:%M")
+    else:
+        return d.strftime("%H:%M")
+
+
 def smart_time_ticks(imin, imax, minor=False):
     """Ticks that auto-adjusts to the current data range,
        and provides both major (__call__()) and minor (minor())
@@ -39,7 +94,6 @@ def smart_time_ticks(imin, imax, minor=False):
     print("delta:", delta)
 
     ticks = []
-    ticklabels = []
     minor_ticks = []
 
     # Defaults: XXX move these to fallback at end of this function
@@ -47,9 +101,7 @@ def smart_time_ticks(imin, imax, minor=False):
     def default_ticks(imin, imax):
         ticks = [imin, (imax-imin)/2, imax]
         labeldict = {}
-        for t in ticks:
-            ticklabels.append(mdates.num2date(t).strftime("%b %-d %H:%M"))
-        return ticks, minor_ticks, ticklabels
+        return ticks, minor_ticks, mticker.FuncFormatter(default_formatter)
 
     # timedelta has only days, seconds, microseconds.
     # Let's not worry about subseconds.
@@ -69,7 +121,7 @@ def smart_time_ticks(imin, imax, minor=False):
             ticks.append(year)
             year += 1
         # XXX Add formatting, minor ticks
-        return ticks, minor_ticks, ticklabels
+        return ticks, minor_ticks, mticker.FuncFormatter(year_formatter)
 
     if days > 75:
         # go by months
@@ -78,13 +130,9 @@ def smart_time_ticks(imin, imax, minor=False):
         while d <= dmax:
             d_ord = mdates.date2num(d)
             ticks.append(d_ord)
-            if d.month == 1:
-                ticklabels.append(d.strftime("%Y %b %-d"))
-            else:
-                ticklabels.append(d.strftime("%b %-d"))
             d = nextmonth(d)
 
-        return ticks, minor_ticks, ticklabels
+        return ticks, minor_ticks, mticker.FuncFormatter(month_formatter)
 
     if days > 7:
         # By days
@@ -95,12 +143,11 @@ def smart_time_ticks(imin, imax, minor=False):
             d_ord = mdates.date2num(d)
             if days < 15 or d.day % 5 == 0 or d.day == 1 or d == dmin:
                 ticks.append(d_ord)
-                ticklabels.append(d.strftime("%b %-d"))
             else:
                 minor_ticks.append(d_ord)
             d += daydelta
 
-        return ticks, minor_ticks, ticklabels
+        return ticks, minor_ticks, mticker.FuncFormatter(day_formatter)
 
     if days > 2:
         # By half-days (12 hours)
@@ -111,14 +158,13 @@ def smart_time_ticks(imin, imax, minor=False):
             d_ord = mdates.date2num(d)
             if d.hour == 0:
                 ticks.append(d_ord)
-                ticklabels.append(d.strftime("%b %-d %H:%M"))
             if d.hour == 12:
                 minor_ticks.append(d_ord)
             d += daydelta
 
-        print("ticks:", [ mdates.num2date(d) for d in ticks])
-        print("minor_ticks:", [ mdates.num2date(d) for d in minor_ticks])
-        return ticks, minor_ticks, ticklabels
+        # print("ticks:", [ mdates.num2date(d) for d in ticks])
+        # print("minor_ticks:", [ mdates.num2date(d) for d in minor_ticks])
+        return ticks, minor_ticks, mticker.FuncFormatter(halfday_formatter)
 
     seconds = delta.total_seconds()
     hours = seconds / 3600
@@ -132,16 +178,32 @@ def smart_time_ticks(imin, imax, minor=False):
         while d <= dmax:
             d_ord = mdates.date2num(d)
             ticks.append(d_ord)
-            if d.hour == 0:
-                ticklabels.append(d.strftime("%b %-d %H:%M"))
-            else:
-                ticklabels.append(d.strftime("%H:%M"))
             d += hourdelta
 
-        return ticks, minor_ticks, ticklabels
+        return ticks, minor_ticks, mticker.FuncFormatter(hour_formatter)
 
     print("I'm confused!")
     return default_ticks(imin, imax)
+
+
+def daytime_formatter(d, pos=None):
+    '''Custom matplotlib formatter
+       show the time of day except at midnight, when the date is shown.
+    '''
+    # Empirically, pos is the X position (in some unkmnown coordinates)
+    # when setting up axis tics. However, later, when locating mouse
+    # positions, pos is None. So we can use pos t tell the difference
+    # between locating and labeling, though this is undocumented
+    # and may change at some point.
+    d = mdates.num2date(d)
+    if pos == None:
+        # pos==None is when you're moving the mouse interactively;
+        # always want an indicator for that.
+        return d.strftime("! %b %d %H:%M")
+
+    if d.hour == 0:
+        return d.strftime("hr %m/%d %H:%M")
+    return d.strftime("s %H:%M")
 
 
 def smart_times_on_xaxis(ax):
@@ -153,15 +215,28 @@ def smart_times_on_xaxis(ax):
     # print("Interval:", [mdates.num2date(x) for x in ax.xaxis.get_data_interval()])
     imin, imax = ax.xaxis.get_data_interval()
 
-    ticks, minor_ticks, ticklabels = smart_time_ticks(imin, imax)
+    # ticks, minor_ticks, ticklabels = smart_time_ticks(imin, imax)
+    ticks, minor_ticks, tickformatter = smart_time_ticks(imin, imax)
 
     ax.set_xticks(ticks, minor=False)
-    ax.set_xticklabels(ticklabels, minor=False)
+    # Can't do this, will be overridden by formatter:
+    # ax.set_xticklabels(ticklabels, minor=False)
     ax.tick_params(which='major', length=10, color='b')
 
     ax.set_xticks(minor_ticks, minor=True)
     # ax.set_xticklabels(minorloc.labellist, minor=True)
     ax.tick_params(which='minor', length=5, color='r')
+
+    # XXX ax.set_xticks() prevents labels as the user mouses over the plot.
+    # To get that, we need ax.xaxis.set_major_formatter();
+    # but that overrides the ticks set with set_xticks!
+    # Order doesn't matter, formatter overrides the list of ticks
+    # even if the list of ticks comes second.
+    # ax.xaxis.set_major_formatter(mticker.FuncFormatter(daytime_formatter))
+    ax.xaxis.set_major_formatter(tickformatter)
+    #
+    # Fortunately I don't think setting a formatter strictly requires
+    # a locator.
 
 
 if __name__ == '__main__':
@@ -247,6 +322,15 @@ Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
 
     if len(sys.argv) < 4:
         tests = [
+            # Currently testing this case: works fine initially,
+            # but doesn't change ticks on zoom-in.
+            # Apparently there's a recursion problem, and to recalculate
+            # axis limits on zoom in it may be necessary to keep two
+            # sets of axes:
+            # https://stackoverflow.com/questions/46855458/recalculate-x-y-values-after-zoom-based-on-current-ylim-and-xlim-in-matplotlib
+            [ datetime.datetime(2017, 1, 1),
+              datetime.datetime(2019, 1, 1),
+              'day', 'Two years by day' ],
             [ datetime.datetime(2017, 1, 1),
               datetime.datetime(2017, 1, 16),
               'day', 'Half month by day' ],
@@ -256,9 +340,6 @@ Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
             [ datetime.datetime(2017, 1, 1),
               datetime.datetime(2017, 1, 8),
               'hour', 'One week by hour' ],
-            [ datetime.datetime(2017, 1, 1),
-              datetime.datetime(2019, 1, 1),
-              'day', 'Two years by day' ],
             [ datetime.datetime(2017, 1, 1),
               datetime.datetime(2017, 1, 2),
               '15sec', 'One day by 15-second intervals' ],
