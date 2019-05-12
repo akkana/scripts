@@ -468,6 +468,16 @@ three_months_from_now = today + relativedelta(months=3)
 # months gives you how many months relative to the current one.
 # For differences of just days or weeks, datetime.timedelta works.
 
+def nextmonth(d):
+    '''Beginning of the following month.
+    '''
+    month = d.month + 1
+    year = d.year
+    if month > 12:
+        month = 1
+        year += 1
+    return d.replace(day=1, month=month, year=year)
+
 # Beginning of today:
 datetime.datetime.now().replace(hour=0, minute=0,
                                 second=0, microsecond=0)
@@ -1014,6 +1024,15 @@ ax1 = fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
 ax.set_xlim([0, enddate])
 ax.set_ylim([0, data[-1]])
 
+# Get the axis limits in data coordinates:
+ax.get_xlim()
+
+# Get axis limits in datetime:
+# matplotlib are like ordinals except that they're floating point
+# and datetime.datetime.fromordinal() will only accept ints.
+import matplotlib.dates as mdates
+[ mdates.num2date(x) for x in ax.get_xlim()) ]
+
 # Trim whitespace between plots:
 # pad controls padding around the top, bottom and sides of the page;
 # w_pad controls space between plots horizontally (if columns > 1),
@@ -1025,7 +1044,7 @@ plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
 # like ax.axis('tight') or plt.axis('tight'), prevent set_?lib
 # and tight_layout from working.
 
-# Exit on key q (this now seems to be the default)
+# Exit on key q (this now seems to happen automatically, hooray)
 plt.figure(1).canvas.mpl_connect('key_press_event',
                                  lambda e:
                                      sys.exit(0) if e.key == 'ctrl+q'
@@ -1042,11 +1061,10 @@ vwraparound = np.vectorize(wraparound)
 wrapped_arr = vwraparound(orig_arr)
 
 # Dates on X axis rotated a bit, so they don't overwrite each other:
-fig.autofmt_xdate()
+# fig.autofmt_xdate()
 
 #
-# Custom ticks and labels for dates:
-# see plot_curves_by_date() in weather/evebump.py
+# Custom ticks and labels for dates: see mpl_smart_dates.py.
 #
 
 
