@@ -108,9 +108,13 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             fname = ' '.join(l[6:])
 
             if recursive and cur_subdir:
+                # XXX Next line had lenpath-1: instead of lenpath.
+                # For running on androidsd:path/to or androidsd:/path/to,
+                # lenpath is correct. Is there a case where lenpath-1 is?
                 fname = posixpath.normpath(posixpath.join(cur_subdir,
-                                                          fname))[lenpath-1:]
-                # Dependng on whether the original path ended with a slash,
+                                                          fname))[lenpath:]
+
+                # Depending on whether the original path ended with a slash,
                 # fname might incorrectly start with one
                 # because lenpath might be too small by one.
                 if fname.startswith('/'):
