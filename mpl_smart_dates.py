@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import datetime
+
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 
@@ -207,7 +209,7 @@ def daytime_formatter(d, pos=None):
 
 
 def smart_times_on_xaxis(ax):
-    plt.xticks(rotation=45, ha="right")
+    # plt.xticks(rotation=45, ha="right")
 
     # What's the date range shown on the plot?
     # imin, imax = ax.get_xlim()
@@ -221,11 +223,11 @@ def smart_times_on_xaxis(ax):
     ax.set_xticks(ticks, minor=False)
     # Can't do this, will be overridden by formatter:
     # ax.set_xticklabels(ticklabels, minor=False)
-    ax.tick_params(which='major', length=10, color='b')
+    ax.tick_params(which='major', length=10, labelrotation=45, color='b')
 
     ax.set_xticks(minor_ticks, minor=True)
     # ax.set_xticklabels(minorloc.labellist, minor=True)
-    ax.tick_params(which='minor', length=5, color='r')
+    ax.tick_params(which='minor', length=5, labelrotation=45, color='r')
 
     # XXX ax.set_xticks() prevents labels as the user mouses over the plot.
     # To get that, we need ax.xaxis.set_major_formatter();

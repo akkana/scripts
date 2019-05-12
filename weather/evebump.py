@@ -104,6 +104,12 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import numpy as np
 
+# Use smart date labeling if available:
+try:
+    import mpl_smart_dates
+except:
+    pass
+
 
 def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
 
@@ -119,43 +125,11 @@ def plot_curves_by_date(dates, val_list, label_list, bumpdates=None):
 
         ax.set_ylabel(label_list[i])
 
-        # Matplotlib default date formatting is so useless, you basically
-        # have to subclass it and write your own to get anything readable.
-        def daytime_formatter(d, pos=None):
-            '''Custom matplotlib formatter
-               show the time of day except at midnight, when the date is shown.
-            '''
-            # Empirically, pos is the X position (in some unkmnown coordinates)
-            # when setting up axis tics. However, later, when locating mouse
-            # positions, pos is None. So we can use pos t tell the difference
-            # between locating and labeling, though this is undocumented
-            # and may change at some point.
-            d = mdates.num2date(d)
-            if pos == None:
-                # pos==None is when you're moving the mouse interactively;
-                # always want an indicator for that.
-                return d.strftime("%b %d %H:%M")
-
-            if d.hour == 0:
-                return d.strftime("%m/%d %H:%M")
-            return d.strftime("%H:%M")
-
-        # Major ticks once a day:
-        ax.xaxis.set_major_formatter(mticker.FuncFormatter(daytime_formatter))
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval = 4))
-        ax.yaxis.set_major_locator(plt.MultipleLocator(10.0))
-        ax.yaxis.set_minor_locator(plt.MultipleLocator(1.0))
-        ax.tick_params(which='major', length=12, color='k')
-        plt.xticks(rotation=45, ha="right")
-        ax.grid(b=True, which='major', color='0.6', linestyle='-')
-        ax.grid(b=True, which='minor', color='.9', linestyle='-')
-        # Or set it separately for the major and ticks:
-        # plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
-        # ax1.set_xticklabels(xticklabels, rotation = 45, ha="right")
-
-        # Minor ticks every hour:
-        ax.xaxis.set_minor_locator(mdates.HourLocator(interval = 1))
-        ax.tick_params(which='minor', length=3, color='r')
+        if 'mpl_smart_dates' in sys.modules:
+            mpl_smart_dates.smart_times_on_xaxis(ax)
+        else:
+            # Even if we can't have smart dates, we can rotate the labels.
+            plt.xticks(rotation=45, ha="right")
 
         ax.legend(loc='upper right')
 
