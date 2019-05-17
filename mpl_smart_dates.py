@@ -209,8 +209,6 @@ def daytime_formatter(d, pos=None):
 
 
 def smart_times_on_xaxis(ax):
-    # plt.xticks(rotation=45, ha="right")
-
     # What's the date range shown on the plot?
     # imin, imax = ax.get_xlim()
     # print("ax_xlim returned", mdates.num2date(imin), mdates.num2date(imax))
@@ -221,13 +219,16 @@ def smart_times_on_xaxis(ax):
     ticks, minor_ticks, tickformatter = smart_time_ticks(imin, imax)
 
     ax.set_xticks(ticks, minor=False)
-    # Can't do this, will be overridden by formatter:
-    # ax.set_xticklabels(ticklabels, minor=False)
-    ax.tick_params(which='major', length=10, labelrotation=45, color='b')
+
+    rotation = 45
+
+    ax.tick_params(which='major', length=10, width=1.5,
+                   labelrotation=rotation, color='k')
 
     ax.set_xticks(minor_ticks, minor=True)
     # ax.set_xticklabels(minorloc.labellist, minor=True)
-    ax.tick_params(which='minor', length=5, labelrotation=45, color='r')
+    ax.tick_params(which='minor', length=5,
+                   labelrotation=rotation, color='#666666')
 
     # XXX ax.set_xticks() prevents labels as the user mouses over the plot.
     # To get that, we need ax.xaxis.set_major_formatter();
@@ -236,9 +237,6 @@ def smart_times_on_xaxis(ax):
     # even if the list of ticks comes second.
     # ax.xaxis.set_major_formatter(mticker.FuncFormatter(daytime_formatter))
     ax.xaxis.set_major_formatter(tickformatter)
-    #
-    # Fortunately I don't think setting a formatter strictly requires
-    # a locator.
 
 
 if __name__ == '__main__':
