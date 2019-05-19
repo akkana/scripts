@@ -36,7 +36,7 @@ def tabular_string_to_calendar(calstr):
             if monthday[0].startswith(m):
                 month = i + 1
                 break
-        if month == None:
+        if month is None:
             print("Couldn't parse month from '%s'" % line)
             continue
         day = int(monthday[1])

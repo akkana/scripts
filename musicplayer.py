@@ -42,7 +42,7 @@ class MusicWin(gtk.Window) :
 
         # Right now, random is the only thing that can be specified
         # in the config file.
-        if random == None:
+        if random is None:
             configfile = os.path.join(self.configdir, "config")
             if os.path.exists(configfile):
                 fp = open(configfile)

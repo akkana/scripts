@@ -622,7 +622,7 @@ class BrowserWindow(QMainWindow):
         if len(self.browserviews) == 0:
             self.new_tab()
             tab = 0
-        elif tab == None:
+        elif tab is None:
             tab = self.active_tab
 
         self.set_tab_text(url[:self.init_tab_name_len],
@@ -663,11 +663,11 @@ class BrowserWindow(QMainWindow):
            view is the requesting BrowserView, and will be compared
            to our browserviews[] to figure out which tab to set.
         '''
-        if self.tabwidget == None:
+        if self.tabwidget is None:
             return
         whichtab = None
         whichtab = self.find_view(view)
-        if whichtab == None:
+        if whichtab is None:
             print("Warning: set_tab_text for unknown view")
             return
         self.tabwidget.setTabText(whichtab, title)

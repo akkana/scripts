@@ -74,7 +74,7 @@ def diff_lines(oldtext, newtext):
     for curi, curj, curn in blocks:
         # Each sequence block is a tuple (i, j, n)
         # that means a[i:i+n] == b[j:j+n]
-        if lasti == None:
+        if lasti is None:
             # On the first line, if curi or curj > 0 that means
             # we had a difference. If curj > 0, the difference
             # exists in the new file.

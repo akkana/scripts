@@ -102,7 +102,7 @@ class ImageViewer(gtk.DrawingArea):
             # Do we need to check rotation info for this image?
             # Get the EXIF embedded rotation info.
             orient = newpb.get_option('orientation')
-            if orient == None :    # No orientation specified; use 0
+            if orient is None :    # No orientation specified; use 0
                 orient = 0
             else :                 # convert to int array index
                 orient = int(orient) - 1
