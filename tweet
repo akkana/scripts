@@ -34,12 +34,12 @@ def prettify(filnam) :
 def getMatchingFiles(pats) :
     '''Find the list of birdcall files matching the list of terms.'''
     matches = []
-    birds = list(map(string.lower, pats))
+    birds = [ s.lower() for s in pats ]
     for root, dirs, files in os.walk(calldir) :
         for f in files :
             # Omit .aup files -- audacity sometimes leaves them
             # but play can't play them.
-            callfile = string.lower(f)
+            callfile = f.lower()
             if callfile.endswith('.aup') :
                 continue
             for bird in birds:
@@ -68,14 +68,14 @@ def playList(lis) :
     for b in lis :
         #print "(", b, ")"
         play(b)
-    
+
 def tweet(args):
     matches = getMatchingFiles(args)
     # If we have more than one, prompt the user:
     while len(matches) > 1 :
         # Prettyprint the list of matches so the user can choose.
         for m in range(0, len(matches)) :
-            dot = string.rfind(matches[m], ".")
+            dot = matches[m].rfind(".")
             if dot < 0 :
                 continue
             print("%d. %s" % (m+1, prettify(matches[m][0:dot])))
