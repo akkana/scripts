@@ -27,6 +27,7 @@ def get_brightness():
         sys.exit(1)
 
     monitor = None
+    s = s.decode()
     for line in s.split('\n'):
         line = line.strip()
         words = line.split()
