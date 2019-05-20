@@ -11,6 +11,8 @@ import sys, os
 import email
 import email.utils
 
+from email.header import Header, decode_header
+
 Debug = False
 
 progname = os.path.basename(sys.argv[0])
@@ -28,12 +30,24 @@ Example: %s -a Subject: /var/mail/yourname
 
 def decode_piece(piece):
     ret = ''
-    for part in email.Header.decode_header(piece):
-        ret += part[0]
+
+    # In Python 2 this was easy: just loop over decode_header(piece).
+    # In Python 3 it's trickier, because decode_header randomly
+    # may return str or bytes in part[0], and although the documentation
+    # suggests that part[1], the charset, should be set for decoded strings
+    # and unset for bytes, in practice part[1] doesn't tell you
+    # anything about whether part[0] is str or bytes.
+    # So you have to check the type.
+    for part in decode_header(piece):
+        if type(part[0]) is bytes:
+            ret += part[0].decode(errors='replace')
+        else:
+            ret += part[0]
 
         # Special case: the header itself comes out with charset None
         # and decode doesn't add a space between it and the next part,
-        # even though there was a space in the original. So add one.
+        # even though there was a space in the original. So add one
+        # (it's better to have too many spaces than too few).
         # I'm taking a wild guess that the relevant factor here is
         # the None charset rather than the fact that it matched
         # the header, but keep an eye open for counterexamples.
@@ -69,7 +83,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
     if filename == '-':
         fil = sys.stdin
     else:
-        fil = open(filename)
+        fil = open(filename, errors='replace')
     print("All?", all)
 
     if not casematch:
@@ -86,7 +100,11 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
             testline = line.lower()
 
         if Debug:
-            print("line:", line)
+            # Were there any bad characters added from errors='replace'?
+            # Python replaces them with U+FFFD, REPLACEMENT CHARACTER
+            if '\ufffd' in line:
+                print("REPLACEMENT CHAR!", end='')
+            print("line:", line, end='')
 
         # Are we looking for continuation lines?
         if output:
