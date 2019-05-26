@@ -120,6 +120,18 @@ def view_message_attachments(fp, tmpdir):
                 ext = '.bin'
             partfile = 'part-%03d%s' % (counter, ext)
 
+        else:
+            # Clean up the filename:
+            # Windows and especially Mac users are prone to use filenames
+            # with spaces, newlines, backspaces etc.
+            newname = ''
+            for c in partfile:
+                if c == ' ':
+                    newname += '_'
+                elif c.isprintable():
+                    newname += c
+            partfile = newname
+
         return os.path.join(tmpdir, partfile)
 
     def save_tmp_file(part):
