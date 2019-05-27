@@ -96,7 +96,6 @@ def find_alignments(observer, waypoints, year, allpoints=False):
     azimuths = {}
 
     # start_date = ephem.Date('%d/1/1' % year)
-    print("Year", year, type(year))
     start_date = ephem.Date((year, 1, 1))
     # date= ephem.date((-59000,1,1))
 
@@ -247,17 +246,42 @@ def get_DOM_text(node, childname=None):
     return None
 
 
-def save_alignments_as_JSON(observer, alignments, filename):
+def find_observer_point(obsname, waypoints):
+    '''Find the waypoint with the name obsname.'''
+    for wp in waypoints:
+        if wp[0] == obsname:
+            return wp
+    return None
+
+
+def save_alignments_as_JSON(observer, alignments, waypoints, filename):
     '''Given a list of alignments,
        save a JSON file that can be plotted in various ways.
     '''
     print("Saving as JSON")
     out = []
     for a in alignments:
-        out.append({ 'observer_name': observer.name,
+        if observer:
+            obsname = observer.name
+            obslat = math.degrees(observer.lat)
+            obslon = math.degrees(observer.lon)
+        else:
+            obs = find_observer_point(a['observer'], waypoints)
+            if not obs:
+                print("Can't find observer for", a)
+                continue
+            obsname = obs[0].split('\n')[0]
+            obslat = obs[1]
+            obslon = obs[2]
+
+        if (a['latitude'] == obslat and
+            a['longitude'] == obslon):
+            continue
+
+        out.append({ 'observer_name': obsname,
                      'event': a['event'],
-                     'observer_lat': math.degrees(observer.lat),
-                     'observer_lon': math.degrees(observer.lon),
+                     'observer_lat': math.degrees(obslat),
+                     'observer_lon': math.degrees(obslon),
                      'target_name': a['target'],
                      'target_lat': a['latitude'],
                      'target_lon': a['longitude'],
@@ -267,7 +291,7 @@ def save_alignments_as_JSON(observer, alignments, filename):
         outfp.write(json.dumps(out))
 
 
-def save_alignments_as_GPX(observer, alignments, filename):
+def save_alignments_as_GPX(observer, alignments, waypoints, filename):
     '''Given a list of alignments,
        save them as a GPX file with tracks between observer and each target,
        and a waypoint for each target.
@@ -278,8 +302,21 @@ def save_alignments_as_GPX(observer, alignments, filename):
 <trk>''', file=outfp)
 
         for a in alignments:
-            if (a['latitude'] == observer.lat and
-                a['longitude'] == observer.lon):
+            if observer:
+                obsname = observer.name
+                obslat = math.degrees(observer.lat)
+                obslon = math.degrees(observer.lon)
+            else:
+                obs = find_observer_point(a['observer'], waypoints)
+                if not obs:
+                    print("Can't find observer for", a)
+                    continue
+                obsname = obs[0].split('\n')[0]
+                obslat = obs[1]
+                obslon = obs[2]
+
+            if (a['latitude'] == obslat and
+                a['longitude'] == obslon):
                 continue
             print('''  <trkseg>
     <name>%s, %s</name>
@@ -292,8 +329,8 @@ def save_alignments_as_GPX(observer, alignments, filename):
       <name>%s, %s</name>
     </trkpt>
   </trkseg>''' % (a['target'], a['event'],
-                  math.degrees(observer.lat), math.degrees(observer.lon),
-                 str(a['time']), "observer",
+                  obslat, obslon,
+                 str(a['time']), obsname,
                    a['latitude'], a['longitude'], str(a['time']),
                    a['target'], a['event']),
                   file=outfp)
@@ -303,8 +340,8 @@ def save_alignments_as_GPX(observer, alignments, filename):
         # Apparently naming trksegs doesn't do anything, at least in pytopo.
         # Set waypoints too.
         for a in alignments:
-            if (a['latitude'] == observer.lat and
-                a['longitude'] == observer.lon):
+            if (a['latitude'] == obslat and
+                a['longitude'] == obslon):
                 continue
             print('''  <wpt lat="%f" lon="%f">
     <time>%s</time>
@@ -407,9 +444,11 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
     if not observer_point:
         print("Using first waypoint for observer:", waypoints[0])
         observer_point = waypoints[0]
-        if not args.allpoints:
-            waypoints = waypoints[1:]
+        waypoints = waypoints[1:]
 
+    # find_alignments will need an initial observer to calculate
+    # things like the dates of equinoxes and solstices, and the
+    # azimuths. So set it even if allpoints is set.
     observer = ephem.Observer()
     # Observer will take degrees as a string, but if you pass it floats
     # it expects radians, though that's undocumented.
@@ -430,6 +469,12 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
 
     alignments = find_alignments(observer, waypoints,
                                  year=year, allpoints=args.allpoints)
+
+    # Now we no longer need the ephem.observer, and if allpoints is set,
+    # don't want to pass observer to save_alignments*.
+    if args.allpoints:
+        observer = None
+
     if alignments:
         # pprint(alignments)
         cur_observer = None
@@ -444,10 +489,12 @@ e.g. -o 34.8086585,-103.2011914,1650f""",
                       a['azimuth'], a['slop']))
 
         if args.writejson:
-            save_alignments_as_JSON(observer, alignments, args.writejson)
+            save_alignments_as_JSON(observer, alignments, waypoints,
+                                    args.writejson)
 
         if args.writegpx:
-            save_alignments_as_GPX(observer, alignments, args.writegpx)
+            save_alignments_as_GPX(observer, alignments, waypoints,
+                                   args.writegpx)
 
     else:
         print("Couldn't find any alignments with %s" % observer.name)
