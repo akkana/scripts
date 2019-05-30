@@ -212,7 +212,10 @@ def read_waypoint_file_GPX(filename):
         except:
             ele = 500    # meters
 
-        name = get_DOM_text(pt, "name")
+        # Some of these names have newlines in them.
+        # Just keep the part before the newline.
+        name = get_DOM_text(pt, "name").split('\n')[0]
+
         # print("  { 'name': '%s', 'lat': %f, 'lon': %f }," % (name, lat, lon))
         if not name:
             pointno += 1
@@ -270,7 +273,7 @@ def save_alignments_as_JSON(observer, alignments, waypoints, filename):
             if not obs:
                 print("Can't find observer for", a)
                 continue
-            obsname = obs[0].split('\n')[0]
+            obsname = obs[0]
             obslat = obs[1]
             obslon = obs[2]
 
@@ -311,7 +314,7 @@ def save_alignments_as_GPX(observer, alignments, waypoints, filename):
                 if not obs:
                     print("Can't find observer for", a)
                     continue
-                obsname = obs[0].split('\n')[0]
+                obsname = obs[0]
                 obslat = obs[1]
                 obslon = obs[2]
 
