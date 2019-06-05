@@ -2,21 +2,47 @@
 
 # A simple music player using pygame.
 # Requirements: python-pygame python-id3 python-mutagen
-# Copyright 2015 by Akkana Peck: share and enjoy under the GPLv2 or later.
+# Copyright 2015.2019 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
 import sys, os
 import time
 import random
 import re
 
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk as gtk
+from gi.repository import Gdk, GLib
+
+# Hide the silly "hello" message from pygame at import time.
+# This supposedly will work with pygame > 1.9.4 but doesn't work yet.
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 from pygame import mixer
-import ID3
+
 import cgi
-from mutagen.mp3 import MP3
 
-import gtk, gobject
+try:
+    import ID3
+except:
+    pass
 
-class MusicWin(gtk.Window) :
+try:
+    from mutagen.mp3 import MP3
+except:
+    pass
+
+class MusicWin(gtk.Window):
+    LEFT_KEY = Gdk.KEY_Left
+    RIGHT_KEY = Gdk.KEY_Right
+    UP_KEY = Gdk.KEY_Up
+    DOWN_KEY = Gdk.KEY_Down
+    SPACE_KEY = Gdk.KEY_space
+    Q_KEY = Gdk.KEY_q
+    D_KEY = Gdk.KEY_d
+    S_KEY = Gdk.KEY_s
+
+    MAX_FILENAME_LEN = 90
+
     def __init__(self, init_songs, random=None, backward=False):
         super(MusicWin, self).__init__()
 
@@ -30,7 +56,7 @@ class MusicWin(gtk.Window) :
         # If no songs or playlists specified, play from our favorites playlist.
         if not init_songs:
             self.playlist = os.path.join(self.configdir, "favorites.m3u")
-            print "Playing favorites"
+            print("Playing favorites")
             init_songs = [ self.playlist ]
         # Did the user specify one single playlist?
         elif len(init_songs) == 1 \
@@ -58,7 +84,7 @@ class MusicWin(gtk.Window) :
                         elif val == "false" or val == '0':
                             self.random = False
                         else:
-                            print "Config file error: '%s'" . line.strip()
+                            print("Config file error: '%s'" . line.strip())
                     break
                 fp.close()
 
@@ -82,44 +108,45 @@ class MusicWin(gtk.Window) :
         # so we have to remember that.
         self.skipped_seconds = 0
 
+        #############################
         # The window and UI:
         mainbox = gtk.VBox(spacing=8)
         self.add(mainbox)
 
-        buttonbox = gtk.HBox(spacing=4)
-        mainbox.pack_end(buttonbox, expand=False)
+        buttonbox = gtk.ButtonBox(spacing=4)
+        mainbox.pack_end(buttonbox, False, False, 0)
 
-        prev_btn = gtk.Button("<<")
+        prev_btn = gtk.Button(label="<<")
         prev_btn.set_tooltip_text("Previous song")
         prev_btn.connect("clicked", self.prev_song);
         buttonbox.add(prev_btn)
 
-        restart_btn = gtk.Button("|<")
+        restart_btn = gtk.Button(label="|<")
         restart_btn.set_tooltip_text("Restart song")
         restart_btn.connect("clicked", self.restart);
         buttonbox.add(restart_btn)
 
-        back_btn = gtk.Button("<")
+        back_btn = gtk.Button(label="<")
         back_btn.set_tooltip_text("Skip back 10 sec")
         back_btn.connect("clicked", self.skip_back);
         buttonbox.add(back_btn)
 
-        self.pause_btn = gtk.Button("||")
+        self.pause_btn = gtk.Button(label="||")
         self.pause_btn.set_tooltip_text("Pause")
         self.pause_btn.connect("clicked", self.pause);
         buttonbox.add(self.pause_btn)
 
-        self.stop_btn = gtk.Button(u"\u25A0")
+        self.stop_btn = gtk.Button(label=u"\u25A0")
         self.stop_btn.set_tooltip_text("Stop")
         self.stop_btn.connect("clicked", self.stop);
         buttonbox.add(self.stop_btn)
 
-        fwd_btn = gtk.Button(">")
+        fwd_btn = gtk.Button(label=">")
         fwd_btn.connect("clicked", self.skip_fwd);
         fwd_btn.set_tooltip_text("Skip forward 10 sec")
         buttonbox.add(fwd_btn)
 
-        next_btn = gtk.Button(">>")
+        next_btn = gtk.Button(label=">>")
         next_btn.set_tooltip_text("Next song")
         next_btn.connect("clicked", self.next_song);
         buttonbox.add(next_btn)
@@ -127,31 +154,76 @@ class MusicWin(gtk.Window) :
         # Assorted info, like the random button and progress indicator:
         views = gtk.HBox(spacing=4)
         # views.padding = 8 So frustrating that we can't set this in general!
-        mainbox.pack_end(views, expand=False)
+        mainbox.pack_end(views, False, False, 0)
         self.time_label = gtk.Label()
 
-        views.pack_start(self.time_label, expand=False, padding=8)
+        views.pack_start(self.time_label, False, False, 8)
 
-        randomBtn = gtk.ToggleButton("Shuffle")
+        randomBtn = gtk.ToggleButton(label="Shuffle")
         randomBtn.set_active(self.random)
         randomBtn.connect("toggled", self.toggle_random);
         views.pack_end(randomBtn, fill=True, expand=False, padding=8)
 
-        # The content area where the song title and info will be shown:
-        self.content_area = gtk.Label()
-        self.content_area.set_use_markup(True)
-        self.content_area.set_line_wrap(True)
-        self.content_area.set_justify(gtk.JUSTIFY_CENTER)
-        mainbox.pack_start(self.content_area, expand=False)
+        # The content areas for the song filename, title and artist:
+        # you might think HTML/CSS markup would let you put these all
+        # together in one label, since isn't that the point of html?
+        # but you'd be wrong:
+        # GTK doesn't let you add things like <span id=''> inside a label.
+        # Set the initial label to a width that will allow room for
+        # the max number of characters; a string of spaces doesn't do it,
+        # a string of all m is a little too wide.
+        self.filename_area = gtk.Label(label='o' * self.MAX_FILENAME_LEN)
+
+        # The label has this function but it doesn't actually limit anything.
+        # limit it in the update function instead.
+        # self.filename_area.set_max_width_chars(90)
+        # self.filename_area.set_use_markup(True)
+        # self.filename_area.set_line_wrap(True)
+        # Right-justify the filename to prefer the basename.
+        # This of course is pointless since GTK can't limit the label size
+        # and just resizes the window any time the text gets longer.
+        # So, again, handle this in the update function.
+        self.filename_area.set_justify(gtk.Justification.CENTER)
+        self.filename_area.set_name("filename")
+        mainbox.pack_start(self.filename_area, False, False, 0)
+
+        self.title_area = gtk.Label()
+        self.title_area.set_use_markup(True)
+        self.title_area.set_line_wrap(True)
+        self.title_area.set_justify(gtk.Justification.CENTER)
+        self.title_area.set_name("title")
+        mainbox.pack_start(self.title_area, False, False, 0)
+
+        self.artist_area = gtk.Label()
+        self.artist_area.set_use_markup(True)
+        self.artist_area.set_line_wrap(True)
+        self.artist_area.set_justify(gtk.Justification.CENTER)
+        self.artist_area.set_name("artist")
+        mainbox.pack_start(self.artist_area, False, False, 0)
+
+        # Style the whole window:
+        css = b'''
+#maincontent { padding: 0em; margin: 0em; border: 0em; }
+#filename { font-style: italic; }
+#title { font-weight: bold; font-size: 2em; }
+#artist { font-size: 1.5em; }
+'''
+        css_provider = gtk.CssProvider()
+        css_provider.load_from_data(css)
+        context = gtk.StyleContext()
+        screen = Gdk.Screen.get_default()
+        context.add_provider_for_screen(screen, css_provider,
+                                        gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         # Add events we need to listen to:
         self.connect("key-press-event", self.key_press_event)
 
-        self.add_events(gtk.gdk.SCROLL_MASK)
+        self.add_events(Gdk.EventMask.SCROLL_MASK)
         self.connect("scroll-event", self.scroll_event)
 
-        # Try to set a maximum size:
-        self.set_size_request(550, 225)
+        # Try to set a maximum size.
+        # In GTK3 this also sets initial size, and it's too big.
+        # self.set_size_request(550, 225)
 
         # Done with UI! Now we can build up the song list.
         self.add_songs_and_directories(init_songs)
@@ -172,12 +244,12 @@ class MusicWin(gtk.Window) :
                 elif os.path.exists(os.path.join(self.configdir, s)):
                     self.add_songs_in_playlist(os.path.join(self.configdir, s))
                 else:
-                    print s, ": No such playlist"
+                    print(s, ": No such playlist")
             else:
                 if os.path.exists(s):
                     self.songs.append(s)
                 else:
-                    print s, ": No such file"
+                    print(s, ": No such file")
 
         # Play music in random order:
         random.seed(os.getpid())
@@ -194,7 +266,7 @@ class MusicWin(gtk.Window) :
 
     def run(self):
         if not self.songs:
-            print "No songs to play!"
+            print("No songs to play!")
             return
 
         self.connect("delete_event", self.quit)
@@ -204,7 +276,7 @@ class MusicWin(gtk.Window) :
         self.show_all()
 
         # set a timeout
-        gobject.timeout_add(500, self.timer_func)
+        GLib.timeout_add(500, self.timer_func)
 
         gtk.main()
 
@@ -262,8 +334,8 @@ class MusicWin(gtk.Window) :
         try:
             self.song_ptr = self.songs.index(cursong)
         except:
-            print "Current song doesn't seem to be in the list any more!"
-            print cursong
+            print("Current song doesn't seem to be in the list any more!")
+            print(cursong)
             self.song_ptr = 0
 
     def next_song(self, w=None):
@@ -334,7 +406,7 @@ class MusicWin(gtk.Window) :
     def save_playlist(self):
         '''Save the current playlist.'''
         if not self.playlist:
-            print "No playlist to save to!"
+            print("No playlist to save to!")
             return
 
         if not os.path.exists(self.configdir):
@@ -351,11 +423,25 @@ class MusicWin(gtk.Window) :
         fp.close()
 
     def update_content_area(self):
-        text = self.songs[self.song_ptr]
         has_title = False
         has_artist = False
 
-        id3info = ID3.ID3(self.songs[self.song_ptr])
+        # Limit the filename size, since GTK doesn't seem able to do that.
+        fname_len = len(self.songs[self.song_ptr])
+        if fname_len > self.MAX_FILENAME_LEN:
+            fname = self.songs[self.song_ptr][fname_len-self.MAX_FILENAME_LEN:]
+        else:
+            fname = self.songs[self.song_ptr]
+        self.filename_area.set_label(fname)
+
+        try:
+            id3info = ID3.ID3(self.songs[self.song_ptr])
+        except:
+            self.title_area.set_label(os.path.splitext(
+                os.path.basename(self.songs[self.song_ptr]))[0])
+            self.artist_area.set_label('-')
+            return
+
         # for k, v in id3info.items():
         #     if k == "ARTIST":
         #         has_artist = True
@@ -363,33 +449,30 @@ class MusicWin(gtk.Window) :
         #         has_title = True
         #     text += '\n' + k + ' : ' + v
 
-        text += '<span size="25000">\n'
         try:
-            text += cgi.escape(id3info['TITLE'])
+            self.title_area.set_label(unicode(cgi.escape(id3info['TITLE']),
+                                                         'utf-8',
+                                                         errors='replace'))
         except KeyError:
-            text += cgi.escape(os.path.basename(self.songs[self.song_ptr]))
-        text += '\n'
+            self.title_area.set_label(os.path.basename(self.songs[self.song_ptr]))
         try:
-            text += cgi.escape(id3info['ARTIST'])
+            self.artist_area.set_label(cgi.escape(id3info['ARTIST']))
         except KeyError:
-            pass
-        text += '</span>'
-
-        self.content_area.set_label(unicode(text, 'utf-8', errors='replace'))
+            self.artist_area.set_label('-')
 
     def key_press_event(self, widget, event):
-        if event.keyval == gtk.keysyms.q and \
-           event.state == gtk.gdk.CONTROL_MASK:
+        if event.keyval == MusicWin.Q_KEY and \
+           event.state == Gdk.ModifierType.CONTROL_MASK:
             self.quit()
-        elif event.keyval == gtk.keysyms.Left:
+        elif event.keyval == MusicWin.LEFT_KEY:
             self.prev_song()
-        elif event.keyval == gtk.keysyms.Right:
+        elif event.keyval == MusicWin.RIGHT_KEY:
             self.next_song()
-        elif event.keyval == gtk.keysyms.Up:
+        elif event.keyval == MusicWin.UP_KEY:
             self.volume_up()
-        elif event.keyval == gtk.keysyms.Down:
+        elif event.keyval == MusicWin.DOWN_KEY:
             self.volume_down()
-        elif event.keyval == gtk.keysyms.space:
+        elif event.keyval == MusicWin.SPACE_KEY:
             self.pause()
         elif event.string == '.':
             self.stop()
@@ -398,23 +481,23 @@ class MusicWin(gtk.Window) :
 
         # d means delete from the current playlist;
         # ctrl-d actually deletes the song from disk.
-        elif event.keyval == gtk.keysyms.d:
-            if event.state == gtk.gdk.CONTROL_MASK:
+        elif event.keyval == MusicWin.D_KEY:
+            if event.state == Gdk.ModifierType.CONTROL_MASK:
                 self.delete_song_from_disk()
             else:
                 self.delete_song_from_playlist()
 
-        elif event.keyval == gtk.keysyms.s and \
-           event.state == gtk.gdk.CONTROL_MASK:
-            print "Saving playlist"
+        elif event.keyval == MusicWin.S_KEY and \
+           event.state == Gdk.ModifierType.CONTROL_MASK:
+            print("Saving playlist")
             self.save_playlist()
 
         return True
 
     def scroll_event(self, widget, event):
-        if event.direction == gtk.gdk.SCROLL_UP:
+        if event.direction == Gdk.ScrollDirection.UP:
             self.volume_up()
-        elif event.direction == gtk.gdk.SCROLL_DOWN:
+        elif event.direction == Gdk.ScrollDirection.DOWN:
             self.volume_down()
 
     def sec_to_str(self, sec):
@@ -447,7 +530,7 @@ class MusicWin(gtk.Window) :
         self.song_ptr = (self.song_ptr + 1) % len(self.songs)
 
         while not os.path.exists(self.songs[self.song_ptr]):
-            print self.songs[self.song_ptr], "doesn't exist!"
+            print(self.songs[self.song_ptr], "doesn't exist!")
             del self.songs[self.song_ptr]
             # self.song_ptr = (self.song_ptr - 1) % len(self.songs)
 
@@ -470,8 +553,8 @@ class MusicWin(gtk.Window) :
             # Make sure the buttons are sane:
             self.pause_btn.set_label('||')
             self.stop_btn.set_label(u"\u25A0") # black square
-        except Exception, e:
-            print "Can't play", self.songs[self.song_ptr], ':', str(e)
+        except Exception as e:
+            print("Can't play", self.songs[self.song_ptr], ':', str(e))
             del self.songs[self.song_ptr]
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         return True
