@@ -164,7 +164,18 @@ network id / ssid / bssid / flags
 3       COAFreeWireless any
 4       LAC-Public Library      any
 '''
-    pass
+    start_wpa_supplicant(iface)
+    networks = {}
+    out, err = run_cmd(["wpa_cli", "list_networks"])
+    stdout_lines = out.split('\n')
+
+    for line in stdout_lines:
+        line = line.strip()
+        if line.endswith('[CURRENT]'):
+            words = line.split('\t')
+            return words[1]
+
+    return None
 
 def get_known_networks():
     start_wpa_supplicant(iface)
@@ -181,6 +192,12 @@ def get_known_networks():
             networks[int(words[0])] = words[1]
 
     return networks
+
+def match_ssid(pat, ssids):
+    for net in ssids:
+        if pat in net:
+            return net
+    return None
 
 def get_wireless_ifaces():
     # For a list of all devices, ls /sys/class/net
@@ -359,8 +376,12 @@ def connect_to(to_ap):
                                                          to_ap))
                 sys.exit(1)
         else:
-            print("'%s' isn't visible" % to_ap)
-            sys.exit(1)
+            matched = match_ssid(to_ap, accesspoints.keys())
+            if not matched:
+                print("'%s' isn't visible" % to_ap)
+                sys.exit(1)
+            to_ap = matched
+            print("Matched:", matched)
 
     # Now to_ap is an SSID that's known.
     if to_ap in known:
@@ -521,7 +542,11 @@ if __name__ == '__main__':
     # If no flags specified, then we should have one arg,
     # either a numeric specifier or an essid.
     if not args.connect_to:
-        parser.print_help()
-        sys.exit(1)
+        current = get_current()
+        if current:
+            print("Connected to", current)
+        else:
+            print("Not connected")
+        sys.exit(0)
 
     connect_to(args.connect_to)
