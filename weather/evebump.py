@@ -231,7 +231,7 @@ def find_bump_times(dates, vals, dvals, start_time=None):
             raise RuntimeError("Dates must be out of order!")
 
         if day == cur_day:
-            if start_idx == None:
+            if start_idx is None:
                 if d.time() >= start_time:
                     # print("Starting a day at", d)
                     start_idx = i

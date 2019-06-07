@@ -113,7 +113,7 @@ def compose_email_msg(recipients, sender, html, text=None,
     # If text is None, no text part will be attached.
     if not text:
         msg = html_part
-    elif text == True:
+    elif text is True:
         msg = MIMEMultipart('alternative')
         msg.attach(MIMEText(soup.get_text(), 'plain'))
         msg.attach(html_part)

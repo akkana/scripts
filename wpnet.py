@@ -388,12 +388,12 @@ def connect_to(to_ap):
         if verbose:
             print("Great, we see", to_ap, "and we know it already")
 
-        if known_index == None:
+        if known_index is None:
             for i in known_nets:
                 if known_nets[i] == to_ap:
                     known_index = i
                     break
-        if known_index == None:
+        if known_index is None:
             print("Internal error, lost track of SSID %s" % to_ap)
 
         if verbose:

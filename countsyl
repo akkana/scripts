@@ -32,7 +32,7 @@ def count_syllables(word):
     for c in word:
         is_vowel = c in vowels
 
-        if on_vowel == None:
+        if on_vowel is None:
             on_vowel = is_vowel
 
         # y is a special case

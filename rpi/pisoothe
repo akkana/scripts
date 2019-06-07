@@ -105,7 +105,7 @@ class SoundPlayer :
     def play(self, interrupt=False) :
         path = self.file_list[self.samplenum]
         if self.current :
-            if self.current.poll() == None :
+            if self.current.poll() is None :
                 # Current process hasn't finished yet. Is this the same sound?
                 if path == self.curpath :
                     # A repeat of the currently playing sound.

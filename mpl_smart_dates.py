@@ -24,7 +24,7 @@ def default_formatter(d_ord, pos=None):
 def year_formatter(d_ord, pos=None):
     d = mdates.num2date(d_ord)
 
-    if pos == None:
+    if pos is None:
         return d.strftime("%Y %b %d")
 
     return d.strftime("%Y")
@@ -33,7 +33,7 @@ def year_formatter(d_ord, pos=None):
 def month_formatter(d_ord, pos=None):
     d = mdates.num2date(d_ord)
 
-    if pos == None:
+    if pos is None:
         return d.strftime("%Y %b %d")
 
     if d.month == 1:
@@ -45,7 +45,7 @@ def month_formatter(d_ord, pos=None):
 def day_formatter(d_ord, pos=None):
     d = mdates.num2date(d_ord)
 
-    if pos == None:
+    if pos is None:
         return d.strftime("%Y %b %d %H:%M")
 
     return d.strftime("%b %-d")
@@ -54,7 +54,7 @@ def day_formatter(d_ord, pos=None):
 def halfday_formatter(d_ord, pos=None):
     d = mdates.num2date(d_ord)
 
-    if pos == None:
+    if pos is None:
         return d.strftime("%Y %b %d %H:%M")
 
     return d.strftime("%b %-d %H:%M")
@@ -63,7 +63,7 @@ def halfday_formatter(d_ord, pos=None):
 def hour_formatter(d_ord, pos=None):
     d = mdates.num2date(d_ord)
 
-    if pos == None:
+    if pos is None:
         return d.strftime("%Y %b %d %H:%M:%S")
 
     if d.hour == 0:
@@ -198,7 +198,7 @@ def daytime_formatter(d, pos=None):
     # between locating and labeling, though this is undocumented
     # and may change at some point.
     d = mdates.num2date(d)
-    if pos == None:
+    if pos is None:
         # pos==None is when you're moving the mouse interactively;
         # always want an indicator for that.
         return d.strftime("! %b %d %H:%M")

@@ -27,7 +27,7 @@ class SoundPlayer :
 
     def play(self, path) :
         if self.current :
-            if self.current.poll() == None :
+            if self.current.poll() is None :
                 # Current process hasn't finished yet. Is this the same sound?
                 if path == self.curpath :
                     # A repeat of the currently playing sound.
@@ -48,7 +48,7 @@ class SoundPlayer :
         self.current = subprocess.Popen([ SoundPlayer.PLAYER, '-q', path ] )
 
     def wait(self) :
-        if self.current and self.current.poll() == None :
+        if self.current and self.current.poll() is None :
             self.current.wait()
 
 # To test this class, run this file with a list of paths to sound files,

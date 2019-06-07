@@ -47,6 +47,8 @@ except NameError:
 # Is something a particular type? (But of course duck-typing is better.)
 if type(s) is str:
     print("It's a string")
+if isinstance(s, str):
+    print("It's a string")
 
 # More deprecated:
 if type(s) == types.StringType:
@@ -1062,6 +1064,10 @@ wrapped_arr = vwraparound(orig_arr)
 
 # Dates on X axis rotated a bit, so they don't overwrite each other:
 # fig.autofmt_xdate()
+
+# Two ways to do axis rotation:
+plt.xticks(rotation=45, ha="right")
+ax.tick_params(which='major', length=10, labelrotation=45, color='b')
 
 #
 # Custom ticks and labels for dates: see mpl_smart_dates.py.

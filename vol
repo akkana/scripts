@@ -10,8 +10,12 @@
 # You may use, distribute, or modify this program under the terms of the GPL.
 
 import string, re, os, sys
-import gtk
+
 import alsaaudio
+
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk as gtk
 
 def Usage() :
     print("Usage: %s [-v|-h]" % os.path.basename(sys.argv[0]))
@@ -56,7 +60,7 @@ def create_window(vol, verticalP) :
         scale = gtk.HScale(adjustment=adj)
         scale.set_size_request(250, 50)
     scale.set_digits(0)
-    vbox.pack_start(scale)
+    vbox.pack_start(scale, False, False, 0)
     scale.show()
     vbox.show()
 
