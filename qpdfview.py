@@ -136,7 +136,7 @@ class PDFWidget(QLabel):
             self.load_cb()
 
 
-class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
+class PDFScrolledWidget(QScrollArea):
 
     '''
     Show all pages of a PDF, with scrollbars.
@@ -181,6 +181,9 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         # Add page 1 to the vertical layout:
         self.scroll_layout.addWidget(self.pages[0])
 
+        QShortcut("Space", self, activated=self.page_down)
+        QShortcut("Shift+Space", self, activated=self.page_up)
+
 
     def load_cb(self):
         page1 = self.pages[0]
@@ -211,6 +214,7 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
         # so resizeEvent() won't zoom.
         self.loaded = True
 
+
     def resizeToFitContent(self):
         '''Resize to be wide enough not to show a horizontal scrollbar,
            and just a little taller than the first page of PDF content.
@@ -235,7 +239,16 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
         self.resize(width, height)
 
-    # def showEvent(self, event):
+
+    def page_down(self):
+        vbar = self.verticalScrollBar()
+        vbar.setValue(vbar.value() + vbar.pageStep())
+
+
+    def page_up(self):
+        vbar = self.verticalScrollBar()
+        vbar.setValue(vbar.value() - vbar.pageStep())
+
 
     def resizeEvent(self, event):
         '''On resizes after the initial resize,
@@ -249,6 +262,7 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
 
         super(PDFScrolledWidget, self).resizeEvent(event)
 
+
     def zoom(self, frac=1.25):
         '''Zoom the page by the indicated fraction.
         '''
@@ -256,6 +270,7 @@ class PDFScrolledWidget(QScrollArea):   # inherit from QScrollArea?
             # Resize according to width, ignoring height.
             page.dpi *= frac
             page.render()
+
 
     def unzoom(self, frac=.8):
         '''Zoom the page by the indicated fraction.
