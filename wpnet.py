@@ -226,11 +226,15 @@ def show_browser_if_redirect():
     # and put that URL in ~/.config/netscheme/testurl
     testurl = None
     testurlfile = os.path.expanduser("~/.config/netscheme/testurl")
-    if os.path.exists(testurlfile):
-        with open(testurlfile) as tufile:
-            testurl = tufile.read().strip()
-        with open(testurlfile + ".out") as tufile:
-            content_from_file = tufile.read()
+    if not os.path.exists(testurlfile):
+        print("No test URL file; not testing connection")
+        return
+
+    with open(testurlfile) as tufile:
+        testurl = tufile.read().strip()
+    with open(testurlfile + ".out") as tufile:
+        content_from_file = tufile.read()
+
     if verbose and not testurl:
         print("No test URL set; not checking for redirects")
         return
