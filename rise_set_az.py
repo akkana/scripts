@@ -5,6 +5,7 @@ from ephem import cities
 
 import argparse
 import datetime
+import re
 import sys
 
 
@@ -75,8 +76,21 @@ def observer_for_city(city):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Calculate sun/moon rise/set")
+    parser = argparse.ArgumentParser(
+        description="""Calculate sun/moon rise/set.""")
 
+    # Required argument: the observer's location
+    parser.add_argument("-o", "--observer", action="store", required=True,
+                        dest="observer", default="White Rock",
+                        help='Observer location: city name or '
+                             'lat(dd),lon(dd)[,elevation(m)[,name]]')
+
+    # Required argument: azimuth where the rise or set is wanted
+    parser.add_argument("-a", "--azimuth", action="store",
+                        dest="az", type=int, required=True,
+                        help='Target rise/set azimuth, in decimal degrees')
+
+    # The rest of the arguments are optional.
     parser.add_argument("--moon", dest="moon", default=False,
                         action="store_true", help="Moon (default)")
     parser.add_argument("--sun", dest="sun", default=False,
@@ -87,17 +101,9 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--set", dest="set", default=False,
                         action="store_true", help="Set (rather than rise)")
 
-    parser.add_argument("-a", "--azimuth", action="store",
-                        dest="az", type=int,
-                        help='Target rise/set azimuth, in decimal degrees')
-
     parser.add_argument("-p", "--phase", action="store", default=0,
                         dest="phase", type=int,
                         help='Phase percent (default: all phases)')
-
-    parser.add_argument("-o", "--observer", action="store",
-                        dest="observer", default="White Rock",
-                        help='Observer location')
 
     parser.add_argument("--slop", action="store", dest="slop", default=1,
                         type=int,
@@ -116,7 +122,42 @@ if __name__ == '__main__':
 
     args = parser.parse_args(sys.argv[1:])
 
-    observer = observer_for_city(args.observer)
+    obsparts = args.observer.split(',')
+    if len(obsparts) > 1:
+        floatexp = r"[-+]?\d*\.\d+|\d+"
+        try:
+            lat = re.findall(floatexp, obsparts[0])[0].strip()
+            lon = re.findall(floatexp, obsparts[1])[0].strip()
+            if len(obsparts) > 2:
+                ele = re.findall(floatexp, obsparts[2])[0].strip()
+            else:
+                ele = '0'
+            if len(obsparts) > 3:
+                obsname = ','.join(obsparts[3:]).strip()
+            else:
+                obsname = 'Custom'
+
+            print("lat", lat, "lon", lon, "ele", ele, "obsname", obsname)
+
+            observer = ephem.Observer()
+            observer.name = obsname
+            observer.lon = ephem.degrees(lon)
+            observer.lat = ephem.degrees(lat)
+            observer.elevation = float(ele)
+        except RuntimeError:
+            observer = None
+    else:
+        observer = None
+
+    if not observer:
+        observer = observer_for_city(args.observer)
+
+    if not observer:
+        print("Couldn't parse observer '%s'" % args.observer)
+        parser.print_help()
+        sys.exit(1)
+
+    print("Observer:", observer)
 
     if args.sun:
         body = ephem.Sun()
