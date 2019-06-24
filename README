@@ -243,7 +243,7 @@ mnist.py:
 
 moonpos:
     Predict when the moon (or another body) will be at a specified
-    altitude and azimuth during a specified time window
+    altitude and azimuth during a specified time window.
 
 mouseevent.py:
     Read mouse events from /dev/input even if not running X,
@@ -360,6 +360,10 @@ readkey.py:
 repo-pullpush:
     Modify a git repository, taking the existing URL, making that
     the pushurl and adding a passwordless pull URL alongside it.
+
+rise_set_az.py:
+    Find the times when the sun or moon will rise or set at a specific
+    azimuth, within a specified phase range, from a specified location.
 
 scrubjay:
     Demo of how to use a few different Twitter API.
