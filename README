@@ -139,11 +139,9 @@ fincompare.py:
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
 
-findbooks.py:
-    List books by author, and optionally year of publication.
-    The idea was to find new books by particular authors,
-    but currently the script uses the Open Library database
-    which isn't sufficiently up to date to be useful for that purpose.
+newreads.py:
+    List books by author optionally year of publication,
+    to find new books by particular authors.
 
 fixbookcover:
     Fix books whose cover doesn't include the title, like many
