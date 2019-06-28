@@ -13,6 +13,8 @@
 # to get an API key:
 # https://www.oclc.org/developer/develop/web-services/worldcat-search-api.en.html
 #
+# https://isbndb.com/apidocs sounds nice, but it has no free level.
+#
 # Or maybe scrape the Library of Congress search pages;
 # the LOC has APIs for seemingly everything *except* books,
 # Typical LOC search page URL by author:
@@ -34,6 +36,7 @@ import requests
 # import json
 from bs4 import BeautifulSoup
 import argparse
+import time
 import sys, os
 
 class Book:
@@ -76,13 +79,17 @@ class Book:
 
 
     def __repr__(self):
+        retstr = '%s, by %s' % (self.title, ','.join(self.authors))
         if self.pub_month:
-            return '%s (%s %d) (Goodreads %s)'\
-                % (self.title,
-                   Book.monthnames[self.pub_month],
-                   self.pub_year, self.id)
-        return '%s (%d) (Goodreads %s)' \
-            % (self.title, self.pub_year, self.id)
+            retstr += ' (%s %d)' % (Book.monthnames[self.pub_month],
+                                    self.pub_year)
+        elif self.pub_year:
+            retstr += ' %d' % self.pub_year
+
+        if self.id:
+            retstr += ' (Goodreads %d)' % self.id
+
+        return retstr
 
 
 class GoodreadsAPI:
@@ -106,12 +113,15 @@ class GoodreadsAPI:
         # if 'secret' not in self.keys:
         #     print("API key is there, but won't be able to write")
 
+        self.debug = False
 
-    def book_description(self, bookid):
+
+    def book_by_id(self, bookid):
         # The reviews page includes book description and language
         url = 'https://www.goodreads.com/book/show/%d.xml?key=%s' \
             % (bookid, self.keys['key'])
-        print("url", url)
+        if self.debug:
+            print("url", url)
 
         r = requests.get(url)
         if r.status_code != 200:
@@ -124,14 +134,15 @@ class GoodreadsAPI:
         authors = []
         for authortag in authorstag.findAll('author'):
             authors.append(authortag.find('name').text)
-
         title = soup.find('title').text
 
         desc = soup.find('description')
         # print("description tag:", desc)
         desc = desc.text
 
-        return title + ", by " + ','.join(authors) + '\n' + desc
+        # XXX Unfortunately this URL doesn't have pub year or month.
+
+        return Book(bookid, title, authors, desc, 0, 0)
 
 
     def books_by_author(self, authorname):
@@ -147,7 +158,8 @@ class GoodreadsAPI:
 
         url = "https://www.goodreads.com/api/author_url/%s?key=%s" \
             % (authorname, self.keys['key'])
-        # print("URL", url)
+        if self.debug:
+            print("URL", url)
 
         r = requests.get(url)
         if r.status_code != 200:
@@ -177,13 +189,13 @@ class GoodreadsAPI:
                 url = "https://www.goodreads.com/author/list/%s" \
                       "?format=xml&key=%s&page=%d" \
                       % (author_id, self.keys['key'], page)
-                print("url", url)
+                if self.debug:
+                    print("url", url)
 
                 print('%d... ' % page, end='', file=sys.stderr)
                 sys.stderr.flush()
                 r = requests.get(url)
                 if r.status_code != 200:
-
                     raise RuntimeError("Bad status %d on %s" % (r.status_code,
                                                                 url))
 
@@ -266,6 +278,40 @@ class GoodreadsAPI:
         return booklist, anthologies
 
 
+def lookup_books(args):
+    for val in args.author_or_id:
+        val = val.strip()
+
+        try:
+            bookid = int(val)
+            book = api.book_by_id(bookid)
+            print(book)
+            print(book.desc)
+
+        except ValueError:
+            booklist, anthologies = api.books_by_author(val)
+
+            print("\n====", val)
+
+            if args.anthologies:
+                for book in anthologies:
+                    if not args.year or book.pub_year >= args.year:
+                        print(book)
+
+            for book in booklist:
+                if not args.year or book.pub_year >= args.year:
+                    print(book)
+                    if args.desc:
+                        print(book.desc)
+                        print()
+
+        # The Goodreads API has some sort of once-a-second limit,
+        # but they're unclear exactly how that works,
+        # which calls are limited. Just to be safe, it doesn't hurt
+        # to wait a second between arguments.
+        time.sleep(1)
+
+
 if __name__ == '__main__':
 
     # book2019 = Book(1234, 'Book 2019', ['a b'], '', 2019, 0)
@@ -281,29 +327,19 @@ if __name__ == '__main__':
                         help='Include anthologies that include this author')
     parser.add_argument('-y', action="store", dest="year", type=int,
                         help='year: Show only books from this year or later')
-    parser.add_argument('-d', action="store", dest="desc", type=int,
-                        help='description: show Goodreads description for this book')
-    parser.add_argument('author', nargs='*', help="Authors")
+    parser.add_argument('-d', action="store_true", dest="desc",
+                        help='description: show Goodreads descriptions')
+    parser.add_argument('-D', action="store_true", dest="debug",
+                        help='Show debugging information, like URLs used')
+    parser.add_argument('author_or_id', nargs='*', help="Authors or Goodreads numerical IDs")
     args = parser.parse_args(sys.argv[1:])
 
-    api = GoodreadsAPI()
+    try:
+        api = GoodreadsAPI()
+        if args.debug:
+            api.debug = True
 
-    if args.desc:
-        print(api.book_description(args.desc))
-        sys.exit(0)
+        lookup_books(args)
 
-    for author in args.author:
-        author = author.strip()
-
-        booklist, anthologies = api.books_by_author(author)
-
-        print("\n====", author)
-
-        if args.anthologies:
-            for book in anthologies:
-                if not args.year or book.pub_year >= args.year:
-                    print(book)
-
-        for book in booklist:
-            if not args.year or book.pub_year >= args.year:
-                print(book)
+    except KeyboardInterrupt:
+        print("Interrupt")
