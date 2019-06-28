@@ -1,19 +1,26 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Search books by author and, optionally, date (looking for recent books).
 # Copyright 2019 by Akkana Peck, share and enjoy under the GPLv2 or later.
 
-# Uses the Open Library API, https://openlibrary.org/
-# but the database is not very up to date and is likely to be
-# missing recent books, making this not particularly useful.
+# Currently uses either of two APIs:
+# Python isbnlib or Goodreads.
+# Goodreads requires an API key: create a file
+# ~/.config/newreads/goodreads.keys
+# containing one line:
+# key YOUR_KEY_HERE
+# isbnlib doesn't require a a key and so is the default.
 
+######################################################################
+# Notes on other possible APIs:
+#
 # Perhaps better is the worldcat API, though it requires signing up for a key.
 # http://web.archive.org/web/20100616012651/http://worldcat.org/devnet/wiki/BasicAPIDetails
 # But the WorldCat search API implies that you have to be a library
 # to get an API key:
 # https://www.oclc.org/developer/develop/web-services/worldcat-search-api.en.html
 #
-# https://isbndb.com/apidocs sounds nice, but it has no free level.
+# https://isbndb.com/apidocs looks interesting, but isn't free.
 #
 # Or maybe scrape the Library of Congress search pages;
 # the LOC has APIs for seemingly everything *except* books,
@@ -26,15 +33,9 @@
 # Other sites that could be scrapd:
 # https://www.bookseriesinorder.com/connie-willis/
 # https://www.fictiondb.com/search/searchresults.htm?srchtxt=robin+sloan
-#
-# The Goodreads API https://www.goodreads.com/api/
-# might be able to do it, but their documentation is so bad that you have
-# to sign up for an API key and try stuff even to see what they offer.
 # Don't request any method more often than once a second
+##### end API notes ##################################################
 
-import requests
-# import json
-from bs4 import BeautifulSoup
 import argparse
 import time
 import sys, os
@@ -44,9 +45,9 @@ class Book:
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ]
 
 
-    def __init__(self, id, title, authorlist, description,
-                 pub_year, pub_month):
-        self.id = int(id)
+    def __init__(self, ISBN, title, authorlist, description,
+                 pub_year, pub_month, goodreads_id=0):
+        self.ISBN13 = ISBN
         self.title = title
         self.authors = authorlist
         self.desc = description
@@ -58,12 +59,11 @@ class Book:
             self.pub_month = int(pub_month)
         except:
             self.pub_month = 0
+        self.goodreads_id = int(goodreads_id)
 
         # Things that can be filled in later, which may or may not
-        # be available:
+        # be available from any given call:
         self.language = None
-        self.isbn = None
-        self.isbn13 = None
 
 
     # Books need to be sortable by publication date
@@ -74,7 +74,10 @@ class Book:
             return True
         if self.pub_year == other.pub_year and \
            self.pub_month == other.pub_month:
-            return self.id < other.id
+            if self.ISBN13 and other.ISBN13:
+                return self.ISBN13 < other.ISBN13
+            if self.goodreads_id and other.goodreads_id:
+                return self.goodreads_id < other.goodreads_id
         return False
 
 
@@ -86,10 +89,47 @@ class Book:
         elif self.pub_year:
             retstr += ' %d' % self.pub_year
 
-        if self.id:
-            retstr += ' (Goodreads %d)' % self.id
+        if self.ISBN13:
+            retstr += ' (ISBN %s)' % self.ISBN13
+
+        if self.goodreads_id:
+            retstr += ' (Goodreads %d)' % self.goodreads_id
 
         return retstr
+
+
+class ISBNlibAPI:
+    def __init__(self):
+        self.debug = False
+
+
+    def book_by_ISBN(self, isbn):
+        # print("Looking up ISBN", isbn)
+        meta = isbnlib.meta(isbn)
+        return Book(isbn, meta['Title'], meta['Authors'], '',
+                    meta['Year'], 0)
+
+
+    def book_by_id(self, bookid):
+        return self.book_by_ISBN(bookid)
+
+
+    def books_by_author(self, authorname):
+        '''Find books by all authors matching the given name.
+           authorname is a string like "Connie Willis")
+           Order of names probably doesn't matter.
+           Returns two lists: booklists, anthologies
+           each of which consists of triples [year, month, title]
+        '''
+        booklist = []
+        books = isbnlib.goom(authorname)
+        for meta in books:
+            booklist.append(Book(meta['ISBN-13'], meta['Title'],
+                                 meta['Authors'], '',
+                                 meta['Year'], 0))
+
+        booklist.sort(reverse=True)
+        return booklist, []
 
 
 class GoodreadsAPI:
@@ -116,16 +156,16 @@ class GoodreadsAPI:
         self.debug = False
 
 
-    def book_by_id(self, bookid):
-        # The reviews page includes book description and language
-        url = 'https://www.goodreads.com/book/show/%d.xml?key=%s' \
-            % (bookid, self.keys['key'])
+    def book_from_url(self, url):
         if self.debug:
             print("url", url)
 
         r = requests.get(url)
         if r.status_code != 200:
-            raise RuntimeError("Bad status %d on %s" % (r.status_code, url))
+            if self.debug:
+                raise RuntimeError("Bad status %d on %s" % (r.status_code, url))
+            else:
+                return None
 
         # print(r.text)
         soup = BeautifulSoup(r.text, 'lxml-xml')
@@ -136,13 +176,50 @@ class GoodreadsAPI:
             authors.append(authortag.find('name').text)
         title = soup.find('title').text
 
-        desc = soup.find('description')
-        # print("description tag:", desc)
-        desc = desc.text
+        desc = soup.find('description').text
 
-        # XXX Unfortunately this URL doesn't have pub year or month.
+        # The pages by goodreads ID seldom have pub year or month,
+        # but the ISBN searches sometimes do. Doesn't hurt to try:
+        try:
+            pubyear = int(soup.find('original_publication_year').text)
+        except:
+            pubyear = 0
+        try:
+            pubmonth = int(soup.find('original_publication_month').text)
+        except:
+            pubmonth = 0
 
-        return Book(bookid, title, authors, desc, 0, 0)
+        try:
+            gid = int(soup.find('id').text)
+        except:
+            gid = 0
+
+        try:
+            isbn13 = soup.find('isbn13').text
+        except:
+            isbn13 = 0
+
+        return Book(isbn13, title, authors, desc, pubyear, pubmonth,
+                    goodreads_id=gid)
+
+
+    def book_by_ISBN(self, bookid):
+        if self.debug:
+            print("Looking up book by isbn", bookid)
+
+        # The reviews page includes book description and language
+        url = 'https://www.goodreads.com/book/isbn/%s?key=%s' \
+            % (bookid, self.keys['key'])
+
+        return self.book_from_url(url)
+
+
+    def book_by_id(self, bookid):
+        # The reviews page includes book description and language
+        url = 'https://www.goodreads.com/book/show/%s.xml?key=%s' \
+            % (bookid, self.keys['key'])
+
+        return self.book_from_url(url)
 
 
     def books_by_author(self, authorname):
@@ -275,6 +352,13 @@ class GoodreadsAPI:
 
         booklist.sort(reverse=True)
         anthologies.sort(reverse=True)
+
+        # The Goodreads API has some sort of once-a-second limit,
+        # but they're unclear exactly how that works,
+        # which calls are limited. Just to be safe, it doesn't hurt
+        # to wait a second between arguments.
+        time.sleep(1)
+
         return booklist, anthologies
 
 
@@ -282,13 +366,24 @@ def lookup_books(args):
     for val in args.author_or_id:
         val = val.strip()
 
-        try:
-            bookid = int(val)
-            book = api.book_by_id(bookid)
+        # If the argument is all digits, it's presumably an ID,
+        # either an ISBN13 or a Goodreads ID.
+        if val.isdigit():
+            if args.ISBN or len(val) == 13:
+                book = api.book_by_ISBN(val)
+                if not book:
+                    print("No book with ISBN", val)
+                    continue
+            else:
+                book = api.book_by_id(val)
+                if not book:
+                    print("No book with ID", val)
+                    continue
+
             print(book)
             print(book.desc)
 
-        except ValueError:
+        else:
             booklist, anthologies = api.books_by_author(val)
 
             print("\n====", val)
@@ -305,22 +400,8 @@ def lookup_books(args):
                         print(book.desc)
                         print()
 
-        # The Goodreads API has some sort of once-a-second limit,
-        # but they're unclear exactly how that works,
-        # which calls are limited. Just to be safe, it doesn't hurt
-        # to wait a second between arguments.
-        time.sleep(1)
-
 
 if __name__ == '__main__':
-
-    # book2019 = Book(1234, 'Book 2019', ['a b'], '', 2019, 0)
-    # book2019_2 = Book(1234, 'Book 2 2019', ['a b'], '', 2019, 2)
-    # book2017 = Book(1234, 'Book 2017', ['a b'], '', 2017, 5)
-    # book2014 = Book(1234, 'Book 2014', ['a b'], '', 2014, 9)
-    # books = [ book2017, book2019, book2014, book2019_2 ]
-    # print(sorted(books))
-    # sys.exit(0)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-a', action="store_true", dest="anthologies",
@@ -329,16 +410,35 @@ if __name__ == '__main__':
                         help='year: Show only books from this year or later')
     parser.add_argument('-d', action="store_true", dest="desc",
                         help='description: show Goodreads descriptions')
+    parser.add_argument('-G', action="store_true", dest="Goodreads",
+                        help='Use the Goodreads API (requires API key)')
+    parser.add_argument('-I', action="store_true", dest="ISBN",
+                        help='Consider numbers as ISBN13 even if using the Goodreads API')
     parser.add_argument('-D', action="store_true", dest="debug",
                         help='Show debugging information, like URLs used')
-    parser.add_argument('author_or_id', nargs='*', help="Authors or Goodreads numerical IDs")
+    parser.add_argument('author_or_id', nargs='+',
+                        help="Authors or Goodreads numerical IDs")
+
     args = parser.parse_args(sys.argv[1:])
 
-    try:
-        api = GoodreadsAPI()
+    # Imports have to happen at the top level,
+    # not in a function like lookup_books.
+    if args.Goodreads:
         if args.debug:
-            api.debug = True
+            print("Using Goodreads API")
+        import requests
+        from bs4 import BeautifulSoup
+        api = GoodreadsAPI()
+    else:
+        if args.debug:
+            print("Using Python ISBNlib")
+        import isbnlib
+        api = ISBNlibAPI()
 
+    if args.debug:
+        api.debug = True
+
+    try:
         lookup_books(args)
 
     except KeyboardInterrupt:
