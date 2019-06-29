@@ -66,6 +66,10 @@ birdcodes.py:
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
 
+bookfind.py:
+    List books by author optionally year of publication,
+    to find new books by particular authors.
+
 cachefile.py:
     A general class for cases where you need to fetch data from some
     slow process, like a web API, and cache it locally for speedier access.
@@ -138,10 +142,6 @@ fincompare.py:
     Download financial data from Yahoo finance and plot lots of
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
-
-newreads.py:
-    List books by author optionally year of publication,
-    to find new books by particular authors.
 
 fixbookcover:
     Fix books whose cover doesn't include the title, like many
