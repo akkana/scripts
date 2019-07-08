@@ -9,7 +9,48 @@ import subprocess
 import math
 
 
-def raytrace_DEM_file(demfile, lat, lon, outwidth=800, outheight=600):
+earthR = 6378.1    # Earth radius in km
+
+
+def dest_from_bearing(srclon, srclat, bearing_rad, dist_km):
+    '''Given a source lon and lat in degrees, a bearing in radians,
+       and a distance in km, return destination lon, lat in degrees.
+    '''
+    srclon_rad = math.radians(srclon)
+    srclat_rad = math.radians(srclat)
+    distfrac = dist_km / earthR
+
+    dstlat_rad = math.asin( math.sin(srclat_rad) * math.cos(distfrac)
+                        + (math.cos(srclat_rad) * math.sin(distfrac)
+                           * math.cos(bearing_rad)))
+
+    dstlon_rad = srclon_rad \
+        +  math.atan2(math.sin(bearing_rad) * math.sin(distfrac)
+                      * math.cos(srclat_rad),
+                      math.cos(distfrac) - math.sin(srclat_rad)
+                      * math.sin(dstlat_rad))
+
+    return math.degrees(dstlon_rad), math.degrees(dstlat_rad)
+
+
+def haversine_distance(lon1, lat1, lon2, lat2):
+    '''
+    Haversine distance between two points, expressed in meters.
+    Input coordinates are in degrees.
+    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
+    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+    '''
+    d_lat = math.radians(lat1 - lat2)
+    d_lon = math.radians(lon1 - lon2)
+    lat1 = math.radians(lat1)
+    lat2 = math.radians(lat2)
+    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
+        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
+        math.cos(lat1) * math.cos(lat2)
+    return earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
     demdata = gdal.Open(demfile)
     demarray = np.array(demdata.GetRasterBand(1).ReadAsArray())
     affine_transform = affine.Affine.from_gdal(*demdata.GetGeoTransform())
@@ -18,6 +59,8 @@ def raytrace_DEM_file(demfile, lat, lon, outwidth=800, outheight=600):
     print("Observer is at pixel position", obs_x, obs_y)
     imheight, imwidth = demarray.shape
     obs_ele = demarray[obs_x, obs_y]
+    lon_rad = math.radians(lon)
+    lat_rat = math.radians(lat)
 
     # povray doesn't work if you view from ground level.
     # I don't know what the rules are or if it's better to multiply
@@ -25,46 +68,64 @@ def raytrace_DEM_file(demfile, lat, lon, outwidth=800, outheight=600):
     # multiplying by 1.15 seems to work (1.1 doesn't).
     heightfudge = 1.15
 
-    # Quick fudge at the eight cardinal points;
-    # in reality this should calculate bearing angles from the observer.
-    # lookats = { '1N': (.5, 1), '2NE': (1, 1), '3E': (1, .5), '4SE': (1, 0),
-    #             '5S': (.5, 0), '6SW': (0, 0), '7W': (0, .5), '8NW': (0, 1) }
+    # How big a circle, in km, can we draw around the observer
+    # while staying inside the image?
+    # Note that affine_transform returns degrees, not radians,
+    # so that's what we need to pass to haversine_distance.
 
-    # How big a circle, in pixels, can we draw around the observer
-    # without going outside the image?
-    obsradius = min(obs_x, imwidth - obs_x, obs_y, imheight - obs_y) - 1
-    if obsradius < 100:
+    # Edge of image north of observer:
+    northlon, northlat = affine_transform * (obs_x, 0)
+    northdist = haversine_distance(lon, lat, northlon, northlat)
+    # Edge of image south of observer:
+    southlon, southlat = affine_transform * (obs_x, imheight)
+    southdist = haversine_distance(lon, lat, southlon, southlat)
+    # Edge of image west of observer:
+    westlon, westlat = affine_transform * (0, obs_y)
+    westdist = haversine_distance(lon, lat, westlon, westlat)
+    # Edge of image east of observer:
+    eastlon, eastlat = affine_transform * (imwidth, obs_y)
+    eastdist = haversine_distance(lon, lat, eastlon, eastlat)
+
+    # Minimum of the distances to image edge in the four cardinal directions:
+    obsradius = min(northdist, southdist, westdist, eastdist)
+
+    # print("Image size is %dx%d" % (imwidth, imheight))
+    # print("Observer is at (%d, %d)" % (obs_x, obs_y))
+    # print("Distance (km): north", northdist, "south", southdist,
+    #       "west", westdist, "east", eastdist)
+    # print("Min dist:", obsradius)
+
+    if obsradius < 3:
         print("Observer is too close to the edge")
         return
 
-    lookats = []
+    # Loop over 8 compass points (N, NE, E etc.) and calculate the
+    # pixel coordinates of the point obsradius away from the observer.
     for bearingfrac in range(8):
         bearing = bearingfrac * math.pi / 4
-        lookats.append( ((obs_x + obsradius * math.sin(bearing)) / imwidth,
-                         (obs_y + obsradius * math.cos(bearing)) / imheight ) )
+        bearing_deg = bearingfrac * 45
 
-    for i, lookat in enumerate(lookats):
-        outfilename = 'outfile%03d.png' % (i * 45)
-        print(i*45, lookat)
-        # continue
+        # Find the coordinate for point with that bearing and obsradius dist:
+        destlon, destlat = dest_from_bearing(lon, lat, bearing, obsradius)
+        # and translate that back to pixels
+        px, py = [ round(f) for f in inverse_transform * (destlon, destlat) ]
+
+        outfilename = 'outfile%03d.png' % (bearing_deg)
+        # print("%3d %8.4f  %8.3f %8.3f  (%4d, %4d)" % (bearing_deg, bearing,
+        #                                               destlon, destlat,
+        #                                               px, py))
+
         povfilename = '/tmp/povfile.pov'
 
         povfiletext = '''
 camera {
-    // "perspective" is the default camera.
-    // It will probably make it hard to stitch multiple images together.
-
-    // "orthographic" projection might make it easiest to stitch
-    // multiple images together; it requires also specifying "angle"
-    // to get reasonable scaling.
-    //orthographic
-    //angle
-
-    // "cylinder 1" uses a vertical cylinder and doesn't need angle.
+    // "perspective" is the default camera, which warps images
+    // so they're hard to stitch together.
+    // "cylinder 1" uses a vertical cylinder.
     cylinder 1
 
-    // povray coordinates are < rightward, upward, forward >
-
+    // povray coordinates compared to the height field image are
+    // < rightward, upward, forward >
     location <%f, %f, %f>
     look_at  <%f, %f, %f>
 }
@@ -88,7 +149,7 @@ height_field {
     scale <1, 1, 1>
 }
 ''' % (obs_x / imwidth, heightfudge * obs_ele / 65536, 1. - obs_y / imheight,
-       lookat[0], heightfudge * obs_ele / 65536, lookat[1],
+       px / imwidth, heightfudge * obs_ele / 65536, 1.0 - py / imheight,
        demfile)
 
         with open(povfilename, 'w') as pf:
@@ -109,5 +170,5 @@ if __name__ == '__main__':
     lat = float(sys.argv[2])
     lon = float(sys.argv[3])
 
-    raytrace_DEM_file(demfile, lat, lon)
+    raytrace_DEM_file(demfile, lon, lat)
 
