@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-import sys, os
-import subprocess
-
 import gdal
 import numpy as np
 import affine
 
+import sys, os
+import subprocess
+import math
 
-def handle_DEM_file(demfile, lat, lon):
+
+def raytrace_DEM_file(demfile, lat, lon, outwidth=800, outheight=600):
     demdata = gdal.Open(demfile)
     demarray = np.array(demdata.GetRasterBand(1).ReadAsArray())
     affine_transform = affine.Affine.from_gdal(*demdata.GetGeoTransform())
@@ -17,8 +18,6 @@ def handle_DEM_file(demfile, lat, lon):
     print("Observer is at pixel position", obs_x, obs_y)
     imheight, imwidth = demarray.shape
     obs_ele = demarray[obs_x, obs_y]
-    outwidth = 800
-    outheight = 600
 
     # povray doesn't work if you view from ground level.
     # I don't know what the rules are or if it's better to multiply
@@ -28,11 +27,26 @@ def handle_DEM_file(demfile, lat, lon):
 
     # Quick fudge at the eight cardinal points;
     # in reality this should calculate bearing angles from the observer.
-    lookats = { 'N': (.5, 1), 'NE': (1, 1), 'E': (1, .5), 'SE': (1, 0),
-                'S': (.5, 0), 'SW': (0, 0), 'W': (0, .5), 'NW': (0, 1) }
+    # lookats = { '1N': (.5, 1), '2NE': (1, 1), '3E': (1, .5), '4SE': (1, 0),
+    #             '5S': (.5, 0), '6SW': (0, 0), '7W': (0, .5), '8NW': (0, 1) }
 
-    for l in lookats:
-        outfilename = 'outfile%s.png' % l
+    # How big a circle, in pixels, can we draw around the observer
+    # without going outside the image?
+    obsradius = min(obs_x, imwidth - obs_x, obs_y, imheight - obs_y) - 1
+    if obsradius < 100:
+        print("Observer is too close to the edge")
+        return
+
+    lookats = []
+    for bearingfrac in range(8):
+        bearing = bearingfrac * math.pi / 4
+        lookats.append( ((obs_x + obsradius * math.sin(bearing)) / imwidth,
+                         (obs_y + obsradius * math.cos(bearing)) / imheight ) )
+
+    for i, lookat in enumerate(lookats):
+        outfilename = 'outfile%03d.png' % (i * 45)
+        print(i*45, lookat)
+        # continue
         povfilename = '/tmp/povfile.pov'
 
         povfiletext = '''
@@ -43,11 +57,11 @@ camera {
     // "orthographic" projection might make it easiest to stitch
     // multiple images together; it requires also specifying "angle"
     // to get reasonable scaling.
-    orthographic
-    angle
+    //orthographic
+    //angle
 
-    // "cylinder 1" is a vertical cylinder and doesn't need angle.
-    // cylinder 1
+    // "cylinder 1" uses a vertical cylinder and doesn't need angle.
+    cylinder 1
 
     // povray coordinates are < rightward, upward, forward >
 
@@ -66,7 +80,7 @@ height_field {
             // Adjusting the 0 color can make darks a little brighter,
             // otherwise everything comes out super dark.
             // [ 0 color <.25 .25 .25> ]
-            [ 0 color <.7 .7 .7> ]
+            [ 0 color <.8 .8 .8> ]
             [ 1 color <1 1 1> ]
         }
     }
@@ -74,7 +88,7 @@ height_field {
     scale <1, 1, 1>
 }
 ''' % (obs_x / imwidth, heightfudge * obs_ele / 65536, 1. - obs_y / imheight,
-       lookats[l][0], heightfudge * obs_ele / 65536, lookats[l][1],
+       lookat[0], heightfudge * obs_ele / 65536, lookat[1],
        demfile)
 
         with open(povfilename, 'w') as pf:
@@ -95,5 +109,5 @@ if __name__ == '__main__':
     lat = float(sys.argv[2])
     lon = float(sys.argv[3])
 
-    handle_DEM_file(demfile, lat, lon)
+    raytrace_DEM_file(demfile, lat, lon)
 
