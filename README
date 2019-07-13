@@ -257,6 +257,9 @@ mapping/demproj.py:
     Raytrace a Digital Elevation Model file using povray,
     creating a 260-degree panorama.
 
+mapping/viewshed.py:
+    Use GRASS r.viewshed for a viewshed analysis on a DEM input file.
+
 multiplot3d.py:
     3D plots in matplotlib of a sequence of functions are so poorly
     documented, it took me ages to get one working. Here's a simple example.
