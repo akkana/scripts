@@ -7,7 +7,7 @@
 # moon rising over Lick Observatory; or predict when the full
 # moon shining in your skylight might keep you awake.
 
-# Copyright 2015 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Copyright 2015,2019 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 
 import ephem
 import sys, os
@@ -47,7 +47,7 @@ def time_zone_offset(ephemdate):
 
 def when_at_position(body, observer, targetalt, targetaz,
                      starttime, endtime, startdate=None, numdays=0,
-                     slop=5., minphase=0, maxphase=100):
+                     slop=2., minphase=0, maxphase=100):
     '''When will body be at the alt-az position during the time window,
        in the year following the date of the observer passed in
        (which defaults to today's date.)
@@ -111,6 +111,7 @@ def when_at_position(body, observer, targetalt, targetaz,
         body.compute(observer)
         alt = body.alt * DEGREES
         az = body.az * DEGREES
+        print(observer.date, az, body.phase)
         if alt >= targetalt - slop and alt <= targetalt + slop \
            and az >= targetaz - slop and az <= targetaz + slop:
             if (body.phase > minphase and body.phase < maxphase):
@@ -204,7 +205,7 @@ def when_at_position(body, observer, targetalt, targetaz,
     return results
 
 def when_rise_set_at_position(body, observer, targetaz, rise_set,
-                              startdate=None, slop=5.,
+                              startdate=None, slop=5., numdays=365,
                               minphase=0, maxphase=100):
     '''When will body rise at the target azimuth
        in the year following the date of the observer passed in
@@ -233,11 +234,11 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set,
     if numdays:
         end_date = ephem.Date((start_triple[0], start_triple[1],
                                start_triple[2] + ephem.hour * numdays * 24,
-                               starttime, 0, 0))
+                               0, 0, 0))
     else:
         end_date = ephem.Date((start_triple[0]+1, start_triple[1],
                                start_triple[2],
-                               starttime, 0, 0))
+                               0, 0, 0))
 
     results = []
 
@@ -292,7 +293,7 @@ if __name__ == '__main__':
     phasestr = "moon"
     MIN_FULL = 90
     startdate = None
-    days = 0
+    days = 365
     while True:
         if args[0] == '-f':
             minphase = MIN_FULL
