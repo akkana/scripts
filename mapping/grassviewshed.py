@@ -29,7 +29,8 @@ def grass_temp_location(templocation):
     rcfile = gsetup.init(gisbase, gisdb, templocation, mapset)
     print("Set up grass; rc file is", rcfile)
 
-    grass.run_command('g.proj', flags='c', georef=demfile, location=templocation)
+    grass.run_command('g.proj', flags='c', georef=demfile,
+                      location=templocation)
 
     # The previous command says,
     # You can switch to the new location by
@@ -38,9 +39,21 @@ def grass_temp_location(templocation):
     # <PERMANENT> is already the current mapset
     # grass.run_command('g.mapset', location=templocation, mapset=mapset)
 
-def compute_viewshed(demfile, obs_lon, obs_lat, viewshedname):
+def compute_viewshed(demfile, obs_lon, obs_lat, viewshedname, extension='tif'):
+    '''Use GRASS r.viewshed to compute a viewshed for the given DEM file
+       and observer longitude and latitude (in degrees),
+       saving the output to viewshedname.extension.
+       Currently only tif and png output are supported.
+    '''
     demname = 'dem'
-    viewshedfile = viewshedname + ".png"
+    viewshedfile = viewshedname + '.' + extension
+
+    if extension == 'tif':
+        grassoutfmt = 'GTiff'
+    elif extension == 'png':
+        grassoutfmt = 'PNG'
+    else:
+        raise RuntimeError("Can't handle extension " + extension)
 
     # Read in the DEM file
     grass.run_command('r.in.gdal', input=demfile, output=demname,
@@ -54,7 +67,7 @@ def compute_viewshed(demfile, obs_lon, obs_lat, viewshedname):
             overwrite=True)
 
     grass.run_command("r.out.gdal", input=viewshedname, overwrite=True,
-                      output=viewshedfile, format="PNG")
+                      output=viewshedfile, format=grassoutfmt)
     print("Wrote (hopefully)", viewshedfile)
 
 def cleanup(templocation):
