@@ -51,6 +51,11 @@ def haversine_distance(lon1, lat1, lon2, lat2):
 
 
 def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
+    '''Use povray to raytrace an input Digital Elevation Model.
+       demfile is a file in a format gdal can open, e.g. GeoTIFF.
+       lon, lat are in degrees.
+       outwidth and outheight are the size of the generated image.
+    '''
     demdata = gdal.Open(demfile)
     demarray = np.array(demdata.GetRasterBand(1).ReadAsArray())
     affine_transform = affine.Affine.from_gdal(*demdata.GetGeoTransform())
