@@ -14,7 +14,7 @@
 ######################################################################
 # Notes on other possible APIs:
 #
-# Perhaps better is the worldcat API, though it requires signing up for a key.
+# The worldcat API initially looked promising:
 # http://web.archive.org/web/20100616012651/http://worldcat.org/devnet/wiki/BasicAPIDetails
 # But the WorldCat search API implies that you have to be a library
 # to get an API key:
