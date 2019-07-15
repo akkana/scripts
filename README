@@ -257,7 +257,7 @@ mapping/demproj.py:
     Raytrace a Digital Elevation Model file using povray,
     creating a 260-degree panorama.
 
-mapping/viewshed.py:
+mapping/grassviewshed.py:
     Use GRASS r.viewshed for a viewshed analysis on a DEM input file.
 
 multiplot3d.py:
