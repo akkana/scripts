@@ -86,7 +86,7 @@ for k in d:
     setattr(obj, k, d[k])
 
 ########################################################
-# One-liners
+# Shell One-liners
 ########################################################
 # Python gives unclear errors if you try to make a one-liner that
 # includes multiple lines plus a loop or conditional.
@@ -392,8 +392,10 @@ def parse_args():
     # Boolean flag
     parser.add_argument('-c', "--check", dest="check", default=False,
                         action="store_true", help="Help string")
+
     # int or string flag.
     # Without type=, will store a string.
+    # For a mandatory argument, add required=True.
     parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
                         help='Beta parameter (default: 2)')
 
@@ -592,6 +594,15 @@ if __name__ == '__main__':
     for i in range(10):
           print(i*2)
           time.sleep(2)
+
+########################################################
+# CSV
+########################################################
+with open(filename) as csvfp:
+    reader = csv.DictReader(csvfp)
+    for row in reader:
+        # Each row is an OrderedDict
+
 
 ########################################################
 # BeautifulSoup
@@ -1007,6 +1018,10 @@ p.sort_stats('time').print_stats(30)
 >>> seven_from_radians = ephem.degrees(7 * math.pi / 180.)
 >>> print(seven_from_radians)
 7:00:00.0
+
+# If you have a float representing degrees, do this:
+>>> ephem.degrees(90. * ephem.pi / 180.)
+1.5707963267948966
 
 >>> seven_hours_from_radians = ephem.hours(7 * math.pi / 12)
 >>> print(seven_hours_from_radians)
