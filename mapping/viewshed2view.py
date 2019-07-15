@@ -59,13 +59,19 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
     # Distance resolution in meters
     step_m = 100
 
-    # Save peaks as a list with 360 elements,
+    # For higher vertical resolution, you might want to use a higher
+    # angular resolution than 1 degree. But 1 is plenty for the vertical
+    # resolution in typical GRASS r.viewshed geotiff files.
+    binmult = 1
+    nbins = 360 * binmult
+
+    # Save peaks as a list with nbins elements,
     # each of which is a list of view angles where peaks were seen.
     # Can't do [[]] * 360 -- that makes 360 pointers to the same list!
-    savepeaks = [ [] for i in range(360) ]
+    savepeaks = [ [] for i in range(nbins) ]
 
-    for bearing in range(360):
-    # for bearing in range(45, 47):
+    for bearing_i in range(nbins):
+        bearing = bearing_i / binmult
         bearingrad = math.radians(bearing)
         dist_m = step_m
         lastval = 0
@@ -91,7 +97,7 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
             if math.isnan(val) and lastval and not math.isnan(lastval):
                 # lastval was a peak, and now we're past it heading downhill.
                 # Record the peak.
-                savepeaks[bearing].append(lastval)
+                savepeaks[bearing_i].append(lastval)
                 # print(bearing, "Appending", lastval, "now", savepeaks[bearing])
 
             lastval = val
@@ -105,8 +111,8 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
     im = Image.new('RGB', (outwidth, outheight), (0, 0, 0))
     draw = ImageDraw.Draw(im)
     rectsize = 1
-    # curx, cury = savepeaks[0][0]
-    for bearing, heightlist in enumerate(savepeaks):
+    for i, heightlist in enumerate(savepeaks):
+        bearing = i * 360. / len(savepeaks)
         for height in heightlist:
             # Height is an angle, where 0 means straight down, 90 horizontal,
             # 180 straight up.
@@ -114,8 +120,9 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
             y = outheight - height * outheight / 180
             draw.rectangle(((x, y), (x+rectsize, y+rectsize)),
                      fill="yellow")
-        # draw.line()
-    im.show()
+    # im.show()
+    im.save('view.png')
+    print("Saved to view.png")
 
 
 if __name__ == '__main__':
