@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Decode From and Subject lines spammers encode in other charsets
 # to try to hide them from spam filters. (RFC 2047 encoding.)
