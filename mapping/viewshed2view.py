@@ -7,6 +7,8 @@ import affine
 
 from PIL import Image, ImageDraw
 
+import csv
+
 import sys, os
 import math
 
@@ -35,7 +37,95 @@ def dest_from_bearing(srclon, srclat, bearing_rad, dist_km):
     return math.degrees(dstlon_rad), math.degrees(dstlat_rad)
 
 
-def viewshed2view(demfile, lon, lat, peak_gpx=None,
+def haversine_distance_bearing(lon1, lat1, lon2, lat2):
+    '''
+    Haversine distance between two points, expressed in meters.
+    Input coordinates are in degrees.
+    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
+    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+    Returns dist_km, bearing_dd
+    '''
+    d_lat = math.radians(lat1 - lat2)
+    d_lon = math.radians(lon1 - lon2)
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2)
+    lon2 = math.radians(lon2)
+    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
+        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
+        math.cos(lat1) * math.cos(lat2)
+
+    bearing = math.atan2(math.sin(lon2-lon1)*math.cos(lat2),
+                         math.cos(lat1) * math.sin(lat2)
+                         - math.sin(lat1) * math.cos(lat2)
+                           * math.cos(lon2-lon1))
+    bearing = math.degrees(bearing)
+
+    return (earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)),
+            (bearing + 360) % 360)
+
+
+def globe_bearing(lon1, lat1, lon2, lat2):
+    '''Bearing between two lat/long
+    '''
+
+
+def read_GNIS_file(filename, verbose=False):
+    '''Read a GNIS file, CSV format with | as separator.
+       Return a list of peaks, each a dictionary with keys
+       'ele', 'name', 'lat', 'lon', 'county'
+    '''
+    with open('NM_Features_20190701.txt') as csvfp:
+        reader = csv.DictReader(csvfp, delimiter='|')
+        nodata = []
+        peaklist = []
+
+        for row in reader:
+            if row['FEATURE_CLASS'] != 'Summit':
+                continue
+            try:
+                elev = int(row['ELEV_IN_FT'])
+            except ValueError:
+                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
+                continue
+            try:
+                lat = float(row['PRIM_LAT_DEC'])
+            except ValueError:
+                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
+                continue
+            try:
+                lon = float(row['PRIM_LONG_DEC'])
+            except ValueError:
+                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
+                continue
+
+            if not lat or not lon or not elev:
+                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
+                continue
+
+            # If we get this far, there's real data
+            # for elevation and coordinates
+            peaklist.append({ 'name': row['FEATURE_NAME'],
+                              'ele': elev,
+                              'lat':  lat, 'lon': lon,
+                              'county': row['COUNTY_NAME'] })
+
+        # peaklist.sort(reverse=True, key=lambda pk: -pk['ele'])
+        # for peak in peaklist:
+        #     print("%5d %25s   (%.4f %.4f)  %s" % (peak['ele'])
+        # print("Total of", len(peaklist), "peaks with data")
+
+        # if verbose:
+        #     nodata.sort()
+        #     print("\nPeaks lacking elevation or coordinates:")
+        #     for peak in nodata:
+        #         print("%s (%s)" % (peak[0], peak[1]))
+        #     print("Total of", len(nodata), "peaks with no data")
+
+        return peaklist
+
+
+def viewshed2view(demfile, lon, lat, peak_gnis=None,
                   outwidth=800, outheight=600):
     '''Turn a GRASS viewshed into a panorama of mountain locations.
        demfile is a file in a format gdal can open, e.g. GeoTIFF.
@@ -56,6 +146,24 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
     # print("Observer is at pixel position", obs_x, obs_y)
     # print("Image size %d x %d" % (imwidth, imheight))
 
+    # Read in the peak list, if any.
+    if peak_gnis:
+        peaklist = read_GNIS_file(peak_gnis)
+
+        # For each peak in the peak list, figure out its bearing and distance
+        # from our observer, and where it would be in pixel coordinates
+        # on the image.
+        for peak in peaklist:
+            d, bearing = haversine_distance_bearing(lon, lat,
+                                                    peak['lon'], peak['lat'])
+            peak['dist'] = d
+            peak['bearing'] = round(bearing)
+
+            peak['x'], peak['y'] = [ round(f)
+                       for f in inverse_transform * (peak['lon'], peak['lat']) ]
+    else:
+        peaklist = []
+
     # Distance resolution in meters
     step_m = 100
 
@@ -65,10 +173,15 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
     binmult = 1
     nbins = 360 * binmult
 
-    # Save peaks as a list with nbins elements,
+    # Save ridges as a list with nbins elements,
     # each of which is a list of view angles where peaks were seen.
     # Can't do [[]] * 360 -- that makes 360 pointers to the same list!
-    savepeaks = [ [] for i in range(nbins) ]
+    ridgelist = [ [] for i in range(nbins) ]
+
+    peaks_seen = [ None for i in range(nbins) ]
+    # for peak in peaklist:
+
+    PEAKSLOP = 4
 
     for bearing_i in range(nbins):
         bearing = bearing_i / binmult
@@ -86,19 +199,28 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
             # value of the viewshed image, corresponding to the vertical
             # angle in degrees (0 being straight down, 90 horizontal)
             # to that point.
-            # print(px, py)
             try:
                 val = demarray[py][px]
             except IndexError:
                 # Outside the image, done with this bearing
                 break
 
-            # print("dist %5.1f (%4d, %4d): val %f" % (dist_m/1000, px, py, val))
             if math.isnan(val) and lastval and not math.isnan(lastval):
                 # lastval was a peak, and now we're past it heading downhill.
                 # Record the peak.
-                savepeaks[bearing_i].append(lastval)
-                # print(bearing, "Appending", lastval, "now", savepeaks[bearing])
+                ridgelist[bearing_i].append(lastval)
+
+                # does it correspond to a peak in the peaklist?
+                for peak in peaklist:
+                    # XXXXXXXXXXXXXXXXXXXXXXXXX
+                    # Black Mesa is at (831, 694)
+                    # the nearest peak we see is (834, 692)
+
+                    if round(bearing) == peak['bearing'] and \
+                       abs(peak['x'] - px) < PEAKSLOP and \
+                       abs(peak['y'] - py) < PEAKSLOP:
+                        peak['alt'] = lastval
+                        peaks_seen[bearing_i] = peak
 
             lastval = val
             # lastcoords = destlon, destlat
@@ -111,15 +233,27 @@ def viewshed2view(demfile, lon, lat, peak_gpx=None,
     im = Image.new('RGB', (outwidth, outheight), (0, 0, 0))
     draw = ImageDraw.Draw(im)
     rectsize = 1
-    for i, heightlist in enumerate(savepeaks):
-        bearing = i * 360. / len(savepeaks)
+    for i, heightlist in enumerate(ridgelist):
+        bearing = i * 360. / len(ridgelist)
         for height in heightlist:
             # Height is an angle, where 0 means straight down, 90 horizontal,
             # 180 straight up.
             x = bearing * outwidth / 360
             y = outheight - height * outheight / 180
-            draw.rectangle(((x, y), (x+rectsize, y+rectsize)),
-                     fill="yellow")
+            draw.rectangle(((x, y), (x+rectsize, y+rectsize)), fill="yellow")
+
+    for peak in peaks_seen:
+        if peak:
+            # print(peak)
+            if peak['name'] == 'Black Mesa' or peak['name'] == 'Montoso Peak':
+                PEAKLINE = 50
+            else:
+                PEAKLINE = 20
+            x = peak['bearing'] * outwidth / 360
+            y = outheight - peak['alt'] * outheight / 180
+            print("(%4d, %4d) %s" % (x, y, peak['name']))
+            draw.line(((x, y), (x, y-PEAKLINE)), fill="white")
+
     # im.show()
     im.save('view.png')
     print("Saved to view.png")
@@ -130,6 +264,7 @@ if __name__ == '__main__':
         print("Usage: %s demfile lat lon [peaknames]"
               % os.path.basename(sys.argv[0]))
         print("DEM file must be PNG. Lat, lon in decimal degrees.")
+        print("peaknames file should be a GNIS CSV file with | separator")
         sys.exit(1)
 
     demfile = sys.argv[1]
@@ -137,10 +272,10 @@ if __name__ == '__main__':
     lon = float(sys.argv[3])
 
     if len(sys.argv) > 4:
-        peak_gpx = sys.argv[4]
+        peak_gnis = sys.argv[4]
     else:
-        peak_gpx = None
+        peak_gnis = None
 
-    viewshed2view(demfile, lon, lat, peak_gpx=peak_gpx)
+    viewshed2view(demfile, lon, lat, peak_gnis=peak_gnis)
 
 
