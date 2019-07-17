@@ -24,6 +24,7 @@ import shutil
 import email, mimetypes
 import tempfile
 import subprocess
+import string
 from bs4 import BeautifulSoup
 
 ################################################
@@ -89,6 +90,11 @@ class mysubprocess:
         subprocess.Popen(arr, shell=False,
                          stdin=None, stdout=None, stderr=None)
 
+printset = set(string.printable)
+
+def isprintable(s):
+    return set(s).issubset(printset)
+
 def view_message_attachments(fp, tmpdir):
     '''View message attachments coming from the file-like object fp.
     '''
@@ -128,7 +134,7 @@ def view_message_attachments(fp, tmpdir):
             for c in partfile:
                 if c == ' ':
                     newname += '_'
-                elif c.isprintable():
+                elif isprintable(c):
                     newname += c
             partfile = newname
 
