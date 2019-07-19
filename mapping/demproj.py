@@ -1,4 +1,20 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+
+# Note: this script is almost completely pointless.
+# It was written before I realized I could specify a povray
+# camera angle of 360 degrees. You can use this program as an
+# example of how to project equal angles around a sphere on the earth,
+# but it's definitely not the best way to generate a povray 360.
+
+# Generate a 360-degree panorama of raytraced terrain views
+# from a Digital Elevation Model (DEM) file and observer coordinates,
+# using povray. Input DEM must be in a format povray understands,
+# like PNG, as discussed in
+# http://shallowsky.com/blog/mapping/DEM-data-in-3d.html
+
+# Copyright 2019 by Akkana Peck; share and enjoy under the GPLv2 or later.
+
+from __future__ import print_function
 
 import gdal
 import numpy as np
@@ -61,9 +77,9 @@ def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
     affine_transform = affine.Affine.from_gdal(*demdata.GetGeoTransform())
     inverse_transform = ~affine_transform
     obs_x, obs_y = [ round(f) for f in inverse_transform * (lon, lat) ]
-    print("Observer is at pixel position", obs_x, obs_y)
     imheight, imwidth = demarray.shape
-    obs_ele = demarray[obs_x, obs_y]
+    # In Python2, numpy can't deal with floating point indices:
+    obs_ele = demarray[int(obs_x), int(obs_y)]
     lon_rad = math.radians(lon)
     lat_rat = math.radians(lat)
 
@@ -94,11 +110,11 @@ def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
     # Minimum of the distances to image edge in the four cardinal directions:
     obsradius = min(northdist, southdist, westdist, eastdist)
 
-    # print("Image size is %dx%d" % (imwidth, imheight))
-    # print("Observer is at (%d, %d)" % (obs_x, obs_y))
-    # print("Distance (km): north", northdist, "south", southdist,
-    #       "west", westdist, "east", eastdist)
-    # print("Min dist:", obsradius)
+    print("Image size is %dx%d" % (imwidth, imheight))
+    print("Observer is at (%d, %d)" % (obs_x, obs_y))
+    print("Distance (km): north", northdist, "south", southdist,
+          "west", westdist, "east", eastdist)
+    print("Min dist:", obsradius)
 
     if obsradius < 3:
         print("Observer is too close to the edge")
@@ -116,9 +132,10 @@ def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
         px, py = [ round(f) for f in inverse_transform * (destlon, destlat) ]
 
         outfilename = 'outfile%03d.png' % (bearing_deg)
-        # print("%3d %8.4f  %8.3f %8.3f  (%4d, %4d)" % (bearing_deg, bearing,
-        #                                               destlon, destlat,
-        #                                               px, py))
+        print("%3d %8.4f  %8.3f %8.3f  (%4d, %4d)" % (bearing_deg, bearing,
+                                                      destlon, destlat,
+                                                      px, py))
+        print("%f, %f" % (float(obs_x) / imwidth, 1. - float(obs_y) / imheight))
 
         povfilename = '/tmp/povfile.pov'
 
@@ -143,9 +160,6 @@ height_field {
     pigment {
         gradient y
         color_map {
-            // Adjusting the 0 color can make darks a little brighter,
-            // otherwise everything comes out super dark.
-            // [ 0 color <.25 .25 .25> ]
             [ 0 color <.8 .8 .8> ]
             [ 1 color <1 1 1> ]
         }
@@ -164,6 +178,9 @@ height_field {
         subprocess.call(['povray', '+A', '+W%d' % outwidth, '+H%d' % outheight,
                          '+I' + povfilename, '+O' + outfilename])
 
+        print("Wrote", povfilename)
+        sys.exit(0)
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
@@ -174,6 +191,7 @@ if __name__ == '__main__':
     demfile = sys.argv[1]
     lat = float(sys.argv[2])
     lon = float(sys.argv[3])
+    print("Observer is at latitude %f, longitude %f" % (lat, lon))
 
     raytrace_DEM_file(demfile, lon, lat)
 

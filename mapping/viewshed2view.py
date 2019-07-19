@@ -1,5 +1,19 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
+# Given a viewshed file, generate a 360-degree panorama showing
+# outlines of peaks/ridges visible from a given latitude/longitude.
+# Optionally, label peaks with names from a GNIS file.
+
+# The viewshed file should be in an image format with
+# geographic references, and must include visibility angles
+# (e.g. GRASS r.viewshed's default output setting).
+# GeoTIF is the recommended input format and the only format I've tested.
+
+# See grassviewshed.py for generating viewsheds using GRASS.
+
+# Copyright 2019 by Akkana Peck; share and enjoy under the GPLv2 or later.
+
+from __future__ import print_function
 
 import gdal
 import numpy as np
@@ -9,6 +23,7 @@ from PIL import Image, ImageDraw
 
 import csv
 
+import argparse
 import sys, os
 import math
 
@@ -39,8 +54,8 @@ def dest_from_bearing(srclon, srclat, bearing_rad, dist_km):
 
 def haversine_distance_bearing(lon1, lat1, lon2, lat2):
     '''
-    Haversine distance between two points, expressed in meters.
-    Input coordinates are in degrees.
+    Haversine distance and bearing between two points.
+    Input coordinates are in decimal degrees.
     From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
     Implemented from http://www.movable-type.co.uk/scripts/latlong.html
     Returns dist_km, bearing_dd
@@ -65,17 +80,14 @@ def haversine_distance_bearing(lon1, lat1, lon2, lat2):
             (bearing + 360) % 360)
 
 
-def globe_bearing(lon1, lat1, lon2, lat2):
-    '''Bearing between two lat/long
-    '''
-
-
 def read_GNIS_file(filename, verbose=False):
-    '''Read a GNIS file, CSV format with | as separator.
+    '''Read a GNIS file, CSV format with | as separator,
+       matching the format downloadable from
+       https://www.usgs.gov/core-science-systems/ngp/board-on-geographic-names/download-gnis-data
        Return a list of peaks, each a dictionary with keys
        'ele', 'name', 'lat', 'lon', 'county'
     '''
-    with open('NM_Features_20190701.txt') as csvfp:
+    with open(filename) as csvfp:
         reader = csv.DictReader(csvfp, delimiter='|')
         nodata = []
         peaklist = []
@@ -110,23 +122,23 @@ def read_GNIS_file(filename, verbose=False):
                               'lat':  lat, 'lon': lon,
                               'county': row['COUNTY_NAME'] })
 
-        # peaklist.sort(reverse=True, key=lambda pk: -pk['ele'])
+        peaklist.sort(reverse=True, key=lambda pk: -pk['ele'])
         # for peak in peaklist:
-        #     print("%5d %25s   (%.4f %.4f)  %s" % (peak['ele'])
+        #     print("%5d %25s   (%.4f %.4f)  %s" % (peak['ele']))
         # print("Total of", len(peaklist), "peaks with data")
 
-        # if verbose:
-        #     nodata.sort()
-        #     print("\nPeaks lacking elevation or coordinates:")
-        #     for peak in nodata:
-        #         print("%s (%s)" % (peak[0], peak[1]))
-        #     print("Total of", len(nodata), "peaks with no data")
+        if verbose:
+            nodata.sort()
+            print("\nPeaks lacking elevation or coordinates:")
+            for peak in nodata:
+                print("%s (%s)" % (peak[0], peak[1]))
+            print("Total of", len(nodata), "peaks with no data")
 
         return peaklist
 
 
 def viewshed2view(demfile, lon, lat, peak_gnis=None,
-                  outwidth=800, outheight=600):
+                  outfile="view.png", outwidth=800, outheight=600):
     '''Turn a GRASS viewshed into a panorama of mountain locations.
        demfile is a file in a format gdal can open, e.g. GeoTIFF.
        lon, lat are in degrees.
@@ -140,7 +152,8 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
     inverse_transform = ~affine_transform
     obs_x, obs_y = [ round(f) for f in inverse_transform * (lon, lat) ]
     imheight, imwidth = demarray.shape
-    obs_ele = demarray[obs_x, obs_y]
+    # In Python 2, numpy array indices can't be float:
+    obs_ele = demarray[int(obs_x), int(obs_y)]
     lon_rad = math.radians(lon)
     lat_rat = math.radians(lat)
     # print("Observer is at pixel position", obs_x, obs_y)
@@ -160,15 +173,15 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
             peak['bearing'] = round(bearing)
 
             peak['x'], peak['y'] = [ round(f)
-                       for f in inverse_transform * (peak['lon'], peak['lat']) ]
+                for f in inverse_transform * (peak['lon'], peak['lat']) ]
     else:
         peaklist = []
 
     # Distance resolution in meters
-    step_m = 100
+    step_m = 100.0
 
     # For higher vertical resolution, you might want to use a higher
-    # angular resolution than 1 degree. But 1 is plenty for the vertical
+    # angular resolution than 1 degree. But 1 seems enough for the vertical
     # resolution in typical GRASS r.viewshed geotiff files.
     binmult = 1
     nbins = 360 * binmult
@@ -179,28 +192,32 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
     ridgelist = [ [] for i in range(nbins) ]
 
     peaks_seen = [ None for i in range(nbins) ]
-    # for peak in peaklist:
 
+    # How close does a peak have to be (max pixel distance in any direction)
+    # to match a named peak?
     PEAKSLOP = 4
 
+    # Loop over a full circle:
     for bearing_i in range(nbins):
-        bearing = bearing_i / binmult
+        bearing = float(bearing_i) / binmult
         bearingrad = math.radians(bearing)
         dist_m = step_m
         lastval = 0
+
+        # Loop over distances at this bearing, from close to far
         while True:
-            # Find the coordinate for point with that bearing and distance
+            # Find the coordinate for point with this bearing and distance
             destlon, destlat = dest_from_bearing(lon, lat,
                                                  bearingrad, dist_m / 1000)
             # and translate that back to pixels
             px, py = [ round(f)
                        for f in inverse_transform * (destlon, destlat) ]
 
-            # value of the viewshed image, corresponding to the vertical
+            # value of the viewshed image, which is the vertical
             # angle in degrees (0 being straight down, 90 horizontal)
-            # to that point.
+            # to whatever is at that point.
             try:
-                val = demarray[py][px]
+                val = demarray[int(py), int(px)]
             except IndexError:
                 # Outside the image, done with this bearing
                 break
@@ -212,10 +229,6 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
 
                 # does it correspond to a peak in the peaklist?
                 for peak in peaklist:
-                    # XXXXXXXXXXXXXXXXXXXXXXXXX
-                    # Black Mesa is at (831, 694)
-                    # the nearest peak we see is (834, 692)
-
                     if round(bearing) == peak['bearing'] and \
                        abs(peak['x'] - px) < PEAKSLOP and \
                        abs(peak['y'] - py) < PEAKSLOP:
@@ -223,7 +236,6 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
                         peaks_seen[bearing_i] = peak
 
             lastval = val
-            # lastcoords = destlon, destlat
 
             dist_m += step_m
 
@@ -244,8 +256,9 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
 
     for peak in peaks_seen:
         if peak:
-            # print(peak)
-            if peak['name'] == 'Black Mesa' or peak['name'] == 'Montoso Peak':
+            # XXX Temporary for testing, until there are labels
+            if peak['name'] == 'Black Mesa' or peak['name'] == 'Montoso Peak' \
+               or peak['name'] == 'Lake Peak':
                 PEAKLINE = 50
             else:
                 PEAKLINE = 20
@@ -255,27 +268,29 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
             draw.line(((x, y), (x, y-PEAKLINE)), fill="white")
 
     # im.show()
-    im.save('view.png')
-    print("Saved to view.png")
+    im.save(outfile)
+    print("Saved to", outfile)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print("Usage: %s demfile lat lon [peaknames]"
-              % os.path.basename(sys.argv[0]))
-        print("DEM file must be PNG. Lat, lon in decimal degrees.")
-        print("peaknames file should be a GNIS CSV file with | separator")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=""
+        """Convert a viewshed file to a 360-degree view from a given point.
 
-    demfile = sys.argv[1]
-    lat = float(sys.argv[2])
-    lon = float(sys.argv[3])
+Coordinates are specified in decimal degrees""",
+                                     formatter_class=
+                                         argparse.RawTextHelpFormatter)
 
-    if len(sys.argv) > 4:
-        peak_gnis = sys.argv[4]
-    else:
-        peak_gnis = None
+    parser.add_argument('-p', '--peaknames', dest='peakfile',
+                        help="a GNIS CSV file with | separator")
 
-    viewshed2view(demfile, lon, lat, peak_gnis=peak_gnis)
+    # Required arguments:
+    parser.add_argument('viewshed'
+                        , help="Viewshed file; GeoTIF format recommended")
+    parser.add_argument('lat', type=float, help="latitude")
+    parser.add_argument('lon', type=float, help="longitude")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    viewshed2view(args.viewshed, args.lon, args.lat, peak_gnis=args.peakfile)
 
 

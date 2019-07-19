@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 
+# Generate a viewshed given a Digital Elevation Model file
+# and a latitude/longitude.
+
 # Create a GRASS temporary location, import a DEM file,
 # compute a viewshed and save it.
+
+# Copyright 2019 by Akkana Peck; share and enjoy under the GPLv2 or later.
 
 import sys, os
 import shutil
