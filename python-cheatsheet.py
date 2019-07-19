@@ -423,9 +423,16 @@ def parse_args():
     parser.add_argument('urls', nargs='?', default='http://localhost/',
                         help="URLs to open")
 
-    # or, multiple arguments requiring at least one
+    # or, multiple arguments requiring at least one.
     parser.add_argument('urls', nargs='+', default='http://localhost/',
                         help="URLs to open")
+
+    # nargs can also be an integer, but usage statements will repeat
+    # the argument name N times, e.g. this will say "coords coords"
+    # so be sure to have a good help string as well.
+    # If using numeric types, argparse is smart enough to allow negative vals.
+    parser.add_argument('coords', nargs=2, type=float,
+                        help="longitude latitude in decimal degrees")
 
     args = parser.parse_args(sys.argv[1:])
     # Now we have args.check, args.beta, args.url or urls.
