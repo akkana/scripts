@@ -289,16 +289,16 @@ def show_available_networks():
     known_nets = get_known_networks()
 
     # Print the ones we have saved already:
-    format = "%-20s %7s %4s  %s"
-    print(format % ("SSID", "Signal", "#", "Encryption"))
-    print(format % ("----", "------", "--", "----------"))
+    format = "%-20s %4s %7s  %s"
+    print(format % ("SSID", "#", "Signal", "Encryption"))
+    print(format % ("----", "--", "------", "----------"))
 
     known = []
     for i in sorted(known_nets):
         if known_nets[i] in aps:
             print(format % (known_nets[i],
-                            accesspoints[known_nets[i]]['signal'],
                             i,
+                            accesspoints[known_nets[i]]['signal'],
                             accesspoints[known_nets[i]]['flags']))
             known.append(known_nets[i])
 
@@ -354,8 +354,8 @@ CTRL-EVENT-CONNECTED - Connection to f8:d1:11:23:c2:2f completed (auth) [id=1 id
     for ap in aps:
         if ap not in known:
             print(format % (ap,
-                            accesspoints[ap]['signal'],
                             '',
+                            accesspoints[ap]['signal'],
                             accesspoints[ap]['flags']))
 
 def connect_to(to_ap):
