@@ -186,6 +186,9 @@ grebook.py:
 htmlmail.py:
     Compose and send HTML mail, including image attachments.
 
+hypermoon.py:
+    Make up silly names for tonight's moon, as a CGI.
+
 imageviewer.py:
     A generic image viewer widget and image viewer window that can
     be imported into other python programs.
