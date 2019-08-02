@@ -258,8 +258,9 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
     # knowing the absolute pathname of a font's ttf file.
     # There's a call ImageFont.load_default() but that loads a bitmap font
     # at a fixed size so tiny it's unreadable.
+    # Don't ask me what encoding="unic" means, it's not documented anywhere.
     font = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBoldOblique.ttf",
-                              20, encoding="unic")
+                              18, encoding="unic")
 
     for peak in peaks_seen:
         if peak:
@@ -277,14 +278,19 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
                 # but draw.textsize apparently doesn't account for
                 # different character widths, which this does better:
                 w, h = font.getsize(peak['name'])
-
-                draw.text((x - w/2, y - PEAKLINE - h), peak['name'],
-                          font=font, fill=(255,255,255,255))
+                # Everybody says to use 'L' here for the mode, but that
+                # doesn't work, need to use 'RGBA'.
+                label = Image.new('RGBA', (w, h))
+                ImageDraw.Draw(label).text((0, 0), peak['name'],
+                                           font=font, fill=(255,255,255,255))
+                label = label.rotate(80, expand=1)
+                sx, sy = label.size
+                # The label size is floating point numbers, which don't
+                # work if you pass them to paste().
+                im.paste(label, (int(x - sx/3), int(y - PEAKLINE - sy - 3)))
 
             else:
                 PEAKLINE = 20
-
-            # print("(%4d, %4d) %s" % (x, y, peak['name']))
 
             draw.line(((x, y), (x, y-PEAKLINE)), fill="white")
 
@@ -312,6 +318,10 @@ Coordinates are specified in decimal degrees""",
 
     args = parser.parse_args(sys.argv[1:])
 
+
+    if not os.path.exists(args.viewshed):
+        print("%s: no such file" % args.viewshed)
+        sys.exit(1)
     viewshed2view(args.viewshed, args.lon, args.lat, peak_gnis=args.peakfile)
 
 
