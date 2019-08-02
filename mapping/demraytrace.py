@@ -1,11 +1,4 @@
-#!/usr/bin/env python
-
-# Note: this script is almost completely pointless.
-# It was written before I realized I could specify a povray
-# camera angle of 360 degrees. You can use this program as an
-# example of how to project equal angles around a sphere on the earth,
-# but it's definitely not the best way to generate a povray 360.
-# See demraytrace.py for a much faster way.
+#!/usr/bin/env python3
 
 # Generate a 360-degree panorama of raytraced terrain views
 # from a Digital Elevation Model (DEM) file and observer coordinates,
@@ -26,48 +19,9 @@ import subprocess
 import math
 
 
-earthR = 6378.1    # Earth radius in km
-
-
-def dest_from_bearing(srclon, srclat, bearing_rad, dist_km):
-    '''Given a source lon and lat in degrees, a bearing in radians,
-       and a distance in km, return destination lon, lat in degrees.
-    '''
-    srclon_rad = math.radians(srclon)
-    srclat_rad = math.radians(srclat)
-    distfrac = dist_km / earthR
-
-    dstlat_rad = math.asin( math.sin(srclat_rad) * math.cos(distfrac)
-                        + (math.cos(srclat_rad) * math.sin(distfrac)
-                           * math.cos(bearing_rad)))
-
-    dstlon_rad = srclon_rad \
-        +  math.atan2(math.sin(bearing_rad) * math.sin(distfrac)
-                      * math.cos(srclat_rad),
-                      math.cos(distfrac) - math.sin(srclat_rad)
-                      * math.sin(dstlat_rad))
-
-    return math.degrees(dstlon_rad), math.degrees(dstlat_rad)
-
-
-def haversine_distance(lon1, lat1, lon2, lat2):
-    '''
-    Haversine distance between two points, expressed in meters.
-    Input coordinates are in degrees.
-    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
-    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
-    '''
-    d_lat = math.radians(lat1 - lat2)
-    d_lon = math.radians(lon1 - lon2)
-    lat1 = math.radians(lat1)
-    lat2 = math.radians(lat2)
-    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
-        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
-        math.cos(lat1) * math.cos(lat2)
-    return earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-
-def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
+def raytrace_DEM_file(demfile, lon, lat,
+                      outwidth=3600, outheight=600,
+                      outfilename="povray360.png"):
     '''Use povray to raytrace an input Digital Elevation Model.
        demfile is a file in a format gdal can open, e.g. GeoTIFF.
        lon, lat are in degrees.
@@ -121,26 +75,9 @@ def raytrace_DEM_file(demfile, lon, lat, outwidth=800, outheight=600):
         print("Observer is too close to the edge")
         return
 
-    # Loop over 8 compass points (N, NE, E etc.) and calculate the
-    # pixel coordinates of the point obsradius away from the observer.
-    for bearingfrac in range(8):
-        bearing = bearingfrac * math.pi / 4
-        bearing_deg = bearingfrac * 45
+    povfilename = '/tmp/povfile.pov'
 
-        # Find the coordinate for point with that bearing and obsradius dist:
-        destlon, destlat = dest_from_bearing(lon, lat, bearing, obsradius)
-        # and translate that back to pixels
-        px, py = [ round(f) for f in inverse_transform * (destlon, destlat) ]
-
-        outfilename = 'outfile%03d.png' % (bearing_deg)
-        print("%3d %8.4f  %8.3f %8.3f  (%4d, %4d)" % (bearing_deg, bearing,
-                                                      destlon, destlat,
-                                                      px, py))
-        print("%f, %f" % (float(obs_x) / imwidth, 1. - float(obs_y) / imheight))
-
-        povfilename = '/tmp/povfile.pov'
-
-        povfiletext = '''
+    povfiletext = '''
 camera {
     // "perspective" is the default camera, which warps images
     // so they're hard to stitch together.
@@ -150,7 +87,9 @@ camera {
     // povray coordinates compared to the height field image are
     // < rightward, upward, forward >
     location <%f, %f, %f>
-    look_at  <%f, %f, %f>
+    look_at  <%f, %f, 0>
+
+    angle 360
 }
 
 light_source { <2, 1, -1> color <1,1,1> }
@@ -169,18 +108,36 @@ height_field {
     scale <1, 1, 1>
 }
 ''' % (obs_x / imwidth, heightfudge * obs_ele / 65536, 1. - obs_y / imheight,
-       px / imwidth, heightfudge * obs_ele / 65536, 1.0 - py / imheight,
+       obs_x / imwidth, heightfudge * obs_ele / 65536,
        demfile)
 
-        with open(povfilename, 'w') as pf:
-            pf.write(povfiletext)
+    with open(povfilename, 'w') as pf:
+        pf.write(povfiletext)
 
-        print("Generating", outfilename)
-        subprocess.call(['povray', '+A', '+W%d' % outwidth, '+H%d' % outheight,
-                         '+I' + povfilename, '+O' + outfilename])
+    print("Generating 360", outfilename)
+    subprocess.call(['povray', '+A', '+W%d' % outwidth, '+H%d' % outheight,
+                     '+I' + povfilename, '+O' + outfilename])
 
-        print("Wrote", povfilename)
-        sys.exit(0)
+    print("Wrote", outfilename)
+
+
+def haversine_distance(lon1, lat1, lon2, lat2):
+    '''
+    Haversine distance between two points, expressed in meters.
+    Input coordinates are in degrees.
+    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
+    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+    '''
+    earthR = 6378.1    # Earth radius in km
+
+    d_lat = math.radians(lat1 - lat2)
+    d_lon = math.radians(lon1 - lon2)
+    lat1 = math.radians(lat1)
+    lat2 = math.radians(lat2)
+    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
+        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
+        math.cos(lat1) * math.cos(lat2)
+    return earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 if __name__ == '__main__':

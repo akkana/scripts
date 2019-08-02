@@ -256,9 +256,11 @@ mpl_smart_dates.py:
     spans. Matplotlib's AutoDateLocator does this for major ticks,
     but doesn't offer the option of minor ticks.
 
-mapping/demproj.py:
+mapping/demraytrace.py:
     Raytrace a Digital Elevation Model file using povray,
-    creating a 260-degree panorama.
+    creating a 360-degree panorama.
+    demproj.py is similar but pointless, making lots of smaller
+    povray projections that you can stitch together.
 
 mapping/grassviewshed.py:
     Use GRASS r.viewshed for a viewshed analysis on a DEM input file.
