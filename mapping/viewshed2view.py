@@ -19,7 +19,7 @@ import gdal
 import numpy as np
 import affine
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 import csv
 
@@ -242,7 +242,7 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
     # Draw it onto a new image
     outwidth = 1080
     outheight = 800
-    im = Image.new('RGB', (outwidth, outheight), (0, 0, 0))
+    im = Image.new('RGBA', (outwidth, outheight), (0, 0, 0, 0))
     draw = ImageDraw.Draw(im)
     rectsize = 1
     for i, heightlist in enumerate(ridgelist):
@@ -254,17 +254,38 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
             y = outheight - height * outheight / 180
             draw.rectangle(((x, y), (x+rectsize, y+rectsize)), fill="yellow")
 
+    # Unbelievably, PIL seems to have no way to draw text without first
+    # knowing the absolute pathname of a font's ttf file.
+    # There's a call ImageFont.load_default() but that loads a bitmap font
+    # at a fixed size so tiny it's unreadable.
+    font = ImageFont.truetype("/usr/share/fonts/truetype/freefont/FreeSansBoldOblique.ttf",
+                              20, encoding="unic")
+
     for peak in peaks_seen:
         if peak:
+            x = peak['bearing'] * outwidth / 360
+            y = outheight - peak['alt'] * outheight / 180
+
             # XXX Temporary for testing, until there are labels
             if peak['name'] == 'Black Mesa' or peak['name'] == 'Montoso Peak' \
                or peak['name'] == 'Lake Peak':
                 PEAKLINE = 50
+
+                # Get the text size.
+                # You can get it roughly like this:
+                # w, h = draw.textsize(peak['name'], font=font)
+                # but draw.textsize apparently doesn't account for
+                # different character widths, which this does better:
+                w, h = font.getsize(peak['name'])
+
+                draw.text((x - w/2, y - PEAKLINE - h), peak['name'],
+                          font=font, fill=(255,255,255,255))
+
             else:
                 PEAKLINE = 20
-            x = peak['bearing'] * outwidth / 360
-            y = outheight - peak['alt'] * outheight / 180
-            print("(%4d, %4d) %s" % (x, y, peak['name']))
+
+            # print("(%4d, %4d) %s" % (x, y, peak['name']))
+
             draw.line(((x, y), (x, y-PEAKLINE)), fill="white")
 
     # im.show()
