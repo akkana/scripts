@@ -28,7 +28,8 @@ from PyQt5.QtNetwork import QNetworkAccessManager, \
 from popplerqt5 import Poppler
 
 # Poppler gives page sizes in points, so 72 DPI.
-# If you want to use a DPI other than 72, you have to convert.
+# If you want to use a DPI other than 72, you have to convert,
+# and initial page sizes are given in pixels assuming 72 DPI.
 POINTS_PER_INCH = 72
 
 class PDFWidget(QLabel):
@@ -39,14 +40,28 @@ class PDFWidget(QLabel):
     make sure you share the document (let the first PDFWidget
     create the document, then pass thatPDFwidget.document to any
     subsequent widgets you create) or use a ScrolledPDFWidget.
+    Will try to resize to a reasonable size to fit inside the
+    geometry passed in (typically the screen size, a PyQt5.QtCore.QRect);
+    or specify dpi explicitly.
     '''
 
-    def __init__(self, url, document=None, pageno=1, dpi=72, parent=None,
-                 load_cb=None):
+    def __init__(self, url, document=None, pageno=1, dpi=None,
+                 geometry=None, parent=None, load_cb=None):
         '''
            load_cb: will be called when the document is loaded.
         '''
         super(PDFWidget, self).__init__(parent)
+
+        self.geometry = geometry
+
+        # Guess at initial size: will be overridden later.
+        if geometry:
+            self.winwidth = geometry.height() * .75
+            self.winheight = geometry.height()
+        else:
+            self.geometry = PyQt5.QtCore.QSize(600, 800)
+            self.winwidth = 600
+            self.winheight = 800
 
         self.filename = url
 
@@ -63,7 +78,7 @@ class PDFWidget(QLabel):
         else:
             self.document = document
         self.page = None
-        self.pagesize = QSize(600, 800)
+        self.pagesize = QSize(self.winwidth, self.winheight)
 
         self.dpi = dpi
 
@@ -78,7 +93,7 @@ class PDFWidget(QLabel):
     def sizeHint(self):
         if not self.page:
             if not self.document:
-                return QSize(600, 800)
+                return QSize(self.winwidth, self.winheight)
             self.page = self.document.page(self.pageno)
 
         if not self.pagesize:
@@ -99,11 +114,29 @@ class PDFWidget(QLabel):
             self.document.setRenderHint(Poppler.Document.TextAntialiasing)
             # self.document.setRenderHint(Poppler.Document.TextHinting)
 
-        # Most Qt5 programs seem to use setGeometry(x, y, w, h)
-        # to set initial window size. resize() is the only method I've
-        # found that doesn't force initial position as well as size.
-        # self.resize(self.pagesize.width() * self.dpi/POINTS_PER_INCH,
-        #             self.pagesize.height() * self.dpi/POINTS_PER_INCH)
+        if not self.dpi:
+            # Probably first time here.
+            # self.pagesize is sized in pixels assuming POINTS_PER_INCH;
+            # adjust that so the page barely fits on in self.geometry.
+
+            # First assume that it's portrait aspect ratio and that
+            # vertical size will be the limiting factor.
+            self.dpi = POINTS_PER_INCH * \
+                self.geometry.height() / self.pagesize.height()
+
+            # Was that too much: will it overflow in width?
+            if self.pagesize.width() * self.dpi / POINTS_PER_INCH \
+               > self.geometry.width():
+                self.dpi = POINTS_PER_INCH * \
+                    self.geometry.width() / self.pagesize.width()
+
+            self.winwidth = self.pagesize.width() * self.dpi / POINTS_PER_INCH
+            self.winheight = self.pagesize.height() * self.dpi / POINTS_PER_INCH
+
+            # Most Qt5 programs seem to use setGeometry(x, y, w, h)
+            # to set initial window size. resize() is the only method I've
+            # found that doesn't force initial position as well as size.
+            self.resize(self.winwidth, self.winheight)
 
         self.setWindowTitle('PDF Viewer')
 
@@ -142,7 +175,7 @@ class PDFScrolledWidget(QScrollArea):
     Show all pages of a PDF, with scrollbars.
     '''
 
-    def __init__(self, filename, dpi=72, parent=None):
+    def __init__(self, filename, dpi=72, geometry=None, parent=None):
         super(PDFScrolledWidget, self).__init__(parent)
 
         self.loaded = False
@@ -150,6 +183,8 @@ class PDFScrolledWidget(QScrollArea):
         self.vscrollbar = None
 
         self.setWidgetResizable(True)
+
+        self.geometry = geometry
 
         # Try to eliminate the guesswork in sizing the window to content:
         self.setFrameShape(self.NoFrame)
@@ -173,7 +208,8 @@ class PDFScrolledWidget(QScrollArea):
         # Create the widget for the first page of the PDF,
         # which will also create the Poppler document we'll use
         # to render the other pages.
-        self.pages = [ PDFWidget(filename, document=None, pageno=1, dpi=dpi,
+        self.pages = [ PDFWidget(filename, document=None, pageno=1,
+                                 geometry=self.geometry,
                                  load_cb = self.load_cb) ]
         self.pages[0].setContentsMargins(0, 0, 0, 0)
         self.pages[0].setFrameShape(self.NoFrame)
@@ -197,6 +233,7 @@ class PDFScrolledWidget(QScrollArea):
 
         for p in range(2, page1.document.numPages()):
             pagew = PDFWidget(page1.filename, document=page1.document,
+                              geometry=self.geometry,
                               pageno=p, dpi=page1.dpi)
             pagew.setContentsMargins(0, 0, 0, 0)
 
@@ -208,14 +245,14 @@ class PDFScrolledWidget(QScrollArea):
 
         # Now there's a size. Set the initial page size to be big enough
         # to show one page, including room for scrollbars, at 72 DPI.
-        self.resizeToFitContent()
+        self.resize_to_fit_content()
 
         # Don't set the loaded flag until after the first set of resizes,
         # so resizeEvent() won't zoom.
         self.loaded = True
 
 
-    def resizeToFitContent(self):
+    def resize_to_fit_content(self):
         '''Resize to be wide enough not to show a horizontal scrollbar,
            and just a little taller than the first page of PDF content.
         '''
@@ -235,8 +272,7 @@ class PDFScrolledWidget(QScrollArea):
         # print("widget width is", self.widget().width(),
         #       ", sizehint", self.widget().sizeHint().width())
         width = self.widget().sizeHint().width() + vscrollbarwidth
-        height = self.pages[0].pagesize.height() + vscrollbarwidth
-
+        height = self.widget().sizeHint().height()
         self.resize(width, height)
 
 
@@ -302,8 +338,8 @@ if __name__ == '__main__':
     geometry = desktops.screenGeometry(desktops.screenNumber())
     # print("screen geometry is", geometry.width(), geometry.height())
 
-    w = PDFScrolledWidget(sys.argv[1])
-    # w = PDFWidget(sys.argv[1])
+    # w = PDFWidget(sys.argv[1], geometry=geometry)
+    w = PDFScrolledWidget(sys.argv[1], geometry=geometry)
 
     QShortcut("Ctrl+Q", w, activated=w.close)
 
