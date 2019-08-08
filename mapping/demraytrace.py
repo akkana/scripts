@@ -14,13 +14,18 @@ import gdal
 import numpy as np
 import affine
 
+from PIL import Image, ImageDraw, ImageFont
+
 import sys, os
 import subprocess
 import math
 
+from maputils import haversine_distance, haversine_distance_bearing, \
+     read_GNIS_file
+
 
 def raytrace_DEM_file(demfile, lon, lat,
-                      outwidth=3600, outheight=600,
+                      outwidth=3600, outheight=1800,
                       outfilename="povray360.png"):
     '''Use povray to raytrace an input Digital Elevation Model.
        demfile is a file in a format gdal can open, e.g. GeoTIFF.
@@ -81,6 +86,7 @@ def raytrace_DEM_file(demfile, lon, lat,
 camera {
     // "perspective" is the default camera, which warps images
     // so they're hard to stitch together.
+    // panoramic sounds tempting but also warps.
     // "cylinder 1" uses a vertical cylinder.
     cylinder 1
 
@@ -119,29 +125,11 @@ height_field {
                      '+I' + povfilename, '+O' + outfilename])
 
     print("Wrote", outfilename)
-
-
-def haversine_distance(lon1, lat1, lon2, lat2):
-    '''
-    Haversine distance between two points, expressed in meters.
-    Input coordinates are in degrees.
-    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
-    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
-    '''
-    earthR = 6378.1    # Earth radius in km
-
-    d_lat = math.radians(lat1 - lat2)
-    d_lon = math.radians(lon1 - lon2)
-    lat1 = math.radians(lat1)
-    lat2 = math.radians(lat2)
-    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
-        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
-        math.cos(lat1) * math.cos(lat2)
-    return earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return outfilename
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
+    if len(sys.argv) < 4:
         print("Usage: %s demfile.png lat lon" % os.path.basename(sys.argv[0]))
         print("DEM file must be PNG. Lat, lon in decimal degrees.")
         sys.exit(1)
@@ -151,5 +139,6 @@ if __name__ == '__main__':
     lon = float(sys.argv[3])
     print("Observer is at latitude %f, longitude %f" % (lat, lon))
 
-    raytrace_DEM_file(demfile, lon, lat)
+    outfilename = raytrace_DEM_file(demfile, lon, lat,
+                                    outwidth=2000, outheight=1000)
 

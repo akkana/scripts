@@ -27,125 +27,21 @@ import argparse
 import sys, os
 import math
 
-
-earthR = 6378.1    # Earth radius in km
-
-
-def dest_from_bearing(srclon, srclat, bearing_rad, dist_km):
-    '''Given a source lon and lat in degrees, a bearing in radians,
-       and a distance in km, return destination lon, lat in degrees.
-    '''
-    srclon_rad = math.radians(srclon)
-    srclat_rad = math.radians(srclat)
-    distfrac = dist_km / earthR
-
-    dstlat_rad = math.asin( math.sin(srclat_rad) * math.cos(distfrac)
-                        + (math.cos(srclat_rad) * math.sin(distfrac)
-                           * math.cos(bearing_rad)))
-
-    dstlon_rad = srclon_rad \
-        +  math.atan2(math.sin(bearing_rad) * math.sin(distfrac)
-                      * math.cos(srclat_rad),
-                      math.cos(distfrac) - math.sin(srclat_rad)
-                      * math.sin(dstlat_rad))
-
-    return math.degrees(dstlon_rad), math.degrees(dstlat_rad)
+from maputils import haversine_distance_bearing, dest_from_bearing
+from maputils import read_GNIS_file
 
 
-def haversine_distance_bearing(lon1, lat1, lon2, lat2):
-    '''
-    Haversine distance and bearing between two points.
-    Input coordinates are in decimal degrees.
-    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
-    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
-    Returns dist_km, bearing_dd
-    '''
-    d_lat = math.radians(lat1 - lat2)
-    d_lon = math.radians(lon1 - lon2)
-    lat1 = math.radians(lat1)
-    lon1 = math.radians(lon1)
-    lat2 = math.radians(lat2)
-    lon2 = math.radians(lon2)
-    a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
-        math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
-        math.cos(lat1) * math.cos(lat2)
-
-    bearing = math.atan2(math.sin(lon2-lon1)*math.cos(lat2),
-                         math.cos(lat1) * math.sin(lat2)
-                         - math.sin(lat1) * math.cos(lat2)
-                           * math.cos(lon2-lon1))
-    bearing = math.degrees(bearing)
-
-    return (earthR * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)),
-            (bearing + 360) % 360)
-
-
-def read_GNIS_file(filename, verbose=False):
-    '''Read a GNIS file, CSV format with | as separator,
-       matching the format downloadable from
-       https://www.usgs.gov/core-science-systems/ngp/board-on-geographic-names/download-gnis-data
-       Return a list of peaks, each a dictionary with keys
-       'ele', 'name', 'lat', 'lon', 'county'
-    '''
-    with open(filename) as csvfp:
-        reader = csv.DictReader(csvfp, delimiter='|')
-        nodata = []
-        peaklist = []
-
-        for row in reader:
-            if row['FEATURE_CLASS'] != 'Summit':
-                continue
-            try:
-                elev = int(row['ELEV_IN_FT'])
-            except ValueError:
-                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
-                continue
-            try:
-                lat = float(row['PRIM_LAT_DEC'])
-            except ValueError:
-                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
-                continue
-            try:
-                lon = float(row['PRIM_LONG_DEC'])
-            except ValueError:
-                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
-                continue
-
-            if not lat or not lon or not elev:
-                nodata.append((row['FEATURE_NAME'], row['COUNTY_NAME']))
-                continue
-
-            # If we get this far, there's real data
-            # for elevation and coordinates
-            peaklist.append({ 'name': row['FEATURE_NAME'],
-                              'ele': elev,
-                              'lat':  lat, 'lon': lon,
-                              'county': row['COUNTY_NAME'] })
-
-        peaklist.sort(reverse=True, key=lambda pk: -pk['ele'])
-        # for peak in peaklist:
-        #     print("%5d %25s   (%.4f %.4f)  %s" % (peak['ele']))
-        # print("Total of", len(peaklist), "peaks with data")
-
-        if verbose:
-            nodata.sort()
-            print("\nPeaks lacking elevation or coordinates:")
-            for peak in nodata:
-                print("%s (%s)" % (peak[0], peak[1]))
-            print("Total of", len(nodata), "peaks with no data")
-
-        return peaklist
-
-
-def viewshed2view(demfile, lon, lat, peak_gnis=None,
-                  outfile="view.png", outwidth=800, outheight=600):
+def viewshed2view(demfile, lon, lat, start_image=None, peak_gnis=None,
+                  outfile="view.png", outwidth=1080, outheight=800):
     '''Turn a GRASS viewshed into a panorama of mountain locations.
        demfile is a file in a format gdal can open, e.g. GeoTIFF.
        lon, lat are in degrees.
        outwidth and outheight are the size of the generated image.
+       start_image is an optional image to label, like a povray 3d pano.
        peaknames is an optional GPX waypoint file containing locations
        and names of mountain peaks.
     '''
+
     demdata = gdal.Open(demfile)
     demarray = np.array(demdata.GetRasterBand(1).ReadAsArray())
     affine_transform = affine.Affine.from_gdal(*demdata.GetGeoTransform())
@@ -239,10 +135,20 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
 
             dist_m += step_m
 
-    # Draw it onto a new image
-    outwidth = 1080
-    outheight = 800
-    im = Image.new('RGBA', (outwidth, outheight), (0, 0, 0, 0))
+    # If a starting image was specified, use it as a starting point,
+    # and use its size rather than outwidth and outheight
+    if start_image:
+        im = Image.open(start_image)
+        outwidth, outheight = im.size
+        heightscale = outheight / 90
+
+    else:
+        # Draw it onto a new image
+        im = Image.new('RGBA', (outwidth, outheight), (0, 0, 0, 0))
+        heightscale = outheight
+
+    print("outheight is", outheight, "heightscale is", heightscale)
+
     draw = ImageDraw.Draw(im)
     rectsize = 1
     for i, heightlist in enumerate(ridgelist):
@@ -251,7 +157,7 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
             # Height is an angle, where 0 means straight down, 90 horizontal,
             # 180 straight up.
             x = bearing * outwidth / 360
-            y = outheight - height * outheight / 180
+            y = outheight - height * heightscale
             draw.rectangle(((x, y), (x+rectsize, y+rectsize)), fill="yellow")
 
     # Unbelievably, PIL seems to have no way to draw text without first
@@ -265,11 +171,15 @@ def viewshed2view(demfile, lon, lat, peak_gnis=None,
     for peak in peaks_seen:
         if peak:
             x = peak['bearing'] * outwidth / 360
-            y = outheight - peak['alt'] * outheight / 180
+            # y = outheight - peak['alt'] * outheight / 180
+            # XXX Try to tune heightscale to match the undocumented
+            # camera angles in a povray image.
+            y = outheight/2 - peak['alt'] * heightscale
 
             # XXX Temporary for testing, until there are labels
             if peak['name'] == 'Black Mesa' or peak['name'] == 'Montoso Peak' \
                or peak['name'] == 'Lake Peak':
+                print(peak['name'], "y", y)
                 PEAKLINE = 50
 
                 # Get the text size.
@@ -307,6 +217,9 @@ Coordinates are specified in decimal degrees""",
                                      formatter_class=
                                          argparse.RawTextHelpFormatter)
 
+    parser.add_argument('-i', '--image', dest='image',
+                        help="Image to start with, e.g. a 360 povray pano")
+
     parser.add_argument('-p', '--peaknames', dest='peakfile',
                         help="a GNIS CSV file with | separator")
 
@@ -322,6 +235,7 @@ Coordinates are specified in decimal degrees""",
     if not os.path.exists(args.viewshed):
         print("%s: no such file" % args.viewshed)
         sys.exit(1)
-    viewshed2view(args.viewshed, args.lon, args.lat, peak_gnis=args.peakfile)
+    viewshed2view(args.viewshed, args.lon, args.lat,
+                  start_image=args.image, peak_gnis=args.peakfile)
 
 
