@@ -324,11 +324,11 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
     if moves:
         if dryrun:
             print("\n\nMoving files that changed location but not size")
-        for pair in moves:
+        for mvsrc, mvdst in moves:
             if dryrun:
                 print("%s -> %s" % (mvsrc, mvdst))
             else:
-                move(*pair)
+                move(mvsrc, mvdst)
     else:
         print("No files need moving.")
 
