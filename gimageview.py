@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import gtk, gobject
+import gtk, gobject, glib
 import gc
 
 class ImageViewer() :
