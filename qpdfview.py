@@ -231,7 +231,7 @@ class PDFScrolledWidget(QScrollArea):
             width += sbw
             height += sbw
 
-        for p in range(2, page1.document.numPages()):
+        for p in range(2, page1.document.numPages()+1):
             pagew = PDFWidget(page1.filename, document=page1.document,
                               geometry=self.geometry,
                               pageno=p, dpi=page1.dpi)
