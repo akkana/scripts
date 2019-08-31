@@ -467,6 +467,15 @@ parser.print_help()
 # Dates and times
 ########################################################
 
+# Printing formats:
+>>> dt = datetime.datetime.now()
+>>> dt.strftime("%Y-%m-%d %H:%M")
+'2019-07-22 19:46'
+>>> dt.isoformat()
+'2019-07-22T19:46:20.164427'
+>>> f"{dt:%Y-%m-%d %H:%M}"        # Only in Python >= 3.6
+'2019-07-22 19:46'
+
 #
 # Add N months to a date: same day of month but next month.
 #
