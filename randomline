@@ -6,6 +6,46 @@
 # Thanks to saz and http://www.goldfish.org/books/O'Reilly%20Perl%20CD%20Bookshelf%202.0/cookbook/ch08_07.htm
 # for the cute algorithm.
 
+from __future__ import print_function
+
+import sys
+import random
+
+def randomline(fp):
+    num_lines = 0
+    picked = ""
+    #for line in fp:
+    while True:
+        line = fp.readline()
+        line = line.strip()
+        if not line : break
+        num_lines += 1
+        if random.randint(1, num_lines) == 1 :
+            return line
+
+    # In the unlikely case random didn't give anything, return the last line.
+    return line
+
+if __name__ == '__main__':
+    random.seed()
+
+    if len(sys.argv) > 1:
+        fp = open(sys.argv[1])
+    else:
+        fp = sys.stdin
+
+    print(randomline(fp))
+
+
+
+
+
+
+
+
+
+
+'''
 import sys, string, random
 
 # main
@@ -24,3 +64,4 @@ while 1 :
 
 print(picked)
 
+'''

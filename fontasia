@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 # fontasia 0.7:
 # List all fonts on the system and let the user group them into categories.

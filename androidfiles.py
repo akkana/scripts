@@ -428,7 +428,7 @@ def sync(src, dst, dryrun=True):
         idst += 1
 
     # When setting up moves, we avoided adding the files to removes,
-    # but the new location was still added to updates. Remvoe those.
+    # but the new location was still added to updates. Remove those.
     for movepair in moves:
         # print("Removing %s from updates, it's moving from %s"
         #       % (movepair[1], movepair[0]))
