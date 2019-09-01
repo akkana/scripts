@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python
 
 # fontasia 0.7:
 # List all fonts on the system and let the user group them into categories.
@@ -24,6 +24,12 @@
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Thanks to jan bodnar's ZetCode.com PyGTK/Pango tutorial.
+
+from __future__ import print_function
+
+from gi import pygtkcompat
+pygtkcompat.enable()
+pygtkcompat.enable_gtk(version='3.0')
 
 import gtk
 import pango
@@ -68,6 +74,12 @@ class ButtonboxTable(Buttonbox):
             self.cur_col += 1
 
 class FontApp(gtk.Window):
+
+    # CSS for the category buttons
+    CSS = b'''
+.highlightbtn { background-image: none; background-color: #cff; }
+'''
+
     def __init__(self):
         super(FontApp, self).__init__()
 
@@ -79,8 +91,6 @@ class FontApp(gtk.Window):
         # No categories to start with
         self.category_fontlists = []
         self.category_buttons = []
-        self.oldcolors = None
-        self.highlightcolor = None
         self.DEFAULT_TEXT = "The quick brown fox jumped over the lazy dog"
         self.preview_text = self.DEFAULT_TEXT
         self.DEFAULT_FONT_SIZE = 18
@@ -114,15 +124,15 @@ class FontApp(gtk.Window):
         self.preview.set_text(self.preview_text)
 
         # Don't use fallbacks for characters not in the current font.
-        # This apparently doesn't work.
-        al = pango.AttrList()
-        al.insert(pango.AttrFallback(False, 0, -1))
-        self.preview.get_layout().set_attributes(al)
+        # This apparently didn't work in gtk2, and is deprecated in gtk3.
+        # al = pango.AttrList()
+        # al.insert(pango.AttrFallback(False, 0, -1))
+        # self.preview.get_layout().set_attributes(al)
 
         hbox.pack_start(self.preview, expand=True)
 
         # Quit button
-        btn = gtk.Button("Quit")
+        btn = gtk.Button(label="Quit")
         hbox.pack_end(btn, expand=False)
         btn.connect("clicked", self.save_and_quit);
 
@@ -140,8 +150,9 @@ class FontApp(gtk.Window):
         self.all_families = context.list_families()
         self.store = gtk.ListStore(str)
 
-        self.treeView = gtk.TreeView(self.store)
-        self.treeView.set_rules_hint(True)
+        self.treeView = gtk.TreeView(model=self.store)
+        # XXX deprecated
+        # self.treeView.set_rules_hint(True)
         self.store.set_sort_column_id(0, gtk.SORT_ASCENDING)
 
         selection = self.treeView.get_selection()
@@ -166,35 +177,37 @@ class FontApp(gtk.Window):
         vbox.pack_start(hbox, expand=False)
 
         # Checkbox for showing fonts in the font list
-        self.fancy_btn = gtk.ToggleButton("Fancy list")
+        self.fancy_btn = gtk.ToggleButton(label="Fancy list")
         self.fancy_btn.set_active(self.fancy_list)
         self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb);
         hbox.pack_start(self.fancy_btn, expand=False)
 
         # Font size
-        label = gtk.Label("Size:")
+        label = gtk.Label(label="Size:")
         hbox.pack_start(label, expand=False)
 
-        adj = gtk.Adjustment(self.fontsize, 1, 1000, 1)
-        self.sizespin = gtk.SpinButton(adj)
+        adj = gtk.Adjustment(value=self.fontsize, lower=1, upper=1000,
+                             step_increment=1)
+        self.sizespin = gtk.SpinButton(adjustment=adj)
         self.sizespin.set_numeric(True)
         self.sizespin.connect("value-changed", self.render_font);
         hbox.pack_start(self.sizespin, expand=False)
 
         # Bold and italic buttons
-        self.bold_btn = gtk.ToggleButton("Bold")
+        self.bold_btn = gtk.ToggleButton(label="Bold")
         hbox.pack_start(self.bold_btn, expand=False)
         self.bold_btn.connect("toggled", self.render_font);
-        self.italic_btn = gtk.ToggleButton("Italic")
+        self.italic_btn = gtk.ToggleButton(label="Italic")
         hbox.pack_start(self.italic_btn, expand=False)
         self.italic_btn.connect("toggled", self.render_font);
 
         #
         # View category menu
         #
-        label = gtk.Label("View:")
-        # This is supposed to right-align the label, but alas it does nothing:
-        label.set_alignment(1.0, .5)
+        label = gtk.Label(label="View:")
+        # This is supposed to right-align the label, but alas it does nothing
+        # and is now deprecated in gtk3:
+        #label.set_alignment(1.0, .5)
         # This also doesn't right-align, but the docs are clear on that:
         # label.set_justify(gtk.JUSTIFY_RIGHT)
         hbox.pack_start(label, expand=False)
@@ -204,22 +217,17 @@ class FontApp(gtk.Window):
         self.combo_connect_id = self.view_cat_combo.connect("changed",
                                                             self.combochanged)
 
-        # Now we can get the default button background (I hope):
-        widgcopy = btn.get_style().copy()
-        self.oldcolors = widgcopy.bg
-        self.highlightcolor = gtk.gdk.Color(0, 65535, 0)
-
         # Categories header row
         hbox = gtk.HBox(spacing=8)
         vbox.pack_start(hbox, expand=False)
-        label = gtk.Label("Categories")
+        label = gtk.Label(label="Categories")
         hbox.pack_start(label, expand=False)
 
         entry = gtk.Entry()
         entry.set_width_chars(20)
         hbox.pack_start(entry, expand=False)
 
-        btn = gtk.Button("Add category")
+        btn = gtk.Button(label="Add category")
         hbox.pack_start(btn, expand=False)
         btn.set_sensitive(False)
         btn.connect("clicked", self.add_category, entry);
@@ -231,6 +239,16 @@ class FontApp(gtk.Window):
         #
         self.buttonbox = ButtonboxTable()
         vbox.pack_start(self.buttonbox.widget, expand=True)
+
+        #
+        # Apply the CSS
+        #
+        css_provider = gtk.CssProvider()
+        css_provider.load_from_data(FontApp.CSS)
+        context = gtk.StyleContext()
+        context.add_provider_for_screen(gtk.gdk.Screen.get_default(),
+                                        css_provider,
+                                        gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         #
         # Just before showing, update everything:
@@ -276,7 +294,7 @@ class FontApp(gtk.Window):
             column.set_cell_data_func(rendererText, None)
             rendererText.set_property('font', None)
 
-    def set_list_font(self, column, cell, model, iter):
+    def set_list_font(self, column, cell, model, iter, user_data):
         fontname = model.get_value(iter, 0)
 
         # If the font name ends with a number, we're in trouble --
@@ -329,7 +347,7 @@ class FontApp(gtk.Window):
         # Read all the selected fonts, not just the first one:
         for x in item:
             fontname = model[x[0]][0]
-            #print "Adding", fontname, "to", catname
+            #print("Adding", fontname, "to", catname)
             self.toggle_font_in_category(fontname, catname)
             self.update_category_buttons(fontname)
         self.treeView.grab_focus()
@@ -346,7 +364,7 @@ class FontApp(gtk.Window):
 
         for btn in self.category_buttons:
             catname = btn.get_name()
-            item = gtk.MenuItem(catname)
+            item = gtk.MenuItem(label=catname)
             self.view_cat_combo.append_text(catname)
 
         self.view_cat_combo.set_active(0)
@@ -479,12 +497,12 @@ class FontApp(gtk.Window):
                     # for writing back to the file even though
                     # we don't understand any others
                     else:
-                        print "Skipping unknown setting", varval[0]
+                        print("Skipping unknown setting", varval[0])
                         continue
 
                 colon = line.find(":")
                 if colon < 0:
-                    print "Didn't understand line", line,
+                    print("Didn't understand line", line, end='')
                     continue
                 catname = line[0:colon].strip()
                 self.add_category(catname)
@@ -497,7 +515,7 @@ class FontApp(gtk.Window):
             self.update_cats_menu()
 
         except IOError:
-            print "No fontasia conf file yet -- Welcome to fontasia!"
+            print("No fontasia conf file yet -- Welcome to fontasia!")
 
             # Set up a couple of default categories with likely fonts
             self.add_category('monospace')
@@ -521,31 +539,32 @@ class FontApp(gtk.Window):
         txt = self.preview.get_text()
         if txt != self.DEFAULT_TEXT:
             try:
-                print >>catfp, "set string=" + txt
+                print("set string=" + txt, file=catfp)
             except:
-                print "Problem saving the string -- reverting to default string"
+                print("Problem saving the string; reverting to default string")
 
         fontsize = self.sizespin.get_value()
         if fontsize != self.DEFAULT_FONT_SIZE:
-            print >>catfp, "set fontsize=" + str(int(fontsize))
+            print("set fontsize=" + str(int(fontsize)), file=catfp)
 
         # Get the current sizes for the list and the preview
         alloc = self.get_allocation()
-        print >>catfp, "set win_width=" + str(alloc.width)
-        print >>catfp, "set win_height=" + str(alloc.height)
+        print("set win_width=" + str(alloc.width), file=catfp)
+        print("set win_height=" + str(alloc.height), file=catfp)
         alloc = self.sw.get_allocation()
-        print >>catfp, "set list_width=" + str(alloc.width)
+        print("set list_width=" + str(alloc.width), file=catfp)
         alloc = self.preview.get_allocation()
-        print >>catfp, "set preview_height=" + str(alloc.height)
+        print("set preview_height=" + str(alloc.height), file=catfp)
 
         if not self.fancy_list:
-            print >>catfp, "set fancy_list=False"
+            print("set fancy_list=False", file=catfp)
 
         for i in range(0, len(self.category_buttons)):
             catname = self.category_buttons[i].get_name()
-            print >>catfp, catname + ":", ', '.join(self.category_fontlists[i])
+            print(catname + ":", ', '.join(self.category_fontlists[i]),
+                  file=catfp)
         catfp.close()
-        print "Saved to", self.cat_file_name
+        print("Saved to", self.cat_file_name)
 
     def new_cat_entry_changed(self, entry, btn):
         btn.set_sensitive(entry.get_text_length() > 0)
@@ -564,7 +583,7 @@ class FontApp(gtk.Window):
         if (self.category_exists(newcat)):
             return
 
-        btn = gtk.Button(newcat)  # was togglebutton
+        btn = gtk.Button(label=newcat)
         btn.set_name(newcat)
         self.buttonbox.addButton(btn)
         btn.connect("clicked", self.toggle_cur_font_in_cat, newcat);
@@ -588,22 +607,10 @@ class FontApp(gtk.Window):
     #    self.update_font_list()
 
     def change_button_color(self, btn, yesno):
-        if self.oldcolors is None:
-            self.oldcolors = btn.get_modifier_style().bg
-        if self.highlightcolor is None:
-            self.highlightcolor = gtk.gdk.Color(0, 65535, 0)
         if yesno:
-            btn.modify_bg(gtk.STATE_NORMAL, self.highlightcolor)
-            btn.modify_bg(gtk.STATE_ACTIVE, self.highlightcolor)
-            btn.modify_bg(gtk.STATE_PRELIGHT, self.highlightcolor)
-            btn.modify_bg(gtk.STATE_SELECTED, self.highlightcolor)
+            btn.get_style_context().add_class("highlightbtn")
         else:
-            btn.modify_bg(gtk.STATE_NORMAL, self.oldcolors[gtk.STATE_NORMAL])
-            btn.modify_bg(gtk.STATE_ACTIVE, self.oldcolors[gtk.STATE_ACTIVE])
-            btn.modify_bg(gtk.STATE_PRELIGHT,
-                          self.oldcolors[gtk.STATE_PRELIGHT])
-            btn.modify_bg(gtk.STATE_SELECTED,
-                          self.oldcolors[gtk.STATE_SELECTED])
+            btn.get_style_context().remove_class("highlightbtn")
 
     def update_category_buttons(self, fontname):
         for i in range(0, len(self.category_buttons)):
@@ -648,6 +655,7 @@ class FontApp(gtk.Window):
         else:
             fontdesc.set_style(pango.STYLE_NORMAL)
 
+        # XXX Deprecated
         self.preview.modify_font(fontdesc)
 
         self.update_category_buttons(fontname)
