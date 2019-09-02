@@ -189,6 +189,10 @@ htmlmail.py:
 hypermoon.py:
     Make up silly names for tonight's moon, as a CGI.
 
+intel_backlight.py:
+    Tiny script to adjust the backlight on an Intel-based laptop
+    that uses /sys/class/backlight/intel_backlight.
+
 imageviewer.py:
     A generic image viewer widget and image viewer window that can
     be imported into other python programs.
