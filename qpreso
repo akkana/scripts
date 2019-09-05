@@ -14,8 +14,10 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QApplication, QShortcut, QDesktopWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
+
 class PresoView(QWebEngineView):
-    def __init__(self, url, zoom=1.0, show_notes=True):
+
+    def __init__(self, url, fullscreen=False, zoom=1.0, show_notes=True):
 
         super(PresoView, self).__init__()
 
@@ -45,9 +47,10 @@ class PresoView(QWebEngineView):
                                           self.fullheight))
 
 
-        # Run fullscreen if the display is XGA or smaller.
+        # Run fullscreen if the display is XGA or smaller,
+        # or if fullscreen was explicitly set.
         # displaysize = QApplication.desktop.screenGeometry()
-        if self.displayheight <= 768:
+        if fullscreen or self.displayheight <= 768:
             self.showFullScreen()
 
         # Key bindings
@@ -65,6 +68,9 @@ class PresoView(QWebEngineView):
 def parse_args():
     """Parse commandline arguments."""
     parser = argparse.ArgumentParser()
+    parser.add_argument('-f', "--fullscreen", dest="fullscreen", default=False,
+                        action="store_true",
+                        help="Run fullscreen regardless of screen size")
     parser.add_argument('url', help='The URL to open')
 
     args = parser.parse_known_args()[0]
@@ -84,7 +90,7 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
 
-    pv = PresoView(args.url)
+    pv = PresoView(args.url, fullscreen=args.fullscreen)
     pv.show()
 
     app.exec_()
