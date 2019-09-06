@@ -83,8 +83,9 @@ chatsounds.py:
     Also a rare example of an xchat Python script.
 
 check-monitors
-    A trivial shell script to probe for connected monitors and
-    use xrandr to activate the right one.
+check-monitors.py
+    A shell script, later translated to Python, to probe for connected
+    monitors and use xrandr to activate the right one.
 
 cleanhtml.py
     Clean up HTML edited by gmail users -- remove font/color/style tags
