@@ -16,9 +16,13 @@
 # to put focus in a window.
 #
 
+
 from Xlib import X, display
 from Xlib.ext import randr
 from Xlib.error import XError
+
+import argparse
+import sys
 
 
 # Leave debugging info in a file of known location,
@@ -59,9 +63,10 @@ def find_monitors():
         monitors[data['name']] = data
 
 
-def print_monitor(mon):
-    print("\n====", mon['name'])
-    print(", ".join([allmodes[m] for m in mon['modes']]))
+def print_monitor(mon, show_all_modes):
+    if show_all_modes:
+        print("\n%s:" % mon['name'])
+        print(", ".join([allmodes[m] for m in mon['modes']]))
 
     # Figure out if it's cloned or extended, and its xinerama position
     # https://stackoverflow.com/questions/49136692/python-xlib-how-to-deterministically-tell-whether-display-output-is-in-extendi
@@ -74,19 +79,37 @@ def print_monitor(mon):
         # with that since I don't personally use it.
         x = crtcInfo.x
         y = crtcInfo.y
-        print("   Size %dx%d   Position: (%d, %d)" % (crtcInfo.width,
-                                                      crtcInfo.height,
-                                                      crtcInfo.x, crtcInfo.y))
+        if not show_all_modes:
+            print("%s: " % mon['name'], end='')
+        print("Size: %dx%d Position: (%d, %d)" % (crtcInfo.width,
+                                                  crtcInfo.height,
+                                                  crtcInfo.x, crtcInfo.y))
     except XError:
         print("    Xlib error")
 
 
-def print_monitors():
+def print_monitors(allmodes):
     for mname in monitors:
-        print_monitor(monitors[mname])
+        print_monitor(monitors[mname], allmodes)
 
 
 if __name__ == '__main__':
     find_monitors()
-    print_monitors()
+
+    parser = argparse.ArgumentParser(description="Check and change monitor connections")
+
+    parser.add_argument('-s', "--switch", dest="switch", default=False,
+                        action="store_true",
+                        help="Switch which monitor(s) are connected")
+    parser.add_argument('-a', "--allmodes", dest="show_all_modes",
+                        default=False, action="store_true",
+                        help="Show all modes allowed for each monitor")
+
+    args = parser.parse_args(sys.argv[1:])
+
+    if args.switch:
+        print("Would switch!")
+
+    else:
+        print_monitors(args.show_all_modes)
 
