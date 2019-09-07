@@ -17,7 +17,8 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 class PresoView(QWebEngineView):
 
-    def __init__(self, url, fullscreen=False, zoom=1.0, show_notes=True):
+    def __init__(self, url, fullscreen=False, monitor=-1,
+                 zoom=1.0, show_notes=True):
 
         super(PresoView, self).__init__()
 
@@ -46,12 +47,23 @@ class PresoView(QWebEngineView):
             print("Full size: %d x %d" % (self.fullwidth,
                                           self.fullheight))
 
+        if monitor >= 0:
+            # The number of the monitor where the window should show up
+            screens = app.screens()
+            if monitor + 1 > len(screens):
+                print("There is no monitor", monitor)
+                sys.exit(1)
 
-        # Run fullscreen if the display is XGA or smaller,
-        # or if fullscreen was explicitly set.
-        # displaysize = QApplication.desktop.screenGeometry()
-        if fullscreen or self.displayheight <= 768:
+            geom = screens[monitor].geometry()
+            self.move(geom.left(), geom.top())
             self.showFullScreen()
+
+        else:
+            # Run fullscreen if the display is XGA or smaller,
+            # or if fullscreen was explicitly set.
+            # displaysize = QApplication.desktop.screenGeometry()
+            if fullscreen or self.displayheight <= 768:
+                self.showFullScreen()
 
         # Key bindings
         # For keys like function keys, use QtGui.QKeySequence("F12")
@@ -71,6 +83,9 @@ def parse_args():
     parser.add_argument('-f', "--fullscreen", dest="fullscreen", default=False,
                         action="store_true",
                         help="Run fullscreen regardless of screen size")
+    parser.add_argument('-m', '--monitor', action="store", default=-1,
+                        dest="monitor", type=int,
+                        help='Run fullscreen on this monitor')
     parser.add_argument('url', help='The URL to open')
 
     args = parser.parse_known_args()[0]
@@ -90,7 +105,7 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
 
-    pv = PresoView(args.url, fullscreen=args.fullscreen)
+    pv = PresoView(args.url, fullscreen=args.fullscreen, monitor=args.monitor)
     pv.show()
 
     app.exec_()
