@@ -21,6 +21,8 @@ from Xlib import X, display
 from Xlib.ext import randr
 from Xlib.error import XError
 
+from ewmh import EWMH
+
 import argparse
 import sys
 
@@ -52,6 +54,7 @@ class XDisp:
         self.root = self.dpy.screen().root
         print("root size", self.root.get_geometry())
         self.resources = self.root.xrandr_get_screen_resources()._data
+        self.ewmh = EWMH()
 
         # Accessing modes sometimes makes outputs mysteriously disappear,
         # so save outputs first.
@@ -140,18 +143,22 @@ class XDisp:
     def find_orphans(self):
         print("Trying to find orphans")
 
-        window_ids = self.root.get_full_property(
-            self.dpy.intern_atom('_NET_CLIENT_LIST'), X.AnyPropertyType
-        ).value
-        for win_id in window_ids:
-            win = self.dpy.create_resource_object('window', win_id)
+        def topframe(client):
+            frame = client
+            while frame.query_tree().parent != self.ewmh.root:
+                frame = frame.query_tree().parent
+            return frame
 
-            geom = win.get_geometry()
-
-            print("%4dx%4d +%d+%d   %s" % (geom.width, geom.height,
-                                           geom.x, geom.y,
-                                           win.get_wm_name()))
-
+        for client in self.ewmh.getClientList():
+            name, classname = client.get_wm_class()
+            # There's also client.get_wm_name() which is the long name
+            # that currently appears on the titlebar.
+            geom = topframe(client).get_geometry()
+            print("ew %4d x %4d   +%4d + %4d   %s: %s" % (geom.width,
+                                                          geom.height,
+                                                          geom.x, geom.y,
+                                                          name,
+                                                          client.get_wm_name()))
 
 
     def move_orphan(self, win, geom, newx, newy):
