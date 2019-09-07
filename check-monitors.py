@@ -30,71 +30,75 @@ import sys
 # but maybe you can shell in and read what happened.
 DEBUGFILE = '/tmp/check-monitors.out'
 
+class XDisp:
 
-dpy = display.Display()
-root = dpy.screen().root
-resources = root.xrandr_get_screen_resources()._data
+    def __init__(self):
+        self.dpy = display.Display()
+        self.root = self.dpy.screen().root
+        self.resources = self.root.xrandr_get_screen_resources()._data
 
-monitors = {}
-allmodes = {}
-
-
-def find_monitors():
-    # Accessing modes sometimes makes outputs mysteriously disappear,
-    # so save outputs first.
-    outputs = resources['outputs']
-
-    # Build up a mode table. There's probably some clever IterTools construct
-    # that could do this in one line.
-    for m in resources['modes']:
-        allmodes[m['id']] = '%dx%d' % (m['width'], m['height'])
-
-    # Loop over the outputs.
-    for output in outputs:
-        data = dpy.xrandr_get_output_info(output,
-                                          resources['config_timestamp'])._data
-
-        if data['mm_width'] <= 0 or data['mm_height'] <= 0:
-            # Not an actual monitor; I'm not sure what these are for
-            # but they don't seem to have any useful info
-            continue
-
-        name = data['name']
-        monitors[data['name']] = data
+        self.monitors = {}
+        self.allmodes = {}
 
 
-def print_monitor(mon, show_all_modes):
-    if show_all_modes:
-        print("\n%s:" % mon['name'])
-        print(", ".join([allmodes[m] for m in mon['modes']]))
+    def find_monitors(self):
+        # Accessing modes sometimes makes outputs mysteriously disappear,
+        # so save outputs first.
+        outputs = self.resources['outputs']
 
-    # Figure out if it's cloned or extended, and its xinerama position
-    # https://stackoverflow.com/questions/49136692/python-xlib-how-to-deterministically-tell-whether-display-output-is-in-extendi
-    # which references https://www.x.org/wiki/Development/Documentation/HowVideoCardsWork/#index3h3
-    try:
-        crtcInfo = dpy.xrandr_get_crtc_info(mon['crtc'],
-                                            resources['config_timestamp'])
-        # print(crtcInfo)
-        # crtcInfo also includes rotation info but I'm not doing anything
-        # with that since I don't personally use it.
-        x = crtcInfo.x
-        y = crtcInfo.y
-        if not show_all_modes:
-            print("%s: " % mon['name'], end='')
-        print("Size: %dx%d Position: (%d, %d)" % (crtcInfo.width,
-                                                  crtcInfo.height,
-                                                  crtcInfo.x, crtcInfo.y))
-    except XError:
-        print("    Xlib error")
+        # Build up a mode table. There's probably some clever IterTools construct
+        # that could do this in one line.
+        for m in self.resources['modes']:
+            self.allmodes[m['id']] = '%dx%d' % (m['width'], m['height'])
+
+        # Loop over the outputs.
+        for output in outputs:
+            data = self.dpy.xrandr_get_output_info(
+                output, self.resources['config_timestamp'])._data
+
+            if data['mm_width'] <= 0 or data['mm_height'] <= 0:
+                # Not an actual monitor; I'm not sure what these are for
+                # but they don't seem to have any useful info
+                continue
+
+            name = data['name']
+            self.monitors[data['name']] = data
 
 
-def print_monitors(allmodes):
-    for mname in monitors:
-        print_monitor(monitors[mname], allmodes)
+    def print_monitor(self, mon, show_all_modes):
+        if show_all_modes:
+            print("\n%s:" % mon['name'])
+            print(", ".join([self.allmodes[m] for m in mon['modes']]))
+
+        # Figure out if it's cloned or extended, and its xinerama position
+        # https://stackoverflow.com/questions/49136692/python-xlib-how-to-deterministically-tell-whether-display-output-is-in-extendi
+        # which references https://www.x.org/wiki/Development/Documentation/HowVideoCardsWork/#index3h3
+        try:
+            crtcInfo = self.dpy.xrandr_get_crtc_info(mon['crtc'],
+                                            self.resources['config_timestamp'])
+            # print(crtcInfo)
+            # crtcInfo also includes rotation info but I'm not doing anything
+            # with that since I don't personally use it.
+            x = crtcInfo.x
+            y = crtcInfo.y
+            if not show_all_modes:
+                print("%s: " % mon['name'], end='')
+            print("Size: %dx%d Position: (%d, %d)" % (crtcInfo.width,
+                                                      crtcInfo.height,
+                                                      crtcInfo.x, crtcInfo.y))
+        except XError:
+            print("    Xlib error")
+
+
+    def print_monitors(self, show_all_modes):
+        for mname in self.monitors:
+            self.print_monitor(self.monitors[mname], show_all_modes)
 
 
 if __name__ == '__main__':
-    find_monitors()
+    xdisp = XDisp()
+
+    xdisp.find_monitors()
 
     parser = argparse.ArgumentParser(description="Check and change monitor connections")
 
@@ -111,5 +115,5 @@ if __name__ == '__main__':
         print("Would switch!")
 
     else:
-        print_monitors(args.show_all_modes)
+        xdisp.print_monitors(args.show_all_modes)
 
