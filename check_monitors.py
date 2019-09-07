@@ -194,37 +194,36 @@ class XDisp:
 
     def find_orphans(self):
         print("Trying to find orphans")
-        if not self.laptop_screen:
-            print("No laptop screen, not sure how to tell what's orphaned")
-            return
 
         if not self.allwindows:
             self.find_all_windows()
 
+        # A safe place to move orphans, on the laptop screen or, otherwise,
+        # the first connected display.
+        if self.laptop_screen:
+            safegeom = self.mon_geom[self.laptop_screen]
+        else:
+            # Just pick the first one, understanding that dicts have no "first"
+            safegeom = self.mon_geom[self.mon_geom.keys()[0]]
+        safe_x = safegeom['x'] + 25
+        safe_y = safegeom['y'] + 25
+
         for win, geom in self.allwindows:
             name, classname = win.get_wm_class()
 
-            if self.is_visible(geom.x, geom.y):
-                print("vis        ", end='')
-            else:
-                print("**** Orphan", end='')
-
-            print("%4d x %4d   +%4d + %4d   %s: %s" % (geom.width,
-                                                       geom.height,
-                                                       geom.x, geom.y,
-                                                       name,
-                                                       win.get_wm_name()))
+            if not self.is_visible(geom.x, geom.y):
+                self.move_orphan(win, geom, safe_x, safe_y)
 
 
     def move_orphan(self, win, geom, newx, newy):
         print("Moving %s from %d, %d. Current size %dx%d"
-              % (win.name, geom.x, geom.y, geom.width, geom.height))
+              % (win.get_wm_name(), geom.x, geom.y, geom.width, geom.height))
 
         win.configure(x=newx, y=newy,
                       width=geom.width, height=geom.height)
                       # border_width=0,
                       # stack_mode=Xlib.X.Above)
-        dpy.sync()
+        self.dpy.sync()
 
 
 if __name__ == '__main__':
@@ -245,7 +244,7 @@ if __name__ == '__main__':
                         help="Show all existing top-level windows")
     parser.add_argument('-o', "--orphans", dest="orphans", default=False,
                         action="store_true",
-                        help="Find orphaned windows that are no longer visible")
+                        help="Find orphaned windows that are no longer visible, and move them so they are")
 
     args = parser.parse_args(sys.argv[1:])
 
