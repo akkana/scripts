@@ -48,6 +48,9 @@ class XDisp:
         # If this is a laptop, the name of its native display
         self.laptop_screen = None
 
+        # A list of [ (win, geom) ] for all windows on screen
+        self.allwindows = []
+
 
     def find_monitors(self):
         self.dpy = display.Display()
@@ -140,9 +143,7 @@ class XDisp:
                                         geom.x, geom.y))
 
 
-    def find_orphans(self):
-        print("Trying to find orphans")
-
+    def find_all_windows(self):
         def topframe(client):
             frame = client
             while frame.query_tree().parent != self.ewmh.root:
@@ -150,15 +151,69 @@ class XDisp:
             return frame
 
         for client in self.ewmh.getClientList():
-            name, classname = client.get_wm_class()
-            # There's also client.get_wm_name() which is the long name
-            # that currently appears on the titlebar.
             geom = topframe(client).get_geometry()
-            print("ew %4d x %4d   +%4d + %4d   %s: %s" % (geom.width,
-                                                          geom.height,
-                                                          geom.x, geom.y,
-                                                          name,
-                                                          client.get_wm_name()))
+            self.allwindows.append((client, geom))
+
+
+    def print_all_windows(self):
+        if not self.allwindows:
+            self.find_all_windows()
+
+        for win, geom in self.allwindows:
+            name, classname = win.get_wm_class()
+            print("%4d x %4d   +%4d + %4d   %s: %s" % (geom.width,
+                                                       geom.height,
+                                                       geom.x, geom.y,
+                                                       name,
+                                                       win.get_wm_name()))
+
+
+    def is_visible(self, x, y):
+        '''Is the point x, y currently visible? That is, is there
+           currently a connected screen that is showing that point?
+        '''
+        x_visible = False
+        y_visible = False
+        for mname in self.mon_geom:
+            geom = self.mon_geom[mname]
+
+            # Is x visible?
+            if x > geom['x'] and x < geom['x'] + geom['width']:
+                x_visible = True
+
+            # Is y visible?
+            if y > geom['y'] and y < geom['y'] + geom['height']:
+                y_visible = True
+
+            if x_visible and y_visible:
+                print("%d, %d visible on monitor %s" % (x, y, mname))
+                return True
+
+        return False
+
+
+    def find_orphans(self):
+        print("Trying to find orphans")
+        if not self.laptop_screen:
+            print("No laptop screen, not sure how to tell what's orphaned")
+            return
+
+        if not self.allwindows:
+            self.find_all_windows()
+
+        for win, geom in self.allwindows:
+            name, classname = win.get_wm_class()
+
+            if self.is_visible(geom.x, geom.y):
+                print("vis        ", end='')
+            else:
+                print("**** Orphan", end='')
+
+            print("%4d x %4d   +%4d + %4d   %s: %s" % (geom.width,
+                                                       geom.height,
+                                                       geom.x, geom.y,
+                                                       name,
+                                                       win.get_wm_name()))
 
 
     def move_orphan(self, win, geom, newx, newy):
@@ -185,6 +240,9 @@ if __name__ == '__main__':
     parser.add_argument('-a', "--allmodes", dest="show_all_modes",
                         default=False, action="store_true",
                         help="Show all modes allowed for each monitor")
+    parser.add_argument('-w', "--allwindows", dest="show_all_windows",
+                        default=False, action="store_true",
+                        help="Show all existing top-level windows")
     parser.add_argument('-o', "--orphans", dest="orphans", default=False,
                         action="store_true",
                         help="Find orphaned windows that are no longer visible")
@@ -193,6 +251,9 @@ if __name__ == '__main__':
 
     if args.switch:
         print("Would switch!")
+
+    elif args.show_all_windows:
+        xdisp.print_all_windows()
 
     elif args.orphans:
         xdisp.find_orphans()
