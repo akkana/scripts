@@ -83,7 +83,7 @@ chatsounds.py:
     Also a rare example of an xchat Python script.
 
 check-monitors
-check-monitors.py
+check_monitors.py
     A shell script, later translated to Python, to probe for connected
     monitors and use xrandr to activate the right one.
 
