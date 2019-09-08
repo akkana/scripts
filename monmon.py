@@ -55,7 +55,6 @@ class XDisp:
     def find_monitors(self):
         self.dpy = display.Display()
         self.root = self.dpy.screen().root
-        print("root size", self.root.get_geometry())
         self.resources = self.root.xrandr_get_screen_resources()._data
         self.ewmh = EWMH()
 
@@ -70,6 +69,8 @@ class XDisp:
 
         # Loop over the outputs.
         for output in outputs:
+            # print("Output info:", self.dpy.xrandr_get_output_info(output, self.resources['config_timestamp']))
+
             mondata = self.dpy.xrandr_get_output_info(
                 output, self.resources['config_timestamp'])._data
 
@@ -260,3 +261,9 @@ if __name__ == '__main__':
     else:
         xdisp.print_monitors(args.show_all_modes)
 
+# XXX It would be nice to be able to enable and disable monitors with this
+# program. However, there's no documentation for how to do that with
+# python randr, and no one anywhere seems to have even tried.
+# Some vaguely relevant docs:
+# https://www.x.org/wiki/Development/Documentation/HowVideoCardsWork/
+# https://cgit.freedesktop.org/xorg/proto/randrproto/tree/randrproto.txt

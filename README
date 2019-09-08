@@ -83,9 +83,8 @@ chatsounds.py:
     Also a rare example of an xchat Python script.
 
 check-monitors
-check_monitors.py
-    A shell script, later translated to Python, to probe for connected
-    monitors and use xrandr to activate the right one.
+    A shell script to probe for connected monitors and use xrandr to
+    activate the right one. Obsoleted by monmon.py.
 
 cleanhtml.py
     Clean up HTML edited by gmail users -- remove font/color/style tags
@@ -246,6 +245,12 @@ mbsyncd:
 
 mnist.py:
     A simple example of a neural net using keras/tensorflow.
+
+monmon.py
+    Probe for connected monitors and their sizes and relative positions.
+    Find "orphaned" windows (windows that are invisible offscreen)
+    and move them back to a monitor that's still connected.
+    Replaces and extends check-monitors.
 
 moonpos:
     Predict when the moon (or another body) will be at a specified
