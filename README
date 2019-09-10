@@ -246,6 +246,10 @@ mbsyncd:
 mnist.py:
     A simple example of a neural net using keras/tensorflow.
 
+moncycle.py:
+    Cycle between connected monitors (e.g. laptop display to HDMI).
+    Can be bound to XF86Display in your window manager.
+
 monmon.py
     Probe for connected monitors and their sizes and relative positions.
     Find "orphaned" windows (windows that are invisible offscreen)
