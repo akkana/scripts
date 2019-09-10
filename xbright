@@ -18,8 +18,12 @@ import subprocess
 XRANDR = "/usr/bin/xrandr"
 
 def get_brightness():
-    # xrandr --verbose | grep -i brightness
-    proc = subprocess.Popen([XRANDR, "--verbose"],
+    '''Return the current brightness setting from the first
+       (as defined by xrandr --verbose) currently active monitor.
+       Currently this is a float between 0 and 1.
+    '''
+    # xrandr --verbose --current | grep Brightness:
+    proc = subprocess.Popen([ XRANDR, "--verbose", "--current" ],
                             shell=False, stdout=subprocess.PIPE)
     s = proc.communicate()[0]
     if not s:
@@ -40,7 +44,7 @@ def get_brightness():
     print("No Brightness line in xrandr --verbose!")
     sys.exit(1)
 
-def set_brightness(new_brightness, redshift=True):
+def set_brightness(new_brightness, monitor, redshift=True):
     '''Set the brightness.
        If redshift is True, then adjust the color balance
        to get redder as the screen gets dimmer, for evening use.
@@ -66,11 +70,12 @@ def set_brightness(new_brightness, redshift=True):
 
 def Usage():
     print("Usage: %s [b | +b | -b]" % os.path.basename(sys.argv[0]))
+    print("Brightness range is from 0 to 1.")
     sys.exit(1)
 
 if __name__ == "__main__":
-    # We need to call cur_brightness even if we're setting an absolute
-    # brightness, because we need to get the relevant monitor.
+    # Need to call cur_brightness even when setting an absolute brightness,
+    # in order to to get the relevant monitor.
     cur_brightness, monitor = get_brightness()
 
     if len(sys.argv) <= 1:
@@ -87,4 +92,4 @@ if __name__ == "__main__":
     else:
         b = float(sys.argv[1])
 
-    set_brightness(b)
+    set_brightness(b, monitor)
