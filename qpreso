@@ -50,11 +50,12 @@ class PresoView(QWebEngineView):
         if monitor >= 0:
             # The number of the monitor where the window should show up
             screens = app.screens()
-            if monitor + 1 > len(screens):
+            print("screens:", screens)
+            if monitor - 1 > len(screens):
                 print("There is no monitor", monitor)
                 sys.exit(1)
 
-            geom = screens[monitor].geometry()
+            geom = screens[monitor-1].geometry()
             self.move(geom.left(), geom.top())
             self.showFullScreen()
 
