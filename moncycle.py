@@ -6,91 +6,56 @@
 import sys
 import subprocess
 
+# Use monmon to detect connected and active monitors using python-xrandr.
+# This saves needing to call xrandr and xrandr --listactivemonitors separately,
+# which took twice as long.
+import monmon
+
 DEBUGFILE = open("/tmp/moncycle", "a")
 
 print("===============", file=DEBUGFILE)
 
-# The types of monitors to care about, in the order we care.
-montypes = [ "eDP", "HDMI" ]
-# This will have keys name (str), connected (bool), active (bool).
-monitors = {}
+monmon = monmon.MonMon()
+monmon.find_monitors()
 
+# Monitors that are physically connected (a dict of dicts):
+connected_mons = monmon.connected_monitors()
+print("Connected monitors:", connected_mons, file=DEBUGFILE)
 
-# Monitors that are physically connected:
-proc = subprocess.Popen(["xrandr"], stdout=subprocess.PIPE)
-for line in proc.stdout:
-    if not line:
-        continue
-    line = line.decode('utf-8')
-    if line[0] == ' ':
-        continue
-    # Now line should look something like:
-    # HDMI-1 connected 1920x1200+0+0 (normal left inverted right x axis y axis) 518mm x 324mm\n
+# All monitors that are currently active:
+active_mons = monmon.active_monitors()
+# First monitors that's currently active
+active_mon = active_mons[0]
+print("Active monitors:", active_mons, file=DEBUGFILE)
 
-    words = line.split()
-    if words[1] != 'connected':
-        continue
-
-    # Now it's a line for a physically connected monitor.
-    for montype in montypes:
-        if montype in words[0]:
-            monitors[montype] = {
-                'name': words[0],
-                'connected': True,
-                'active': False
-            }
-
-print("Connected monitors:", monitors, file=DEBUGFILE)
-
-# But which monitors are actually active? That's not easy to tell from
-# the normal xrandr output. You can tell it from xrandr --listmonitors
-# or --listactivemonitors, which are mentioned in xrandr --help
-# but not in man xrandr; in practice they both list active monitors,
-# not connected monitors (hooray for commands with predictable,
-# easily parseable output! not.) It would be nice to be able to
-# get both in one command, because xrandr is quite slow, requiring
-# several seconds for each invocation.
-
-proc = subprocess.Popen(["xrandr", "--listactivemonitors"],
-                        stdout=subprocess.PIPE)
-for line in proc.stdout:
-    line = line.decode('utf-8')
-    if line.startswith("Monitors:"):
-        continue
-    words = line.split()
-    # The monitor name starts with a + for some unknown reason, so strip that.
-    mon_name = words[1][1:]
-
-    for montype in montypes:
-        if montype in mon_name:
-            # Only interested in monitors that are connected.
-            # The active list may include other monitors that USED
-            # to be connected, which explicitly shouldn't be included.
-            if montype in monitors:
-                monitors[montype]['active']  = True
-            # else:
-            #     print("%s is listed as active but isn't connected" % mon_name,
-            #             file=DEBUGFILE)
-
-print("Active monitors:", monitors, file=DEBUGFILE)
-
-# Whew. Now we have the two monitor lists.
-# Cycle through each of the monitor types.
-# XXX Eventually, add a mode where all monitors are active.
+# If there are no connected monitors, big trouble.
+if len(connected_mons) < 1:
+    print("No monitors connected! Bailing.")
+    sys.exit(1)
 
 # If only one monitor is connected, no-brainer.
-if len(monitors) == 1:
-    firstmon = monitors[next(iter(monitors))]
-    args = ["xrandr", "--output", firstmon['name'], "--auto"]
+if len(connected_mons) == 1:
+    args = ["xrandr", "--output", connected_mons[0]['name'], "--auto"]
+    sys.exit(0)
 
-else:
-    # If more than one connected, cycle.
-    for i, montype in enumerate(montypes):
-        if monitors[montype]['active']:
-            nexttype = montypes[(i + 1) % len(montypes)]
-            args = ["xrandr",
-                    "--output", monitors[nexttype]['name'], "--auto",
-                    "--output", monitors[montype]['name'], "--off"]
+nextindex = None
+for i, mon in enumerate(connected_mons):
+    if mon == active_mon:
+        nextindex = (i+1) % len(connected_mons)
+        break
+
+# Nothing connexted? Use the first connected monitor.
+if not nextindex:
+    nextindex = 0
+
+args = [ "xrandr" ]
+
+for i, mon in enumerate(connected_mons):
+    if i == nextindex:
+        args += [ "--output", mon, "--auto" ]
+    else:
+        args += [ "--output", mon, "--off" ]
+
 print("Calling:", args, file=DEBUGFILE)
 subprocess.call(args)
 

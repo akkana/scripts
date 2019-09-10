@@ -32,7 +32,7 @@ import sys
 # but maybe you can shell in and read what happened.
 DEBUGFILE = '/tmp/check-monitors.out'
 
-class XDisp:
+class MonMon:
 
     def __init__(self):
         # Display modes
@@ -41,7 +41,7 @@ class XDisp:
         # Monitor objects for all the connected monitors, indexed by name
         self.monitors = {}
 
-        # width, height and xinerama x, y for all connected monitors,
+        # width, height and xinerama x, y for all active monitors,
         # indexed by name
         self.mon_geom = {}
 
@@ -83,25 +83,53 @@ class XDisp:
             self.monitors[name] = mondata
             if name.startswith('eDP') or name.startswith('LVDS'):
                 self.laptop_screen = name
-                print("laptop monitor:", name)
+                # print("laptop monitor:", name)
 
             # Figure out if it's cloned or extended, and its xinerama position
             # https://stackoverflow.com/questions/49136692/python-xlib-how-to-deterministically-tell-whether-display-output-is-in-extendi
             # which references https://www.x.org/wiki/Development/Documentation/HowVideoCardsWork/#index3h3
             # crtcInfo also includes rotation info but I'm not doing anything
             # with that since I don't personally use it.
-            crtcInfo = self.dpy.xrandr_get_crtc_info(mondata['crtc'],
-                                            self.resources['config_timestamp'])
-            # print(crtcInfo)
+            try:
+                crtcInfo = self.dpy.xrandr_get_crtc_info(mondata['crtc'],
+                                           self.resources['config_timestamp'])
+                # print(crtcInfo)
 
-            self.mon_geom[name] = {
-                'x': crtcInfo.x,
-                'y': crtcInfo.y,
-                'width': crtcInfo.width,
-                'height': crtcInfo.height,
-                'mm_width': mondata['mm_width'],
-                'mm_height': mondata['mm_height']
-            }
+                self.mon_geom[name] = {
+                    'x': crtcInfo.x,
+                    'y': crtcInfo.y,
+                    'width': crtcInfo.width,
+                    'height': crtcInfo.height,
+                    'mm_width': mondata['mm_width'],
+                    'mm_height': mondata['mm_height']
+                }
+            except XError:
+                # If get_crtc_info fails it means that the monitor is
+                # connected but not active.
+                pass
+
+
+    def active_monitors(self):
+        '''List monitors xrandr is actually using'''
+        active = []
+        for mname in self.monitors:
+            if mname in self.mon_geom:
+                active.append(mname)
+        return active
+
+
+    def inactive_monitors(self):
+        '''List monitors that are connected but not being used'''
+        inactive = []
+        for mname in self.monitors:
+            if mname not in self.mon_geom:
+                inactive.append(mname)
+        return inactive
+
+
+    def connected_monitors(self):
+        '''List all connected monitors'''
+        return list(self.monitors.keys())
 
 
     def print_monitor(self, mon, show_all_modes):
@@ -109,15 +137,20 @@ class XDisp:
             print("\n%s:" % mon['name'])
             print(", ".join([self.allmodes[m] for m in mon['modes']]))
 
-        geom = self.mon_geom[mon['name']]
-        if self.laptop_screen == mon['name']:
-            islaptop = "    **laptop"
-        else:
-            islaptop = ""
-        print("Size: %4dx%4d   Position: (%4d, %4d)   mm: %d x %d%s"
-              % (geom['width'], geom['height'], geom['x'], geom['y'],
-                 geom['mm_width'], geom['mm_height'],
-                 islaptop))
+        try:
+            geom = self.mon_geom[mon['name']]
+            if self.laptop_screen == mon['name']:
+                islaptop = "    **laptop"
+            else:
+                islaptop = ""
+            print("%s: %4dx%4d   Position: (%4d, %4d)   mm: %d x %d%s"
+                  % (mon['name'],
+                     geom['width'], geom['height'], geom['x'], geom['y'],
+                     geom['mm_width'], geom['mm_height'],
+                     islaptop))
+
+        except KeyError:
+            print("%s: Inactive" % mon['name'])
 
 
     def print_monitors(self, show_all_modes):
@@ -228,9 +261,9 @@ class XDisp:
 
 
 if __name__ == '__main__':
-    xdisp = XDisp()
+    monmon = MonMon()
 
-    xdisp.find_monitors()
+    monmon.find_monitors()
 
     parser = argparse.ArgumentParser(description="Check and change monitor connections")
 
@@ -245,7 +278,7 @@ if __name__ == '__main__':
                         help="Show all existing top-level windows")
     parser.add_argument('-o', "--orphans", dest="orphans", default=False,
                         action="store_true",
-                        help="Find orphaned windows that are no longer visible, and move them so they are")
+                        help="Find orphaned windows that are no longer visible, and move them back onscreen")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -253,13 +286,13 @@ if __name__ == '__main__':
         print("Would switch!")
 
     elif args.show_all_windows:
-        xdisp.print_all_windows()
+        monmon.print_all_windows()
 
     elif args.orphans:
-        xdisp.find_orphans()
+        monmon.find_orphans()
 
     else:
-        xdisp.print_monitors(args.show_all_modes)
+        monmon.print_monitors(args.show_all_modes)
 
 # XXX It would be nice to be able to enable and disable monitors with this
 # program. However, there's no documentation for how to do that with
