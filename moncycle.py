@@ -13,19 +13,20 @@ import monmon
 
 DEBUGFILE = open("/tmp/moncycle", "a")
 
-print("===============", file=DEBUGFILE)
+print("==== moncycle ===============", file=DEBUGFILE)
 
 monmon = monmon.MonMon()
 monmon.find_monitors()
 
 # Monitors that are physically connected (a dict of dicts):
 connected_mons = monmon.connected_monitors()
-print("Connected monitors:", connected_mons, file=DEBUGFILE)
 
 # If there are no connected monitors, big trouble.
 if not connected_mons:
     print("No monitors connected! Bailing.", file=DEBUGFILE)
     sys.exit(1)
+
+print("Connected monitors:", connected_mons, file=DEBUGFILE)
 
 # If only one monitor is connected, no-brainer.
 if len(connected_mons) == 1:
@@ -42,17 +43,16 @@ if active_mons:
     active_mon = active_mons[0]
     print("Active monitors:", active_mons, file=DEBUGFILE)
 else:
+    active_mon = None
     print("No active monitors", file=DEBUGFILE)
 
-nextindex = None
+# Nothing active? Use the first connected monitor.
+nextindex = 0
+# See if anything is active:
 for i, mon in enumerate(connected_mons):
     if mon == active_mon:
         nextindex = (i+1) % len(connected_mons)
         break
-
-# Nothing connected? Use the first connected monitor.
-if not nextindex:
-    nextindex = 0
 
 args = [ "xrandr" ]
 
