@@ -8,6 +8,9 @@
 # Either run this from the downloaded and unpacked Firefox directory,
 # or pass the path to that directory as the first argument.
 
+# On a system where firefox is installed as a package, pass it the
+# location of the firefox files, e.g. /usr/lib/firefox on Debian/Ubuntu.
+
 # You'll need to re-run this every time Firefox updates browser/omni.ja.
 # That doesn't necessarily happen in every Firefox update, but if
 # you include a harmless patch to the default URLbar message,
@@ -16,7 +19,8 @@
 
 FIREFOXDIR=$1
 if [ x"$FIREFOXDIR" = "x" ]; then
-  FIREFOXDIR=$(pwd)
+  echo "Pass location of firefox files, e.g. /usr/lib/firefox"
+  exit 1
 else
   # In zsh, $FIREFOXDIR:A would do this.
   FIREFOXDIR=$(realpath $FIREFOXDIR)
@@ -29,16 +33,19 @@ fi
 
 echo Firefox dir is $FIREFOXDIR
 
+realomni=$FIREFOXDIR/browser/omni.ja
+
 OMNITMPDIR=/tmp/omni
 
-BACKUP_OMNI=$FIREFOXDIR/browser-omni-backup.ja
+# BACKUP_OMNI=$FIREFOXDIR/browser-omni-backup.ja
+BACKUP_OMNI=$HOME/browser-omni-backup-$(date +%Y-%m-%d).ja
 
 echo "Making directory $OMNITMPDIR ..."
 mkdir $OMNITMPDIR
 cd $OMNITMPDIR
 
 echo "Unzipping in $OMNITMPDIR ..."
-unzip -q $FIREFOXDIR/browser/omni.ja
+unzip -q $realomni
 
 echo "Making changes ..."
 
@@ -56,7 +63,9 @@ sed -i 's/or enter address/or just twiddle your thumbs/' chrome/en-US/locale/bro
 #
 # Get rid of the reserved Ctrl-W bindings in text fields:
 #
-sed -i '/key_close/s/ reserved="true"//' chrome/browser/content/browser/browser.xul
+# sed -i '/key_close/s/ reserved="true"//' chrome/browser/content/browser/browser.xul
+# browser.xul got renamed to browser.xhtml in Firefox 69.0:
+sed -i '/key_close/s/ reserved="true"//' chrome/browser/content/browser/browser.xhtml
 # End of patches
 ########################################
 
@@ -64,8 +73,10 @@ echo "Repackaging ..."
 # repackage omni.ja:
 zip -qr9XD /tmp/newomni.ja *
 
+echo "Backing up original to $BACKUP_OMNI"
 cp $FIREFOXDIR/browser/omni.ja $BACKUP_OMNI
-cp /tmp/newomni.ja $FIREFOXDIR/browser/omni.ja
 
-echo "Copied new omni.ja into $FIREFOXDIR/browser/omni.ja"
-echo "Original omni.ja is backed up as $BACKUP_OMNI"
+echo "Trying to copy /tmp/newomni.ja to $realomni"
+echo "If this doesn't work, try sudo cp /tmp/newomni.ja $realomni"
+echo
+cp /tmp/newomni.ja $realomni && echo "Copied new omni.ja into $realomni"
