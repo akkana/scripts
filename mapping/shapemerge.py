@@ -14,8 +14,8 @@
 # This process of coalescing lots of small shapes into a smaller number
 # of larger shapes is for some reason called "dissolving".
 #
-# Get the shapefile from: http://rgis.unm.edu/rgis6/
-# ... click on Boundaries, the Voting Fistricts.
+# Get the precinct shapefile from: http://rgis.unm.edu/rgis6/
+# ... click on Boundaries, the Voting Districts.
 
 # Share and enjoy (or modify for your own state's situation)
 # under the GPLv2 or, at your option, a later GPL.
