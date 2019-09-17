@@ -73,6 +73,8 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     '''
+    if path.endswith('/'):
+        path = path[:-1]
     lenpath = len(path)
 
     if recursive:
@@ -108,9 +110,6 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             fname = ' '.join(l[6:])
 
             if recursive and cur_subdir:
-                # XXX Next line had lenpath-1: instead of lenpath.
-                # For running on androidsd:path/to or androidsd:/path/to,
-                # lenpath is correct. Is there a case where lenpath-1 is?
                 fname = posixpath.normpath(posixpath.join(cur_subdir,
                                                           fname))[lenpath:]
 
