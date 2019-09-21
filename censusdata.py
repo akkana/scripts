@@ -17,16 +17,24 @@ import re
 import zipfile
 from collections import OrderedDict
 
+# A dictionary: { fileno: dic } where fileno is an int from 1 to 39 or 'geo'
+# and dic is another dictionary of 'censuscode': "long description"
+# where censuscode is a 7-char string like P000001 or H016H018.
+CensusCodes = {}
+
 def codesFromZipFile(zipfilename):
     zf = zipfile.ZipFile(zipfilename, 'r')
     pat = re.compile(b" *([A-Z][0-9]{3}[0-9A-Z]{3,4})=' *(.*)'")
-    codes = []
     for name in zf.namelist():
         if not name.lower().endswith('.sas'):
             continue
-        if not re.match('sf[0-9]{3}.sas', name.lower()):
+        filematch = re.match('sf([0-9]{3}).sas', name.lower())
+        if not filematch:
+            print(name, "doesn't match filematch pattern")
             continue
         code_dict = OrderedDict()
+        fileno = int(filematch.group(1))
+
         # basename = os.path.basename(name)
         # root, ext = os.path.splitext(basename)
 
@@ -47,16 +55,14 @@ def codesFromZipFile(zipfilename):
             # else:
             #     print("No match on line:", line)
 
-        codes.append(code_dict)
-
-    return codes
+        CensusCodes[fileno] = code_dict
 
 
 if __name__ == '__main__':
     # Pass in the path to SF1SAS.zip
-    allcodes = codesFromZipFile(sys.argv[1])
-    for i, codes in enumerate(allcodes):
-        print("\n==== File", i+1)
-        for pcode in codes:
-            print("%7s: %s" % (pcode, codes[pcode]))
+    codesFromZipFile(sys.argv[1])
+    for fileno in CensusCodes:
+        print("\n==== File", fileno)
+        for pcode in CensusCodes[fileno]:
+            print("%7s: %s" % (pcode, CensusCodes[fileno][pcode]))
 
