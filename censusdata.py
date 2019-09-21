@@ -14,6 +14,7 @@
 
 import os, sys
 import re
+import argparse
 import zipfile
 from collections import OrderedDict
 
@@ -30,7 +31,7 @@ def codesFromZipFile(zipfilename):
             continue
         filematch = re.match('sf([0-9]{3}).sas', name.lower())
         if not filematch:
-            print(name, "doesn't match filematch pattern")
+            # print(name, "doesn't match filematch pattern")
             continue
         code_dict = OrderedDict()
         fileno = int(filematch.group(1))
@@ -58,11 +59,53 @@ def codesFromZipFile(zipfilename):
         CensusCodes[fileno] = code_dict
 
 
-if __name__ == '__main__':
-    # Pass in the path to SF1SAS.zip
-    codesFromZipFile(sys.argv[1])
+def file_for_code(code):
     for fileno in CensusCodes:
-        print("\n==== File", fileno)
+        if code in CensusCodes[fileno]:
+            return fileno
+
+    return None
+
+
+def codes_for_description(desc):
+    codes = []
+    desc = desc.lower()
+    for fileno in CensusCodes:
         for pcode in CensusCodes[fileno]:
-            print("%7s: %s" % (pcode, CensusCodes[fileno][pcode]))
+            if desc in CensusCodes[fileno][pcode].lower():
+                codes.append((pcode, CensusCodes[fileno][pcode]))
+    return codes
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Parse US Decennial census data")
+
+    parser.add_argument('-c', action="store", dest="code",
+                        help='Show filenumber containing 6-digit census code')
+    parser.add_argument('-d', action="store", dest="desc",
+                        help='Show entries containing a long description')
+
+    parser.add_argument('zipfile', help="location of SF1SAS.zip file")
+
+    args = parser.parse_args(sys.argv[1:])
+    print(args)
+
+    # Pass in the path to SF1SAS.zip
+    codesFromZipFile(args.zipfile)
+
+    if args.code:
+        print("Files with code %s:" % args.code, file_for_code(args.code))
+
+    elif args.desc:
+        codes = codes_for_description(args.desc)
+        print('Codes containing description "%s":' % args.desc)
+        for pair in codes:
+            print("%s: %s" % pair)
+
+    else:
+        for fileno in CensusCodes:
+            print("\n==== File", fileno)
+            for pcode in CensusCodes[fileno]:
+                print("%7s: %s" % (pcode, CensusCodes[fileno][pcode]))
 
