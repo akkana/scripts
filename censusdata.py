@@ -19,21 +19,31 @@ from collections import OrderedDict
 
 def codesFromZipFile(zipfilename):
     zf = zipfile.ZipFile(zipfilename, 'r')
-    pat = re.compile(b" *(P[0-9]{6})=' *(.*)'")
+    pat = re.compile(b" *([A-Z][0-9]{3}[0-9A-Z]{3,4})=' *(.*)'")
     codes = []
     for name in zf.namelist():
         if not name.lower().endswith('.sas'):
             continue
+        if not re.match('sf[0-9]{3}.sas', name.lower()):
+            continue
         code_dict = OrderedDict()
         # basename = os.path.basename(name)
         # root, ext = os.path.splitext(basename)
+
+        # Every file stars with these five, which don't have p-numbers
+        code_dict['FILEID'] = 'File Identification'
+        code_dict['STUSAB'] = 'State/U.S.-Abbreviation (USPS)'
+        code_dict['CHARITER'] = 'Characteristic Iteration'
+        code_dict['CIFSN'] = 'Characteristic Iteration File Sequence Number'
+        code_dict['LOGRECNO'] = 'Logical Record Number'
+
         saslines = zf.read(name).split(b'\n')
         for line in saslines:
             m = re.match(pat, line)
             if m:
-                code, desc = [ s.decode() for s in m.groups() ]
+                pcode, desc = [ s.decode() for s in m.groups() ]
                 # print("%7s -- %s" % (code, desc))
-                code_dict[code] = desc
+                code_dict[pcode] = desc
             # else:
             #     print("No match on line:", line)
 
@@ -44,7 +54,9 @@ def codesFromZipFile(zipfilename):
 
 if __name__ == '__main__':
     # Pass in the path to SF1SAS.zip
-    codes = codesFromZipFile(sys.argv[1])
-    from pprint import pprint
-    pprint(codes)
+    allcodes = codesFromZipFile(sys.argv[1])
+    for i, codes in enumerate(allcodes):
+        print("\n==== File", i+1)
+        for pcode in codes:
+            print("%7s: %s" % (pcode, codes[pcode]))
 
