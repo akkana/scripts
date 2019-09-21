@@ -78,6 +78,9 @@ cachefile.py:
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
 
+censusdata.py
+    Functions to help in parsing US decadal census data.
+
 chatsounds.py:
     An xchat Python script to handle nick (and other special-case) sounds.
     Also a rare example of an xchat Python script.
