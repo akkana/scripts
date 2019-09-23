@@ -5,10 +5,22 @@ from __future__ import print_function
 import sys, os, time
 
 # Tkinter changed capitalization from Python 2 to Python 3.
+# Python 2: import Tkinter as tkinter
+# Python 3: import tkinter
+# The error trying to import a nonexistent module also changed:
+# Python2 raises ImportError, while Python3 raises ModuleNotFoundError
+# which is a class of ImportError. Use ImportError because both
+# Python versions understand it.
 try:
     import tkinter
-except ModuleNotFoundError:
-    import Tkinter as tkinter
+    # This may throw ImportError in Python 2 or ModuleNotFoundError in Py 3.
+except ImportError:
+    # In case it's Python 2, try importing it the Python 2 way:
+    try:
+        import Tkinter as tkinter
+    except ImportError:
+        print("Sorry, ImportError, eggtimer needs Tkinter")
+        sys.exit(1)
 
 # Callback for key events:
 def keyEvent(event):
