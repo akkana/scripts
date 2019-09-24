@@ -23,12 +23,21 @@ from collections import OrderedDict
 # where censuscode is a 7-char string like P000001 or H016H018.
 CensusCodes = {}
 
+# Fields in the sf1geo file
+GeoFields = {}
+
 def codesFromZipFile(zipfilename):
     zf = zipfile.ZipFile(zipfilename, 'r')
     pat = re.compile(b" *([A-Z][0-9]{3}[0-9A-Z]{3,4})=' *(.*)'")
     for name in zf.namelist():
         if not name.lower().endswith('.sas'):
             continue
+
+        # The sf1geo file is special, so parse it separately
+        if name == 'sf1geo.sas':
+            parse_geo_sas_lines(zf.read(name).split(b'\n'))
+            continue
+
         filematch = re.match('sf([0-9]{3}).sas', name.lower())
         if not filematch:
             # print(name, "doesn't match filematch pattern")
@@ -58,6 +67,37 @@ def codesFromZipFile(zipfilename):
 
         CensusCodes[fileno] = code_dict
 
+
+def parse_geo_sas_lines(lines):
+    '''lines are read from the sf1geo.sas file.
+       Create a dictionary of fields:
+       { 'CODE': { 'name':'long name', 'start': int, 'end': int }
+       { 'name', 'code', 'start', 'end' }
+    '''
+    labelpat = re.compile(b"(LABEL )?([A-Z0-9]*)\=\'(.*)\'")
+    fieldspat = re.compile(b"([A-Z]+) \$ ([0-9]+)\-([0-9]+)")
+    for line in lines:
+        line = line.strip()
+        m = re.match(labelpat, line)
+        if m:
+            sys.stdout.flush()
+            # Assume here that labelpats all come before fieldspats,
+            # so if we're seeing a labelpat, it doesn't already exist
+            # inside GeoFields.
+            code = m.group(2).decode()
+            GeoFields[code] = { 'name': m.group(3).decode() }
+            continue
+
+        m = re.match(fieldspat, line)
+        if m:
+            # If there's a fieldspat for this code, it should have
+            # had a long description already using a labelpat,
+            # so the code (group(1)) should already be in GeoFields.
+            # print("groups:", m.groups())
+            code = m.group(1).decode()
+            GeoFields[code]['start'] = int(m.group(2))
+            GeoFields[code]['end']   = int(m.group(3))
+            continue
 
 def file_for_code(code):
     for fileno in CensusCodes:
