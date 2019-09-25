@@ -18,6 +18,9 @@ import argparse
 import zipfile
 from collections import OrderedDict
 
+# While testing:
+from pprint import pprint
+
 # A dictionary: { fileno: dic } where fileno is an int from 1 to 39 or 'geo'
 # and dic is another dictionary of 'censuscode': "long description"
 # where censuscode is a 7-char string like P000001 or H016H018.
@@ -75,7 +78,7 @@ def parse_geo_sas_lines(lines):
        { 'name', 'code', 'start', 'end' }
     '''
     labelpat = re.compile(b"(LABEL )?([A-Z0-9]*)\=\'(.*)\'")
-    fieldspat = re.compile(b"([A-Z]+) \$ ([0-9]+)\-([0-9]+)")
+    fieldspat = re.compile(b"([A-Z0-9]+) \$ ([0-9]+)\-([0-9]+)")
     for line in lines:
         line = line.strip()
         m = re.match(labelpat, line)
@@ -95,9 +98,14 @@ def parse_geo_sas_lines(lines):
             # so the code (group(1)) should already be in GeoFields.
             # print("groups:", m.groups())
             code = m.group(1).decode()
-            GeoFields[code]['start'] = int(m.group(2))
+            GeoFields[code]['start'] = int(m.group(2)) - 1
             GeoFields[code]['end']   = int(m.group(3))
             continue
+
+        print("Didn't match anything:", line)
+
+    # pprint(GeoFields)
+
 
 def file_for_code(code):
     for fileno in CensusCodes:
@@ -117,6 +125,31 @@ def codes_for_description(desc):
     return codes
 
 
+def parse_geo_file(filename):
+    with open(filename) as fp:
+        for line in fp:
+            parse_geo_line(line)
+
+
+def parse_geo_line(line):
+    '''Parse the <st>geo.uf1 file according to the GeoFields.
+    '''
+    d = {}
+    for code in GeoFields:
+        try:
+            d[code] = line[GeoFields[code]['start']:GeoFields[code]['end']]
+        except KeyError:
+            print("Key error, GeoFields[%s] =" % code, GeoFields[code])
+            break
+
+    print("Line:", line)
+    for field in d:
+        print(field, ":", d[field], ":", GeoFields[field]['name'])
+    print()
+
+    return d
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Parse US Decennial census data")
@@ -125,6 +158,8 @@ if __name__ == '__main__':
                         help='Show filenumber containing 6-digit census code')
     parser.add_argument('-d', action="store", dest="desc",
                         help='Show entries containing a long description')
+    parser.add_argument('-g', action="store", dest="geo",
+                        help='Parse the <ST>geo.uf1 file')
 
     parser.add_argument('zipfile', help="location of SF1SAS.zip file")
 
@@ -142,6 +177,9 @@ if __name__ == '__main__':
         print('Codes containing description "%s":' % args.desc)
         for pair in codes:
             print("%s: %s" % pair)
+
+    elif args.geo:
+        parse_geo_file(args.geo)
 
     else:
         for fileno in CensusCodes:
