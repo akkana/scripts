@@ -34,9 +34,11 @@ def create_map(lat, lon, label, infile, fieldname):
     '''
     jsonfile = infile
 
-    m = folium.Map(location=[lat, lon],
-                   tiles='Stamen Terrain',
-                   zoom_start=7)
+    m = folium.Map(location=[lat, lon], zoom_start=7)
+
+    # Add some alternate tile layers
+    folium.TileLayer('Stamen Terrain').add_to(m)
+    folium.TileLayer('Stamen Toner').add_to(m)
 
     def style_fcn(x):
         '''The style function can key off x['properties']['NAME10']
