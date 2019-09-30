@@ -3,13 +3,24 @@
 # https://python-visualization.github.io/folium/quickstart.html
 
 import folium
-import shapefile    # This nonobviously comes from the pyshp module
+# import shapefile    # This nonobviously comes from the pyshp module
+import gdal
 from json import dumps
 import random
 import sys
 
-# Note: to create geojson from shapefiles, use
-#   ogr2ogr -t_srs EPSG:4326 -f GeoJSON file.json file.shp
+
+def shapefile2geojson(infile, outfile, fieldname, shapetype="Feature"):
+    '''Translate a shapefile to GEOJSON.
+       Similar to: ogr2ogr -t_srs EPSG:4326 -f GeoJSON file.json file.shp
+    '''
+    options = gdal.VectorTranslateOptions(format="GeoJSON",
+                                          dstSRS="EPSG:4326")
+
+    # gdal.VectorTranslate(dst_ds, infile, options=options)
+    gdal.VectorTranslate(outfile, infile, options=options)
+    print("Translated GEOJSON file", outfile)
+
 
 def random_html_color():
     r = random.randint(0,256)
@@ -17,9 +28,12 @@ def random_html_color():
     b = random.randint(0,256)
     return '#%02x%02x%02x' % (r, g, b)
 
-def create_map(lat, lon, chamber, jsonfile):
+
+def create_map(lat, lon, label, infile, fieldname):
     '''Create a map and write it to index.html
     '''
+    jsonfile = infile
+
     m = folium.Map(location=[lat, lon],
                    tiles='Stamen Terrain',
                    zoom_start=7)
@@ -35,14 +49,16 @@ def create_map(lat, lon, chamber, jsonfile):
         return { 'fillColor': '#ff0000' }
 
     gj = folium.GeoJson(jsonfile,
-                        name="State %s Boundaries" % chamber,
+                        name="State %s Boundaries" % label,
                         tooltip=folium.GeoJsonTooltip(
-                            fields=['NAME10'],
+                            fields=[fieldname],
 
-                            # Don't show the "NAME10" in the tooltip.
-                            # There doesn't seem to be a
-                            # way to map the actual content
-                            # to show '10' rather than ' Senate District 10'
+                            # Don't include the field name in the tooltip.
+                            # There doesn't seem to be a way to map to
+                            # to '10' rather than ' Senate District 10';
+                            # all folium allows is aliasing the field name
+                            # and it will add a space even if the alias
+                            # is empty.
                             aliases=[''],
 
                             # Optionally can pass a style
@@ -68,12 +84,18 @@ def create_map(lat, lon, chamber, jsonfile):
 
 
 if __name__ == '__main__':
-    # Usage: polidistmap senate_districts.json Senate 34.588 -105.963
+    # Usage: polidistmap senate_districts.json Senate 34.588 -105.963 NAME10
 
-    jsonfile = sys.argv[1]
-    chamber = sys.argv[2]
+    infile = sys.argv[1]
+    label = sys.argv[2]
     lat = float(sys.argv[3])
     lon = float(sys.argv[4])
+    fieldname = sys.argv[5]
 
-    create_map(lat, lon, chamber, jsonfile)
+    if not infile.lower().endswith('json'):
+        jsonfile = '%s.json' % label
+        shapefile2geojson(infile, jsonfile, fieldname)
+        infile = jsonfile
+
+    create_map(lat, lon, label, infile, fieldname)
 

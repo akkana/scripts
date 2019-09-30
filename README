@@ -285,6 +285,7 @@ mapping/grassviewshed.py:
 mapping/polidistmap.py:
     Show political districts -- or any other geojson data -- on a map
     using folium to create a leaflet map.
+    Also has examples for using gdal to translate shapefile to geojson.
 
 mapping/shapemerge.py:
     Starting from a shapefile of New Mexico voting precincts, merge precincts
