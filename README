@@ -282,6 +282,10 @@ mapping/demraytrace.py:
 mapping/grassviewshed.py:
     Use GRASS r.viewshed for a viewshed analysis on a DEM input file.
 
+mapping/polidistmap.py:
+    Show political districts -- or any other geojson data -- on a map
+    using folium to create a leaflet map.
+
 mapping/shapemerge.py:
     Starting from a shapefile of New Mexico voting precincts, merge precincts
     to generate     shapefiles for House, Senate and US Congress districts.
