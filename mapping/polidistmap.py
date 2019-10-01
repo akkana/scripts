@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Display multiple polygons from a GeoJSON or Shapefile on a slippy map.
+# Uses folium, which isn't available as a Debian package, so use pip.
+
 # https://python-visualization.github.io/folium/quickstart.html
 
 import folium
@@ -10,14 +13,13 @@ import random
 import sys
 
 
-def shapefile2geojson(infile, outfile, fieldname, shapetype="Feature"):
+def shapefile2geojson(infile, outfile, fieldname):
     '''Translate a shapefile to GEOJSON.
        Similar to: ogr2ogr -t_srs EPSG:4326 -f GeoJSON file.json file.shp
     '''
     options = gdal.VectorTranslateOptions(format="GeoJSON",
                                           dstSRS="EPSG:4326")
 
-    # gdal.VectorTranslate(dst_ds, infile, options=options)
     gdal.VectorTranslate(outfile, infile, options=options)
     print("Translated GEOJSON file", outfile)
 
@@ -86,7 +88,7 @@ def create_map(lat, lon, label, infile, fieldname):
 
 
 if __name__ == '__main__':
-    # Usage: polidistmap senate_districts.json Senate 34.588 -105.963 NAME10
+    # Usage: polidistmap senate_districts.json Senate 34.3 -105.96 NAME
 
     infile = sys.argv[1]
     label = sys.argv[2]
