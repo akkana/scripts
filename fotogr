@@ -118,7 +118,7 @@ Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''
 
     args = sys.argv[1:]
     dirlist = [ '.' ]
-    if args[0] == '-h' or args[0] == '--help':
+    if not len(args) or args[0] == '-h' or args[0] == '--help':
         Usage()
     if args[0] == '-s':
         separate = True
