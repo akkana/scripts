@@ -6,6 +6,8 @@
 # Usage: xbright [val|+val|-val]
 # val is floating point and can go from 0 to 1 (or maybe higher?)
 
+from __future__ import print_function
+
 import sys, os
 
 # There is an xrandr library for python:
@@ -17,6 +19,10 @@ import sys, os
 import subprocess
 XRANDR = "/usr/bin/xrandr"
 
+# Order of preference of monitors. If there's an external monitor connected,
+# adjust that monitor rather than the built-in one.
+monprefs = [ "HDMI", "DP", "VGA", "eDP", "LVDM" ]
+
 def get_brightness():
     '''Return the current brightness setting from the first
        (as defined by xrandr --verbose) currently active monitor.
@@ -25,22 +31,36 @@ def get_brightness():
     # xrandr --verbose --current | grep Brightness:
     proc = subprocess.Popen([ XRANDR, "--verbose", "--current" ],
                             shell=False, stdout=subprocess.PIPE)
-    s = proc.communicate()[0]
-    if not s:
+    lines = proc.communicate()[0].decode().split('\n')
+    if not lines:
         print("No output from xrandr --verbose!")
         sys.exit(1)
 
-    monitor = None
-    s = s.decode()
-    for line in s.split('\n'):
+    newmonitor = None
+    monitors = []
+    for line in lines:
         line = line.strip()
         words = line.split()
         if len(words) > 1 and words[1] == "connected":
-            monitor = words[0]
+            newmonitor = words[0]
         elif line.startswith("Brightness: "):
-            if not monitor:
+            if not newmonitor:
                 print("Warning: couldn't tell which monitor to use")
-            return (float(line[12:]), monitor)
+                newmonitor = 'UNKNOWN'
+            monitors.append( (newmonitor, float(line[12:])) )
+            newmonitor = None
+
+    # Now monitors is a list of active monitors [ (monitor, brightness) ]
+    for montype in monprefs:
+        for monitor, brightness in monitors:
+            if monitor.startswith(montype):
+                return brightness, monitor
+
+    print("Didn't find any monitors of type", ",".join(monprefs))
+    if monitors:
+        print("Using", monitors[0][0])
+        return monitors[0][1], monitors[0][0]
+
     print("No Brightness line in xrandr --verbose!")
     sys.exit(1)
 
@@ -62,7 +82,7 @@ def set_brightness(new_brightness, monitor, redshift=True):
         red = (1.0 + new_brightness) / 2.
         blue = new_brightness
         green = (red*2 + blue) / 3.
-        print(red, green, blue)
+        # print(red, green, blue)
         args.append("--gamma")
         args.append('%0.2f:%0.2f:%0.2f' % (red, green, blue))
 
