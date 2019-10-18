@@ -115,7 +115,7 @@ class XchatSoundHandler :
 
         self.player = SoundPlayer()
 
-        self.sound_dir = os.path.expanduser("~/.xchat2/sounds/")
+        self.sound_dir = os.path.expanduser("~/.config/hexchat/sounds/")
 
         self.silenced_channels = SILENCED_CHANNELS
 
