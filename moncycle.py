@@ -11,6 +11,23 @@ import subprocess
 # which took twice as long.
 import monmon
 
+# Order to prefer monitors. If connected to an external display,
+# activate it first in preference to the built-in monitor.
+preferred_order = [ 'HDMI', 'DP', 'VGA', 'eDP', 'LVDS' ]
+
+def find_in_preferred_list(mon_name, start_from=0):
+    '''Return the first monitor type (e.g. 'HDMI') that matches mon_name,
+       or None.
+    '''
+    if start_from > 0:
+        thelist = preferred_order + preferred_order[:start_from]
+    else:
+        thelist = preferred_order
+    for t in preferred_order[start_from:]:
+        if t in mon_name:
+            return t
+    return None
+
 DEBUGFILE = open("/tmp/moncycle", "a")
 
 print("==== moncycle ===============", file=DEBUGFILE)
@@ -36,32 +53,41 @@ if len(connected_mons) == 1:
     subprocess.call(args)
     sys.exit(0)
 
-# All monitors that are currently active:
+# Two or more monitors are connected.
+# If one is active, switch the display to the next one in the preferred list.
+# If none are active, turn on the most preferred type.
 active_mons = monmon.active_monitors()
 if active_mons:
-    # First monitors that's currently active
-    active_mon = active_mons[0]
     print("Active monitors:", active_mons, file=DEBUGFILE)
-else:
-    active_mon = None
-    print("No active monitors", file=DEBUGFILE)
+    active_mon = active_mons[0]
 
-# Nothing active? Use the first connected monitor.
-nextindex = 0
-# See if anything is active:
-for i, mon in enumerate(connected_mons):
-    if mon == active_mon:
-        nextindex = (i+1) % len(connected_mons)
-        break
+else:
+    print("No active monitors", file=DEBUGFILE)
+    active_mon = None
+
+# Use the first connected monitor (with the currently active monitor
+# excluded), in order of preference.
+new_mon = None
+for montype in preferred_order:
+    for mon in connected_mons:
+        if montype in mon and mon != active_mon:
+            new_mon = mon
+            break
+
+if not new_mon:
+    print("Connected monitors are", ' '.join(connected_mons))
+    print("None of them match any of", ' '.join(preferred_order))
+    sys.exit(1)
 
 args = [ "xrandr" ]
 
-for i, mon in enumerate(connected_mons):
-    if i == nextindex:
+for mon in connected_mons:
+    if mon == new_mon:
         args += [ "--output", mon, "--auto" ]
     else:
         args += [ "--output", mon, "--off" ]
 
 print("Calling:", args, file=DEBUGFILE)
 subprocess.call(args)
+sys.exit(0)
 
