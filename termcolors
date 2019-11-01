@@ -2,6 +2,9 @@
 
 import sys
 
+# Extra credit: display other formatting
+print('Styles: \033[1mbold\033[0m \033[3mitalic\033[0m \033[4munderline\033[0m \033[9mstrikethrough\033[0m \033[31mred\033[0m\n')
+
 # Display the colors available in a terminal.
 #  given any argument, it'll display 256-color mode as well as 16-color mode.
 
