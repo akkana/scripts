@@ -172,6 +172,10 @@ gpreso:
     A lightweight presentation program for displaying HTML slides.
     Python2/GTK/webkit version. (Previously called preso.)
 
+greatcircle.py:
+    Calculate bearings for a great circle trip between two coordinates
+    on a spherical planet.
+
 gquickbrowse:
     Minimal browser: an older version of quickbrowse written in
     python2-webkit-GTK, now orphaned and no longer available on newer
