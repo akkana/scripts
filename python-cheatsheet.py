@@ -243,7 +243,9 @@ sys.setdefaultencoding('utf8')
 traceback.format_exc()
 
 #############################
-# All the ways of formatting numbers, from https://stackoverflow.com/a/2962966
+# All the ways of formatting numbers.
+# https://docs.python.org/3/tutorial/inputoutput.html
+# For pre-2.6, see https://stackoverflow.com/a/2962966
 
 # String concatenation:
 filename = 'file' + str(num) + '.txt'
@@ -251,11 +253,30 @@ filename = 'file' + str(num) + '.txt'
 # Conversion Specifier:
 filename = 'file%s.txt' % num
 
-# Using local variable names:
-filename = 'file%(num)s.txt' % locals()  # Neat trick
+# Formatted string literals, Python 3.6+
+print(f'Fly to {name}: {lat}N {lon}E')
+print(f'The value of pi is approximately {math.pi:.3f}.')
 
-# Using format():
-filename = 'file{0}.txt'.format(num)     # Note: This is the new preferred way
+# str and repr in formatted string literals
+>>> animals = 'eels'
+>>> print(f'My hovercraft is full of {animals!s}.')    # applies str()
+My hovercraft is full of eels.
+>>> print(f'My hovercraft is full of {animals!r}.')    # applies repr()
+My hovercraft is full of 'eels'.
+
+# Python 3.8+:
+# https://stribny.name/blog/2019/06/debugging-python-programs
+# https://realpython.com/python38-new-features/
+>>> print(f"{i=}, {word=}")
+i=42, word=everything
+
+# Justification:
+print(repr(x).rjust(4))
+
+# Older, pre-3.6 Pythons can use format():
+filename = 'file{0}.txt'.format(num)
+# Using variable names with format()
+filename = 'file%(num)s.txt' % locals()  # Neat trick
 
 # Using string.Template:
 filename = string.Template('file${num}.txt').substitute(locals()))
