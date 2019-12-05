@@ -134,8 +134,8 @@ sys.stderr = open(os.devnull, "w")
 # see run_main_quietly() at the end of quickbrowse.py.
 
 # Prettyprinting
-import pprint
-pprint.pprint(obj)
+from pprint import pprint
+pprint(obj)
 
 # Binary bit fields to string: all the native ways of printing binary
 # in Python insist on signed integers.
@@ -152,6 +152,8 @@ def tobin(data, width=8):
 >>> 0xff ^ 0xff
 0
 
+# Print a listing of variables along with a traceback: see
+# http://code.activestate.com/recipes/52215-get-more-information-from-tracebacks/
 
 ########################################################
 # Stringy stuff
@@ -212,36 +214,6 @@ s = s.replace("\u00A0"," ")
 sep = re.compile('[,\s]+')
 sep.split('HB42,SJR1, HR67 SB3')
 
-############################
-# Frustrations at exceptions when printing,
-# when Python (even Python 3) wants to convert to ascii rather than
-# the system encoding:
-# I need a test case for this, so save one next time it happens!
-# Otherwise, ignore this section, they're just notes to help debug
-# next time I hit this problem.
-
-# New in Python 3.7:
-sys.stdout.reconfigure(errors='surrogateescape')
-# In 3.6, you can get a similar effect with an env variable:
-PYTHONIOENCODING=utf-8:surrogateescape
-
-# In Python2, this might also help:
-sys.setdefaultencoding('utf8')
-# though it's frowned upon:
-# https://stackoverflow.com/questions/3828723/why-should-we-not-use-sys-setdefaultencodingutf-8-in-a-py-script/34378962#34378962
-# You'd think it would use the system locale by default for printing,
-# and quite a few pages claim UTF-8 is the default, but that doesn't
-# seem to be true: even in Python 3 I frequently see exceptions
-# indicating that for some bizarre reason python3 is trying to
-# convert to ascii for printing. And in python3, sys.getdefaultencoding()
-# is already utf-8 so that doesn't explain the ascii codec exceptions.
-
-#############################
-# Speaking of exception frustrations: here's how to print a traceback
-# from the current exception. Curiously, you don't need to pass in the
-# actual exception.
-traceback.format_exc()
-
 #############################
 # All the ways of formatting numbers.
 # https://docs.python.org/3/tutorial/inputoutput.html
@@ -280,6 +252,36 @@ filename = 'file%(num)s.txt' % locals()  # Neat trick
 
 # Using string.Template:
 filename = string.Template('file${num}.txt').substitute(locals()))
+
+############################
+# Frustrations at exceptions when printing,
+# when Python (even Python 3) wants to convert to ascii rather than
+# the system encoding:
+# I need a test case for this, so save one next time it happens!
+# Otherwise, ignore this section, they're just notes to help debug
+# next time I hit this problem.
+
+# New in Python 3.7:
+sys.stdout.reconfigure(errors='surrogateescape')
+# In 3.6, you can get a similar effect with an env variable:
+PYTHONIOENCODING=utf-8:surrogateescape
+
+# In Python2, this might also help:
+sys.setdefaultencoding('utf8')
+# though it's frowned upon:
+# https://stackoverflow.com/questions/3828723/why-should-we-not-use-sys-setdefaultencodingutf-8-in-a-py-script/34378962#34378962
+# You'd think it would use the system locale by default for printing,
+# and quite a few pages claim UTF-8 is the default, but that doesn't
+# seem to be true: even in Python 3 I frequently see exceptions
+# indicating that for some bizarre reason python3 is trying to
+# convert to ascii for printing. And in python3, sys.getdefaultencoding()
+# is already utf-8 so that doesn't explain the ascii codec exceptions.
+
+#############################
+# Speaking of exception frustrations: here's how to print a traceback
+# from the current exception. Curiously, you don't need to pass in the
+# actual exception.
+traceback.format_exc()
 
 ########################################################
 # Byte strings and byte arrays
