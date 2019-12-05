@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import sys
 
 try:
@@ -10,15 +12,28 @@ except:
     print("Couldn't import whois. Try: pip3 install python-whois")
     sys.exit(1)
 
+import socket     # for the socket.timeout exception
+
 import datetime
 from dateutil.relativedelta import relativedelta
 
 format="%25s   %10s %3s %s"
+RETRIES = 1
+
+def get_domain(domainname):
+    for i in range(RETRIES):
+        try:
+            domain = whois.whois(name)
+            return domain
+        except socket.timeout:
+            print("%s timed out; retrying" % domainname)
+    print("Giving up on %s after %d timeouts" % (domainname, RETRIES))
+    return None
 
 if __name__ == '__main__':
     domainlist = []
     for name in sys.argv[1:]:
-        domain = whois.whois(name)
+        domain = get_domain(name)
         if not domain["expiration_date"]:
             print("Can't get expiration date for %s" % name)
             continue
@@ -32,7 +47,9 @@ if __name__ == '__main__':
                     print("Yikes, %s != %s" % (str(e), str(expdate)))
         else:
             expdate = domain["expiration_date"].date()
-        domainlist.append((name, expdate, domain.registrar))
+
+        if domain:
+            domainlist.append((name, expdate, domain.registrar))
 
     domainlist.sort(key = lambda a: a[1])
 
