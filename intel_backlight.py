@@ -34,12 +34,14 @@ def set_brightness(newval):
 
 def change_brightness(incr):
     bright = get_brightness()
+    if bright < 7:
+        incr /= 10
     print("change_brightness from", bright, "by", incr)
     bright += incr
     if bright > 100:
         bright = 100
     if bright < 0:
-        bright = 0
+        bright = .01
     set_brightness(bright)
 
 
@@ -50,7 +52,7 @@ if __name__ == '__main__':
 
     for arg in sys.argv[1:]:
         if arg.startswith('+') or arg.startswith('-'):
-            change_brightness(int(arg))
+            change_brightness(float(arg))
         else:
-            set_brightness(int(arg))
+            set_brightness(float(arg))
 
