@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # URL shortener. Saves needing to copy a link, go to a bookmarked web page,
 # paste the link, read the result page, copy that link, go paste it in
@@ -10,7 +10,8 @@ import urllib, urllib2
 import gtk
 import re
 
-# We have three different shortening services:
+
+# We have three different shortening services to try:
 
 # isgd API reference: http://is.gd/apishorteningreference.php
 def isgd(url, keyword=None):
@@ -46,6 +47,7 @@ def shorturl(url):
 
     return shorturl, longurl
 
+
 def tinyurl(url):
     tiny = "http://tinyurl.com/api-create.php?url=%s" %(url)
     page = urllib2.urlopen(tiny)
@@ -56,12 +58,14 @@ def tinyurl(url):
     # where the short link goes -- I can't find any way of verifying.
     return tiny, url
 
+
 # The list of shorteners, in the order we want to try them:
-shorteners = [ 
+shorteners = [
                ('shorturl', shorturl),
                ('isgd', isgd),
                ('tinyurl', tinyurl)
                ]
+
 
 def SimpleURLWindow(shorturl, longurl, servicename=None):
     window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -96,6 +100,7 @@ def SimpleURLWindow(shorturl, longurl, servicename=None):
     window.show_all()
     gtk.main()
 
+
 if __name__ == "__main__":
     # Should we take the URL as an argument, or get it from the clipboard?
     if len(sys.argv) < 2 or sys.argv[1].startswith('-'):
@@ -108,6 +113,7 @@ if __name__ == "__main__":
     else:
         url = sys.argv[1]
 
+    longurl = None
     for (name, func) in shorteners:
         try:
             shorturl, longurl = func(url)
@@ -119,4 +125,8 @@ if __name__ == "__main__":
             print "Failed on", name
             print e
 
-    SimpleURLWindow(shorturl, longurl, name)
+    if longurl:
+        SimpleURLWindow(shorturl, longurl, name)
+    else:
+        SimpleDialog("Couldn't shorten with any of",
+                     ' '.join([sh[0] for sh in shorteners]))
