@@ -102,8 +102,6 @@ def parse_geo_sas_lines(lines):
             GeoFields[code]['end']   = int(m.group(3))
             continue
 
-        print("Didn't match anything:", line)
-
     # pprint(GeoFields)
 
 
@@ -125,10 +123,20 @@ def codes_for_description(desc):
     return codes
 
 
+counties = []
+
 def parse_geo_file(filename):
     with open(filename) as fp:
         for line in fp:
-            parse_geo_line(line)
+            geo = parse_geo_line(line)
+            c = geo['COUNTY'].strip()
+            if c:
+                c = int(c)
+                if c not in counties:
+                    counties.append(c)
+
+    counties.sort()
+    print("Counties:", counties)
 
 
 def parse_geo_line(line):
@@ -142,10 +150,11 @@ def parse_geo_line(line):
             print("Key error, GeoFields[%s] =" % code, GeoFields[code])
             break
 
-    print("Line:", line)
-    for field in d:
-        print(field, ":", d[field], ":", GeoFields[field]['name'])
-    print()
+    # print("Line:", line)
+    # for field in d:
+    #     print(field, ":", d[field], ":", GeoFields[field]['name'])
+    # print()
+    # print(d['COUNTY'], d['TRACT'], d['BLKGRP'], d['BLOCK'])
 
     return d
 
@@ -164,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('zipfile', help="location of SF1SAS.zip file")
 
     args = parser.parse_args(sys.argv[1:])
-    print(args)
+    # print(args)
 
     # Pass in the path to SF1SAS.zip
     codesFromZipFile(args.zipfile)
