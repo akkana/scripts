@@ -157,6 +157,13 @@ class BrowserView(QWebEngineView):
         # WebDialog, WebBrowserBackgroundTab, all attributes of QWebEnginePage.
         # Right now, though, we're ignoring type and making a new background
         # tab in all cases.
+
+        # Possible wintypes (all part of QWebEnginePage):
+        # WebBrowserWindow:        A complete web browser window.
+        # WebBrowserTab:           A new tab
+        # WebDialog:               A JavaScript-created window
+        # WebBrowserBackgroundTab: A new tab that isn't immediately active
+
         self.browser_win.new_tab()
         return self.browser_win.browserviews[-1]
 
