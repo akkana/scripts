@@ -34,6 +34,9 @@ if __name__ == '__main__':
     domainlist = []
     for name in sys.argv[1:]:
         domain = get_domain(name)
+        if not domain:
+            print("Can't get info for %s" % name)
+            continue
         if not domain["expiration_date"]:
             print("Can't get expiration date for %s" % name)
             continue
