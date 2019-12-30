@@ -15,13 +15,13 @@ def remove_empty_tags(soup):
             t.extract()
 
 def prettyprint(soup):
-    '''Simple prettyprinter, just add newlines around block nodes.
+    """Simple prettyprinter, just add newlines around block nodes.
        No indentation, etc.
        Also get rid of non-breaking spaces (c2 a0).
        Returns a string.
        BS4's prettify() changes the HTML, adding spurious rendered whitespace.
        See https://bugs.launchpad.net/beautifulsoup/+bug/1697296
-    '''
+    """
     s = str(soup)
     print("type s:", type(s), file=sys.stderr)
 

@@ -3,7 +3,7 @@
 # Copyright (C) 2018 by Akkana Peck.
 # Share and enjoy under the GPL v2 or later.
 
-'''A simple private browser.'''
+"""A simple private browser."""
 
 import os
 import sys
@@ -408,9 +408,9 @@ class BrowserWindow(QMainWindow):
 
     @staticmethod
     def send_command(cmd, url):
-        '''Send a command to a running quickbrowse process.
+        """Send a command to a running quickbrowse process.
            This will usually be called from a separate, new, process.
-        '''
+        """
         # Start by finding the available CMD_PIPEs.
         # We'll use the one with the most recent ctime.
         pipedir, sockbase = os.path.split(CMD_PIPE)
@@ -503,7 +503,7 @@ class BrowserWindow(QMainWindow):
         QShortcut("Esc", self, activated=self.unfullscreen)
 
     def eventFilter(self, object, event):
-        '''Handle button presses in the tab bar'''
+        """Handle button presses in the tab bar"""
 
         if object != self.tabwidget.tabBar():
             print("eventFilter Not in tab bar")
@@ -595,11 +595,11 @@ class BrowserWindow(QMainWindow):
         self.tabwidget.removeTab(tabindex)
 
     def load_url(self, url, tab=None):
-        '''Load the given URL in the specified tab, or current tab if tab=None.
+        """Load the given URL in the specified tab, or current tab if tab=None.
            url is a str, not a QUrl.
            PDF URLs will be loaded in a new tab, because there doesn't
            seem to be a way of replacing the BrowserView with a BrowserPDFView.
-        '''
+        """
 
         # If there are newlines, remove newlines plus all adjacent whitespace.
         if '\n' in url:
@@ -640,11 +640,11 @@ class BrowserWindow(QMainWindow):
         self.browserviews[tab].load(qurl)
 
     def load_html(self, html, base=None):
-        '''Load a string containing HTML.
+        """Load a string containing HTML.
            The base is the file: URL the HTML should be considered to have
            come from, to avoid "Not allowed to load local resource" errors
            when clicking on links.
-        '''
+        """
         if not self.browserviews:
             self.new_tab()
             tab = 0
@@ -666,10 +666,10 @@ class BrowserWindow(QMainWindow):
         return None
 
     def set_tab_text(self, title, view):
-        '''Set tab and, perhaps, window title after a page load.
+        """Set tab and, perhaps, window title after a page load.
            view is the requesting BrowserView, and will be compared
            to our browserviews[] to figure out which tab to set.
-        '''
+        """
         if self.tabwidget is None:
             return
         whichtab = None
@@ -746,9 +746,9 @@ def run_browser():
         return parser.parse_args(sys.argv[1:])
 
     def get_procname(procargs):
-        '''Return the program name: either the first commandline argument,
+        """Return the program name: either the first commandline argument,
            or, if that argument is some variant of "python", the second.
-        '''
+        """
         basearg = os.path.basename(procargs[0])
         if basearg.startswith('python'):
             basearg = os.path.basename(procargs[1])
@@ -816,13 +816,13 @@ def run_main_quietly():
 
     @contextmanager
     def stderr_redirected(to=os.devnull):
-        '''
+        """
         import os
 
         with stderr_redirected(to=filename):
             print("from Python")
             os.system("echo non-Python applications are also supported")
-        '''
+        """
         fd = sys.stderr.fileno()
 
         def _redirect_stderr(to):

@@ -54,10 +54,10 @@ class MouseReader:
             print "unknown value", val
 
     def read_mouse(self, timeout=None):
-        '''Returns an evdev event.
+        """Returns an evdev event.
            timeout is specified in floating-point seconds.
            timeout=None will block until there's something to read.
-        '''
+        """
         r,w,x = select.select([self.mousedevice], [], [], timeout)
         events = []
         for event in self.mousedevice.read():

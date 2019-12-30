@@ -34,9 +34,9 @@ class BirdCodes:
                                       self.bird_dict[code]['sci_name'])
 
     def parse_html_table(self):
-        '''Return a dictionary of { code: { name: "", sci_name: "" } }
+        """Return a dictionary of { code: { name: "", sci_name: "" } }
            parsed from the HTML website.
-        '''
+        """
         page = urllib2.urlopen('http://www.pwrc.usgs.gov/BBL/MANUAL/speclist.cfm')
         birdpage = page.read()
         page.close()
@@ -57,9 +57,9 @@ class BirdCodes:
                 print "Eek!", tr
 
     def parse_xml(self):
-        '''Return a dictionary of code: [ common_name, scientific_name ]
+        """Return a dictionary of code: [ common_name, scientific_name ]
            parsed from the XML web page.
-        '''
+        """
         page = urllib2.urlopen('http://www.pwrc.usgs.gov/BBL/xml/Mapped_XML_files/speciestable.xml')
         birdxml = page.read()
         page.close()

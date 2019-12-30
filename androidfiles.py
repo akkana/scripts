@@ -30,8 +30,8 @@ def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
 
 def strip_schema(path):
-    '''Strip off any android: prefix in the path.
-    '''
+    """Strip off any android: prefix in the path.
+    """
     if path.startswith("android:"):
         return path[8:]
 
@@ -58,21 +58,21 @@ def find_sdcards():
     return sdcards
 
 def list_dir(path, **kwargs):
-    '''Recursively list either a local or remote directory.
+    """Recursively list either a local or remote directory.
        Return a list of paths relative to the original directory.
-    '''
+    """
     if is_android(path):
         return list_android_dir(strip_schema(path), **kwargs)
     else:
         return list_local_dir(path, **kwargs)
 
 def list_android_dir(path, sorted=True, sizes=False, recursive=False):
-    '''List the contents of the given directory on Android.
+    """List the contents of the given directory on Android.
        Returns a list of filenames if sizes=False.
        If sizes=True, returns a list of tuples (filename, int size).
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
-    '''
+    """
     if path.endswith('/'):
         path = path[:-1]
     lenpath = len(path)
@@ -139,14 +139,14 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     return file_list
 
 def list_local_dir(path, sorted=True, sizes=False, recursive=False):
-    '''List the contents of the given local directory,
+    """List the contents of the given local directory,
        returning the result in the same format list_android_dir would return
        so we can use them interchangeably.
        Returns a list of filenames if sizes=False.
        If sizes=True, returns a list of tuples (filename, int size).
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
-    '''
+    """
     path = os.path.normpath(path)
     lenpath = len(path)
     if recursive:
@@ -235,12 +235,12 @@ def rmdir_on_android(d, recursive=False):
 # which can take an android: or androidsd: schema or a local path.
 
 def copyfile(src, dst, move=False):
-    '''Copy src file to dst, where either or both can have
+    """Copy src file to dst, where either or both can have
        android: or androidsd: schemas.
        Only intended to handle single files;
        doesn't create directories first.
        If move=True, use move rather than copy (remove the src).
-    '''
+    """
     if not is_android(src) and not is_android(dst):
         if move:
             shutil.move(src, dst)
@@ -284,14 +284,14 @@ def remove(f):
         os.unlink(f)
 
 def find_basename_size_match(pair, pairlist):
-    '''Given a pair (pathname, size) and a list of pairs, take the basename
+    """Given a pair (pathname, size) and a list of pairs, take the basename
        of the given pair's first elemend, and see if it matches
        the basename of the first element of any of the pairs in pairlist.
        If so, compare the sizes (second element), and if they match,
        return the index of the match in pairlist. Else return -1.
        If there's more than one match, be safe and return -1:
        in that case we can't rely on size.
-    '''
+    """
     base = os.path.basename(pair[0])
     match = None
     num_matches = 0
@@ -307,8 +307,8 @@ def find_basename_size_match(pair, pairlist):
     return -1
 
 def make_sync_changes(newdirs, moves, removes, updates, dryrun):
-    '''Print the sync changes, and, if dryrun is false, actually make them.
-    '''
+    """Print the sync changes, and, if dryrun is false, actually make them.
+    """
     if newdirs:
         if dryrun:
             print("\n\nMaking needed directories")
@@ -354,14 +354,14 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
         print("No files need updating.")
 
 def sync(src, dst, dryrun=True):
-    '''Synchronize recursively (like rsync -av --size-only)
+    """Synchronize recursively (like rsync -av --size-only)
        between two locations, e.g. a local directory and an android one.
        Only copy files whose size is different.
        src and dst are either a local path or an android: or androidsd: schema,
        and can point to a file or a directory.
        If dryrun, just print what is to be done, don't actually do it.
        XXX: basically works but needs to remove empty directories.
-    '''
+    """
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
 
@@ -451,9 +451,9 @@ def sync(src, dst, dryrun=True):
     dstdirs = []
 
     def find_dir_in(thedir, whichlist):
-        '''Is the given directory referenced in any of the pathnames
+        """Is the given directory referenced in any of the pathnames
            in whichlist?
-        '''
+        """
         # We need to end with a slash, because otherwise we might
         # match books whose titles start with the same name as the dir.
         if not thedir.endswith('/'):
@@ -465,11 +465,11 @@ def sync(src, dst, dryrun=True):
         return False
 
     def remember_needed_dirs(f):
-        '''Check full pathname f (from src_ls) to see if its dirname
+        """Check full pathname f (from src_ls) to see if its dirname
            already exists in the list of directories in dst_ls.
            If it doesn't, then it will need to be created on the
            destination, perhaps along with its ancestors.
-        '''
+        """
         d = os.path.dirname(f)
         if d in dstdirs:
             return

@@ -70,7 +70,7 @@ def sepstr(sep):
     return "%.1f deg" % deg
 
 class ConjunctionPair:
-    '''A conjunction between a pair of objects'''
+    """A conjunction between a pair of objects"""
     def __init__(self, b1, b2, date, sep):
         self.bodies = [b1, b2]
         self.date = date
@@ -84,10 +84,10 @@ class ConjunctionPair:
         return body in self.bodies
 
 class Conjunction:
-    '''A collection of ConjunctionPairs which may encompass more
+    """A collection of ConjunctionPairs which may encompass more
        than two bodies and several days.
        The list is not guaranteed to be in date (or any other) order.
-    '''
+    """
     def __init__(self):
         self.bodies = []
         self.pairs = []
@@ -123,14 +123,14 @@ class Conjunction:
         return mindate, maxdate, minseps
 
     def andjoin(self, names):
-        '''Join a list together like a, b, c and d'''
+        """Join a list together like a, b, c and d"""
         if len(names) == 1:
             return names[0]
         elif len(names) < 4:
             return ', '.join(names[:-1]) + ' and ' + names[-1]
 
     def closeout(self):
-        '''Time to figure out what we have and print it.'''
+        """Time to figure out what we have and print it."""
 
         # Find the list of minimum separations between each pair.
         startdate = ephem.date('3000/1/1')
@@ -186,9 +186,9 @@ class Conjunction:
                     (m[2], m[3], friendlydate(m[0]), sepstr(m[1])))
 
     def merge(self, conj):
-        '''Merge in another Conjunction -- it must be that the two
+        """Merge in another Conjunction -- it must be that the two
            sets of pairs have bodies in common.
-        '''
+        """
         for p in conj.pairs:
             self.pairs.append(p)
         for body in conj.bodies:
@@ -196,9 +196,9 @@ class Conjunction:
                 self.bodies.append(body)
 
 class ConjunctionList:
-    '''A collection of Conjunctions -- no bodies should be shared
+    """A collection of Conjunctions -- no bodies should be shared
        between any of the conjunctions we contain.
-    '''
+    """
     def __init__(self):
         self.clist = []
 
@@ -226,9 +226,9 @@ class ConjunctionList:
         self.clist.append(c)
 
     def closeout(self):
-        '''When we have a day with no conjunctions, check the list
+        """When we have a day with no conjunctions, check the list
            and close out any pending conjunctions.
-        '''
+        """
         for c in self.clist:
             c.closeout()
         self.clist = []
@@ -315,11 +315,11 @@ def finish_planet(p, d, output_format):
     planets_up[p] = None
 
 def run(start, end, observer, toolate, output_format):
-    '''Find planetary visibility between dates start and end,
+    """Find planetary visibility between dates start and end,
        for an observer whose location has been set,
        between sunset and "toolate" on each date, where toolate is a GMT hour,
        e.g. toolate=7 means we'll stop at 0700 GMT or midnight MDT.
-    '''
+    """
     d = start
     conjunctions = ConjunctionList()
 
@@ -332,12 +332,12 @@ def run(start, end, observer, toolate, output_format):
             (datestr(d), datestr(end)))
 
     def check_if_planet_up(planet, d):
-        '''If the planet is up on the given date, do housekeeping to remember
+        """If the planet is up on the given date, do housekeeping to remember
            that status, then return True if it's up, False otherwise.
            The date passed in is just a date; we will try different times
            on that date, including the immediately preceding sunset
            and a "toolate" hour of the night.
-        '''
+        """
         global crescents, planets_up
 
         # The moon is easy to see, so allow it half the alt of anything else.

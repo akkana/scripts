@@ -87,9 +87,9 @@ class Spider:
         self.nonorphans = [ "favicon.ico", "robots.txt", ".htaccess" ]
 
     def spide(self):
-        '''Check all urls in urls_to_check, which has new urls
+        """Check all urls in urls_to_check, which has new urls
            being added to it during the spidering process.
-        '''
+        """
         self.check_url(self.starturl)
         while self.urls_to_check:
             self.check_url(self.urls_to_check.pop())
@@ -97,9 +97,9 @@ class Spider:
         print "Done spiding"
 
     def check_orphans(self):
-        '''Assuming we already have self.files_succeeded,
+        """Assuming we already have self.files_succeeded,
            find all files in self.rootdir that weren't in succeeded.
-        '''
+        """
         self.orphans = []
         for root, dirs, files in os.walk(self.rootdir, topdown=True):
             dirs[:] = [d for d in dirs if d not in self.excludes]
@@ -130,8 +130,8 @@ class Spider:
             len(self.orphans), "orphaned files."
 
     def get_local_for_url(self, urlpath):
-        '''Get a local file path for a path parsed from an absolute URL.
-        '''
+        """Get a local file path for a path parsed from an absolute URL.
+        """
         # Now compare parsed.path with self.rooturlpath
         if self.rooturlpath not in urlpath:
             return None
@@ -140,10 +140,10 @@ class Spider:
                                                 1))
 
     def make_absolute(self, url, relative_to):
-        '''Make a URL absolute. If it's a relative path,
+        """Make a URL absolute. If it's a relative path,
            then make it relative to relative_to
            which must be an absolute path on the webhost.
-        '''
+        """
         parsed = urlparse.urlparse(url)
         if parsed.scheme:    # already has an http://host specified
             # XXX If we ever extend this to check validity of
@@ -172,7 +172,7 @@ class Spider:
         return urlparse.urlunparse(lurl)
 
     def check_url(self, url):
-        '''Check a URL. This should be an absolute URL on the server.'''
+        """Check a URL. This should be an absolute URL on the server."""
         # If we got this far, we'll be comparing links.
         # So we'll need to know the parsed parts of this url.
         urlparsed = urlparse.urlparse(url)

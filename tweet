@@ -32,7 +32,7 @@ def prettify(filnam) :
     return birdname
 
 def getMatchingFiles(pats) :
-    '''Find the list of birdcall files matching the list of terms.'''
+    """Find the list of birdcall files matching the list of terms."""
     matches = []
     birds = [ s.lower() for s in pats ]
     for root, dirs, files in os.walk(calldir) :
@@ -53,7 +53,7 @@ def getMatchingFiles(pats) :
     return matches
 
 def narrow(pat, lis):
-    '''We already have a list, but we need to narrow it by pattern.'''
+    """We already have a list, but we need to narrow it by pattern."""
 
 def play(fil) :
     try :

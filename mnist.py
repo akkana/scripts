@@ -34,9 +34,9 @@ x_train = x_train.reshape(-1, 784)
 x_test = x_test.reshape(-1, 784)
 
 def train_model(filename, epochs):
-    '''Train the model. When finished, save the result to a file.
+    """Train the model. When finished, save the result to a file.
        Return the model.
-    '''
+    """
     # Create the model.
     model = Sequential()
 
@@ -109,9 +109,9 @@ else:
 x_train_images = x_train.reshape(-1, 28, 28)
 
 def key_press(e):
-    '''Exit on ctrl-q. Any other key dismisses this plot and shows
+    """Exit on ctrl-q. Any other key dismisses this plot and shows
        the next one.
-    '''
+    """
     if e.key == 'ctrl+q' or e.key == 'q':
         sys.exit(0)
 

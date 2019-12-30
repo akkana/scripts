@@ -10,6 +10,7 @@ import time
 import random
 import gtk, gobject
 
+
 class Cellgrid:
     def __init__(self, nrows, ncols):
         self.nrows = nrows
@@ -21,11 +22,11 @@ class Cellgrid:
         self.characters = None
 
     def randomize(self, probabilities):
-        '''Initialize the grid to random values specified by the probailities
+        """Initialize the grid to random values specified by the probailities
            argument. probabilities should be a tuple or list of floating
            point values adding to 1. The number of entries in probabilities
            controls what integer values the grid can take.
-        '''
+        """
         for r in range(self.nrows):
             for c in range(self.ncols):
                 tot = 0
@@ -36,22 +37,22 @@ class Cellgrid:
                         break   # break out of the inner loop over probabilities
 
     def item(self, coords):
-        '''Return the item at the given coordinates,
+        """Return the item at the given coordinates,
            accounting for periodic boundary conditions.
-        '''
+        """
         return self.grid[coords[0] % self.nrows][coords[1] % self.ncols]
 
     def setitem(self, coords, val):
-        '''Set the given item to the given value.
-        '''
+        """Set the given item to the given value.
+        """
         self.grid[coords[0] % self.nrows][coords[1] % self.ncols] = val
 
     def update(self, rule):
-        '''Update self.grid using the given rule.
+        """Update self.grid using the given rule.
            Replaces self.grid with the new grid.
            rule should have the signature
            rule(cellgrid, (row, col)) -> int
-        '''
+        """
         self.newgrid = []
         for r in xrange(self.nrows):
             self.newgrid.append([])
@@ -66,9 +67,8 @@ class Cellgrid:
         sys.exit(0)
 
     def run_plot(self, stepsecs=.1):
-        '''Iterate over the rule, plotting the evolving grid
-        '''
-        
+        """Iterate over the rule, plotting the evolving grid
+        """
 
     def __repr__(self):
         out = ''
@@ -81,10 +81,11 @@ class Cellgrid:
             out += '\n'
         return out
 
+
 class CAWindow:
     def __init__(self, cellgrid, rule=None, timeout = 1):
-        '''Timeout in milliseconds
-        '''
+        """Timeout in milliseconds
+        """
         self.cellgrid = cellgrid
         self.rule = rule
         self.drawing_area = None
@@ -96,8 +97,8 @@ class CAWindow:
         self.timeout = timeout
 
     def draw(self):
-        '''Draw the current state of the cell grid
-        '''
+        """Draw the current state of the cell grid
+        """
         # Clear the background:
         self.drawing_area.window.draw_rectangle(self.bgc, True, 0, 0,
                                                 self.width, self.height)
@@ -171,9 +172,10 @@ class CAWindow:
         win.show()
         gtk.main()
 
+
 def life(cellgrid, cawin):
-    '''Initialize the grids to play Conway's Game of Life.
-    '''
+    """Initialize the grids to play Conway's Game of Life.
+    """
     def liferule(cellgrid, coords):
         # Count the total number of neighbors, not including the cell itself:
         tot = 0
@@ -202,10 +204,11 @@ def life(cellgrid, cawin):
 
     cawin.rule = liferule
 
+
 def neighbor(cellgrid, cawin):
-    '''Initialize the grid to simulate Thomas Schelling's
+    """Initialize the grid to simulate Thomas Schelling's
        segregated neighborhood study.
-    '''
+    """
     def neighbor_rule(cellgrid, coords):
         x, y = coords
         tot = cellgrid.item((x-1, y)) + cellgrid.item((x+1, y)) \
@@ -223,6 +226,7 @@ def neighbor(cellgrid, cawin):
     # Initialize with 50% probability:
     cellgrid.randomize((.5, .5))
     cawin.rule = neighbor_rule
+
 
 if __name__ == "__main__":
     # Some sample rules:

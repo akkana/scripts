@@ -15,7 +15,7 @@ from matplotlib import colors as mcolors
 import random
 
 def gen_data(xbins, numplots, lintest=False):
-    '''Generate a list of random histograms'''
+    """Generate a list of random histograms"""
     data = []
     ymin = 9999999999999
     ymax = -ymin
@@ -40,13 +40,13 @@ def gen_data(xbins, numplots, lintest=False):
     return data, ymin, ymax
 
 def draw_3d(verts, ymin, ymax, line_at_zero=True, colors=True):
-    '''Given verts as a list of plots, each plot being a list
+    """Given verts as a list of plots, each plot being a list
        of (x, y) vertices, generate a 3-d figure where each plot
        is shown as a translucent polygon.
        If line_at_zero, a line will be drawn through the zero point
        of each plot, otherwise the baseline will be at the bottom of
        the plot regardless of where the zero line is.
-    '''
+    """
     # add_collection3d() wants a collection of closed polygons;
     # each polygon needs a base and won't generate it automatically.
     # So for each subplot, add a base at ymin.
@@ -122,11 +122,11 @@ if __name__ == '__main__':
     draw_3d(data, ymin, ymax, colors=args.colors)
     plt.show()
 
-'''
+"""
 1st green: 150, 100, 100 = .59, 1, 1    matplotlib hue .17 -> 0.   1.   0.04
 2nd green: 152, 100, 94  = .60, 1, .94             hue .34 -> 0.   0.94 1.
 
 1st green claims [0.   1.   0.04], GIMP says 0 1 . 5
 2dn green claims [0.   0.94 1.  ], GIMP says 0 .94 .5
 
-'''
+"""

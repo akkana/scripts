@@ -96,8 +96,8 @@ def isprintable(s):
     return set(s).issubset(printset)
 
 def view_message_attachments(fp, tmpdir):
-    '''View message attachments coming from the file-like object fp.
-    '''
+    """View message attachments coming from the file-like object fp.
+    """
 
     msg = email.message_from_string(fp.read())
 
@@ -141,8 +141,8 @@ def view_message_attachments(fp, tmpdir):
         return os.path.join(tmpdir, partfile)
 
     def save_tmp_file(part):
-        '''Saves this part's payload to a tmp file, returning the new filename.
-        '''
+        """Saves this part's payload to a tmp file, returning the new filename.
+        """
         partfile = tmp_file_name(part)
 
         tmpfile = open(partfile, "wb")

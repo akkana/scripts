@@ -24207,11 +24207,11 @@ def find_mac_in(instr):
     return fullmac, mac.upper()
 
 def match_mac(s):
-    '''mac is a string, which may be like "88E90F", like "E0-43-DB"
+    """mac is a string, which may be like "88E90F", like "E0-43-DB"
        or like "20:13:f0:bc:aa:00".
        If it's longer than 17 characters, we'll look in it for
        something matching "nn:nn:nn:nn:nn:nn".
-    '''
+    """
     fullmac, mac = find_mac_in(s)
     if not mac:
         return None

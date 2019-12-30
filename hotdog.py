@@ -33,8 +33,8 @@ def fetch_temps():
 
 # import random
 def overtemp(temps):
-    '''Are any of the temperatures excessive?
-    '''
+    """Are any of the temperatures excessive?
+    """
     # if random.randint(0, 5) == 0:
     #     return True
 
@@ -44,10 +44,10 @@ def overtemp(temps):
     return False
 
 def hoglist(delay=3):
-    '''Return a list of processes using a nonzero CPU percentage
+    """Return a list of processes using a nonzero CPU percentage
        during the interval specified by delay (seconds),
        sorted so the biggest hog is first.
-    '''
+    """
     proccesses = list(psutil.process_iter())
     for proc in proccesses:
         proc.cpu_percent(None)    # non-blocking; throw away first bogus value

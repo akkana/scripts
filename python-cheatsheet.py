@@ -316,6 +316,10 @@ l.insert(3, 'xxx')
 [ a*b+c for a in A for b in B for c in C ]
 # though itertools.product is arguably cleaner for math problems like that.
 
+# They can also have 'if", but I always forget the syntax
+nums = [1, 2, 3, 4, 5]
+odds = ['t' if n%2 else 'f' for n in nums]
+
 # There are dict comprehensions too though the syntax is more fiddly:
 >>> { key: value for key, value in [ (1, 11), (2, 22), (3, 33) ] }
 {1: 11, 2: 22, 3: 33}
@@ -784,10 +788,13 @@ def roundall(numbers):
 #
 # sorting + lambda examples
 #
-# The cmp function is obsolete.
-# Instead, use a key function,
-# which is called on each element of the list prior to sorting.
+# The cmp function is obsolete in py3. Instead, use a key function,
+# which is called on each element of the list prior to sorting,
+# and for each item, returns something that can be simply sorted,
+# like a string or int.
 # https://wiki.python.org/moin/HowTo/Sorting
+# The advantage of a key function is that a comparison function needs
+# to be called on every comparison, a key function only once.
 #
 def sort_by_last_letter(words):
     # sorted() returns a new sorted list.
@@ -842,6 +849,38 @@ for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "
 # NO -9
 # APPLY -10
 # HELP -11
+
+################################################################
+# Pathlib, cross-platform replacement for os.path and much more.
+################################################################
+
+>>> from pathlib import Path, PosixPath
+
+# For paths in Python3=only projects, consider using pathlib rather than os.path
+# https://docs.python.org/3/library/pathlib.html#pathlib.Path
+Path.home()    # the user's homedir
+
+>>> rock =  Path('~', 'Music', 'Rock').expanduser()
+>>> rock
+PosixPath('/home/akkana/Music/Rock')
+>>> g = rock.rglob('*.mp3')
+>>> g
+<generator object Path.rglob at 0x7f630d9e48d0>
+>>> list(g)
+# ... list of PosixPath objects
+# rglob is recursive, glob is nonrecursive unless the pattern starts with **/
+# which means “this directory and all subdirectories, recursively”.
+
+>>> p = Path()
+>>> p
+PosixPath('.')
+>>> p.resolve()
+PosixPath('/home/username/pathlib')
+
+# Other methods include .mkdir(), .rmdir(), .unlink().rename(), .exists(),
+# .is_dir(), .is_file(), .stat(),
+# .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
+  # reads and writes don't require open first
 
 
 ################################################################
@@ -1223,4 +1262,69 @@ gives a Location which may or may not
 be where every file in the package ends up.
 pip uninstall packagename does give the full list, but there's no -n
 option so you have to actually install the package to see the file list.
+'''
+
+################################################################
+# Virtualenv
+################################################################
+'''Python2
+virtualenv ~/pythonenv/envname
+  (requires virtualenv and python-virtualenv)
+'''
+'''Python3
+python3 -m venv ~/pythonenv/envname
+  (requires python3-venv)
+'''
+
+'''
+Optionally, add system-site-packages to either of these.
+
+Then activate it:
+source ~/pythonenv/envname/bin/activate
+'''
+
+################################################################
+# Building and packaging
+################################################################
+
+'''
+Installing to a virtualenv (don't use setup.py install):
+  pip install .
+
+Developing a package in a virtualenv:
+  pip install -e .
+OR
+  setup.py develop
+
+When finished:
+  setup.py develop --uninstall
+
+Packaging Python Projects:
+https://packaging.python.org/tutorials/packaging-projects/
+
+Generate a dist:
+python3 setup.py sdist bdist_wheel
+    (should generate two files in dist/)
+
+Upload to Test PyPI
+python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+Install and test in a new empty virtualenv.
+python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
+  The no-deps is because test pypi may not have all the same dependencies.
+  This is supposed to work if you want to test dependencies:
+    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
+  but it doesn't, at least on Ubuntu, because of
+  https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
+
+If everything works,
+upload to the real PyPI:
+twine upload dist/*
+
+Building and Uploading Sphinx docs:
+https://pythonhosted.org/an_example_pypi_project/buildanduploadsphinx.html
+
+Possibly useful links:
+https://www.tjelvarolsson.com/blog/begginers-guide-creating-clean-python-development-environments/
+http://www.siafoo.net/article/77#install-vs-develop
 '''

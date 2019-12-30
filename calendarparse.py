@@ -20,9 +20,9 @@ months = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
            "Sep", "Oct", "Nov", "Dec" ]
 
 def tabular_string_to_calendar(calstr):
-    '''Parse an erratically formatted string.
+    """Parse an erratically formatted string.
        Return a list of icalendar.Calendar entries.
-    '''
+    """
     entries = []
     for line in calstr.split('\n'):
         if not line.startswith("20"):
@@ -64,11 +64,11 @@ def ics_file_as_html(filename):
     return eventlist_as_html(eventlist)
 
 def eventlist_as_html(entries):
-    '''Take a list of icalendar.Calendar entries;
+    """Take a list of icalendar.Calendar entries;
        format it as a list of events in HTML, returned as a string.
        Writes to icalendar format as an intermediary because that's
        the easiest way to get icalendar.Calendar to parse its date
-    '''
+    """
 
     html = '''<table border=1 summary="This table shows the calendar of events. Each row is an event. Columns contain the event date, time, and description which includes the location">
 <caption>Calendar of Events</caption>

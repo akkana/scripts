@@ -5,11 +5,11 @@
 from __future__ import print_function
 
 class tee():
-    '''A file-like class that can optionally send output to a log file.
+    """A file-like class that can optionally send output to a log file.
        Inspired by
 http://www.redmountainsw.com/wordpress/archives/python-subclassing-file-types
        and with IRC help from Kirk McDonald.
-    '''
+    """
     def __init__(self, _fd1, _fd2):
         self.fd1 = _fd1
         self.fd2 = _fd2

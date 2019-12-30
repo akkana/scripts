@@ -4,10 +4,10 @@ import sys
 import difflib
 
 def file_to_lines(filename):
-    '''Read an input file (HTML) and return a list of lines of text.
+    """Read an input file (HTML) and return a list of lines of text.
        If the file doesn't have many line breaks, we'll split it
        at html tags.
-    '''
+    """
     # Eventually we might want to massage the HTML, prettyprint it,
     # discard things like headers and sidebars.
 
@@ -37,9 +37,9 @@ def file_to_lines(filename):
     return lines
 
 def diff_lines(oldtext, newtext):
-    '''Find differences between lists of lines (not plain strings)
+    """Find differences between lists of lines (not plain strings)
        and print them as RSS items.
-    '''
+    """
 
     # Using the function name is a way to get variables to have a scope
     # s visible to the inner function. Otherwise Python's parser will see
@@ -55,8 +55,8 @@ def diff_lines(oldtext, newtext):
 '''
 
     def add_item(newitem):
-        '''newitem is a list of lines.
-        '''
+        """newitem is a list of lines.
+        """
         diff_lines.numchanges += 1
         diff_lines.ret += '''<item>
   <title>Difference %d</title>

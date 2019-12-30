@@ -30,12 +30,12 @@ def prettyprint(soup,
                 separate_line=tags_separate_line,
                 define_line=tags_define_line,
                 remove_original_newlines=False):
-    '''Simple prettyprinter. Add newlines around specified tags.
+    """Simple prettyprinter. Add newlines around specified tags.
        No indentation, etc.
        Will preserve all original newlines and only add new ones
        unless remove_original_newlines is specified.
        Returns a string.
-    '''
+    """
 
     # Extract empty tags
     for x in soup.find_all():

@@ -13,15 +13,15 @@ import sys
 import apt
 
 class Colprinter():
-    '''Format rows (lists) in columns,
+    """Format rows (lists) in columns,
        sized to the widest element in each column.
-    '''
+    """
     def __init__(self):
         self.thelist = []
         self.lengths = []
 
     def add(self, lis):
-        '''Add a row (a list of items)'''
+        """Add a row (a list of items)"""
         self.thelist.append(list(map(str, lis)))
 
         for i, item in enumerate(lis):

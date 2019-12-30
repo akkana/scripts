@@ -219,9 +219,9 @@ def play_some_chords():
     play_for(major_seventh(440, sawtooth_wave), length)
 
 def parse_chord(ns, default_duration=300):
-    '''Parse a single chord notation, like E4,G4:2.
+    """Parse a single chord notation, like E4,G4:2.
        Returns a list of frequencies (possibly empty) and a duration in ms.
-    '''
+    """
     if ':' in ns:
         ns, durationstr = ns.strip().split(':')
         # everything after the colon is a duration
@@ -252,13 +252,13 @@ def parse_chord(ns, default_duration=300):
     return freqlist, duration
 
 def play_notes(notestring, waveform=None):
-    '''notestring is a string with a format like this:
+    """notestring is a string with a format like this:
     D4,F4 E4,G4:2 Bb3   note#octave,note#octave:duration
     where either octave or duration can be omitted to use the default (1).
     Duration can be a decimal.
     # or b can follow a note letter.
     Omit the note to indicate a rest, e.g. :1.
-    '''
+    """
     if not waveform:
         waveform = square_wave
 

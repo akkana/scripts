@@ -13,16 +13,16 @@ import datetime
 class Gphoto :
 
     def __init__(self, verbose=False):
-        '''May raise CalledProcessError or NotImplementedError
+        """May raise CalledProcessError or NotImplementedError
            if there's no compatible camera connected and switched on.
-        '''
+        """
         self.verbose = verbose
 
     def check_config(self):
-        '''This routine tends to fail -- gphoto2 prints
+        """This routine tends to fail -- gphoto2 prints
            "** Error (-1: 'Unspecified error') ***" --
            even when the camera can capture just fine. So skip it.
-        '''
+        """
         # Do we have a real camera attached using PTP so gphoto2 can talk to it?
         has_capture = False
         # For some reason gphoto2 --list-config ALWAYS exits with nonzero

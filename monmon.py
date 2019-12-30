@@ -110,7 +110,7 @@ class MonMon:
 
 
     def active_monitors(self):
-        '''List monitors xrandr is actually using'''
+        """List monitors xrandr is actually using"""
         active = []
         for mname in self.monitors:
             if mname in self.mon_geom:
@@ -119,7 +119,7 @@ class MonMon:
 
 
     def inactive_monitors(self):
-        '''List monitors that are connected but not being used'''
+        """List monitors that are connected but not being used"""
         inactive = []
         for mname in self.monitors:
             if mname not in self.mon_geom:
@@ -128,7 +128,7 @@ class MonMon:
 
 
     def connected_monitors(self):
-        '''List all connected monitors'''
+        """List all connected monitors"""
         return list(self.monitors.keys())
 
 
@@ -159,8 +159,8 @@ class MonMon:
 
 
     def move_window(self, win, newx, newy):
-        '''Move a window so it's visible on the screen.
-        '''
+        """Move a window so it's visible on the screen.
+        """
         geom = win.get_geometry()
         if win.get_wm_name() == WINDOW_NAME:
             print("Current size", geom.width, geom.height)
@@ -203,9 +203,9 @@ class MonMon:
 
 
     def is_visible(self, x, y):
-        '''Is the point x, y currently visible? That is, is there
+        """Is the point x, y currently visible? That is, is there
            currently a connected screen that is showing that point?
-        '''
+        """
         x_visible = False
         y_visible = False
         for mname in self.mon_geom:

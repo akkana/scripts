@@ -28,9 +28,9 @@ from multiprocessing.dummy import Pool as ThreadPool
 DEBUG=sys.stderr
 
 class UrlDownloader:
-    '''Manage downloading of a single URL (threadable).
+    """Manage downloading of a single URL (threadable).
        Keep track of download success or failure.
-    '''
+    """
     # Status codes for self.status:
     SUCCESS = 0
     ERROR = -1
@@ -39,11 +39,11 @@ class UrlDownloader:
 
     def __init__(self, url, localpath, timeout=10000,
                  user_agent=None, referrer=None, allow_cookies=False):
-        '''Arguments:
+        """Arguments:
             url: the original url to be downloaded
             localpath: where to save it
             timeout=100, referrer=None, user_agent=None, allow_cookies=False
-        '''
+        """
         self.orig_url = url
         self.localpath = localpath
         self.timeout = timeout
@@ -86,9 +86,9 @@ class UrlDownloader:
         return s
 
     def resolve_headers(self):
-        '''Resolve the URL, follow any redirects, but don't
+        """Resolve the URL, follow any redirects, but don't
            actually download the content.
-        '''
+        """
         request = urllib2.Request(self.orig_url)
 
         # If we're after the single-page URL, we may need a referrer
@@ -157,9 +157,9 @@ class UrlDownloader:
         self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
 
     def download_body(self):
-        '''Read the content of the link, whose headers are already resolved,
+        """Read the content of the link, whose headers are already resolved,
            and save the content to the local file path.
-        '''
+        """
         # This can die in various ways -- caught in download()
         html = self.response.read()
 
@@ -196,11 +196,11 @@ class UrlDownloader:
         fp.close()
 
     def download(self):
-        '''Resolve the URL, following any redirects,
+        """Resolve the URL, following any redirects,
            then actually download the URL to the local file.
            This is normally the function callers should use.
            Return self, which includes details like status code and errstring.
-        '''
+        """
         if DEBUG:
             print >>DEBUG, "Start download", self.orig_url
             DEBUG.flush()
@@ -266,7 +266,7 @@ class UrlDownloader:
         return self
 
 class UrlDownloadQueue:
-    '''Maintains a queue of UrlDownloaders and keeps them downloading
+    """Maintains a queue of UrlDownloaders and keeps them downloading
     (eventually asynchronously).
 
     Call download_queue.add(url, localfile=localfile)
@@ -278,7 +278,7 @@ class UrlDownloadQueue:
       referrer
       user_agent
       allow_cookies  default False
-    '''
+    """
     def __init__(self, maxthreads=4):
         self.queue = []     # implemented as a list
         self.succeeded = []
@@ -297,8 +297,8 @@ class UrlDownloadQueue:
         return self.queue.pop()
 
     def add(self, url, **kwargs):
-        '''Add a new URL to the queue to be downloaded.
-        '''
+        """Add a new URL to the queue to be downloaded.
+        """
         kwargs['url'] = url
         if 'localpath' not in kwargs:
             raise ValueError("UrlDownloadQueue.add needs localpath")
@@ -308,12 +308,12 @@ class UrlDownloadQueue:
         self.queue.insert(0, url)
 
     def download(self):
-        '''Start or continue downloading.
+        """Start or continue downloading.
         If maxthreads==0, stay in the current thread and process
         anything available, then return.
         If maxthreads>0, use a separate thread for every download,
         but no more than maxthreads at any given time.
-        '''
+        """
         # XXX If maxthreads==1, would like to start a subthread
         # (if we don't already have one)
         # and process everything in that thread.
@@ -335,10 +335,10 @@ class UrlDownloadQueue:
         self.pool.close()
 
     def cb(self, res):
-        '''Callback that will be called for each UrlDownloader
+        """Callback that will be called for each UrlDownloader
            when it's finished downloading (or has errored out).
            res is a UrlDownloader object.
-        '''
+        """
         if res.status == UrlDownloader.SUCCESS:
             # print "::::: Callback success! Downloaded %d bytes" % res.bytes_downloaded
             self.succeeded.append(res)
@@ -351,8 +351,8 @@ class UrlDownloadQueue:
         self.in_progress.remove(res)
 
     def print_status(self):
-        '''Print a summary of what we did and didn't download successfully.
-        '''
+        """Print a summary of what we did and didn't download successfully.
+        """
         print "\n===== Succeeded:"
         for u in self.succeeded:
             print u
@@ -367,15 +367,15 @@ class UrlDownloadQueue:
                 print u
 
     def processing(self):
-        '''Do we still have URLs in our queues that haven't been processed?
-        '''
+        """Do we still have URLs in our queues that haven't been processed?
+        """
         return (len(self.queue) + len(self.in_progress) > 0)
 
 if __name__ == "__main__":
-    '''One way to test this:
+    """One way to test this:
     urldownloader.py 'http://localhost/delaytest/?delay=.9&count=10' 'http://localhost/delaytest/?delay=1&count=2' 'http://localhost/delaytest/?delay=2&count=4'
        using delaytest.cgi for testing delays repeatably.
-    '''
+    """
     import os
     import urlparse
     import posixpath

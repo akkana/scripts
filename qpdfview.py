@@ -34,7 +34,7 @@ POINTS_PER_INCH = 72
 
 class PDFWidget(QLabel):
 
-    '''
+    """
     A widget showing one page of a PDF.
     If you want to show multiple pages of the same PDF,
     make sure you share the document (let the first PDFWidget
@@ -43,13 +43,13 @@ class PDFWidget(QLabel):
     Will try to resize to a reasonable size to fit inside the
     geometry passed in (typically the screen size, a PyQt5.QtCore.QRect);
     or specify dpi explicitly.
-    '''
+    """
 
     def __init__(self, url, document=None, pageno=1, dpi=None,
                  geometry=None, parent=None, load_cb=None):
-        '''
+        """
            load_cb: will be called when the document is loaded.
-        '''
+        """
         super(PDFWidget, self).__init__(parent)
 
         self.geometry = geometry
@@ -102,8 +102,8 @@ class PDFWidget(QLabel):
         return self.pagesize
 
     def render(self):
-        '''Render to a pixmap at the current DPI setting.
-        '''
+        """Render to a pixmap at the current DPI setting.
+        """
         if not self.document:
             return
 
@@ -145,9 +145,9 @@ class PDFWidget(QLabel):
         self.setPixmap(self.pixmap)
 
     def start_load(self, url):
-        '''Create a Poppler.Document from the given URL, QUrl or filename.
+        """Create a Poppler.Document from the given URL, QUrl or filename.
            Return, then asynchronously call self.load_cb.
-        '''
+        """
 
         # If it's not a local file, we'll need to load it.
         # http://doc.qt.io/qt-5/qnetworkaccessmanager.html
@@ -171,9 +171,9 @@ class PDFWidget(QLabel):
 
 class PDFScrolledWidget(QScrollArea):
 
-    '''
+    """
     Show all pages of a PDF, with scrollbars.
-    '''
+    """
 
     def __init__(self, filename, dpi=72, geometry=None, parent=None):
         super(PDFScrolledWidget, self).__init__(parent)
@@ -253,9 +253,9 @@ class PDFScrolledWidget(QScrollArea):
 
 
     def resize_to_fit_content(self):
-        '''Resize to be wide enough not to show a horizontal scrollbar,
+        """Resize to be wide enough not to show a horizontal scrollbar,
            and just a little taller than the first page of PDF content.
-        '''
+        """
         if not self.vscrollbar:
             self.vscrollbar = self.verticalScrollBar()
         if self.vscrollbar:
@@ -287,9 +287,9 @@ class PDFScrolledWidget(QScrollArea):
 
 
     def resizeEvent(self, event):
-        '''On resizes after the initial resize,
+        """On resizes after the initial resize,
            re-render the PDF to fit the new width.
-        '''
+        """
         oldWidth = event.oldSize().width()
         newWidth = event.size().width()
 
@@ -300,8 +300,8 @@ class PDFScrolledWidget(QScrollArea):
 
 
     def zoom(self, frac=1.25):
-        '''Zoom the page by the indicated fraction.
-        '''
+        """Zoom the page by the indicated fraction.
+        """
         for page in self.pages:
             # Resize according to width, ignoring height.
             page.dpi *= frac
@@ -309,9 +309,9 @@ class PDFScrolledWidget(QScrollArea):
 
 
     def unzoom(self, frac=.8):
-        '''Zoom the page by the indicated fraction.
+        """Zoom the page by the indicated fraction.
            Same as unzoom but with a default that zooms out instead of in.
-        '''
+        """
         self.zoom(frac)
 
 

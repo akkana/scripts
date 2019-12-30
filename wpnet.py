@@ -20,7 +20,7 @@ import time
 
 verbose = False
 
-'''
+"""
 To run this as a normal user, not under sudo:
 edit /etc/wpa_supplicant/wpa_supplicant.conf
 and add a line like:
@@ -69,12 +69,12 @@ WORKED:
      (idiot bash lost this command, probably enable?)
   wpa_cli save_config
   dhclient -v wlp2s0
-'''
+"""
 
 def run_as_root(cmdargs):
-    '''Run cmdargs inside sudo, unless we're already root.
+    """Run cmdargs inside sudo, unless we're already root.
        return (stdout, stderr) as strings.
-    '''
+    """
     if os.getpid() != 0:
         cmdargs = ["sudo"] + cmdargs
 
@@ -86,8 +86,8 @@ def run_as_root(cmdargs):
     return ( b.decode() for b in proc.communicate() )
 
 def run_cmd(cmdargs):
-    '''Run and return (stdout, stderr) as strings.
-    '''
+    """Run and return (stdout, stderr) as strings.
+    """
     if verbose:
         print("\n** Run:", ' '.join(cmdargs))
     proc = subprocess.Popen(cmdargs, shell=False,
@@ -154,7 +154,7 @@ def get_available_accesspoints(iface):
     return aps
 
 def get_current():
-    '''
+    """
 <iridum>- sudo wpa_cli list_networks
 Selected interface 'wlp2s0'
 network id / ssid / bssid / flags
@@ -163,7 +163,7 @@ network id / ssid / bssid / flags
 2       CommunityLab    any     [DISABLED]
 3       COAFreeWireless any
 4       LAC-Public Library      any
-'''
+"""
     start_wpa_supplicant(iface)
     networks = {}
     out, err = run_cmd(["wpa_cli", "list_networks"])

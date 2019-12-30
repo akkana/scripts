@@ -89,9 +89,9 @@ def get_keysym(ch):
     return keysym
 
 def is_shifted(ch):
-    '''Return False if the character isn't shifted.
+    """Return False if the character isn't shifted.
        If it is, return the unshifted character.
-    '''
+    """
     if ch.isupper():
         return ch.lower()
     if "~!@#$%^&*()_+{}|:\"<>?".find(ch) >= 0:

@@ -11,9 +11,9 @@ import argparse
 
 
 def nearest_time(targettime, t1, t2):
-    '''Given a target ephem.time and two other datetimes,
+    """Given a target ephem.time and two other datetimes,
        return the time closer to the target.
-    '''
+    """
     d1 = abs(targettime - t1)
     d2 = abs(targettime - t2)
     if d1 <= d2:
@@ -22,11 +22,11 @@ def nearest_time(targettime, t1, t2):
 
 
 def find_rise_set(observer, obj, d=None):
-    '''Given an object (like Sun or Moon), find its rising and setting time
+    """Given an object (like Sun or Moon), find its rising and setting time
        closest to the given date d, either preceding or following it,
        for the observer's location.
        If date isn't specified, use the observer's date.
-    '''
+    """
     if d:
         observer.date = d
     prevrise = observer.previous_rising(obj)
@@ -89,10 +89,10 @@ def bearing_to(wp1, wp2):
 
 
 def find_alignments(observer, waypoints, year, allpoints=False):
-    '''Find all the alignments with solstice/equinox sun/moon rise/set.
+    """Find all the alignments with solstice/equinox sun/moon rise/set.
        Returns a dict: { 'vernal equinox': { 'moon': { 'rise': 94.17... } } }
        of azimuth angles in decimal degrees
-    '''
+    """
     azimuths = {}
 
     # start_date = ephem.Date('%d/1/1' % year)
@@ -231,10 +231,10 @@ def read_waypoint_file_GPX(filename):
 
 
 def get_DOM_text(node, childname=None):
-    '''Get the text out of a DOM node.
+    """Get the text out of a DOM node.
        Or, if childname is specified, get the text out of a child
        node with node name childname.
-    '''
+    """
     if childname:
         nodes = node.getElementsByTagName(childname)
         # print "node has", len(nodes), childname, "children"
@@ -250,7 +250,7 @@ def get_DOM_text(node, childname=None):
 
 
 def find_observer_point(obsname, waypoints):
-    '''Find the waypoint with the name obsname.'''
+    """Find the waypoint with the name obsname."""
     for wp in waypoints:
         if wp[0] == obsname:
             return wp
@@ -258,9 +258,9 @@ def find_observer_point(obsname, waypoints):
 
 
 def save_alignments_as_JSON(observer, alignments, waypoints, filename):
-    '''Given a list of alignments,
+    """Given a list of alignments,
        save a JSON file that can be plotted in various ways.
-    '''
+    """
     print("Saving as JSON")
     out = []
     for a in alignments:
@@ -295,10 +295,10 @@ def save_alignments_as_JSON(observer, alignments, waypoints, filename):
 
 
 def save_alignments_as_GPX(observer, alignments, waypoints, filename):
-    '''Given a list of alignments,
+    """Given a list of alignments,
        save them as a GPX file with tracks between observer and each target,
        and a waypoint for each target.
-    '''
+    """
     with open(filename, 'w') as outfp:
         print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <gpx version="1.1" creator="SkyAlignments~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">

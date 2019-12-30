@@ -53,10 +53,10 @@ errlog = ''
 # Separate reading the finance data into separate routines,
 # since these web APIs change or disappear so often.
 def read_finance_data(ticker, start_date, end_date):
-    '''Return a dict,
+    """Return a dict,
        'dates': [list of datetime.date objects],
        'vals' : [list of floats]
-    '''
+    """
     return read_finance_data_alphavantage(ticker, start_date, end_date)
 
 
@@ -194,17 +194,17 @@ styles = [ '-', '--', ':', '-.' ]
 markers = [ 'o', '*', 's', '^', 'p', '+', 'D', 'x', '|', 'h' ]
 
 def pick_color(i):
-    '''Pick a color that tries to be reasonably different
+    """Pick a color that tries to be reasonably different
        from other colors so far picked.
-    '''
+    """
     return colors[i % len(colors)] \
         + styles[int(i / len(colors))]
 #        + markers[i%len(markers)]
 
 def plot_funds(tickerlist, initial, start, end):
-    '''Plot a fund by its ticker symbol,
+    """Plot a fund by its ticker symbol,
        normalized to a given initial value.
-    '''
+    """
 
     global outlog, errlog
 

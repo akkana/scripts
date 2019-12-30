@@ -20,9 +20,9 @@ from PyPDF2 import PdfFileMerger
 from io import BytesIO
 
 class HeadlessPagePrinter():
-    '''Load a single page and convert it to PDF.
+    """Load a single page and convert it to PDF.
        When the PDF is ready, call the pdf_ready() callback.
-    '''
+    """
     def __init__(self, app, pdf_ready, x_res=1024):
         self.profile = QWebEngineProfile()
         self.webpage = QWebEnginePage(self.profile, app)
@@ -32,9 +32,9 @@ class HeadlessPagePrinter():
         self.pdf_ready = pdf_ready
 
     def load_url(self, url):
-        '''pdf_ready is a callback called with a QString
+        """pdf_ready is a callback called with a QString
            of the PDF bytes 'printed'.
-        '''
+        """
         # Sadly, QWebEnginePage has no way to apply custom stylesheets
         # or otherwise change style.
         # So we have to intercept the load and insert our print style

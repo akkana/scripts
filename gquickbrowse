@@ -41,8 +41,8 @@ ABOUT_PAGE = """
 URL_FILE = "/tmp/quickbrowse-urls-%d"
 
 class BrowserView(webkit.WebView):
-    '''A WebView in a single tab.
-    '''
+    """A WebView in a single tab.
+    """
 
     def __init__(self, contentPane):
         webkit.WebView.__init__(self)
@@ -205,7 +205,7 @@ class ContentPane (gtk.Notebook):
         self._hovered_uri = None
 
     def current_view(self):
-        '''Returns the BrowserView for the current tab'''
+        """Returns the BrowserView for the current tab"""
         return self.get_nth_page(self.get_current_page()).get_child()
 
     def load (self, text):
@@ -453,8 +453,8 @@ class WebToolbar(gtk.Toolbar):
         window.present()
 
 class WebBrowserWindow(gtk.Window):
-    '''The winddow containing the browser.
-    '''
+    """The winddow containing the browser.
+    """
     def __init__(self):
         gtk.Window.__init__(self)
 
@@ -582,9 +582,9 @@ class WebUtils:
 
     @staticmethod
     def get_procname(procargs):
-        '''Return the program name: either the first commandline argument,
+        """Return the program name: either the first commandline argument,
            or, if that argument is some variant of "python", the second.
-        '''
+        """
         basearg = os.path.basename(procargs[0])
         if basearg == 'python' or basearg == 'python2' \
            or basearg.startswith('python2.'):

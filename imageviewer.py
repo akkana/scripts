@@ -5,8 +5,8 @@ import pango
 import gc
 
 class ImageViewer(gtk.DrawingArea):
-    '''A generic PyGTK image viewer widget
-    '''
+    """A generic PyGTK image viewer widget
+    """
 
     def __init__(self):
         super(ImageViewer, self).__init__()
@@ -74,10 +74,10 @@ class ImageViewer(gtk.DrawingArea):
         self.label_text = None
 
     def prepare_image(self):
-        '''Load the image passed in, and show it.
+        """Load the image passed in, and show it.
            img is a filename.
            Return True for success, False for error.
-        '''
+        """
 
         self.label_text = None
 
@@ -213,8 +213,8 @@ class ImageViewer(gtk.DrawingArea):
                                 layout)
 
 class ImageViewerWindow(gtk.Window):
-    '''Bring up a window that can view images.
-    '''
+    """Bring up a window that can view images.
+    """
 
     def __init__(self, file_list=None, width=1024, height=768):
         super(ImageViewerWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
@@ -275,7 +275,7 @@ class ImageViewerWindow(gtk.Window):
         gtk.main_quit()
 
 def key_press_event(widget, event, imagewin):
-    '''Handle a key press event anywhere in the window'''
+    """Handle a key press event anywhere in the window"""
     if event.string == " ":
         imagewin.next_image()
         return

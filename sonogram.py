@@ -100,9 +100,9 @@ def my_specgram(x, NFFT=256, Fs=2, Fc=0, detrend=mlab.detrend_none,
     return Pxx, freqs, bins, im
 
 def sonogram(wav_file, startsecs=None, endsecs=None):
-    '''Plot a sonogram for the given file,
+    """Plot a sonogram for the given file,
        optionally specifying the start and end time in seconds.
-    '''
+    """
     wav = wave.open(wav_file, 'r')
     frames = wav.readframes(-1)
     frame_rate = wav.getframerate()

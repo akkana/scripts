@@ -7,8 +7,8 @@ import matplotlib.ticker as mticker
 
 
 def nextmonth(d):
-    '''Beginning of the following month.
-    '''
+    """Beginning of the following month.
+    """
     month = d.month + 1
     year = d.year
     if month > 12:
@@ -77,13 +77,13 @@ def smart_time_ticks(imin, imax, minor=False):
        and provides both major (__call__()) and minor (minor())
        locators.
     """
-    '''Given the limits of the plot in float or numpy.float64 ordinals,
+    """Given the limits of the plot in float or numpy.float64 ordinals,
        return three lists:
          [ all major tick positions,
            all minor tick positions,
            all major tick labels ]
        , with the first two in float ordinals.
-    '''
+    """
     # translate to datetime.datetime
     dmin = mdates.num2date(imin)
     dmax = mdates.num2date(imax)
@@ -189,9 +189,9 @@ def smart_time_ticks(imin, imax, minor=False):
 
 
 def daytime_formatter(d, pos=None):
-    '''Custom matplotlib formatter
+    """Custom matplotlib formatter
        show the time of day except at midnight, when the date is shown.
-    '''
+    """
     # Empirically, pos is the X position (in some unkmnown coordinates)
     # when setting up axis tics. However, later, when locating mouse
     # positions, pos is None. So we can use pos t tell the difference
@@ -269,8 +269,8 @@ Three years by week:    2017-01-01T00:00 2020-01-01T00:00 week
 
 
     def test_interval(start, end, interval, desc):
-        '''Test smart dates for one interval. Produce and show a graph.
-        '''
+        """Test smart dates for one interval. Produce and show a graph.
+        """
         if interval[0].isdigit():
             import re
             match = re.match('(\d+)(.+)', interval)

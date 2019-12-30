@@ -129,11 +129,11 @@ def get_wave(freq, waveform=square_wave):
     return wave
 
 def start_note(freqlist, waveform=square_wave, additive=True):
-    '''Start a note of a given frequency and waveform.
+    """Start a note of a given frequency and waveform.
        freqlist can be either a list or a single frequency (float).
        If additive, we'll add it to whatever's already playing;
        otherwise it will replace the current sound.
-    '''
+    """
     global waves_playing
 
     if not freqlist:
@@ -161,8 +161,8 @@ def start_note(freqlist, waveform=square_wave, additive=True):
     return key
 
 def stop_note(wav):
-    '''Subtract waves_playing[wav] from what we're currently playing.
-    '''
+    """Subtract waves_playing[wav] from what we're currently playing.
+    """
     global waves_playing
 
     try:

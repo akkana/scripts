@@ -42,7 +42,7 @@ class BookCoverFixer:
             shutil.rmtree(self.imagedir)
 
     def add_title_to_cover(self):
-        '''Actually do the fix'''
+        """Actually do the fix"""
 
         # XXX figure out how to do this with imagemagick python bindings.
         # ImageMagick doesn't use the pretty font names with spaces in them;
@@ -185,7 +185,7 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
         self.disconnect(self.expose_id)
 
     def key_press_event(self, widget, event, imagewin):
-        '''Handle a key press event anywhere in the window'''
+        """Handle a key press event anywhere in the window"""
         # Don't use space here: space will activate the focused button
         # rather than (or in addition to?) anything here.
         if event.string == "n":

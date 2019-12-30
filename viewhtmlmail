@@ -28,11 +28,11 @@ import tempfile
 import subprocess
 
 def find_first_maildir_file(maildir):
-    '''Maildir: inside /tmp/mutttmpbox, mutt creates another level of
+    """Maildir: inside /tmp/mutttmpbox, mutt creates another level of
        directory, so the file will be something like /tmp/mutttmpbox/cur/1.
        So recurse into directories until we find an actual mail file.
        Return a full path to the filename.
-    '''
+    """
     for root, dirs, files in os.walk(maildir):
         for f in files:
             if not f.startswith('.'):

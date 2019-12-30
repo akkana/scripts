@@ -11,9 +11,9 @@ import sys
 from math import radians, degrees, sin, cos, atan2, sqrt
 
 def flyto(lat1, lon1, lat2, lon2):
-    '''Return initial heading, final heading when flying from (lat1, lon1)
+    """Return initial heading, final heading when flying from (lat1, lon1)
        to (lat2, lon2) on a great circle course.
-    '''
+    """
     # Convert everything to radians
     d3_lat1 = radians(lat1)
     e3_lon1 = radians(lon1)

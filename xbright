@@ -24,10 +24,10 @@ XRANDR = "/usr/bin/xrandr"
 monprefs = [ "HDMI", "DP", "VGA", "eDP", "LVDM" ]
 
 def get_brightness():
-    '''Return the current brightness setting from the first
+    """Return the current brightness setting from the first
        (as defined by xrandr --verbose) currently active monitor.
        Currently this is a float between 0 and 1.
-    '''
+    """
     # xrandr --verbose --current | grep Brightness:
     proc = subprocess.Popen([ XRANDR, "--verbose", "--current" ],
                             shell=False, stdout=subprocess.PIPE)
@@ -65,10 +65,10 @@ def get_brightness():
     sys.exit(1)
 
 def set_brightness(new_brightness, monitor, redshift=True):
-    '''Set the brightness.
+    """Set the brightness.
        If redshift is True, then adjust the color balance
        to get redder as the screen gets dimmer, for evening use.
-    '''
+    """
     args = [ XRANDR ]
 
     if monitor:

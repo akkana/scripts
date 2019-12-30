@@ -33,7 +33,7 @@ class TransImageViewerWindow(ImageViewerWindow):
             print "Not composited"
 
     def key_press_event(self, widget, event):
-        '''Handle a key press event anywhere in the window'''
+        """Handle a key press event anywhere in the window"""
         if event.string == " ":
             imagewin.next_image()
             return

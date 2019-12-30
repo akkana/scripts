@@ -45,10 +45,10 @@ def ping(host):
     return False
 
 def fping(network):
-    '''Ping all hosts on the given network.
+    """Ping all hosts on the given network.
        Return a list of the hosts that responded.
        Raises FileNotFoundError if fping isn't installed.
-    '''
+    """
     proc = subprocess.Popen(["fping", "-c1", "-t1000"]
                             + [ network + '.'
                                 + str(i) for i in range(1,256) ],
@@ -128,10 +128,10 @@ def ip_addr(iface):
     return socket.inet_ntoa(info[20:24])
 
 def scan(iface, port=None):
-    '''Scan all hosts on the network specified by the interface iface.
+    """Scan all hosts on the network specified by the interface iface.
        This is not smart about network classes: it will replace the
        final number in the dotted quad with 1-255.
-    '''
+    """
     myip = ip_addr(iface)
     mynetwork = '.'.join(myip.split('.')[0:3])
 

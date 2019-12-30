@@ -51,9 +51,9 @@ def word2num(word):
     return phonenumber
 
 def find_words(phonenum, multi_wordlen=3):
-    '''Takes either a string of digits, or a list of numbers.
+    """Takes either a string of digits, or a list of numbers.
        If single_word is true, only allow a single word of the same length
-    '''
+    """
 
     # print("find_words(", phonenum)
 
@@ -111,11 +111,11 @@ def find_words(phonenum, multi_wordlen=3):
     return matchwords
 
 def find_dups(matchlen):
-    '''Find phone numbers that have more than one match, for a given length.
+    """Find phone numbers that have more than one match, for a given length.
        Returns an OrderedDict where the keys are number of matches,
        and the values are OrderedDicts whose keys are all the phone
        numbers that have that many matches (values are the match words).
-    '''
+    """
 
     print("Looking for duplicates of length %d ..." % matchlen)
 

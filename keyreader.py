@@ -6,14 +6,14 @@ import termios, fcntl
 import select
 
 class KeyReader :
-    '''
+    """
     Read keypresses one at a time, without waiting for a newline.
     echo: should characters be echoed?
     block: should we block for each character, or return immediately?
            (If !block, we'll return None if nothing is available to read.)
-    '''
+    """
     def __init__(self, echo=False, block=True):
-        '''Put the terminal into cbreak and noecho mode.'''
+        """Put the terminal into cbreak and noecho mode."""
         self.fd = sys.stdin.fileno()
 
         self.block = block
@@ -62,12 +62,12 @@ class KeyReader :
         termios.tcsetattr(self.fd, termios.TCSANOW, newattr)
 
     def __del__(self):
-        '''Reset the terminal before exiting the program.'''
+        """Reset the terminal before exiting the program."""
         self.termios.tcsetattr(self.fd, self.termios.TCSAFLUSH, self.oldterm)
         self.fcntl.fcntl(self.fd, self.fcntl.F_SETFL, self.oldflags)
 
     def getch(self):
-        '''Read keyboard input, returning a string.
+        """Read keyboard input, returning a string.
            Note that one key may result in a string of more than one character,
            e.g. arrow keys that send escape sequences.
            There may also be multiple keystrokes queued up since the last read.
@@ -75,7 +75,7 @@ class KeyReader :
            This function, sadly, cannot read special characters like VolumeUp.
            They don't show up in ordinary CLI reads -- you have to be in
            a window system like X to get those special keycodes.
-        '''
+        """
         # Since we can't use the normal cbreak read from python,
         # use select to see if there's anything there:
         if self.block:

@@ -5,13 +5,13 @@ import termios, fcntl   # For non-blocking key reads
 import time
 
 class KeyReader :
-    '''
+    """
     Read keypresses one at a time, without waiting for a newline.
     Uses the technique from
     http://docs.python.org/2/faq/library.html#how-do-i-get-a-single-keypress-at-a-time
-    '''
+    """
     def __init__(self, echo=False) :
-        '''Put the terminal into cbreak and noecho mode.'''
+        """Put the terminal into cbreak and noecho mode."""
         self.fd = sys.stdin.fileno()
 
         self.oldterm = termios.tcgetattr(self.fd)
@@ -37,12 +37,12 @@ class KeyReader :
         self.termios = termios
 
     def __del__(self) :
-        '''Reset the terminal before exiting the program.'''
+        """Reset the terminal before exiting the program."""
         self.termios.tcsetattr(self.fd, self.termios.TCSAFLUSH, self.oldterm)
         self.fcntl.fcntl(self.fd, self.fcntl.F_SETFL, self.oldflags)
 
     def getch(self) :
-        '''Read keyboard input, returning a string.
+        """Read keyboard input, returning a string.
            Note that one key may result in a string of more than one character,
            e.g. arrow keys that send escape sequences.
            There may also be multiple keystrokes queued up since the last read.
@@ -50,7 +50,7 @@ class KeyReader :
            This function, sadly, cannot read special characters like VolumeUp.
            They don't show up in ordinary CLI reads -- you have to be in
            a window system like X to get those special keycodes.
-        '''
+        """
         try:
             return sys.stdin.read()
         except IOError:

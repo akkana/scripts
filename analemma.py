@@ -56,11 +56,11 @@ class AnalemmaWindow(Gtk.Window):
         self.special_dot_size = 5
 
     def draw_sun_position(self, date):
-        '''Draw a sun at the appropriate position for date.
+        """Draw a sun at the appropriate position for date.
            date can be a string like "2018/8/9 12:00"
            which is the format pyephem expects,
            or an EphemDate.
-        '''
+        """
         if not self.drawing_area:
             print("no drawing area")
             return
@@ -83,9 +83,9 @@ class AnalemmaWindow(Gtk.Window):
         self.project_and_draw(self.sun.az, self.sun.alt, 4)
 
     def calc_special_dates(self):
-        '''Earlist and latest rising and setting times,
+        """Earlist and latest rising and setting times,
            and longest/shortest day.
-        '''
+        """
         if self.special_dates:
             # Already done, nothing more to do.
             return
@@ -137,9 +137,9 @@ class AnalemmaWindow(Gtk.Window):
             dt = ephem.date(dt + ephem.hour * 24)
 
     def gmt_for_time_on_date(self, edate, timetuple):
-        '''Returns the ephem.date for the GMT corresponding to localtime
+        """Returns the ephem.date for the GMT corresponding to localtime
            timetuple on the given ephem.date.
-        '''
+        """
         tup = list(edate.tuple())
         tup[3], tup[4], tup[5] = timetuple
         return self.local_to_gmt(ephem.date(tuple(tup)), reverse=True)
@@ -242,18 +242,18 @@ Latest sunset: %s
                 return 'Polar region: skipping special dates'
 
     def local_mean_time(self, d, reverse=False):
-        '''Adjust GMT to local time.
+        """Adjust GMT to local time.
            We don't know time zone, but we can adjust for actual
            local noon since we know the Observer's longitude:
-        '''
+        """
         return ephem.date(ephem.date(d) \
                     + float(self.observer.lon) * 12 / math.pi * ephem.hour)
 
     def local_to_gmt(self, d, reverse=False):
-        '''Adjust GMT to local time.
+        """Adjust GMT to local time.
            We don't know time zone, but we can adjust for actual
            local noon since we know the Observer's longitude:
-        '''
+        """
         return ephem.date(ephem.date(d) \
                     - float(self.observer.lon) * 12 / math.pi * ephem.hour)
 
@@ -289,12 +289,12 @@ Latest sunset: %s
             self.ctx.fill()
 
     def draw_string(self, label, x, y, offsets=None):
-        '''Draw a string at the specified point.
+        """Draw a string at the specified point.
            offsets is an optional tuple specifying where the string will
            be drawn relative to the coordinates passed in;
            for instance, if offsets are (-1, -1) the string will be
            drawn with the bottom right edge at the given x, y.
-        '''
+        """
         fontname = "Sans Italic 14"
         # fontname = "Sans Italic 14"
 
@@ -382,11 +382,11 @@ Latest sunset: %s
             return self.project_rectangular(az, alt)
 
     def draw(self, widget, ctx, background=None, labels=True):
-        '''Draw everything: the analemma and all the labels.
+        """Draw everything: the analemma and all the labels.
            If background isn't passed, we'll default to
            self.background_color (opaque blue), but save_image()
            will pass in a transparent background.
-        '''
+        """
         self.ctx = ctx
 
         self.width, self.height = self.get_size()
@@ -487,12 +487,12 @@ Latest sunset: %s
             self.draw_string(obslabel, 10, 10)
 
     def save_image(self, outfile, labels=False):
-        '''Save the analemma as a PNG image, with the background
+        """Save the analemma as a PNG image, with the background
            transparent so it can be overlayed on top of a planetarium
            show, scenics, etc.
            Will save to a file named Analemma-$sitename.png
            with spaces replaced with dashes.
-        '''
+        """
         dst_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
                                          self.width, self.height)
 
@@ -512,7 +512,7 @@ Latest sunset: %s
         print("Saved to", outfile)
 
     def key_press(self, widget, event):
-        '''Handle a key press event anywhere in the window'''
+        """Handle a key press event anywhere in the window"""
         # Note: to handle just printables with no modifier keys,
         # use e.g. if event.string == "q"
 

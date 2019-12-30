@@ -14,9 +14,9 @@ from __future__ import print_function
 import sys, os, string
 
 def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
-    '''Inside grepdirs, open files named Tags or Keywords.
+    """Inside grepdirs, open files named Tags or Keywords.
        Search those lines looking for matches in the keywords for pats.
-    '''
+    """
     results = []
     for d in grepdirs:
         for root, dirs, files in os.walk(d) :
@@ -31,11 +31,11 @@ def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
 
 def search_for_keywords_in(d, f, orpats, andpats, notpats, separate,
                            results=None) :
-    '''Search in d/f for lines matching or, and and not pats.
+    """Search in d/f for lines matching or, and and not pats.
        Those have lines in a format like:
        [tag ]keyword, keyword: file.jpg file.jpg
        If results is passed in, append to it, else just print.
-    '''
+    """
     filetags = {}
     for line in open(os.path.join(d, f)):
         line = line.strip()
@@ -77,10 +77,10 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, separate,
                 print(imgfile, end=' ')
 
 def has_match(tags, orpats, andpats, notpats):
-    '''Do the tags contain any of the patterns in orpats,
+    """Do the tags contain any of the patterns in orpats,
        AND all of the patterns in andpats,
        AND none of the patterns in notpats?
-    '''
+    """
     #print "Looking for OR", orpats, "AND", andpats, "NOT", notpats, "IN", tags
     for pat in notpats:
         if pat in tags:

@@ -34,10 +34,10 @@ def Usage():
 
 
 def extra_dirs_by_lang(lang):
-    '''See if there's a lang.conf file that lists extra files by language.
+    """See if there's a lang.conf file that lists extra files by language.
        It should have absolute paths to directories, one per line.
        Return a list of extra dirs.
-    '''
+    """
     #
     # Read the config file
     #
@@ -87,9 +87,9 @@ languages_with_shebang = [ 'python', 'perl', 'sh', 'ruby', 'perl',
 
 
 def check_file_lang(filename, lang):
-    '''Try to guess whether a file is a given programming language.
+    """Try to guess whether a file is a given programming language.
        Use file extensions, shebangs.
-    '''
+    """
 
     if os.path.isdir(filename) or not os.path.exists(filename):
         return False
@@ -125,9 +125,9 @@ def check_file_lang(filename, lang):
 filepaths = set()
 
 def find_files_in_dir(lang, direc):
-    '''Generator: iterate over a set of files that are the right language
+    """Generator: iterate over a set of files that are the right language
        under the given dir.
-    '''
+    """
 
     for root, dirs, fs in os.walk(direc, followlinks=True):
         for f in fs:
@@ -176,9 +176,9 @@ def langgrep(lang, pattern, grepargs, fil):
 
 
 def parse_args():
-    '''Usage: langgrep lang [grepflags] pattern files
+    """Usage: langgrep lang [grepflags] pattern files
        Returns: (lang, pattern, grepargs, files)
-    '''
+    """
     if len(sys.argv) < 3:
         Usage()
 

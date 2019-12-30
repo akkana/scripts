@@ -4,8 +4,8 @@ import gtk, gobject, glib
 import gc
 
 class ImageViewer() :
-    '''
-    '''
+    """Image viewer class using GTK2.
+    """
     def __init__(self, width, height) :
         self.width = width
         self.height = height
@@ -50,9 +50,9 @@ class ImageViewer() :
         self.show_image()
 
     def load_image(self, filename) :
-        '''Load the image passed in, and show it.
+        """Load the image passed in, and show it.
            Return True for success, False for error.
-        '''
+        """
         print "Trying to load", filename
 
         self.cur_img = filename

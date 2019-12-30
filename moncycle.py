@@ -16,9 +16,9 @@ import monmon
 preferred_order = [ 'HDMI', 'DP', 'VGA', 'eDP', 'LVDS' ]
 
 def find_in_preferred_list(mon_name, start_from=0):
-    '''Return the first monitor type (e.g. 'HDMI') that matches mon_name,
+    """Return the first monitor type (e.g. 'HDMI') that matches mon_name,
        or None.
-    '''
+    """
     if start_from > 0:
         thelist = preferred_order + preferred_order[:start_from]
     else:

@@ -77,8 +77,8 @@ class SoundPlayer :
             self.current.wait()
 
 class XchatSoundHandler :
-    ''' Play alert sound depending on the channel and circumstances.
-    '''
+    """ Play alert sound depending on the channel and circumstances.
+    """
 
     STARTUP_DELAY = 25     # No sounds will be played in the first few seconds
 
@@ -122,7 +122,7 @@ class XchatSoundHandler :
         debugprint("Loaded chatsounds.py")
 
     def handle_message(self, word, word_eol, userdata):
-        '''
+        """
         Handle a message in xchat.
         word is something like:
           [ '\xaaaanick', "the message we're acting on" ]
@@ -131,7 +131,7 @@ class XchatSoundHandler :
           http://xchat.org/docs/xchatpython.html
         userdata is something like: 'Channel Message', from EVENTS,
         so you can play different sounds depending on what happened.
-        '''
+        """
 
         # If it's too soon after startup, don't do anything.
         # Then we won't hear a slew of alerts from past scrollback,
@@ -223,8 +223,8 @@ class XchatSoundHandler :
         return xchat.EAT_NONE
 
     def handle_prefs(self, word, word_eol, userdata) :
-        ''' Use this for any prefs/actions, like silence/unsilence.
-        '''
+        """ Use this for any prefs/actions, like silence/unsilence.
+        """
         channel = xchat.get_info('channel')
 
         if word[1] == 'silence' :

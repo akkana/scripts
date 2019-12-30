@@ -61,9 +61,9 @@ class Cachefile(object):
 
 
     def write_cache_file(self, day_data):
-        '''Write (or overwrite) the whole cache file for the given day
+        """Write (or overwrite) the whole cache file for the given day
            Otherwise, will overwrite the whole file.
-        '''
+        """
         if not self.fieldnames:
             self.fieldnames = list(day_data[0].keys())
 
@@ -129,8 +129,8 @@ class Cachefile(object):
 
 
     def write_cache_line(self, cachefp, item):
-        '''Write one interval (one line) to a cache file.
-        '''
+        """Write one interval (one line) to a cache file.
+        """
         self.writer.writerow(item)
 
 
@@ -138,10 +138,10 @@ class Cachefile(object):
     # ~/.cache/enphase/YYYY-MM-DD.dat
     # Inside each file are CSV lines: time,powr,enwh,devices_reporting
     def read_cache_file(self, day=None):
-        '''Read the cache file for the given day (a datetime)
+        """Read the cache file for the given day (a datetime)
            and return the cache file name plus a list of dictionaries,
            one for each line.
-        '''
+        """
         if not day:
             day = datetime.datetime.now()
 
@@ -165,23 +165,23 @@ class Cachefile(object):
 
 
     def fetch_one_day_data(self, day):
-        '''fetch_data, undefined in this base class, should fetch
+        """fetch_data, undefined in this base class, should fetch
            one day's data using whatever web or other API is appropriate.
            Override it in your derived class.
-        '''
+        """
         raise NotImplementedError("Don't know how to fetch: "
                                   "override fetch_data in subclasses")
 
 
     def day_start(self, day):
-        '''Given a datetime, return the beginning of that day as a datetime.
-        '''
+        """Given a datetime, return the beginning of that day as a datetime.
+        """
         return day.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
     def day_end(self, day):
-        '''Given a datetime, return the beginning of that day as a datetime.
-        '''
+        """Given a datetime, return the beginning of that day as a datetime.
+        """
         return day.replace(hour=23, minute=59, second=59, microsecond=0)
 
 
@@ -203,14 +203,14 @@ class Cachefile(object):
 
 
     def time_bounds(self, starttime=None, endtime=None, day=None, now=None):
-        '''If day is specified, return the beginning and end of that day.
+        """If day is specified, return the beginning and end of that day.
            Otherwise, if no starttime, set it to the beginning of today.
            If no endtime, set it to the end of today.
            In every case, restrict the time range to a single day,
            and don't allow anything later than now.
            now can be specified because it may need to be set back by some
            amount, like 10 minutes, depending on how often the API updates.
-        '''
+        """
         if not now:
             now = datetime.datetime.now()
 
@@ -250,12 +250,12 @@ class Cachefile(object):
 
 
     def get_data(self, starttime=None, endtime=None):
-        '''Get a block of data between two datetimes,
+        """Get a block of data between two datetimes,
            reading from cache when possible, otherwise fetching from API
            and writing new cache files.
            starttime defaults to midnight today.
            endtime defaults to now, or the end of the day of starttime.
-        '''
+        """
 
         data = []
 

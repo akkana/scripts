@@ -24,10 +24,10 @@ observer.elevation = 1980  # meters, though the docs don't actually say
 DEGREES = 180. / ephem.pi
 
 def discont_range(start, end, max):
-    '''Return a discontinuous range.
+    """Return a discontinuous range.
     Like range(start, end) except that if start > end, will "loop around"
     e.g. discont_range(22, 2, 24) will return [22, 23, 0, 1].
-    '''
+    """
     start = start%max
     end = end%max
     if start <= end:
@@ -35,8 +35,8 @@ def discont_range(start, end, max):
     return list(range(start, max)) + list(range(0, end))
 
 def time_zone_offset(ephemdate):
-    '''Get the timezone offset at a given ephem.date
-    '''
+    """Get the timezone offset at a given ephem.date
+    """
     # First get the time zone offset. We'll assume the offset
     # is the same all day. That might make us be off by an hour
     # on start and end times for a few hours twice a year.
@@ -48,7 +48,7 @@ def time_zone_offset(ephemdate):
 def when_at_position(body, observer, targetalt, targetaz,
                      starttime, endtime, startdate=None, numdays=0,
                      slop=2., minphase=0, maxphase=100):
-    '''When will body be at the alt-az position during the time window,
+    """When will body be at the alt-az position during the time window,
        in the year following the date of the observer passed in
        (which defaults to today's date.)
     Args:
@@ -68,8 +68,8 @@ def when_at_position(body, observer, targetalt, targetaz,
         maxphase (Optional, int) -- What phase are we interested in (% illum)
     Returns:
         List of [[date, alt, az, phase], ...]
-    '''
-    '''
+    """
+    """
     Examples:
     When will the moon transit at altitude 45 degrees and phase at least half,
     and be bright in my skylight during MST nighttime hours?
@@ -78,7 +78,7 @@ def when_at_position(body, observer, targetalt, targetaz,
     When will the full moon rise exactly due east?
         when_rise_set_at_position(ephem.Moon(), observer, 90., "rise", 5,
                                   100, 20)
-    '''
+    """
 
     # PyEphem triples are (year, month, day)
     if not startdate:
@@ -207,7 +207,7 @@ def when_at_position(body, observer, targetalt, targetaz,
 def when_rise_set_at_position(body, observer, targetaz, rise_set,
                               startdate=None, slop=5., numdays=365,
                               minphase=0, maxphase=100):
-    '''When will body rise at the target azimuth
+    """When will body rise at the target azimuth
        in the year following the date of the observer passed in
        (which defaults to today's date.)
     Args:
@@ -223,7 +223,7 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set,
         maxphase (Optional, int) -- What phase are we interested in (% illum)
     Returns:
         List of [[date, alt, az, phase], ...]
-    '''
+    """
     if not startdate:
         start_triple = observer.date.triple()
     else:
@@ -262,8 +262,8 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set,
     return results
 
 def timerange_str(ephemdate1, ephemdate2):
-    '''Print a pretty time range in localtime for two ephem.date objects
-    '''
+    """Print a pretty time range in localtime for two ephem.date objects
+    """
     # Convert to localtime datetime objects
     lt1 = ephem.localtime(ephemdate1)
     lt2 = ephem.localtime(ephemdate2)

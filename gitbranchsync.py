@@ -34,9 +34,9 @@ def fetch_from_upstream(repo):
     # for things like timeouts.
 
 def comprefs(ref):
-    '''Find the most recent place where this branch and its upstream
+    """Find the most recent place where this branch and its upstream
        matched. Return (commits_since_in_local, commits_since_in_upstream).
-    '''
+    """
     upstream = ref.tracking_branch()
     if not upstream:
         # print("No upstream for " + ref.name)
@@ -60,10 +60,10 @@ def comprefs(ref):
     return 0, 0
 
 def check_push_status(repo, silent=False):
-    '''Does this repo have changes that haven't been pushed upstream?
+    """Does this repo have changes that haven't been pushed upstream?
        Print any info, but also return the number of changes that differ.
        If silent is set, don't print anything, just calculate and return.
-    '''
+    """
     modfiles = 0
     # git status --porcelain -uno
     porcelain = repo.git.status(porcelain=True).splitlines()
@@ -131,9 +131,9 @@ def check_push_status(repo, silent=False):
     return modfiles, alllocaldiffs, allremotediffs
 
 def list_branches(repo, add_tracking=False):
-    '''List branches with their tracking info. If add_tracking is True,
+    """List branches with their tracking info. If add_tracking is True,
        try to make the local and remote branches mirror each other.
-    '''
+    """
 
     remotebranches = {}
     if not repo.remotes:

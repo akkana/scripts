@@ -59,9 +59,9 @@ def get_selection_tk():
     return s
 
 def fix_links(s):
-    '''When running this to paste URLs, it's helpful to stitch together
+    """When running this to paste URLs, it's helpful to stitch together
        multiple lines.
-    '''
+    """
     # eliminate newlines, and any spaces immediately following a newline:
     return re.sub(r'[\r\n]+ *', '', s)
 

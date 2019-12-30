@@ -28,9 +28,9 @@ class EpubBook:
             self.filename = None
 
     def open(self, filename):
-        '''Open an epub file and set up handles to the zip archive
+        """Open an epub file and set up handles to the zip archive
            and the DOM for the OPF file with all the metadata.
-        '''
+        """
         if not zipfile.is_zipfile(filename):
             raise RuntimeError(filename + " isn't an epub file (not zipped)")
 
@@ -76,10 +76,10 @@ class EpubBook:
         self.dom = None
 
     def get_matches(self, elname, delete_tags=False):
-        '''Find matching tags in the OPF DOM.
+        """Find matching tags in the OPF DOM.
            If delete_tags is true, all such tags will be deleted
            along with any children.
-        '''
+        """
         if not self.dom:
             self.parse_contents()
 
@@ -127,15 +127,15 @@ class EpubBook:
         return matches, elements, parent
 
     def get_titles(self):
-        '''Get the title for this work. Returns a list since it's
+        """Get the title for this work. Returns a list since it's
            possible for an epub to have more than one title.
-        '''
+        """
         titles, elements, parent = self.get_matches('dc:title')
         return titles
 
     def get_title(self):
-        '''Get the first (perhaps only) title.
-        '''
+        """Get the first (perhaps only) title.
+        """
         return self.get_titles()[0]
 
     def set_title(self, newtitle):
@@ -147,14 +147,14 @@ class EpubBook:
                 print("Error: dc:title contains something other than text")
 
     def get_authors(self):
-        '''Get the list of authors (perhaps only one of them).
-        '''
+        """Get the list of authors (perhaps only one of them).
+        """
         authors, elements, parent = self.get_matches('dc:creator')
         return authors
 
     def get_tags(self):
-        '''Get all tags in this epub book.
-        '''
+        """Get all tags in this epub book.
+        """
         # Tags are inside <metadata> and look like this:
         # <metadata>
         #   <dc:subject>Presidents -- United States -- Biography</dc:subject>
@@ -164,8 +164,8 @@ class EpubBook:
         return tags
 
     def info_string(self, brief=False):
-        '''Return an info string describing this book, suitable for printing.
-        '''
+        """Return an info string describing this book, suitable for printing.
+        """
         outstr = self.filename + '\n'
 
         # grab the title and author
@@ -198,13 +198,13 @@ class EpubBook:
         return outstr
 
     def delete_tags(self):
-        '''Delete all tags in the book.
-        '''
+        """Delete all tags in the book.
+        """
         tags, elements, parent = self.get_matches(self.subjectTag, True)
 
     def add_tags(self, new_tag_list):
-        '''Add the given tags to any tags the epub already has.
-        '''
+        """Add the given tags to any tags the epub already has.
+        """
         tags, elements, parent = self.get_matches(self.subjectTag)
 
         lowertags = [s.lower() for s in tags]
@@ -262,17 +262,17 @@ class EpubBook:
             print("Adding:", new_tag)
 
     def replace_file(self, oldfilename, newfile):
-        '''When we save_changes, replace the contents of oldfilename
+        """When we save_changes, replace the contents of oldfilename
            (without changing its filename) with the contents of newfile,
            a filename on the local filesystem.
-        '''
+        """
         self.replace_files[oldfilename] = newfile
 
     def save_changes(self):
-        '''Overwrite the old file with any changes that have been
+        """Overwrite the old file with any changes that have been
            made to the epub's tags. The old file will be backed
            up in filename.bak.
-        '''
+        """
         # Open a new zip file to write to, and copy everything
         # but change the content.opf (or whatever.opf) to the new one:
         new_epub_file = self.filename + '.tmp'
@@ -340,11 +340,11 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         os.remove(bakfile)
 
     def extract_cover_image(self, outdir=''):
-        '''Extract just an image named cover.*.
+        """Extract just an image named cover.*.
            Return (newfilename, filename_in_zip_archive)
            or (None, None) if it can't find anything.
-        '''
-        '''
+        """
+        """
         Notes on covers: the epub format doesn't actually specify how to make
         a cover, so apparently there are all sorts of different conventions.
 
@@ -436,7 +436,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         Some URLs suggesting best practices:
         https://www.safaribooksonline.com/blog/2009/11/20/best-practices-in-epub-cover-images/
         http://wiki.mobileread.com/wiki/Ebook_Covers
-        '''
+        """
 
         coverimg = None
         parent = self.dom.getElementsByTagName("manifest")[0]
@@ -504,8 +504,8 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         return outfilename, coverimg
 
     def extract_images(self, outdir=''):
-        '''Extract all images in the book.
-        '''
+        """Extract all images in the book.
+        """
         print("Extracting images from", self.filename, end=' ')
         if outdir:
             print("to", outdir)

@@ -418,7 +418,7 @@ button:hover { background: #dff; border-color: #8bb; }
         self.delete_song(True)
 
     def save_playlist(self):
-        '''Save the current playlist.'''
+        """Save the current playlist."""
         if not self.playlist:
             print("No playlist to save to!")
             return
@@ -517,7 +517,7 @@ button:hover { background: #dff; border-color: #8bb; }
             self.volume_down()
 
     def sec_to_str(self, sec):
-        '''Convert seconds (int) to h:m:s (string)'''
+        """Convert seconds (int) to h:m:s (string)"""
         s = sec % 60
         m = int(sec / 60)
         h = int(sec / 3600)
@@ -527,7 +527,7 @@ button:hover { background: #dff; border-color: #8bb; }
             return '%d:%02d' % (m, s)
 
     def timer_func(self):
-        '''The timer func is what does the actual playing of songs.'''
+        """The timer func is what does the actual playing of songs."""
         # If we're stopped, don't change anything.
         if self.play_state == MusicWin.STOPPED:
             return True

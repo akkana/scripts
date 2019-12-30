@@ -17,9 +17,9 @@ import time
 import urllib.request, urllib.parse, urllib.error, json
 
 def write_gpx_file(entries, filename, omit_address=False):
-    '''Write the list of entries -- each entry is [lat, long, desc] --
+    """Write the list of entries -- each entry is [lat, long, desc] --
        to a GPX file as separate waypoints.
-    '''
+    """
     fp = open(filename, 'w')
     fp.write('''<?xml version="1.0" encoding="UTF-8"?>
 <gpx
@@ -69,9 +69,9 @@ over_query_limit = False
 # https://developers.google.com/maps/documentation/business/articles/usage_limits
 
 def geocode(addr):
-    '''Geocode using the US Census API.
+    """Geocode using the US Census API.
        Returns a (lat, lon) pair, or None, None.
-    '''
+    """
     url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
     url += '?benchmark=Public_AR_Current'
     url += '&vintage=Current'
@@ -91,7 +91,7 @@ def geocode(addr):
             float(firstmatch['coordinates']['x']))
 
 def read_description_file(filename):
-    '''Read a file filled with multi-line descriptions, blank line separated.
+    """Read a file filled with multi-line descriptions, blank line separated.
        The first line of each description may be latitude and longitude,
        separated by whitespace.
        The next one or two lines should be a US street address,
@@ -99,7 +99,7 @@ def read_description_file(filename):
        The rest is free-form description.
        Returns a list of entries, where each entry is a list:
        [ latitude, longitude, text ]
-    '''
+    """
 
     entries = []
     cur_ent = []

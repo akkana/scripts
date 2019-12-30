@@ -72,11 +72,11 @@ def codesFromZipFile(zipfilename):
 
 
 def parse_geo_sas_lines(lines):
-    '''lines are read from the sf1geo.sas file.
+    """lines are read from the sf1geo.sas file.
        Create a dictionary of fields:
        { 'CODE': { 'name':'long name', 'start': int, 'end': int }
        { 'name', 'code', 'start', 'end' }
-    '''
+    """
     labelpat = re.compile(b"(LABEL )?([A-Z0-9]*)\=\'(.*)\'")
     fieldspat = re.compile(b"([A-Z0-9]+) \$ ([0-9]+)\-([0-9]+)")
     for line in lines:
@@ -140,8 +140,8 @@ def parse_geo_file(filename):
 
 
 def parse_geo_line(line):
-    '''Parse the <st>geo.uf1 file according to the GeoFields.
-    '''
+    """Parse the <st>geo.uf1 file according to the GeoFields.
+    """
     d = {}
     for code in GeoFields:
         try:
