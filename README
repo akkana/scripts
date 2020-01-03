@@ -504,6 +504,11 @@ quickbrowse.py:
     Can be used standalone (ln -s /path/to/quickbrowse.py ~/bin/quickbrowse)
     and/or as a python module for derived browser-based programs.
 
+quotekiosk.py:
+    Display a series of quotes in a large, maybe fullscreen, window,
+    as large as possible to fit in the window, changing the quote
+    every so often.
+
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
 
