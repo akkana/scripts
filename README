@@ -388,7 +388,8 @@ python-cheatsheet.py:
 
 qpreso:
     A lightweight presentation program for displaying HTML slides.
-    Python3/QwebEngine version.
+    A Python3/Qt5/QtWebEngine version, since python-gtk-webkit
+    (used for the older gpreso) is no longer supported.
 
 randombg:
     Choose a random background (wallpaper) from a directory named based on
@@ -505,9 +506,14 @@ quickbrowse.py:
     and/or as a python module for derived browser-based programs.
 
 quotekiosk.py:
-    Display a series of quotes in a large, maybe fullscreen, window,
-    as large as possible to fit in the window, changing the quote
+    Display a series of plaintext quotes in a large, maybe fullscreen,
+    window, as large as possible to fit in the window, changing the quote
     every so often.
+
+qquotekiosk.py:
+    Display a series of quotes or other content from HTML files,
+    as large as possible to fit in the window, changing the quote
+    every so often, using qpreso.py for the display window.
 
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
