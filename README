@@ -386,7 +386,7 @@ pysync:
 python-cheatsheet.py:
     Cheatsheet and syntax reminders for useful Python features.
 
-qpreso:
+qpreso.py:
     A lightweight presentation program for displaying HTML slides.
     A Python3/Qt5/QtWebEngine version, since python-gtk-webkit
     (used for the older gpreso) is no longer supported.
@@ -514,6 +514,7 @@ qquotekiosk.py:
     Display a series of quotes or other content from HTML files,
     as large as possible to fit in the window, changing the quote
     every so often, using qpreso.py for the display window.
+    Uses qpreso.py for the HTML display window.
 
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.

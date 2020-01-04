@@ -7,6 +7,9 @@
    taken from a list of HTML files,
    cycling randomly through the quotations and displaying
    the content as large as possible in the available space.
+
+   Example args:
+     qquotekiosk.py -f -t 7 -j /path/to/jquery-min.js /path/to/myquotes*.html
 """
 
 
@@ -20,108 +23,7 @@ from PyQt5.QtCore import QUrl, QTimer
 from PyQt5.QtWidgets import QApplication, QShortcut, QDesktopWidget, QMainWindow
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 
-
-class PresoView(QWebEngineView):
-
-    def __init__(self, url=None, curviews=None, fullscreen=False, monitor=-1,
-                 zoom=1.0, show_notes=True):
-        """Create a new PresoView. Leave curviews unset unless requesting
-           a new window, in which case it must be set to a list of
-           existing PresoViews.
-           Monitor is the monitor number from xrandr.
-        """
-        # Example showing list of views (the ONLY one I've found):
-        # https://stackoverflow.com/questions/55472415/python-pyqt5-window-does-not-open-new-window-or-tab-on-external-url-link-click
-
-        super(PresoView, self).__init__()
-
-        if not curviews:
-            self._windows = []
-        else:
-            self._windows = curviews
-        self._windows.append(self)
-
-        # Are we making screenshots? TODO: make this a command-line param.
-        self.make_screenshots = False
-        self.imgnum = 0
-
-        # Size the audience will see (used for converting to images):
-        displaysize = QDesktopWidget().screenGeometry(-1)
-        self.displaywidth = displaysize.width()
-        self.displayheight = displaysize.height()
-
-        # Size of the window we'll actually display.
-        # XXX Currently assumes a projector at 1024x768
-        # and should be made more general.
-        if show_notes:
-            self.fullwidth = 1366
-        else:
-            self.fullwidth = 1024
-        self.fullheight = 768
-
-        if zoom != 1.0 :
-            self.displaywidth = int(self.displaywidth * zoom)
-            self.displayheight = int(self.displayheight * zoom)
-            self.fullwidth = int(self.fullwidth * zoom)
-            self.fullheight = int(self.fullheight * zoom)
-            print("Display size: %d x %d" % (self.displaywidth,
-                                             self.displayheight))
-            print("Full size: %d x %d" % (self.fullwidth,
-                                          self.fullheight))
-
-        if monitor >= 0:
-            # The number of the monitor where the window should show up
-            screens = app.screens()
-            print("screens:", screens)
-            if monitor > len(screens):
-                print("There is no monitor", monitor)
-                sys.exit(1)
-
-            geom = screens[monitor].geometry()
-            self.move(geom.left(), geom.top())
-            self.showFullScreen()
-
-        else:
-            # Run fullscreen if the display is XGA or smaller,
-            # or if fullscreen was explicitly set.
-            # displaysize = QApplication.desktop.screenGeometry()
-            if fullscreen or self.displayheight <= 768:
-                self.showFullScreen()
-
-        # Key bindings
-        # For keys like function keys, use QtGui.QKeySequence("F12")
-        QShortcut("Ctrl+Q", self, activated=self.close)
-        QShortcut("Ctrl+R", self, activated=self.reload)
-
-        QShortcut("Alt+Left", self, activated=self.back)
-        QShortcut("Alt+Right", self, activated=self.forward)
-
-        self.resize(self.fullwidth, self.fullheight)
-        if url:
-            self.load(QUrl.fromUserInput(url))
-
-
-    def createWindow(self, wintype):
-        """Create an empty window when requested to do so by
-           Javascript or _target.
-           JS may pass a size, and either JS or target will likely pass
-           a URL, but does QWebEngineView pass that info along? Nooooo!
-           I don't know if there's any way to get those details.
-           Even qutebrowser just punts on new window creation.
-        """
-        # Possible wintypes (all part of QWebEnginePage):
-        # WebBrowserWindow:        A new window
-        # WebBrowserTab:           A new tab
-        # WebDialog:               A JavaScript-created window
-        # WebBrowserBackgroundTab: A new tab that isn't immediately active
-
-        if wintype == QWebEnginePage.WebBrowserWindow or \
-           wintype == QWebEnginePage.WebDialog:
-            v = PresoView('about:blank', curviews=self._windows)
-            # v.resize(640, 480)
-            v.show()
-            return v
-
+from qpreso import PresoView
 
 fittext_fmt = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
@@ -225,7 +127,7 @@ def parse_args():
     parser.add_argument('-m', '--monitor', action="store", default=-1,
                         dest="monitor", type=int,
                         help='Run fullscreen on this monitor')
-    parser.add_argument('-t', '--time', action="store", default=-30,
+    parser.add_argument('-t', '--time', action="store", default=30,
                         dest="time", type=int,
                         help='Time in seconds to pause between quotes')
     parser.add_argument('-j', '--jquerypath', action="store",
