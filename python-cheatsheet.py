@@ -112,6 +112,9 @@ python -c "$(printf %b 'import sys\nfor r in range(10): print("%d:" % r)')"
 # Debugging and stack traces
 ########################################################
 
+# Dump into the debugger:
+breakpoint()
+
 # Print a stack trace -- how did we get here?
 traceback.print_stack()
 
@@ -304,6 +307,10 @@ mylist.pop(i)            # Removes and returns list[i]
 # There's no single call to remove ALL instances of an item,
 # so you have to use a list comprehension to do that.
 
+# () turns a list comprehension into a generator:
+>>> ( i*2 for i in range(5) )
+<generator object <genexpr> at 0x7f8fc17db050>
+
 # Delete an item from a dictionary:
 del thedic[key]
 
@@ -316,9 +323,13 @@ l.insert(3, 'xxx')
 [ a*b+c for a in A for b in B for c in C ]
 # though itertools.product is arguably cleaner for math problems like that.
 
-# They can also have 'if", but I always forget the syntax
+# Comprehensions can also have 'if' expressions, but the syntax
+# is a little tricky and inconsistent. A conditional with no "else"
+# must come at the end, after the list, but a conditional with an else
+# may come before the list.
 nums = [1, 2, 3, 4, 5]
-odds = ['t' if n%2 else 'f' for n in nums]
+odds = [n for n in nums if n%2]
+isodd = ['t' if n%2 else 'f' for n in nums]
 
 # There are dict comprehensions too though the syntax is more fiddly:
 >>> { key: value for key, value in [ (1, 11), (2, 22), (3, 33) ] }
@@ -1327,4 +1338,9 @@ https://pythonhosted.org/an_example_pypi_project/buildanduploadsphinx.html
 Possibly useful links:
 https://www.tjelvarolsson.com/blog/begginers-guide-creating-clean-python-development-environments/
 http://www.siafoo.net/article/77#install-vs-develop
+
+
+https://realpython.com/python-concurrency/
+https://realpython.com/python-lambda
+https://realpython.com/documenting-python-code/#docstrings-background
 '''
