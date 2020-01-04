@@ -23,7 +23,7 @@ class ParagraphWindow(Gtk.Window):
                  border_size=40):
         super(ParagraphWindow, self).__init__()
 
-        self.drawing_area = None
+        self.content_area = None
 
         self.width = width
         self.height = height
@@ -34,19 +34,23 @@ class ParagraphWindow(Gtk.Window):
         self.background_color = (0, 0, 0)
         self.text_color = (1, 1, 0)
 
-        self.text = "test 1 2 3"
+        self.quote = "test 1 2 3"
+
+        self.content_area = Gtk.DrawingArea()
+
+        self.add(self.content_area)
 
     def show_window(self):
-        self.drawing_area = Gtk.DrawingArea()
         if self.use_fullscreen:
             self.fullscreen()
         else:
             self.set_default_size(self.width, self.height)
-        self.add(self.drawing_area)
+
         # self.connect("delete_event", Gtk.main_quit)
+        self.content_area.connect('draw', self.draw)
         self.connect("destroy", Gtk.main_quit)
         self.connect("key-press-event", self.key_press)
-        self.drawing_area.connect('draw', self.draw)
+
         self.show_all()
 
     def draw_paragraph(self, paragraph, ctx):
@@ -91,7 +95,7 @@ class ParagraphWindow(Gtk.Window):
            will pass in a transparent background.
         """
         self.width, self.height = self.get_size()
-        self.draw_paragraph(self.text, ctx)
+        self.draw_paragraph(self.quote, ctx)
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
@@ -116,15 +120,21 @@ class KioskWindow(ParagraphWindow):
                                           fullscreen, border_size)
         self.timeout = timeout
 
-        self.texts = None
+        self.quote_list = None
 
         GLib.timeout_add(self.timeout * 1000, self.timeout_cb)
 
+    def set_content(self, newcontent):
+        """Set the quotes that will be displayed.
+           newcontent is a list of strings.
+        """
+        self.quote_list = newcontent
+        self.quote = random.choice(self.quote_list)
+
     def timeout_cb(self):
-        print("blip")
-        if self.texts:
-            self.text = random.choice(self.texts)
-            self.drawing_area.queue_draw()
+        if self.quote_list:
+            self.quote = random.choice(self.quote_list)
+            self.content_area.queue_draw()
 
         GLib.timeout_add(self.timeout * 1000, self.timeout_cb)
 
@@ -143,10 +153,10 @@ if __name__ == "__main__":
     else:
         win = KioskWindow(width=1024, height=768)
 
-    win.texts = ["To be, or not to be--that is the question: Whether 'tis nobler in the mind to suffer The slings and arrows of outrageous fortune Or to take arms against a sea of troubles And by opposing end them. To die, to sleep-- No more--and by a sleep to say we end The heartache, and the thousand natural shocks That flesh is heir to. 'Tis a consummation Devoutly to be wished. To die, to sleep-- To sleep--perchance to dream: ay, there's the rub, For in that sleep of death what dreams may come When we have shuffled off this mortal coil, Must give us pause. There's the respect That makes calamity of so long life.",
-                 "The quick red fox jumped over the lazy dog",
-                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-                 ]
+    win.set_content(["To be, or not to be--that is the question: Whether 'tis nobler in the mind to suffer The slings and arrows of outrageous fortune Or to take arms against a sea of troubles And by opposing end them. To die, to sleep-- No more--and by a sleep to say we end The heartache, and the thousand natural shocks That flesh is heir to. 'Tis a consummation Devoutly to be wished. To die, to sleep-- To sleep--perchance to dream: ay, there's the rub, For in that sleep of death what dreams may come When we have shuffled off this mortal coil, Must give us pause. There's the respect That makes calamity of so long life.",
+                     "The quick red fox jumped over the lazy dog",
+                     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+                 ])
 
     win.show_window()
     Gtk.main()
