@@ -10,7 +10,7 @@ import gtk, gobject
 import webkit
 
 class PresoViewer(gtk.Window):
-    def __init__(self, url, zoom=1.0, show_notes=True):
+    def __init__(self, url, fullscreen=False, zoom=1.0, show_notes=True):
 
         # Are we making screenshots? TODO: make this a command-line param.
         self.make_screenshots = False
@@ -43,7 +43,8 @@ class PresoViewer(gtk.Window):
 
         # If the physical display is bigger than displaywidth,
         # then it's better not to run fullscreen.
-        if gtk.gdk.screen_height() <= self.displayheight and zoom == 1.0 :
+        if fullscreen or \
+           (gtk.gdk.screen_height() <= self.displayheight and zoom == 1.0):
             self.fullscreen()
 
         self.browser = webkit.WebView()
@@ -131,19 +132,31 @@ class PresoViewer(gtk.Window):
         self.set_title(title)
 
 if __name__ == "__main__":
-    if len(sys.argv) <= 1 :
-        print "Usage:", sys.argv[0], "url"
-        sys.exit(0)
+    import argparse
 
-    # Figure out if it's a filename or a url
-    url = sys.argv[1]
-    if url.find(':') < 0 :
-        if url[0] == '/' :
-            url = 'file://' + url
+    parser = argparse.ArgumentParser(description="A simple HTML presentation tool")
+    parser.add_argument('-f', "--fullscreen", dest="fullscreen", default=False,
+                        action="store_true",
+                        help="Run fullscreen with no window decorations")
+    parser.add_argument('-n', "--show-notes", dest="show_notes", default=True,
+                        action="store_true",
+                        help="Make the screen 1366 pixels wide "
+                             "instead of 1024, to show presenter notes")
+    parser.add_argument('-z', action="store", default=1, dest="zoom", type=int,
+                        help='Zoom level')
+    parser.add_argument('url', help='The URL to open')
+    args = parser.parse_args(sys.argv[1:])
+
+    if ':' in args.url:
+        url = args.url
+    else:
+        if args.url[0] == '/' :
+            url = 'file://' + args.url
         else :
-            url = 'file://' + os.getcwd() + '/' + url
+            url = 'file://' + os.getcwd() + '/' + args.url
 
     gobject.threads_init()
-    webbrowser = PresoViewer(url, zoom=1, show_notes=True)
+    webbrowser = PresoViewer(url, zoom=args.zoom, fullscreen=args.fullscreen,
+                             show_notes=args.show_notes)
     gtk.main()
 
