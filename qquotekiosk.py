@@ -3,10 +3,16 @@
 # Copyright (C) 2019 by Akkana Peck.
 # Share and enjoy under the GPL v2 or later.
 
-"""A kiosk that shows quotations (or any other content)
-   taken from a list of HTML files,
+"""A kiosk that shows HTML quotations (or any other content)
+   taken from a list of HTML files, one quotation per file.
    cycling randomly through the quotations and displaying
    the content as large as possible in the available space.
+   Quotation files are expected to be HTML snippets, not complete files;
+   they will be inserted into a generated file one at a time.
+
+   Uses qpreso.py for the display window.
+
+   Adjust the CSS below to your own preferences.
 
    Example args:
      qquotekiosk.py -f -t 7 -j /path/to/jquery-min.js /path/to/myquotes*.html
