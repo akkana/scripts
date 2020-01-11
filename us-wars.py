@@ -101,10 +101,20 @@ def gantt_matplotlib(plotdata, title):
 
 
 if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1:
+        try:
+            yearsfrom = int(sys.argv[1])
+        except:
+            import os
+            print(f"Usage: {os.path.basename(sys.argv[0])} [startyear]")
+            sys.exit(1)
+    else:
+        yearsfrom = None
+
     plotdata = []
     for war in wars:
         years = war[0].split('-')
-        # print("len", len(years), years)
         if len(years) == 2:
             startyear = int(years[0])
             if years[1] == 'present':
@@ -116,15 +126,14 @@ if __name__ == '__main__':
             endyear = startyear+1
 
         # Comment this out to show all wars, not just modern ones.
-        # if endyear < 1900:
-        #     continue
+        if yearsfrom and endyear < yearsfrom:
+            continue
 
         plotdata.append(dict(Task=war[1],
                              startyear=startyear, endyear=endyear,
                              # Start and Finish are for plotly's gantt
                              Start=f'{startyear}-01-01',
                              Finish=f'{endyear}-02-28'))
-    print(plotdata)
 
     if plotdata[0]['startyear'] < 1900:
         title = "US Wars since 1675"

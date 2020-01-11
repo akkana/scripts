@@ -519,6 +519,10 @@ qquotekiosk.py:
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
 
+us-wars.py:
+    Plot a Gantt chart of years of wars the US has participated in.
+    Also serves as an example of a matplotlib Gantt chart.
+
 vcalparse:
     Parse and print an icalendar/vcalendar/ICS file using python-vobject.
 
