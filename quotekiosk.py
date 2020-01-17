@@ -38,7 +38,7 @@ FILLFRAC = .95
 # How many pixbufs can be allocated before garbage collecting?
 PIXBUFS_BEFORE_GC = 2
 
-# Fade parameters
+# Fade parameters. Set FADE_FRAC to 0 for no fading.
 FADE_FRAC = .02
 FADE_TIMEOUT = 60     # milliseconds
 
@@ -52,7 +52,7 @@ class AutoSizerWindow(Gtk.Window):
     """A window that can resize its content, either text or image,
        to fill as much space as possible.
     """
-    def __init__(self, fullscreen=False, fontname="Serif Italic",
+    def __init__(self, fullscreen=False, fadetime=2, fontname="Serif Italic",
                  border_size=40):
         super(AutoSizerWindow, self).__init__()
 
@@ -68,6 +68,15 @@ class AutoSizerWindow(Gtk.Window):
             self.width = 1024
             self.height = 768
 
+        # From the desired total fade time, calculate fade delay in
+        # milliseconds, and what fraction to fade during that time.
+        if fadetime:
+            self.fademillis = 50
+            self.fadefrac = fadetime * 10 / self.fademillis
+        else:
+            self.fademillis = 0
+            self.fadefrac = 0
+
         self.border_size = border_size
 
         self.background_color = (0, 0, 0)
@@ -77,8 +86,10 @@ class AutoSizerWindow(Gtk.Window):
         self.alpha = 1
         self.d_alpha = 0
 
-        self.content = "*"
+        self.content = ""
+        self.imagefile = None
         self.pixbuf = None
+        self.layout = None
 
         # How many pixbufs have we allocated?
         # gdk-pixbuf doesn't handle its own garbage collection.
@@ -92,7 +103,10 @@ class AutoSizerWindow(Gtk.Window):
         """Change the text or image being displayed.
            Initiate fading, if any.
         """
+        self.layout = None
         self.pixbuf = None
+        self.imagefile = None
+        self.content = ""
 
         # garbage collect the old pixbuf, if any, and the one we just read in.
         # GTK doesn't do its own garbage collection.
@@ -114,12 +128,7 @@ class AutoSizerWindow(Gtk.Window):
                     self.content = newcontent
 
             elif ext in IMAGE_EXTS:
-                try:
-                    self.read_pixbuf(newcontent)
-                    self.content = ''
-                except gi.repository.GLib.Error as e:
-                    print("Couldn't open image", newcontent, ":", e)
-                    self.content = newcontent
+                self.imagefile = newcontent
 
         if self.content:
             self.content = self.content.strip()
@@ -132,12 +141,12 @@ class AutoSizerWindow(Gtk.Window):
         # Get the size every time: window may have changed.
         self.width, self.height = self.get_size()
 
-        if self.pixbuf:
+        if self.pixbuf or self.imagefile:
             self.draw_image(ctx)
         else:
-            self.draw_text(self.content, ctx)
+            self.draw_text(ctx)
 
-    def draw_text(self, paragraph, ctx):
+    def draw_text(self, ctx):
         """Draw the text as large as can fit."""
 
         # Clear the page
@@ -146,35 +155,41 @@ class AutoSizerWindow(Gtk.Window):
         # Set color and alpha
         ctx.set_source_rgba(*self.text_color, self.alpha)
 
-        layout = PangoCairo.create_layout(ctx)
-        layout.set_text(paragraph, -1)
+        if not self.layout: # or not self.d_alpha or self.alpha == 0:
+            # print("Laying out text")
+            self.layout = PangoCairo.create_layout(ctx)
+            self.layout.set_text(self.content, -1)
 
-        # For some reason pango width has to be 1024 times the width.
-        # Why? Where does this 1024 come from?
-        # No one explains this anywhere.
-        layout.set_width(1024 * (self.width - self.border_size*2))
-        layout.set_wrap(Pango.WrapMode.WORD_CHAR)
+            # For some reason pango width has to be 1024 times the width.
+            # Why? Where does this 1024 come from?
+            # No one explains this anywhere.
+            self.layout.set_width(1024 * (self.width - self.border_size*2))
+            self.layout.set_wrap(Pango.WrapMode.WORD_CHAR)
 
-        fontsize = 100
+            fontsize = 100
 
-        while fontsize:
-            font = f"{self.fontname} {fontsize}"
-            desc = Pango.font_description_from_string(font)
-            layout.set_font_description(desc)
-            pxsize = layout.get_pixel_size()
-            if pxsize.width < self.width - self.border_size*2 and \
-               pxsize.height < self.height - self.border_size*2:
-                break
-            fontsize -= 1
+            while fontsize:
+                font = f"{self.fontname} {fontsize}"
+                desc = Pango.font_description_from_string(font)
+                self.layout.set_font_description(desc)
+                pxsize = self.layout.get_pixel_size()
+                if pxsize.width < self.width - self.border_size*2 and \
+                   pxsize.height < self.height - self.border_size*2:
+                    break
+                fontsize -= 1
 
         ctx.move_to(self.border_size, self.border_size)
-        PangoCairo.show_layout(ctx, layout)
 
-    def read_pixbuf(self, filename):
-        self.pixbuf = GdkPixbuf.Pixbuf.new_from_file(filename)
+        PangoCairo.show_layout(ctx, self.layout)
+
+    def setup_image(self):
+        """Read self.imagefile into a pixbuf, and scale it to the screen.
+        """
+        # print("setting up image", self.imagefile)
+
+        self.pixbuf = GdkPixbuf.Pixbuf.new_from_file(self.imagefile)
         self.pixbuf_count += 1
 
-    def resize_image(self):
         if not self.pixbuf:
             print("Yikes, resize_image called with no pixbuf!")
             return
@@ -198,7 +213,15 @@ class AutoSizerWindow(Gtk.Window):
     def draw_image(self, ctx):
         """Resize and draw the pixbuf."""
 
-        self.resize_image()
+        # Don't resize the image if in the middle of a fade -- too slow!
+        # if not self.pixbuf or not self.d_alpha or self.alpha == 0:
+        if self.imagefile and not self.pixbuf:
+            try:
+                self.setup_image()
+            except gi.repository.GLib.Error as e:
+                print("Couldn't open image", newcontent, ":", e)
+                self.content = self.imagefile
+                return self.draw_text(ctx)
 
         imgW = self.pixbuf.get_width()
         imgH = self.pixbuf.get_height()
@@ -211,7 +234,7 @@ class AutoSizerWindow(Gtk.Window):
         ctx.paint_with_alpha(self.alpha)
 
     def clear(self, ctx):
-        """Clear the screen. XXX eventually this should fade.
+        """Clear the screen.
         """
         ctx.set_source_rgb(*self.background_color)
         ctx.rectangle(0, 0, self.width, self.height)
@@ -230,6 +253,29 @@ class AutoSizerWindow(Gtk.Window):
 
         self.show_all()
 
+    def fade_cb(self):
+
+        # Adjust fade
+        self.alpha += self.d_alpha
+        if self.alpha <= 0:
+            self.alpha = 0
+            self.d_alpha = FADE_FRAC
+
+            # Fade out just finished, time to choose a new quote
+            self.new_quote()
+
+        elif self.alpha >= 1:
+            # Fading finished
+            self.alpha = 1
+            self.d_alpha = 0
+
+        self.content_area.queue_draw()
+
+        if self.d_alpha:
+            return True
+
+        return False
+
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
 
@@ -241,9 +287,11 @@ class AutoSizerWindow(Gtk.Window):
 
 
 class KioskWindow(AutoSizerWindow):
-    def __init__(self, fullscreen=False, fontname="Serif Italic",
+    def __init__(self, fullscreen=False, fadetime=2,
+                 fontname="Serif Italic",
                  border_size=40, timeout=30):
-        super(KioskWindow, self).__init__(fullscreen,
+        super(KioskWindow, self).__init__(fullscreen=fullscreen,
+                                          fadetime=fadetime,
                                           fontname=fontname,
                                           border_size=border_size)
         self.timeout = timeout
@@ -254,10 +302,6 @@ class KioskWindow(AutoSizerWindow):
         GLib.timeout_add(self.timeout * 1000, self.timeout_cb)
 
     def new_quote(self):
-        # Fade out
-        self.d_alpha = -FADE_FRAC
-        GLib.timeout_add(FADE_TIMEOUT, self.fade_cb)
-
         choice = random.choice(self.quote_list)
         print("*** New choice", choice)
 
@@ -274,27 +318,20 @@ class KioskWindow(AutoSizerWindow):
         self.new_quote()
 
     def timeout_cb(self):
-        self.new_quote()
+        """The main timeout routine, called to change quotes.
+        """
+        # If fades are enabled, start one.
+        # fade_cb will call new_quote() when the fade out is finished.
+        if self.fadefrac:
+            self.d_alpha = -self.fadefrac
+            GLib.timeout_add(self.fademillis, self.fade_cb)
+
+        # If no fades, pick a new quote immediately.
+        else:
+            self.new_quote()
 
         # Returning True keeps the timeout in effect; no need to set a new one.
         return True
-
-    def fade_cb(self):
-
-        # Adjust fade
-        self.alpha += self.d_alpha
-        if self.alpha <= 0:
-            self.alpha = 0
-            self.d_alpha = FADE_FRAC
-        elif self.alpha >= 1:
-            self.alpha = 1
-            self.d_alpha = 0
-
-        self.content_area.queue_draw()
-
-        if self.d_alpha:
-            return True
-        return False
 
 
 if __name__ == "__main__":
@@ -308,10 +345,17 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--time', action="store",
                         dest="time", type=int, default=30,
                         help='Time in seconds to pause between quotes')
+    parser.add_argument('-F', '--fadetime', action="store",
+                        dest="fadetime", type=float, default=2,
+                        help='Fade time in seconds (0 = no fade)')
+    parser.add_argument('-fn', '--fontname', action="store",
+                        dest="fontname", default='Serif Italic',
+                        help='Fade time in seconds (0 = no fade)')
     parser.add_argument('quotes', nargs='+', help="Quotes, or files of quotes")
     args = parser.parse_args(sys.argv[1:])
 
-    win = KioskWindow(fullscreen=args.fullscreen, timeout=args.time)
+    win = KioskWindow(fullscreen=args.fullscreen, timeout=args.time,
+                      fadetime=args.fadetime, fontname=args.fontname)
 
     win.add_content(args.quotes)
 
