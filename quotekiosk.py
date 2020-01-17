@@ -5,6 +5,9 @@
    every so often.
 """
 
+# On Debian/Raspbian/Ubuntu, requires:
+# python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-html2text
+
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('PangoCairo', '1.0')
@@ -19,6 +22,7 @@ from gi.repository import GdkPixbuf
 
 import random
 import re
+import gc
 from pathlib import Path
 
 import html2text
@@ -26,10 +30,17 @@ import html2text
 html_converter = html2text.HTML2Text()
 html_converter.body_width = 0
 
-IMAGE_EXTS = ( '.jpg', '.png', '.gif', '.tif' )
+IMAGE_EXTS = ( '.jpg', '.jpeg', '.png', '.gif', '.tif' )
 
 # Fraction of screen images should take up:
 FILLFRAC = .95
+
+# How many pixbufs can be allocated before garbage collecting?
+PIXBUFS_BEFORE_GC = 2
+
+# Fade parameters
+FADE_FRAC = .02
+FADE_TIMEOUT = 60     # milliseconds
 
 
 def is_html_file(filename):
@@ -50,24 +61,45 @@ class AutoSizerWindow(Gtk.Window):
         self.fontname = fontname
 
         self.use_fullscreen = fullscreen
-        if not fullscreen:
-            self.width=1024
-            self.height=768
+        if fullscreen:
+            self.width = 0
+            self.height = 0
+        else:
+            self.width = 1024
+            self.height = 768
 
         self.border_size = border_size
 
         self.background_color = (0, 0, 0)
         self.text_color = (1, 1, 0)
 
+        # alpha to be used for fades
+        self.alpha = 1
+        self.d_alpha = 0
+
         self.content = "*"
         self.pixbuf = None
+
+        # How many pixbufs have we allocated?
+        # gdk-pixbuf doesn't handle its own garbage collection.
+        self.pixbuf_count = 0
 
         self.content_area = Gtk.DrawingArea()
 
         self.add(self.content_area)
 
     def set_content(self, newcontent):
+        """Change the text or image being displayed.
+           Initiate fading, if any.
+        """
         self.pixbuf = None
+
+        # garbage collect the old pixbuf, if any, and the one we just read in.
+        # GTK doesn't do its own garbage collection.
+        if self.pixbuf_count > PIXBUFS_BEFORE_GC:
+            gc.collect()
+            self.pixbuf_count = 0
+
         contentpath = Path(newcontent)
         if contentpath.exists():
             ext = contentpath.suffix.lower()
@@ -77,38 +109,42 @@ class AutoSizerWindow(Gtk.Window):
                         self.content = qf.read()
                     self.content = html_converter.handle(self.content)
 
-                except Exception as e:
+                except FileNotFoundError as e:
                     print("Couldn't read", newcontent, ":", e)
                     self.content = newcontent
 
             elif ext in IMAGE_EXTS:
                 try:
-                    self.prepare_image(newcontent)
-                except Exception as e:
+                    self.read_pixbuf(newcontent)
+                    self.content = ''
+                except gi.repository.GLib.Error as e:
                     print("Couldn't open image", newcontent, ":", e)
                     self.content = newcontent
 
-        self.content = self.content.strip()
+        if self.content:
+            self.content = self.content.strip()
 
-    def show_window(self):
-        if self.use_fullscreen:
-            self.fullscreen()
+    def draw(self, widget, ctx):
+        """Draw everything."""
+
+        self.clear(ctx)
+
+        # Get the size every time: window may have changed.
+        self.width, self.height = self.get_size()
+
+        if self.pixbuf:
+            self.draw_image(ctx)
         else:
-            self.set_default_size(self.width, self.height)
-
-        # self.connect("delete_event", Gtk.main_quit)
-        self.content_area.connect('draw', self.draw)
-        self.connect("destroy", Gtk.main_quit)
-        self.connect("key-press-event", self.key_press)
-
-        self.show_all()
+            self.draw_text(self.content, ctx)
 
     def draw_text(self, paragraph, ctx):
         """Draw the text as large as can fit."""
 
         # Clear the page
         self.clear(ctx)
-        ctx.set_source_rgb(*self.text_color)
+
+        # Set color and alpha
+        ctx.set_source_rgba(*self.text_color, self.alpha)
 
         layout = PangoCairo.create_layout(ctx)
         layout.set_text(paragraph, -1)
@@ -132,11 +168,17 @@ class AutoSizerWindow(Gtk.Window):
             fontsize -= 1
 
         ctx.move_to(self.border_size, self.border_size)
-        PangoCairo.show_layout (ctx, layout)
-        # self.ctx.show_text(label)
+        PangoCairo.show_layout(ctx, layout)
 
-    def prepare_image(self, filename):
+    def read_pixbuf(self, filename):
         self.pixbuf = GdkPixbuf.Pixbuf.new_from_file(filename)
+        self.pixbuf_count += 1
+
+    def resize_image(self):
+        if not self.pixbuf:
+            print("Yikes, resize_image called with no pixbuf!")
+            return
+
         imgW = self.pixbuf.get_width()
         imgH = self.pixbuf.get_height()
 
@@ -154,6 +196,10 @@ class AutoSizerWindow(Gtk.Window):
                                                GdkPixbuf.InterpType.BILINEAR)
 
     def draw_image(self, ctx):
+        """Resize and draw the pixbuf."""
+
+        self.resize_image()
+
         imgW = self.pixbuf.get_width()
         imgH = self.pixbuf.get_height()
         x = (self.width - imgW) / 2
@@ -162,7 +208,7 @@ class AutoSizerWindow(Gtk.Window):
         self.clear(ctx)
         Gdk.cairo_set_source_pixbuf(ctx, self.pixbuf, x, y)
 
-        ctx.paint()
+        ctx.paint_with_alpha(self.alpha)
 
     def clear(self, ctx):
         """Clear the screen. XXX eventually this should fade.
@@ -171,18 +217,18 @@ class AutoSizerWindow(Gtk.Window):
         ctx.rectangle(0, 0, self.width, self.height)
         ctx.fill()
 
-    def draw(self, widget, ctx):
-        """Draw everything."""
-
-        self.clear(ctx)
-
-        # Get the size every time: window may have changed.
-        self.width, self.height = self.get_size()
-
-        if self.pixbuf:
-            self.draw_image(ctx)
+    def show_window(self):
+        if self.use_fullscreen:
+            self.fullscreen()
         else:
-            self.draw_text(self.content, ctx)
+            self.set_default_size(self.width, self.height)
+
+        # self.connect("delete_event", Gtk.main_quit)
+        self.content_area.connect('draw', self.draw)
+        self.connect("destroy", Gtk.main_quit)
+        self.connect("key-press-event", self.key_press)
+
+        self.show_all()
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
@@ -205,12 +251,15 @@ class KioskWindow(AutoSizerWindow):
         # quote_list can be a mixture of quotes and filenames
         self.quote_list = []
 
-        print("Setting a timeout of time", self.timeout * 1000)
         GLib.timeout_add(self.timeout * 1000, self.timeout_cb)
 
     def new_quote(self):
+        # Fade out
+        self.d_alpha = -FADE_FRAC
+        GLib.timeout_add(FADE_TIMEOUT, self.fade_cb)
+
         choice = random.choice(self.quote_list)
-        print("choice", choice)
+        print("*** New choice", choice)
 
         self.set_content(choice)
 
@@ -229,6 +278,23 @@ class KioskWindow(AutoSizerWindow):
 
         # Returning True keeps the timeout in effect; no need to set a new one.
         return True
+
+    def fade_cb(self):
+
+        # Adjust fade
+        self.alpha += self.d_alpha
+        if self.alpha <= 0:
+            self.alpha = 0
+            self.d_alpha = FADE_FRAC
+        elif self.alpha >= 1:
+            self.alpha = 1
+            self.d_alpha = 0
+
+        self.content_area.queue_draw()
+
+        if self.d_alpha:
+            return True
+        return False
 
 
 if __name__ == "__main__":
