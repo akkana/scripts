@@ -4,6 +4,8 @@
 # Requirements: python-pygame python-id3 python-mutagen
 # Copyright 2015.2019 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
+from __future__ import print_function
+
 import sys, os
 import time
 import random
@@ -29,6 +31,7 @@ except:
 try:
     from mutagen.mp3 import MP3
 except:
+    print("No mutagen, won't be able to check song length")
     pass
 
 class MusicWin(Gtk.Window):
