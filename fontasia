@@ -212,7 +212,7 @@ class FontApp(gtk.Window):
         # label.set_justify(gtk.JUSTIFY_RIGHT)
         hbox.pack_start(label, expand=False)
 
-        self.view_cat_combo = gtk.combo_box_new_text()
+        self.view_cat_combo = gtk.ComboBoxText()
         hbox.pack_start(self.view_cat_combo, expand=False)
         self.combo_connect_id = self.view_cat_combo.connect("changed",
                                                             self.combochanged)
@@ -358,6 +358,9 @@ class FontApp(gtk.Window):
             self.view_cat_combo.handler_block(self.combo_connect_id)
 
         self.view_cat_combo.get_model().clear()
+        # A recent gtk3 change requires this or none of the combobox entries
+        # will appear at all.
+        self.view_cat_combo.set_entry_text_column(0)
         self.view_cat_combo.append_text("All fonts")
         self.view_cat_combo.append_text("All in categories")
         self.view_cat_combo.append_text("All uncategorized")
