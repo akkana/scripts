@@ -327,9 +327,9 @@ web_image = {
 }
 
 descriptions = {
-    "Mars": "Mars is visible as a bright, reddish \"star\".",
-    "Saturn": "Saturn is visible. A small telescope will show its rings.",
-    "Jupiter": "Jupiter is visible. With binoculars you can see its four brightest moons."
+    "Mars": " as a bright, reddish \"star\".",
+    "Saturn": ". A small telescope will show its rings.",
+    "Jupiter": ". With binoculars you can see its four brightest moons."
     }
 
 def quotecsv(s):
@@ -340,21 +340,41 @@ def quotecsv(s):
 def escape_singlequotes(s):
     return s.replace("'", "\\'")
 
-def finish_planet(p, d, output_format):
+def finish_planet(p, d, observer, output_format):
     if not planets_up[p]:
         return
 
-    if p in list(descriptions.keys()):
-        if output_format == "csv":
-            isvis = quotecsv(descriptions[p])
-        elif output_format == "sql":
-            isvis = escape_singlequotes(descriptions[p])
-        else:
-            isvis = descriptions[p]
-    elif p == "Venus" or p == "Mercury":
-        isvis = p + " is visible in the early evening sky."
+    # Morning or evening? For that, we need to get a handle on
+    # the ephem body object again.
+    body = planets[planets_by_name.index(p)]
+    observer.date = d
+    transit = observer.previous_transit(body) - ephem.hour * timezone
+    transit = list(ephem.Date(transit).tuple())
+    if transit[3] < 3 or transit[3] > 12:
+        when = "evening"
     else:
-        isvis = p + " is visible."
+        when = "morning"
+
+    if p == "Venus" or p == "Mercury":
+        if when == "evening":
+            isvis = p + " is visible in the early evening sky."
+        else:
+            isvis = p + " is visible in the morning sky."
+
+    elif p in list(descriptions.keys()):
+        desc = p + " is visible in the " + when + descriptions[p]
+        if output_format == "csv":
+            isvis = quotecsv(desc)
+        elif output_format == "sql":
+            isvis = escape_singlequotes(desc)
+        else:
+            isvis = desc
+
+    elif p == "Moon":
+        isvis = "The moon is visible in the " + when + "."
+
+    else:
+        isvis = p + " is visible in the " + when + "."
 
     # How about crescent info?
     if p in list(crescents.keys()):
@@ -499,8 +519,9 @@ def run(start, end, observer, toolate, output_format):
                     print("  ", observer.date, planet, "alt", planet.alt)
                 if not check_if_planet_up(planet, observer.date):
                     # Planet is not up. Was it up yesterday?
-                    if planets_up[planet.name]:
-                        finish_planet(planet.name, observer.date, output_format)
+                    if planets_up[planet.name] and planet.name != "Moon":
+                        finish_planet(planet.name, observer.date,
+                                      observer, output_format)
 
         # print()
         # print(datestr(d), "visible planets:",
@@ -544,7 +565,8 @@ def run(start, end, observer, toolate, output_format):
     if saw_conjunction:
         conjunctions.closeout()
     for p in visible_planets:
-        finish_planet(p.name, d, output_format)
+        if p.name != "Moon":
+            finish_planet(p.name, d, observer, output_format)
 
 if __name__ == '__main__':
     import sys, os
