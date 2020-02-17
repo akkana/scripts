@@ -202,7 +202,10 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
 # Helper routines to copy to/from/on android.
 # These assume the schemas have already been removed.
 def quote(s):
-    return pipes.quote(s)
+    #return pipes.quote(s)
+    # Actually, quoting breaks things. subprocess segments the arguments
+    # on its own just fine.
+    return s
 
 def copy_to_android(src, dst):
     subprocess.call(["adb", "push", quote(src), quote(dst)])
@@ -363,6 +366,7 @@ def sync(src, dst, dryrun=True):
        XXX: basically works but needs to remove empty directories.
     """
     src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
+    # print("src_ls:", src_ls)
     dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
 
     # Indices as we loop over the src and dst lists:
@@ -425,6 +429,8 @@ def sync(src, dst, dryrun=True):
                                                       dst_ls[idst][0]))
         isrc += 1
         idst += 1
+
+    # print("Updates:", updates)
 
     # When setting up moves, we avoided adding the files to removes,
     # but the new location was still added to updates. Remove those.
@@ -495,11 +501,13 @@ def sync(src, dst, dryrun=True):
         remember_needed_dirs(fpair[1])
     for f in updates:
         remember_needed_dirs(f)
+    # print("After remember_needed_dirs, updates is", updates)
 
     # Time to actually do it!
 
     # We'll be prepending src and dst (including their schemae)
     # so make sure they end with a slash:
+    # XXX This means that neither src nor dst can be a file, only directories.
     if not src.endswith('/'):
         src += '/'
     if not dst.endswith('/'):
