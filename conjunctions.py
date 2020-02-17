@@ -568,6 +568,41 @@ def run(start, end, observer, toolate, output_format):
         if p.name != "Moon":
             finish_planet(p.name, d, observer, output_format)
 
+
+def moon_phases(start, end, output_format):
+    d = ephem.previous_full_moon(start)
+    d = ephem.previous_full_moon(d)
+    print("Starting from", d)
+
+    def output_moon_phase(d, phasename, img, attr):
+        if output_format == "sql":
+            print("('%s', 'astronomy', 'naked eye', '%s', '%s', '%s', "
+                  "'%s', 240, 240, '%s')," % (phasename + " moon",
+                                              datestr(d), datestr(d),
+                                              phasename + " moon",
+                                              img, attr))
+        else:
+            print(datestr(d), ":", phasename + " moon")
+
+    while d <= end:
+        d = ephem.next_first_quarter_moon(d)
+        output_moon_phase(d, "First quarter", 'astronomy/Phase-088.jpg',
+                          '<a href=\"http://commons.wikimedia.org/wiki/'
+                          'File:Phase-088.jpg\">Jay Tanner</a>')
+        d = ephem.next_full_moon(d)
+        output_moon_phase(d, "Full", 'astronomy/Phase-180.jpg',
+                          '<a href=\"http://commons.wikimedia.org/wiki/'
+                          'File:Phase-180.jpg\">Jay Tanner</a>')
+        d = ephem.next_last_quarter_moon(d)
+        output_moon_phase(d, "Last quarter", 'astronomy/Phase-270.jpg',
+                          '<a href=\"http://commons.wikimedia.org/wiki/'
+                          'File:Phase-270.jpg\">Jay Tanner</a>')
+        d = ephem.next_new_moon(d)
+        output_moon_phase(d, "New", 'astronomy/New_Moon.jpg',
+                          '<a href="https://commons.wikimedia.org/wiki/'
+                          'File:New_Moon.jpg">QuimGil</a>')
+
+
 if __name__ == '__main__':
     import sys, os
 
@@ -621,6 +656,8 @@ if __name__ == '__main__':
 
     try:
         run(start, end, observer, toolate, output_format)
+        moon_phases(start, end, output_format)
+
     except KeyboardInterrupt:
         print("Interrupted")
 
