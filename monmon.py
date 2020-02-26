@@ -30,7 +30,7 @@ import sys
 # Leave debugging info in a file of known location,
 # because if it fails, you won't be able to see any error output,
 # but maybe you can shell in and read what happened.
-DEBUGFILE = '/tmp/check-monitors.out'
+DEBUGFILE = open('/tmp/check-monitors.out', 'w')
 
 class MonMon:
 
@@ -69,7 +69,9 @@ class MonMon:
 
         # Loop over the outputs.
         for output in outputs:
-            # print("Output info:", self.dpy.xrandr_get_output_info(output, self.resources['config_timestamp']))
+            print("Output info:",
+                  self.dpy.xrandr_get_output_info(output,
+                      self.resources['config_timestamp']), file=DEBUGFILE)
 
             mondata = self.dpy.xrandr_get_output_info(
                 output, self.resources['config_timestamp'])._data
