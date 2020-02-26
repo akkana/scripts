@@ -92,9 +92,9 @@ class PiMotor:
         self.pwm.ChangeDutyCycle(abs(speed))
 
 if __name__ == '__main__':
-    # GPIO pins you can't use:
+    # GPIO pins you can't use (this is from the Pi1 days, may have changed)::
     # 14-15: used for serial console
-    # 9-10: SPI0_MOSI and SPI0_MISO, no idea what that is
+    # 9-10: SPI0_MOSI and SPI0_MISO
     # 23, 25: not used for anything but we can't use them anyway.
     # It looks like the pins we CAN use are:
     #    top row: 18, 23, 24, 25, 8, 7

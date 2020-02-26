@@ -357,7 +357,7 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
         print("No files need updating.")
 
 def sync(src, dst, dryrun=True):
-    """Synchronize recursively (like rsync -av --size-only)
+    """Synchronize recursively (like rsync -av --checksum)
        between two locations, e.g. a local directory and an android one.
        Only copy files whose size is different.
        src and dst are either a local path or an android: or androidsd: schema,
