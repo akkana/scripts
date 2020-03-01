@@ -47,6 +47,7 @@ class EclipticPoleWindow(Gtk.Window):
 
         self.auscale = auscale
         self.timestep = timestep
+        self.stepping = True
 
         if start_time:
             self.time = start_time
@@ -136,7 +137,8 @@ class EclipticPoleWindow(Gtk.Window):
 
             self.planet_paths[i].append((x, y))
 
-        return True
+        # Returning True reschedules the timeout.
+        return self.stepping
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
@@ -146,20 +148,31 @@ class EclipticPoleWindow(Gtk.Window):
         if event.keyval == Gdk.KEY_q:
             return Gtk.main_quit()
 
+        if event.keyval == Gdk.KEY_space:
+            self.stepping = not self.stepping
+            if self.stepping:
+                GLib.timeout_add(self.timestep, self.idle_cb)
+
         return False
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Draw planet orbits from the north ecliptic pole")
-    parser.add_argument('-a', "--au", dest="auscale", type=float, default=10,
+    parser = argparse.ArgumentParser(
+        description="""Draw planet orbits from the north ecliptic pole.
+
+Key bindings:
+  space   Start/stop animation
+  q       quit""",
+        formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-a', "--au", dest="auscale", type=float, default=11,
                         action="store",
-                        help="Scale of the window in astronomical units."
-                              " Default is 11, which shows Saturn."
-                              " 2.6 shows Mars, 30 shows Pluto.")
+                        help="""Scale of the window in astronomical units.
+Default is 11, which shows Saturn.
+2.6 shows Mars, 30 shows Pluto.""")
     parser.add_argument('-t', "--timestep", dest="timestep",
                         type=float, default=30,
-                        help="Time step in milliseconds (default 30)."
-                             "Controls how fast the orbits are drawn.")
+                        help="""Time step in milliseconds (default 30).
+Controls how fast the orbits are drawn.""")
     args = parser.parse_args(sys.argv[1:])
 
     win = EclipticPoleWindow(auscale=args.auscale, timestep=args.timestep)
