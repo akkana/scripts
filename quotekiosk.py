@@ -53,8 +53,8 @@ class AutoSizerWindow(Gtk.Window):
        to fill as much space as possible.
     """
     def __init__(self, fullscreen=False, fadetime=2, fontname="Serif Italic",
-                 border_size=40):
-        super(AutoSizerWindow, self).__init__()
+                 colors='yellow:black', border_size=40):
+        super().__init__()
 
         self.content_area = None
 
@@ -79,8 +79,11 @@ class AutoSizerWindow(Gtk.Window):
 
         self.border_size = border_size
 
-        self.background_color = (0, 0, 0)
-        self.text_color = (1, 1, 0)
+        if colors:
+            self.background_color = (0, 0, 0)
+            self.text_color = (1, 1, 0)
+        else:
+            self.parse_colors(colors)
 
         # alpha to be used for fades
         self.alpha = 1
@@ -230,8 +233,35 @@ class AutoSizerWindow(Gtk.Window):
 
         self.clear(ctx)
         Gdk.cairo_set_source_pixbuf(ctx, self.pixbuf, x, y)
-
         ctx.paint_with_alpha(self.alpha)
+
+    def parse_colors(self, c):
+        try:
+            if len(c) = 3:
+                return c
+        except:
+            pass
+
+        try:
+            if c.startswith('('):
+                blah
+            if c.startswith('#'):
+                blah
+            gdk_parse_blah(c)
+
+    def parse_colors(self, colors):
+        try:
+            fg, bg = colors
+
+        except TypeError:
+            try:
+                fg, bg = colors.split(':')
+            except AttributeError, ValueError:
+                raise RuntimeError("Don't know how to unpack colors:"
+                                   + str(colors))
+
+        self.background_color = parse_color(bg)
+        self.text_color = parse_color(fg)
 
     def clear(self, ctx):
         """Clear the screen.
@@ -290,10 +320,10 @@ class KioskWindow(AutoSizerWindow):
     def __init__(self, fullscreen=False, fadetime=2,
                  fontname="Serif Italic",
                  border_size=40, timeout=30):
-        super(KioskWindow, self).__init__(fullscreen=fullscreen,
-                                          fadetime=fadetime,
-                                          fontname=fontname,
-                                          border_size=border_size)
+        super().__init__(fullscreen=fullscreen,
+                         fadetime=fadetime,
+                         fontname=fontname,
+                         border_size=border_size)
         self.timeout = timeout
 
         # quote_list can be a mixture of quotes and filenames
@@ -338,6 +368,9 @@ if __name__ == "__main__":
     import argparse
     import sys
 
+    def parse_colors(s):
+        pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--fullscreen", dest="fullscreen",
                         action="store_true", default=False,
@@ -346,11 +379,14 @@ if __name__ == "__main__":
                         dest="time", type=int, default=30,
                         help='Time in seconds to pause between quotes')
     parser.add_argument('-F', '--fadetime', action="store",
-                        dest="fadetime", type=float, default=2,
+                        dest="fadetime", type=float, default=2.,
                         help='Fade time in seconds (0 = no fade)')
     parser.add_argument('-fn', '--fontname', action="store",
-                        dest="fontname", default='Serif Italic',
-                        help='Fade time in seconds (0 = no fade)')
+                        dest="fontname", default='Times New Roman',
+                        help='Font name')
+    parser.add_argument('--colors', action="store",
+                        dest="colors", default='yellow:black',
+                        help='Colors, foreground:background')
     parser.add_argument('quotes', nargs='+', help="Quotes, or files of quotes")
     args = parser.parse_args(sys.argv[1:])
 

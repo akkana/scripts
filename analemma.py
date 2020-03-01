@@ -26,7 +26,7 @@ from gi.repository import PangoCairo
 
 class AnalemmaWindow(Gtk.Window):
     def __init__(self, observer, year, lunar=False, background=None):
-        super(AnalemmaWindow, self).__init__()
+        super().__init__()
 
         self.observer = observer
         print("AnalemmaWindow: observer at %.1f %.1f" % (observer.lat,

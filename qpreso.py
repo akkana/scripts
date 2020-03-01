@@ -27,7 +27,7 @@ class PresoView(QWebEngineView):
         # Example showing list of views (the ONLY one I've found):
         # https://stackoverflow.com/questions/55472415/python-pyqt5-window-does-not-open-new-window-or-tab-on-external-url-link-click
 
-        super(PresoView, self).__init__()
+        super().__init__()
 
         if not curviews:
             self._windows = []
@@ -134,7 +134,7 @@ class PresoView(QWebEngineView):
 
     # def event(self, ev):
     #     print("event!", ev)
-    #     return super(PresoView, self).event(ev)
+    #     return super().event(ev)
 
 
 def parse_args():

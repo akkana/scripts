@@ -50,7 +50,7 @@ class PDFWidget(QLabel):
         """
            load_cb: will be called when the document is loaded.
         """
-        super(PDFWidget, self).__init__(parent)
+        super().__init__(parent)
 
         self.geometry = geometry
 
@@ -176,7 +176,7 @@ class PDFScrolledWidget(QScrollArea):
     """
 
     def __init__(self, filename, dpi=72, geometry=None, parent=None):
-        super(PDFScrolledWidget, self).__init__(parent)
+        super().__init__(parent)
 
         self.loaded = False
 
@@ -296,7 +296,7 @@ class PDFScrolledWidget(QScrollArea):
         if oldWidth > 0 and self.loaded:
             self.zoom(newWidth / oldWidth)
 
-        super(PDFScrolledWidget, self).resizeEvent(event)
+        super().resizeEvent(event)
 
 
     def zoom(self, frac=1.25):

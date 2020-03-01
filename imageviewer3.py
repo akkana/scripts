@@ -16,7 +16,7 @@ class ImageViewer(Gtk.DrawingArea):
     """
 
     def __init__(self):
-        super(ImageViewer, self).__init__()
+        super().__init__()
         # self.connect("expose-event", self.expose_handler)
         self.connect("draw", self.draw)
         self.xgc_bg = None
@@ -220,7 +220,7 @@ class ImageViewerWindow(Gtk.Window):
     """
 
     def __init__(self, file_list=None, width=1024, height=768):
-        super(ImageViewerWindow, self).__init__()
+        super().__init__()
         self.file_list = file_list
         self.imgno = 0
 

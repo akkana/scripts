@@ -20,7 +20,7 @@ import sys
 
 class CairoDrawWindow(Gtk.Window):
     def __init__(self, message):
-        super(CairoDrawWindow, self).__init__()
+        super().__init__()
 
         self.message = message
 

@@ -85,6 +85,11 @@ if isinstance(x, dict)
 for k in d:
     setattr(obj, k, d[k])
 
+# Initialize a list to multiple copies of something.
+# DON'T USE l = [ [] ] * 10  -- you'll get ten copies of the same list!
+# Instead,
+l = [ [] for i in range(10) ]
+
 ########################################################
 # Shell One-liners
 ########################################################

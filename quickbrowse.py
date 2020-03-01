@@ -42,7 +42,7 @@ MAX_TAB_NAME = 22
 
 class ReadlineEdit(QLineEdit):
     def __init__(self):
-        super (ReadlineEdit, self).__init__()
+        super ().__init__()
 
     def keyPressEvent(self, event):
         # http://pyqt.sourceforge.net/Docs/PyQt4/qt.html#Key-enum
@@ -70,7 +70,7 @@ class ReadlineEdit(QLineEdit):
             return
 
         # For anything else, call the base class.
-        super(ReadlineEdit, self).keyPressEvent(event)
+        super().keyPressEvent(event)
 
 # Only define the PDFBrowserView if we have the modules it requires.
 if handle_pdf:
@@ -81,7 +81,7 @@ if handle_pdf:
             else:
                 self.theurl = url
 
-            super(PDFBrowserView, self).__init__(self.theurl, parent=parent)
+            super().__init__(self.theurl, parent=parent)
 
         def url(self):
             return QUrl(self.theurl)
@@ -108,9 +108,9 @@ class BrowserView(QWebEngineView):
             self.height = 768
 
         if 'parent' in kwargs:
-            super(BrowserView, self).__init__(kwargs['parent'])
+            super().__init__(kwargs['parent'])
         else:
-            super(BrowserView, self).__init__()
+            super().__init__()
 
         self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
 
@@ -267,7 +267,7 @@ class BrowserPage(QWebEnginePage):
     def __init__(self, profile, browser_view, browser_window):
         self.browser_view = browser_view
         self.browser_window = browser_window
-        super(BrowserPage, self).__init__(profile)
+        super().__init__(profile)
 
         self.fullScreenRequested.connect(self.fullscreen_requested)
 
@@ -313,7 +313,7 @@ class BrowserWindow(QMainWindow):
             self.height = 735
 
         # Then run the default constructor.
-        super(BrowserWindow, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.browserviews = []
 

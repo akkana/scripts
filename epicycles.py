@@ -46,7 +46,7 @@ class EclipticPoleWindow(Gtk.Window):
         """time_increment is in days.
            start_time is a an ephem.Date object.
         """
-        super(EclipticPoleWindow, self).__init__()
+        super().__init__()
 
         self.auscale = auscale
         self.timestep = timestep
