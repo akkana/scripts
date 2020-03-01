@@ -131,6 +131,10 @@ docx2html, doc2html have been replaced by word2html.
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
 
+epicycle.py:
+    Show planet orbits as they would be viewed from the north ecliptic
+    pole in a geocentric universe. Show the Venus Pentagram, etc.
+
 epubtag.py:
     Display author, title and tag information for ebooks in epub format;
     or add or modify an ebook's topic tags, title or cover.
