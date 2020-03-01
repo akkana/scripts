@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 
+# Plot all the planets' orbits, as viewed from a point that
+# floats above the Earth's north ecliptic pole and moves with
+# the Earth, to demonstrate phenomena like epicycles and the
+# Venus pentagram. Idea from Galen Gisler's planetarium show.
+#
+# Copyright 2020 by Akkana Peck: Share and enjoy under the GPLv2 or later.
+
 import ephem
 
 import gi
