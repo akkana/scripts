@@ -75,6 +75,10 @@ cachefile.py:
     slow process, like a web API, and cache it locally for speedier access.
     Caches in CSV format.
 
+cairodrawwin.py:
+    A base for building Python3 GTK3/Cairo apps using a drawing area.
+    You can import and subclass it, or use it as a template.
+
 cellaut.py:
     Simple cellular automata simulation in Python. Slow.
 
