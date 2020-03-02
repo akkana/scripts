@@ -80,7 +80,7 @@ class EclipticPoleWindow(Gtk.Window):
         GLib.timeout_add(self.timestep, self.idle_cb)
 
         self.drawing_area.connect('draw', self.draw)
-        # self.drawing_area.connect('configure-event', self.on_configure)
+        self.drawing_area.connect('configure-event', self.configure)
         self.connect("destroy", Gtk.main_quit)
         self.connect("key-press-event", self.key_press)
 
@@ -97,7 +97,7 @@ class EclipticPoleWindow(Gtk.Window):
         # to draw incrementally. So save it here.
         self.ctx = ctx
 
-        self.set_scale()
+        self.configure(None, None)
 
         ctx.set_source_rgb(self.bg_color.red, self.bg_color.green,
                            self.bg_color.blue)
@@ -117,12 +117,6 @@ class EclipticPoleWindow(Gtk.Window):
 
             ctx.stroke()
 
-    def set_scale(self):
-        # These should really only be set at configure change notify time.
-        self.halfwidth = self.width/2.
-        self.halfheight = self.height/2.
-        self.dist_scale = self.halfheight / self.auscale
-
     def idle_cb(self):
         """Calculate and draw the next position of each planet.
         """
@@ -130,8 +124,6 @@ class EclipticPoleWindow(Gtk.Window):
         self.time += self.time_increment
 
         ctx = self.drawing_area.get_window().cairo_create()
-
-        self.set_scale()
 
         for i, p in enumerate(planets):
 
@@ -164,6 +156,12 @@ class EclipticPoleWindow(Gtk.Window):
             ctx.line_to(x, y)
         else:
             ctx.move_to(x, y)
+
+    def configure(self, widget, event):
+        """Window size change: reset the scale factors."""
+        self.halfwidth = self.width/2.
+        self.halfheight = self.height/2.
+        self.dist_scale = self.halfheight / self.auscale
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
