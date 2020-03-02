@@ -21,7 +21,6 @@ import math
 import argparse
 import sys
 from datetime import datetime
-from pprint import pprint
 
 planets = [
     ephem.Mercury(),
@@ -34,11 +33,14 @@ planets = [
     ephem.Pluto()
     ]
 
+# For some reason, Gdk's "green" is not the 0 255   0 from rgb.txt, but
+# comes out (red=0, green=32896, blue=0). But it parses green1 correctly.
 planet_color_names = [ 'yellow', 'white', 'red', 'cyan', 'violet',
-                       'green', 'blue', 'purple' ]
+                       'green1', 'blue', 'purple' ]
 
+# Cairo drawing wants color components to go from 0 to 1; GTK uses 0 to 65535.
+# The good thing about standards is that there are so many of them.
 def color_to_triplet(c):
-    return c.red, c.green, c.blue
     return c.red / 65535, c.green / 65535, c.blue / 65535
 
 class EclipticPoleWindow(Gtk.Window):
@@ -95,21 +97,31 @@ class EclipticPoleWindow(Gtk.Window):
         # to draw incrementally. So save it here.
         self.ctx = ctx
 
+        self.set_scale()
+
         ctx.set_source_rgb(self.bg_color.red, self.bg_color.green,
                            self.bg_color.blue)
         ctx.rectangle(0, 0, self.width, self.height)
         ctx.fill()
 
-        ctx.set_line_width(self.line_width)
+        # This makes no sense: specified line width has to be one less here
+        # than it does in idle_cb to result in the same line width.
+        ctx.set_line_width(self.line_width-1)
         for i, path in enumerate(self.planet_paths):
             if not path:
                 continue
             ctx.set_source_rgb(*color_to_triplet(self.planet_colors[i]))
-            ctx.move_to(*path[0])
-            for x, y in path[1:]:
-                ctx.line_to(x, y)
+            self.planet_segment(ctx, *path[0], False)
+            for pair in path[1:]:
+                self.planet_segment(ctx, *pair, True)
 
             ctx.stroke()
+
+    def set_scale(self):
+        # These should really only be set at configure change notify time.
+        self.halfwidth = self.width/2.
+        self.halfheight = self.height/2.
+        self.dist_scale = self.halfheight / self.auscale
 
     def idle_cb(self):
         """Calculate and draw the next position of each planet.
@@ -119,29 +131,39 @@ class EclipticPoleWindow(Gtk.Window):
 
         ctx = self.drawing_area.get_window().cairo_create()
 
+        self.set_scale()
+
         for i, p in enumerate(planets):
-            halfwidth = self.width/2.
-            halfheight = self.height/2.
 
             p.compute(self.time)
             ra = p.ra
             dist = p.earth_distance
 
-            dist_scale = halfheight * dist / self.auscale
-            x = dist_scale * math.cos(ra) + halfwidth
-            y = dist_scale * math.sin(ra) + halfheight
             if self.planet_paths[i]:
                 ctx.set_source_rgb(*color_to_triplet(self.planet_colors[i]))
                 ctx.new_path()
-                ctx.move_to(*self.planet_paths[i][-1])
-                ctx.line_to(x, y)
+
+                self.planet_segment(ctx, *self.planet_paths[i][-1], False)
+                self.planet_segment(ctx, ra, dist, True)
+
                 ctx.stroke()
                 ctx.close_path()
 
-            self.planet_paths[i].append((x, y))
+            self.planet_paths[i].append((ra, dist))
 
         # Returning True reschedules the timeout.
         return self.stepping
+
+    def planet_segment(self, ctx, ra, dist, drawp):
+        """Draw (if drawp) or move to the appropriate place on the screen
+           for the given ra and dist coordinates.
+        """
+        x = dist * self.dist_scale * math.cos(ra) + self.halfwidth
+        y = dist * self.dist_scale * math.sin(ra) + self.halfheight
+        if drawp:
+            ctx.line_to(x, y)
+        else:
+            ctx.move_to(x, y)
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
