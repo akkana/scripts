@@ -8,7 +8,33 @@ html_converter = html2text.HTML2Text()
 html_converter.body_width = 0
 
 
-class TextResponse:
+class Candidate:
+    def __init__(self):
+        self.name = ''
+        self.lastname = ''
+        self.party = ''
+        self.questions = []
+        self.answers = []
+
+    def output(self, formatter):
+        formatter.add_header(self.name, 2)
+        formatter.add_paragraph('(' + self.party + ')')
+
+        for i, q in enumerate(self.questions):
+            # formatter.add_header(q, 3)
+            formatter.add_bold_paragraph(q)
+            if self.answers[i]:
+                formatter.add_paragraph(self.answers[i])
+            else:
+                formatter.add_paragraph("No response was received.")
+
+    # Sorting:
+    # Adjust as needed to match ballot order.
+    def __lt__(self, other):
+        return self.lastname < other.lastname
+
+
+class TextFormatter:
     def __init__(self):
         pass
 
@@ -28,7 +54,7 @@ class TextResponse:
         pass
 
 
-class DocxResponse:
+class DocxFormatter:
     def __init__(self):
         self.doc = docx.Document()
 
@@ -61,29 +87,34 @@ def convert_vote411_file(filename, fmt='text'):
         # are blank. That's why this can't use csv.DictReader.
         # Instead, go through and figure out the indices for
         # the columns that will be needed.
+        name_i = columnnames.index('Name')
+        lastname_i = columnnames.index('Last Name')
         office_i = columnnames.index('Race/Referendum')
         desc_i = columnnames.index('Description of Race/Referendum')
-        name_i = columnnames.index('Name')
         party_i = columnnames.index('Party Affiliation')
         question1_i = columnnames.index('Question 1')
 
-        vgdoc = None
+        formatter = None
+        candidates = []
 
         for row in reader:
             # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
             # ID	Name	Last Name	Private Email	Contact Name	Security Code	Party Affiliation	Race/Referendum	Description of Race/Referendum	Category of Race/Referendum	Occupation	Mailing Address	Campaign Phone	Website	Street address	Campaign Email	Facebook	Twitter	OCD	facebook	Question 1	Guide Answer 1	Print Answer 1	Question 2	Guide Answer 2	Print Answer 2	...
 
-            if not vgdoc:
+            if not formatter:
                 if fmt == 'text':
-                    vgdoc = TextResponse()
+                    formatter = TextFormatter()
                 elif fmt == 'docx':
-                    vgdoc = DocxResponse()
+                    formatter = DocxFormatter()
 
-                vgdoc.add_header(row[office_i], 1)
-                vgdoc.add_paragraph(html_converter.handle(row[desc_i]))
+                formatter.add_header(row[office_i], 1)
+                formatter.add_paragraph(html_converter.handle(row[desc_i]))
 
-            vgdoc.add_header(row[name_i], 2)
-            vgdoc.add_paragraph('(' + row[party_i] + ')')
+            candidate = Candidate()
+
+            candidate.name = row[name_i]
+            candidate.lastname = row[lastname_i]
+            candidate.party = row[party_i]
 
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
@@ -96,19 +127,20 @@ def convert_vote411_file(filename, fmt='text'):
                 # print("q_i", q_i, "len", len(row))
                 if len(row) < q_i + 2:
                     break
-
-                # vgdoc.add_header(row[q_i], 3)
-                vgdoc.add_bold_paragraph(row[q_i])
-                answer = row[q_i + 1]
-                if answer:
-                    vgdoc.add_paragraph(answer)
-                else:
-                    vgdoc.add_paragraph("No response was received.")
+                candidate.questions.append(row[q_i])
+                candidate.answers.append(row[q_i + 1])
 
                 questionnum += 1
 
-        # Done with loop over tab-separated lines.
-        vgdoc.save('savedoc.docx')
+            candidates.append(candidate)
+
+        # Done with loop over tab-separated lines. All candidates are read.
+        candidates.sort()
+
+        for candidate in candidates:
+            candidate.output(formatter)
+
+        formatter.save('savedoc.docx')
 
 
 if __name__ == '__main__':
