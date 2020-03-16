@@ -13,7 +13,7 @@ class TextResponse:
         pass
 
     def add_header(self, s, level):
-        print('*', s)
+        print('===', s)
         print()
 
     def add_paragraph(self, s):
@@ -50,53 +50,65 @@ class DocxResponse:
 
 # Read tab-separated files
 def convert_vote411_file(filename, fmt='text'):
-    # This doesn't work:
-    # tab-separated files exported by VOTE411 have column names
-    # up to the second question, but after that, the columns
-    # are blank. So you can't just use csv.DictReader.
     with open(filename) as csvfp:
-        reader = csv.DictReader(csvfp, delimiter='\t')
+        reader = csv.reader(csvfp, delimiter='\t')
 
-        response = None
+        # Get the first line, and use it to figure out important fields
+        columnnames = next(reader)
+
+        # tab-separated files exported by VOTE411 have column names
+        # up to the second question, but after that, the columns
+        # are blank. That's why this can't use csv.DictReader.
+        # Instead, go through and figure out the indices for
+        # the columns that will be needed.
+        office_i = columnnames.index('Race/Referendum')
+        desc_i = columnnames.index('Description of Race/Referendum')
+        name_i = columnnames.index('Name')
+        party_i = columnnames.index('Party Affiliation')
+        question1_i = columnnames.index('Question 1')
+
+        vgdoc = None
 
         for row in reader:
             # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
             # ID	Name	Last Name	Private Email	Contact Name	Security Code	Party Affiliation	Race/Referendum	Description of Race/Referendum	Category of Race/Referendum	Occupation	Mailing Address	Campaign Phone	Website	Street address	Campaign Email	Facebook	Twitter	OCD	facebook	Question 1	Guide Answer 1	Print Answer 1	Question 2	Guide Answer 2	Print Answer 2	...
 
-            if not response:
+            if not vgdoc:
                 if fmt == 'text':
-                    response = TextResponse()
+                    vgdoc = TextResponse()
                 elif fmt == 'docx':
-                    response = DocxResponse()
+                    vgdoc = DocxResponse()
 
-                response.add_header(row['Race/Referendum'], 1)
-                response.add_paragraph(html_converter.handle(row['Description of Race/Referendum']))
+                vgdoc.add_header(row[office_i], 1)
+                vgdoc.add_paragraph(html_converter.handle(row[desc_i]))
 
-            response.add_header(row['Name'], 2)
-            response.add_paragraph('(' + row['Party Affiliation'] + ')')
+            vgdoc.add_header(row[name_i], 2)
+            vgdoc.add_paragraph('(' + row[party_i] + ')')
 
+            # Loop over the questions. They start at index question1_i
+            # and there are three columns for each question:
+            # question, Guide Answer, Print Answer.
+            # Print Answers are always blank, I don't know what they're for.
             questionnum = 1
             while True:
-                qidx = f'Question {questionnum}'
-                if qidx not in row:
+                q_i = question1_i + (questionnum-1) * 3
+                # print(row)
+                # print("q_i", q_i, "len", len(row))
+                if len(row) < q_i + 2:
                     break
 
-                # response.add_header(row[qidx], 3)
-                response.add_bold_paragraph(row[qidx])
-                gidx = f'Guide Answer {questionnum}'
-                # I don't know what the Print Answer is for,
-                # but empirically it seems to be blank.
-                # pidx = f'Print Answer {questionnum}'
-                answer = row[gidx]
+                # vgdoc.add_header(row[q_i], 3)
+                vgdoc.add_bold_paragraph(row[q_i])
+                answer = row[q_i + 1]
                 if answer:
-                    response.add_paragraph(answer)
+                    vgdoc.add_paragraph(answer)
                 else:
-                    response.add_paragraph("No response was received.")
+                    vgdoc.add_paragraph("No response was received.")
 
                 questionnum += 1
 
         # Done with loop over tab-separated lines.
-        response.save('savedoc.docx')
+        vgdoc.save('savedoc.docx')
 
 
 if __name__ == '__main__':
