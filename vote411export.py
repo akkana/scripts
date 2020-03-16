@@ -54,6 +54,34 @@ class TextFormatter:
         pass
 
 
+class HtmlFormatter:
+    def __init__(self):
+        print ('''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>asdf</title>
+</head>
+
+<body>
+''')
+
+    def add_header(self, s, level):
+        print(f'<h{level}>{s}</h{level}>')
+
+    def add_paragraph(self, s):
+        print(f'<p>{s}</p>')
+
+    def add_bold_paragraph(self, s):
+        print(f'<p><b>{s}</b></p>')
+
+    def save(self, outfile):
+        print('''
+</body>
+</html>''')
+
+
 class DocxFormatter:
     def __init__(self):
         self.doc = docx.Document()
@@ -104,6 +132,8 @@ def convert_vote411_file(filename, fmt='text'):
             if not formatter:
                 if fmt == 'text':
                     formatter = TextFormatter()
+                elif fmt == 'html':
+                    formatter = HtmlFormatter()
                 elif fmt == 'docx':
                     formatter = DocxFormatter()
 
@@ -149,7 +179,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Convert Vote411 tab-separated files to text or docx")
     parser.add_argument('-F', "--format", dest="format", default='text',
-                        action="store", help="Output format: text or docx")
+                        action="store", help="Output format: text, html, docx")
     parser.add_argument('infiles', nargs='+',
                         help="Input files, in tab-separated format")
     args = parser.parse_args(sys.argv[1:])
