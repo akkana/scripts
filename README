@@ -547,6 +547,10 @@ vol:
     A simple python-gtk volume slider. Much simpler and smaller than
     alsamixergui.
 
+vote411export.py:
+    A script to take an exported format from the LWV VOTE411 site,
+    parse it, and produce clean outputs for a printed Voter Guide.
+
 waymaker:
     Take a file and of descriptions, multi-line and separated by blank lines,
     and turn it into a collection of GPX waypoints suitable for import into
