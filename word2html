@@ -20,7 +20,7 @@ def docx2html(infile, outfile):
     for m in mammout.messages:
         print("Mammoth %s: %s" % (m.type, m.message))
 
-    html = prettyprint_html(mammout.value)
+    html = prettyprint_html(mammout.value, infile)
 
     if outfile == "--":
         print(html)
@@ -28,16 +28,53 @@ def docx2html(infile, outfile):
         with open(outfile, "w") as fp:
             print(html, file=fp)
 
-def prettyprint_html(inhtml):
-    # Prettyprint it
+def prettyprint_html(inhtml, filename=''):
+    '''Prettyprint some HTML, which is assumed not to
+       have <html>, <head>, <body>..
+    '''
     soup = BeautifulSoup(inhtml, "lxml")
 
-    return prettysoup.prettyprint(soup)
+    # Try to get a title:
+    if soup.head and soup.head.title:
+        title = soup.head.title.text
+    elif soup.h1:
+        title = soup.h1.text
+    else:
+        print("filename is", filename)
+        title = os.path.splitext(filename)[0]
+    if title:
+        title = '<title>' + title + '</title>'
+
+    # Failed attempts to add meta charset via BS:
+    # # Add <meta charset="UTF-8"> at beginning of <head>
+    # head = soup.head
+    # if not head:
+    #     print("There's no head")
+    #     head = soup.new_tag('head')
+    #     soup.body.insert_before(head)
+    # metatag = soup.new_tag('meta')
+    # metatag.attrs['http-equiv'] = 'Content-Type'
+    # metatag.attrs['content'] = 'text/html; charset=utf-8"'
+    # # soup.head.append(metatag)
+    # soup.head.insert(0, metatag)
+
+    # BS adds <body> but not <head>
+    header = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+%s
+</head>
+''' % title
+    footer = '</html>'
+
+    return header + prettysoup.prettyprint(soup.body) + footer
     # return soup.prettify().encode("utf-8")
 
 def html2html(infile, outfile):
     with open(infile) as infp:
-        pphtml = prettyprint_html(infp.read())
+        pphtml = prettyprint_html(infp.read(), infile)
         with open(outfile, "w") as outfp:
             outfp.write(pphtml)
 
