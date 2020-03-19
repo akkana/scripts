@@ -9,12 +9,19 @@ html_converter.body_width = 0
 
 
 class Candidate:
-    def __init__(self):
-        self.name = ''
-        self.lastname = ''
-        self.party = ''
-        self.questions = []
-        self.answers = []
+    def __init__(self, name, lastname, party, questions, answers):
+        '''name, lastname, party are strings
+           questions and answers are lists
+        '''
+        self.name = name
+        self.lastname = lastname
+        self.party = party
+        self.questions = questions
+        self.answers = answers
+
+        self.sortkey = ''.join([ c.lower() for c in self.lastname
+                                           if c.isalpha() ])
+
 
     def output(self, formatter):
         formatter.add_header(self.name, 2)
@@ -31,7 +38,7 @@ class Candidate:
     # Sorting:
     # Adjust as needed to match ballot order.
     def __lt__(self, other):
-        return self.lastname < other.lastname
+        return self.sortkey < other.sortkey
 
 
 class TextFormatter:
@@ -140,16 +147,12 @@ def convert_vote411_file(filename, fmt='text'):
                 formatter.add_header(row[office_i], 1)
                 formatter.add_paragraph(html_converter.handle(row[desc_i]))
 
-            candidate = Candidate()
-
-            candidate.name = row[name_i]
-            candidate.lastname = row[lastname_i]
-            candidate.party = row[party_i]
-
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
             # question, Guide Answer, Print Answer.
             # Print Answers are always blank, I don't know what they're for.
+            questions = []
+            answers = []
             questionnum = 1
             while True:
                 q_i = question1_i + (questionnum-1) * 3
@@ -157,12 +160,14 @@ def convert_vote411_file(filename, fmt='text'):
                 # print("q_i", q_i, "len", len(row))
                 if len(row) < q_i + 2:
                     break
-                candidate.questions.append(row[q_i])
-                candidate.answers.append(row[q_i + 1])
+                questions.append(row[q_i])
+                answers.append(row[q_i + 1])
 
                 questionnum += 1
 
-            candidates.append(candidate)
+
+            candidates.append(Candidate(row[name_i], row[lastname_i],
+                                        row[party_i], questions, answers))
 
         # Done with loop over tab-separated lines. All candidates are read.
         candidates.sort()
