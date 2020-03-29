@@ -22,21 +22,12 @@ class Candidate:
         self.sortkey = ''.join([ c.lower() for c in self.lastname
                                            if c.isalpha() ])
 
-
     def output(self, formatter):
-        formatter.add_header(self.name, 2)
-        formatter.add_paragraph('(' + self.party + ')')
+        formatter.add_name_and_party(self.name, f'({self.party})')
 
         for i, q in enumerate(self.questions):
             if not self.answers[i]:
                 self.answers[i] = "No response was received."
-
-            # # formatter.add_header(q, 3)
-            # formatter.add_bold_paragraph(q)
-            # if self.answers[i]:
-            #     formatter.add_paragraph(self.answers[i])
-            # else:
-            #     formatter.add_paragraph("No response was received.")
 
             # No paragraph break between question and answer
             formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
@@ -51,16 +42,19 @@ class TextFormatter:
     def __init__(self):
         pass
 
-    def add_header(self, s, level):
-        print('===', s)
+    def add_office(self, office, description):
+        print("===", office)
+        print(description)
         print()
 
-    def add_paragraph(self, s):
-        print(s)
+    def add_name_and_party(self, name, party):
+        print("*", name)
+        print(party)
         print()
 
-    def add_bold_paragraph(self, s):
-        print('*', s)
+    def add_q_and_a(self, question, answer):
+        print(question)
+        print(answer)
         print()
 
     def save(self, outfile):
@@ -80,14 +74,21 @@ class HtmlFormatter:
 <body>
 ''')
 
-    def add_header(self, s, level):
-        print(f'<h{level}>{s}</h{level}>')
+    def add_office(self, office, description):
+        print(f'<h1>{office}</h1>')
+        print('<p>')
+        print(description)
+        print()
 
-    def add_paragraph(self, s):
-        print(f'<p>{s}</p>')
+    def add_name_and_party(self, name, party):
+        print()
+        print(f'<h2>{name}</h2>')
+        print(party)
 
-    def add_bold_paragraph(self, s):
-        print(f'<p><b>{s}</b></p>')
+    def add_q_and_a(self, question, answer):
+        print('<p>')
+        print(f'<b>{question}</b><br />')
+        print(answer)
 
     def save(self, outfile):
         print('''
@@ -103,37 +104,20 @@ class DocxFormatter:
         font.name = 'Times New Roman'
         font.size = docx.shared.Pt(12)
 
-        # Styles for headings are ignored, but this is what SHOULD work:
-        font = self.doc.styles['Heading 1'].font
-        font.name = 'Times New Roman'
-        font.size = docx.shared.Pt(16)
-
-        font = self.doc.styles['Heading 2'].font
-        font.name = 'Times New Roman'
-        font.size = docx.shared.Pt(14)
-
-    def add_header(self, s, level):
-        # self.doc.add_heading(s, level)
-        # Since headings always have Calibri font regardless of any
-        # attempts to change that, just use a regular bold paragraph:
+    def add_office(self, office, description):
         para = self.doc.add_paragraph('')
-        run = para.add_run(s)
+        run = para.add_run(office + '\n')
         run.bold = True
-        if level == 1:
-            run.font.size =  docx.shared.Pt(16)
-        else:
-            run.font.size =  docx.shared.Pt(14)
+        run.font.size = docx.shared.Pt(16)
+        run = para.add_run(description)
 
-    def add_paragraph(self, s):
-        para = self.doc.add_paragraph(s)
-        # para.style.font.size = docx.shared.Pt(12)
-
-    def add_bold_paragraph(self, s, fontsize=None):
+    def add_name_and_party(self, name, party):
         para = self.doc.add_paragraph('')
-        run = para.add_run(s)
+        run = para.add_run(name + '\n')
         run.bold = True
-        if fontsize:
-            run.style.font.size = docx.shared.Pt(fontsize)
+        run.font.size = docx.shared.Pt(14)
+        run = para.add_run(party)
+        run.font.size = docx.shared.Pt(12)
 
     def add_q_and_a(self, question, answer):
         para = self.doc.add_paragraph('')
@@ -186,8 +170,8 @@ def convert_vote411_file(filename, fmt='text'):
                 elif fmt == 'docx':
                     formatter = DocxFormatter()
 
-                formatter.add_header(row[office_i], 1)
-                formatter.add_paragraph(html_converter.handle(row[desc_i]))
+                formatter.add_office(row[office_i],
+                                     html_converter.handle(row[desc_i]))
 
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
