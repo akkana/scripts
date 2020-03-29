@@ -113,15 +113,27 @@ class DocxFormatter:
         font.size = docx.shared.Pt(14)
 
     def add_header(self, s, level):
-        self.doc.add_heading(s, level)
+        # self.doc.add_heading(s, level)
+        # Since headings always have Calibri font regardless of any
+        # attempts to change that, just use a regular bold paragraph:
+        para = self.doc.add_paragraph('')
+        run = para.add_run(s)
+        run.bold = True
+        if level == 1:
+            run.font.size =  docx.shared.Pt(16)
+        else:
+            run.font.size =  docx.shared.Pt(14)
 
     def add_paragraph(self, s):
-        self.doc.add_paragraph(s)
+        para = self.doc.add_paragraph(s)
+        # para.style.font.size = docx.shared.Pt(12)
 
-    def add_bold_paragraph(self, s):
-        # https://www.geeksforgeeks.org/python-working-with-docx-module/
+    def add_bold_paragraph(self, s, fontsize=None):
         para = self.doc.add_paragraph('')
-        para.add_run(s).bold = True
+        run = para.add_run(s)
+        run.bold = True
+        if fontsize:
+            run.style.font.size = docx.shared.Pt(fontsize)
 
     def add_q_and_a(self, question, answer):
         para = self.doc.add_paragraph('')
