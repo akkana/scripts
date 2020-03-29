@@ -342,6 +342,16 @@ isodd = ['t' if n%2 else 'f' for n in nums]
 >>> { key: value for key, value in zip( [1, 2, 3], [11, 22, 33] ) }
 {1: 11, 2: 22, 3: 33}
 
+# dictionary default values, several ways:
+
+# With regular dicts
+total['newvalue']] = total.get(key, 0) + 42
+
+# With collections:
+from collections import defaultdict
+total = defaultdict(int)
+total['newvalue'] += 42
+
 # Pairwise loops with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
 heights = [324, 381, 442]
