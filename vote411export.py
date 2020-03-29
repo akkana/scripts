@@ -28,12 +28,18 @@ class Candidate:
         formatter.add_paragraph('(' + self.party + ')')
 
         for i, q in enumerate(self.questions):
-            # formatter.add_header(q, 3)
-            formatter.add_bold_paragraph(q)
-            if self.answers[i]:
-                formatter.add_paragraph(self.answers[i])
-            else:
-                formatter.add_paragraph("No response was received.")
+            if not self.answers[i]:
+                self.answers[i] = "No response was received."
+
+            # # formatter.add_header(q, 3)
+            # formatter.add_bold_paragraph(q)
+            # if self.answers[i]:
+            #     formatter.add_paragraph(self.answers[i])
+            # else:
+            #     formatter.add_paragraph("No response was received.")
+
+            # No paragraph break between question and answer
+            formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
 
     # Sorting:
     # Adjust as needed to match ballot order.
@@ -93,8 +99,21 @@ class DocxFormatter:
     def __init__(self):
         self.doc = docx.Document()
 
+        font = self.doc.styles['Normal'].font
+        font.name = 'Times New Roman'
+        font.size = docx.shared.Pt(12)
+
+        # Styles for headings are ignored, but this is what SHOULD work:
+        font = self.doc.styles['Heading 1'].font
+        font.name = 'Times New Roman'
+        font.size = docx.shared.Pt(16)
+
+        font = self.doc.styles['Heading 2'].font
+        font.name = 'Times New Roman'
+        font.size = docx.shared.Pt(14)
+
     def add_header(self, s, level):
-        self.doc.add_heading(s, level-1)
+        self.doc.add_heading(s, level)
 
     def add_paragraph(self, s):
         self.doc.add_paragraph(s)
@@ -103,6 +122,17 @@ class DocxFormatter:
         # https://www.geeksforgeeks.org/python-working-with-docx-module/
         para = self.doc.add_paragraph('')
         para.add_run(s).bold = True
+
+    def add_q_and_a(self, question, answer):
+        para = self.doc.add_paragraph('')
+
+        run = para.add_run(question)
+        run.bold = True
+        run.font.size = docx.shared.Pt(14)
+
+        para.add_run('\n')
+        run = para.add_run(answer)
+        run.font.size = docx.shared.Pt(12)
 
     def save(self, outfile):
         self.doc.save(outfile)
