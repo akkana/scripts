@@ -27,9 +27,12 @@ except:
 
 
 def Usage():
-    print("langgrep lang [grepflags] pattern [files]")
-    print(" e.g. langgrep python -w find")
+    print("langgrep [-f] lang [grepflags] pattern [files]")
+    print("     e.g. langgrep python -w find")
+    print("-f: print full path of files")
+    print()
     print("If no files are specified, will search in ~/bin")
+    print("plus any directory specified in ~/.config/langgrep/$LANGUAGE.conf")
     sys.exit(0)
 
 
@@ -56,7 +59,10 @@ def extra_dirs_by_lang(lang):
     try:
         with open(configfile) as cf:
             for line in cf:
-                line = line.strip()
+                # Allow $HOME or ~ in specifiers
+                if '$HOME' in line:
+                    line = line.replace('$HOME', '~')
+                line = os.path.expanduser(line.strip())
                 if line and not line.startswith('#') and os.path.exists(line):
                     extradirs.append(line)
     except:
@@ -139,7 +145,7 @@ def find_files_in_dir(lang, direc):
                     yield filepath
 
 
-def langgrep(lang, pattern, grepargs, fil):
+def langgrep(lang, pattern, grepargs, fil, flags):
     arglist = ['grep', '-H']
     arglist.extend(grepargs)
     arglist.append(pattern)
@@ -170,7 +176,11 @@ def langgrep(lang, pattern, grepargs, fil):
             path = pathparts[-1]
         else:
             path = '/'.join(pathparts[-2:])
-        s = "%s%s" % (os.path.basename(path), line[colon:])
+
+        if 'fullpath' in flags and flags['fullpath']:
+            s = "%s%s" % (path, line[colon:])
+        else:
+            s = "%s%s" % (os.path.basename(path), line[colon:])
         # print(s.encode('utf-8', "backslashreplace"))
         print(s)
 
@@ -180,6 +190,15 @@ def parse_args():
        Returns: (lang, pattern, grepargs, files)
     """
     if len(sys.argv) < 3:
+        Usage()
+
+    flags = {}
+
+    if sys.argv[1] == '-f':
+        flags['fullpath'] = True
+        sys.argv = sys.argv[1:]
+
+    elif sys.argv[1].startswith('-'):
         Usage()
 
     lang = sys.argv[1]
@@ -202,27 +221,27 @@ def parse_args():
 
         files.append(arg)
 
-    return (lang, pattern, grepargs, files)
+    return (lang, pattern, grepargs, files, flags)
 
 
 if __name__ == '__main__':
     try:
-        lang, pattern, grepargs, files = parse_args()
+        lang, pattern, grepargs, files, flags = parse_args()
 
         if not files:
             for filepath in find_files_in_dir(lang,
                                           os.path.join(os.getenv("HOME"),
                                                        "bin")):
-                langgrep(lang, pattern, grepargs, filepath)
+                langgrep(lang, pattern, grepargs, filepath, flags)
 
             for d in extra_dirs_by_lang(lang):
                 for filepath in find_files_in_dir(lang, d):
-                    langgrep(lang, pattern, grepargs, filepath)
+                    langgrep(lang, pattern, grepargs, filepath, flags)
 
         # print("files:", '\n'.join(files))
 
         for fil in files:
-            langgrep(lang, pattern, grepargs, fil)
+            langgrep(lang, pattern, grepargs, fil, ('fullpath') in flags)
 
         # Try to catch ctrl-C and print a nicer message.
         # This doesn't work, though:
