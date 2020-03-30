@@ -63,7 +63,7 @@ class TextFormatter:
 
 class HtmlFormatter:
     def __init__(self):
-        print ('''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+        self.htmlstr = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
@@ -72,63 +72,97 @@ class HtmlFormatter:
 </head>
 
 <body>
-''')
+'''
 
     def add_office(self, office, description):
-        print(f'<h1>{office}</h1>')
-        print('<p>')
-        print(description)
-        print()
+        self.htmlstr += f'<h1>{office}</h1>\n<p>' + description + '\n'
 
     def add_name_and_party(self, name, party):
-        print()
-        print(f'<h2>{name}</h2>')
-        print(party)
+        self.htmlstr += f'\n<h2>{name}</h2>\n' + party
 
     def add_q_and_a(self, question, answer):
-        print('<p>')
-        print(f'<b>{question}</b><br />')
-        print(answer)
+        self.htmlstr += f'<p>\n<b>{question}</b><br />\n' + answer
 
     def save(self, outfile):
-        print('''
+        self.htmlstr += '''
 </body>
-</html>''')
+</html>
+'''
+        outfile = 'savedoc.html'
+        with open(outfile, 'w') as outfp:
+            outfp.write(self.htmlstr)
+        print('Saved to', outfile)
 
 
 class DocxFormatter:
+    FONT_NAME = "Times New Roman"
+    BASE_SIZE = 12
+    TITLE_SIZE = 16
+    NAME_SIZE = 14
+    QUESTION_SIZE = 14
+
     def __init__(self):
         self.doc = docx.Document()
+        self.para = None
+
+        # Diane says she just uses normal text and changes the size
+        # and boldness, but I can't help but think that using actual
+        # headers would make it easier for the newspaper to convert
+        # it to HTML for their website. Make it optional:
+        self.use_headings = True
 
         font = self.doc.styles['Normal'].font
-        font.name = 'Times New Roman'
-        font.size = docx.shared.Pt(12)
+        font.name = self.FONT_NAME
+        font.size = docx.shared.Pt(self.BASE_SIZE)
 
     def add_office(self, office, description):
-        para = self.doc.add_paragraph('')
-        run = para.add_run(office + '\n')
-        run.bold = True
-        run.font.size = docx.shared.Pt(16)
-        run = para.add_run(description)
+        if self.use_headings:
+            heading = self.doc.add_heading(office, 1)
+            self.set_heading_style(heading, self.TITLE_SIZE)
+            self.doc.add_paragraph(description)
+
+        else:
+            self.para = self.doc.add_paragraph('')
+            run = self.para.add_run(office + '\n')
+            run.bold = True
+            run.font.size = docx.shared.Pt(self.TITLE_SIZE)
+            run = self.para.add_run(description)
 
     def add_name_and_party(self, name, party):
-        para = self.doc.add_paragraph('')
-        run = para.add_run(name + '\n')
-        run.bold = True
-        run.font.size = docx.shared.Pt(14)
-        run = para.add_run(party)
-        run.font.size = docx.shared.Pt(12)
+        if self.use_headings:
+            heading = self.doc.add_heading(name, 2)
+            self.set_heading_style(heading, self.NAME_SIZE)
+            self.doc.add_paragraph(party)
+
+        else:
+            if not self.para:
+                self.para = self.doc.add_paragraph('')
+            run = self.para.add_run('\n' + name + '\n')
+            run.bold = True
+            run.font.size = docx.shared.Pt(self.NAME_SIZE)
+            run = self.para.add_run(party)
+            run.font.size = docx.shared.Pt(self.BASE_SIZE)
 
     def add_q_and_a(self, question, answer):
-        para = self.doc.add_paragraph('')
+        self.para = self.doc.add_paragraph('')
 
-        run = para.add_run(question)
+        run = self.para.add_run(question)
         run.bold = True
-        run.font.size = docx.shared.Pt(14)
+        run.font.size = docx.shared.Pt(self.QUESTION_SIZE)
 
-        para.add_run('\n')
-        run = para.add_run(answer)
-        run.font.size = docx.shared.Pt(12)
+        self.para.add_run('\n')
+        run = self.para.add_run(answer)
+        run.font.size = docx.shared.Pt(self.BASE_SIZE)
+
+    def set_heading_style(self, heading, font_size):
+        heading.style.font.size = docx.shared.Pt(font_size)
+
+        # https://stackoverflow.com/questions/60921603/how-do-i-change-heading-font-face-and-size-in-python-docx
+        rFonts = heading.style.element.rPr.rFonts
+        rFonts.set(docx.oxml.ns.qn("w:asciiTheme"), self.FONT_NAME)
+        # Also change the color from blue to black:
+        color = heading.style.element.rPr.color
+        color.set(docx.oxml.ns.qn("w:val"), "000000")
 
     def save(self, outfile):
         self.doc.save(outfile)
@@ -171,7 +205,7 @@ def convert_vote411_file(filename, fmt='text'):
                     formatter = DocxFormatter()
 
                 formatter.add_office(row[office_i],
-                                     html_converter.handle(row[desc_i]))
+                                     html_converter.handle(row[desc_i]).strip())
 
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
@@ -190,7 +224,6 @@ def convert_vote411_file(filename, fmt='text'):
                 answers.append(row[q_i + 1])
 
                 questionnum += 1
-
 
             candidates.append(Candidate(row[name_i], row[lastname_i],
                                         row[party_i], questions, answers))
