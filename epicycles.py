@@ -7,6 +7,14 @@
 #
 # Copyright 2020 by Akkana Peck: Share and enjoy under the GPLv2 or later.
 
+# Weird GLib bug: GLib.timeout_add takes an integer number
+# of milliseconds, but if you pass it a float, it sets the timeout
+# but then doesn't call draw() automatically after configure(),
+# resulting in a transparent window since the black background
+# doesn't get drawn. I guess it's some mysterious GTK/Cairo bug.
+# Of course I could require an integer timeout when parsing arguments,
+# but it's such an amusingly weird bug that I've left it as a float.
+
 import ephem
 
 import gi
@@ -72,9 +80,7 @@ class EclipticPoleWindow(Gtk.Window):
         self.line_width = 3
 
         self.drawing_area = Gtk.DrawingArea()
-        self.width = 1024
-        self.height = 768
-        self.set_default_size(self.width, self.height)
+        self.set_default_size(1024, 768)
         self.add(self.drawing_area)
 
         GLib.timeout_add(self.timestep, self.idle_cb)
@@ -90,14 +96,10 @@ class EclipticPoleWindow(Gtk.Window):
 
     def draw(self, widget, ctx):
         # print("Draw")
-        self.width, self.height = self.get_size()
 
-        # There is no easy way to get a DrawingArea's context,
-        # besides getting it in draw(), but idle_cb needs it
-        # to draw incrementally. So save it here.
-        self.ctx = ctx
-
-        self.configure(None, None)
+        if not ctx:
+            print("Draw with no cairo context")
+            ctx = widget.get_window().cairo_create()
 
         ctx.set_source_rgb(self.bg_color.red, self.bg_color.green,
                            self.bg_color.blue)
@@ -120,6 +122,10 @@ class EclipticPoleWindow(Gtk.Window):
     def idle_cb(self):
         """Calculate and draw the next position of each planet.
         """
+        if not self.width:
+            print("idle: skipping")
+            return True
+
         # self.time += ephem.date(self.time + self.time_increment)
         self.time += self.time_increment
 
@@ -159,9 +165,13 @@ class EclipticPoleWindow(Gtk.Window):
 
     def configure(self, widget, event):
         """Window size change: reset the scale factors."""
+        # print("configure")
+        self.width, self.height = self.get_size()
         self.halfwidth = self.width/2.
         self.halfheight = self.height/2.
         self.dist_scale = self.halfheight / self.auscale
+
+        # self.draw(widget, None)
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""
@@ -191,7 +201,7 @@ Key bindings:
                         action="store",
                         help="""Scale of the window in astronomical units.
 Default is 11, which shows Saturn.
-2.6 shows Mars, 30 shows Pluto.""")
+2.6 shows Mars, 30 shows some of Pluto, 50 shows all of Pluto.""")
     parser.add_argument('-t', "--timestep", dest="timestep",
                         type=float, default=30,
                         help="""Time step in milliseconds (default 30).
