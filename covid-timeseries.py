@@ -7,7 +7,10 @@ import argparse
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import datetime
+import pygal
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from pprint import pprint
 
 import sys, os
 
@@ -65,7 +68,7 @@ def get_timeseries(location):
             timeseries[key].append(0)
 
     for d in covid_data[location]['dates']:
-        dates.append(datetime.datetime.strptime(d, '%Y-%m-%d'))
+        dates.append(datetime.strptime(d, '%Y-%m-%d'))
         append_or_zero(timeseries, 'cases',
                        covid_data[location]['dates'][d])
         if len(timeseries['cases']) >= 2:
@@ -99,6 +102,43 @@ def plot_timeseries_matplotlib(dates, timeseries):
     plt.show()
 
 
+def date_labels(start, end):
+    """Generate labels for the 1st and 15th of each month"""
+    labels = []
+
+    # If starting before the 15th of the month, append the 15th first.
+    if start.day < 15:
+        start = start.replace(day=15)
+        labels.append(start)
+
+    # Set to the first of next month
+    start = start.replace(day=1) + relativedelta(months=1)
+
+    while start <= end:
+        labels.append(start)
+        labels.append(start.replace(day=15))
+        start += relativedelta(months=1)
+
+    return labels
+
+
+def plot_timeseries_pygal(dates, timeseries):
+    datetimeline = pygal.DateTimeLine(
+        x_label_rotation=35, truncate_label=-1,
+        show_x_guides=False, show_y_guides=False,
+        x_value_formatter=lambda dt: dt.strftime('%b %d'))
+    datetimeline.add("Cases", list(zip(dates, timeseries['cases'])))
+
+    datetimeline.x_labels = date_labels(dates[0], dates[-1])
+
+    [datetime(2017, 1, 30, 0, 0, n) for n in range(0, 60)]
+
+    outfile = '/tmp/covid.svg'
+    with open(outfile, 'wb') as outfp:
+        outfp.write(datetimeline.render())
+    print("Saved to", outfile)
+
+
 # Location can be something like "NM, USA" or "Bernalillo County, NM, USA"
 # Run with -L to see all locations, or -L 'pat' to show all locations
 # that include a pattern.
@@ -119,7 +159,8 @@ if __name__ == '__main__':
 
     try:
         dates, timeseries = get_timeseries(args.locations[0])
-        plot_timeseries_matplotlib(dates, timeseries)
+        # plot_timeseries_matplotlib(dates, timeseries)
+        plot_timeseries_pygal(dates, timeseries)
 
     except IndexError:
         parser.print_help()
