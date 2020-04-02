@@ -160,14 +160,22 @@ class DocxFormatter:
         # https://stackoverflow.com/questions/60921603/how-do-i-change-heading-font-face-and-size-in-python-docx
         rFonts = heading.style.element.rPr.rFonts
         rFonts.set(docx.oxml.ns.qn("w:asciiTheme"), self.FONT_NAME)
+
         # Also change the color from blue to black:
-        color = heading.style.element.rPr.color
-        color.set(docx.oxml.ns.qn("w:val"), "000000")
+
+        # This works, using the same technique as for font name,
+        # but is obscure:
+        # color = heading.style.element.rPr.color
+        # color.set(docx.oxml.ns.qn("w:val"), "000000")
+
+        # A more readable way.
+        # The .color attribute on Font is a ColorFormat object,
+        # not an RGBColor directly
+        heading.style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
     def save(self, outfile):
         self.doc.save(outfile)
         print("Saved to", outfile)
-
 
 # Read tab-separated files
 def convert_vote411_file(filename, fmt='text'):
