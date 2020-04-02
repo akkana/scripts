@@ -10,12 +10,14 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pprint import pprint
 
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+# import matplotlib.pyplot as plt
+# import matplotlib.dates as mdates
 import pygal
 
 import sys, os
 
+
+verbose = True
 
 DATAFILEURL = 'https://coronadatascraper.com/timeseries-byLocation.json'
 
@@ -41,7 +43,8 @@ def fetch_data():
             lastupdate -= relativedelta(days=1)
 
         if lastupdate <= filetime:
-            print(datafile, "is cached and up to date")
+            if verbose:
+                print(datafile, "is cached and up to date")
             needs_download = False
 
     except FileNotFoundError:
@@ -51,13 +54,11 @@ def fetch_data():
         r = requests.get(DATAFILEURL)
         with open(datafile, 'wb') as datafd:
             datafd.write(r.content)
-        print("Fetched", datafile)
+        if verbose:
+            print("Fetched", datafile)
 
     with open(datafile) as infp:
         return json.loads(infp.read())
-
-
-covid_data = fetch_data()
 
 
 def show_locations(matches):
@@ -72,7 +73,7 @@ def show_locations(matches):
             print(k)
 
 
-def get_allseries(location):
+def get_allseries(covid_data, location):
     dates = []
     allseries = {
         'dates': [],
@@ -150,7 +151,7 @@ def plot_timeseries_pygal(dates, allseries, key, title):
         x_label_rotation=35, truncate_label=-1,
         title=f"COVID {title}", x_title=None, y_title=None,
         height=300,
-        show_x_guides=False, show_y_guides=False,
+        show_x_guides=True, show_y_guides=False,
         x_value_formatter=lambda dt: dt.strftime('%b %d'))
 
     # Don't add title (1st arg) here: it adds it as a legend on the left side
@@ -159,19 +160,29 @@ def plot_timeseries_pygal(dates, allseries, key, title):
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
-    outfile = f'/tmp/covid-{key}.svg'
-    datetimeline.render_to_file(outfile)
-    print("Saved to", outfile)
+    outfile = f'{DATA_DIR}/covid-{key}.svg'
+
+    # datetimeline.render_to_file(outfile)
+    svg = datetimeline.render()
+
+    # pygal loads a script from github and has no option to change that.
+    # https://github.com/Kozea/pygal/issues/351
+    # Load it locally instead
+    evil_redirect = b'https://kozea.github.io/pygal.js/2.0.x/pygal-tooltips.min.js'
+    svg = svg.replace(evil_redirect, b'pygal-tooltips.min.js')
+    with open(outfile, 'wb') as outfp:
+        outfp.write(svg)
+
+    if verbose:
+        print("Saved to", outfile)
 
 
-def plot_allseries_pygal(dates, allseries):
+def plot_allseries_pygal(dates, allseries, outfile):
     plot_timeseries_pygal(dates, allseries, 'cases', 'Cases')
     plot_timeseries_pygal(dates, allseries, 'newcases', 'New Cases')
     plot_timeseries_pygal(dates, allseries, 'deaths', 'Deaths')
 
-    outfile = "/tmp/covid.html"
-    with open(outfile, "w") as outfp:
-        outfp.write('''<!DOCTYPE html>
+    html_out = '''<!DOCTYPE html>
 <html>
   <head>
     <title>COVID-19 Cases in New Mexico</title>
@@ -185,36 +196,63 @@ def plot_allseries_pygal(dates, allseries):
     </figure>
   </body>
 </html>
-''')
-        print("Saved to", outfile)
+'''
+    if outfile:
+        if not outfile.startswith('/'):
+            outfile = os.path.join(DATA_DIR, outfile)
+        with open(outfile, "w") as outfp:
+            outfp.write(html_out)
+            if verbose:
+                print("Saved to", outfile)
+    else:
+        print('Content-type: text/html\n')
+        print(html_out)
 
 
 # Location can be something like "NM, USA" or "Bernalillo County, NM, USA"
 # Run with -L to see all locations, or -L 'pat' to show all locations
 # that include a pattern.
 
+def main():
+    global verbose, DATA_DIR
+
+    # print("env keys:", os.environ.keys(), file=sys.stderr)
+
+    # Run as a CGI?
+    if 'REQUEST_URI' in os.environ:
+        verbose = False
+        DATA_DIR = os.path.dirname(os.getenv('SCRIPT_FILENAME'))
+
+        covid_data = fetch_data()
+        dates, allseries = get_allseries(covid_data, 'NM, USA')
+        plot_allseries_pygal(dates, allseries, None)
+
+    else:
+        verbose = True
+        parser = argparse.ArgumentParser(
+            description="Plot COVID-19 data by location")
+        parser.add_argument('-L', "--show-locations", dest="show_locations",
+                            default=False, action="store_true",
+                            help="Show all available locations")
+        parser.add_argument('locations', nargs='*',
+                            help="Locations to show")
+        args = parser.parse_args(sys.argv[1:])
+
+        if args.show_locations:
+            show_locations(args.locations)
+            sys.exit(0)
+
+        covid_data = fetch_data()
+        try:
+            dates, allseries = get_allseries(covid_data, args.locations[0])
+            # plot_allseries_matplotlib(dates, allseries)
+            plot_allseries_pygal(dates, allseries, "covid.html")
+
+        except IndexError:
+            parser.print_help()
+            sys.exit(1)
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Plot COVID-19 data by location")
-    parser.add_argument('-L', "--show-locations", dest="show_locations",
-                        default=False, action="store_true",
-                        help="Show all available locations")
-    parser.add_argument('locations', nargs='*',
-                        help="Locations to show")
-    args = parser.parse_args(sys.argv[1:])
-
-    if args.show_locations:
-        show_locations(args.locations)
-        sys.exit(0)
-
-    try:
-        dates, allseries = get_allseries(args.locations[0])
-        # plot_allseries_matplotlib(dates, allseries)
-        plot_allseries_pygal(dates, allseries)
-
-    except IndexError:
-        parser.print_help()
-        sys.exit(1)
-
-
+    main()
 
