@@ -4,13 +4,15 @@
 
 import json
 import argparse
+import requests
+
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pygal
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from pprint import pprint
 
 import sys, os
 
@@ -22,15 +24,34 @@ DATA_DIR = os.path.expanduser("~/Data/covid")
 
 def fetch_data():
     datafile = os.path.join(DATA_DIR, 'timeseries-byLocation.json')
+    needs_download = True
 
-    # XXX Check last-mod date and update if needed
-    if not os.path.exists(datafile):
+    # Check the data file's last-modified time, and update if needed.
+    # The coronascraper updates at approximately 9pm PST, 5am UTC.
+    # Use 6 UTC here to be safe.
+    UTC_update_hour = 6
+    try:
+        # last mod time in UTC.
+        filetime = datetime.utcfromtimestamp(os.stat(datafile).st_mtime)
+
+        # Make a datetime for the last occurrence of 6 UTC.
+        utcnow = datetime.utcnow()
+        lastupdate = utcnow.replace(hour=UTC_update_hour, minute=0, second=0)
+        if lastupdate > utcnow:
+            lastupdate -= relativedelta(days=1)
+
+        if lastupdate <= filetime:
+            print(datafile, "is cached and up to date")
+            needs_download = False
+
+    except FileNotFoundError:
+        pass
+
+    if needs_download:
         r = requests.get(DATAFILEURL)
         with open(datafile, 'wb') as datafd:
             datafd.write(r.content)
-        print("Wrote", datafile)
-    else:
-        print(datafile, "was already cached")
+        print("Fetched", datafile)
 
     with open(datafile) as infp:
         return json.loads(infp.read())
@@ -116,7 +137,9 @@ def date_labels(start, end):
 
     while start <= end:
         labels.append(start)
-        labels.append(start.replace(day=15))
+        ides = start.replace(day=15)
+        if ides <= end:
+            labels.append(ides)
         start += relativedelta(months=1)
 
     return labels
