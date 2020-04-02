@@ -51,9 +51,9 @@ def show_locations(matches):
             print(k)
 
 
-def get_timeseries(location):
+def get_allseries(location):
     dates = []
-    timeseries = {
+    allseries = {
         'dates': [],
         'cases': [],
         'newcases': [],
@@ -61,37 +61,37 @@ def get_timeseries(location):
         'recovered': []
     }
 
-    def append_or_zero(timeseries, key, dic):
+    def append_or_zero(allseries, key, dic):
         if key in dic:
-            timeseries[key].append(dic[key])
+            allseries[key].append(dic[key])
         else:
-            timeseries[key].append(0)
+            allseries[key].append(0)
 
     for d in covid_data[location]['dates']:
         dates.append(datetime.strptime(d, '%Y-%m-%d'))
-        append_or_zero(timeseries, 'cases',
+        append_or_zero(allseries, 'cases',
                        covid_data[location]['dates'][d])
-        if len(timeseries['cases']) >= 2:
-            timeseries['newcases'].append(timeseries['cases'][-1]
-                                          - timeseries['cases'][-2])
+        if len(allseries['cases']) >= 2:
+            allseries['newcases'].append(allseries['cases'][-1]
+                                          - allseries['cases'][-2])
         else:
-            timeseries['newcases'].append(0)
-        append_or_zero(timeseries, 'deaths',
+            allseries['newcases'].append(0)
+        append_or_zero(allseries, 'deaths',
                        covid_data[location]['dates'][d])
-        append_or_zero(timeseries, 'recovered',
+        append_or_zero(allseries, 'recovered',
                        covid_data[location]['dates'][d])
 
-    return dates, timeseries
+    return dates, allseries
 
 
-def plot_timeseries_matplotlib(dates, timeseries):
+def plot_allseries_matplotlib(dates, allseries):
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, figsize=(10, 10))
-    ax1.plot(dates, timeseries['cases'], label='Total cases')
+    ax1.plot(dates, allseries['cases'], label='Total cases')
     ax1.set_title('Total cases')
-    ax2.plot(dates, timeseries['newcases'], color='green', label='New cases')
+    ax2.plot(dates, allseries['newcases'], color='green', label='New cases')
     ax2.set_title('New cases')
-    ax3.plot(dates, timeseries['deaths'], color="red", label='Deaths')
+    ax3.plot(dates, allseries['deaths'], color="red", label='Deaths')
     ax3.set_title('Deaths')
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -122,21 +122,48 @@ def date_labels(start, end):
     return labels
 
 
-def plot_timeseries_pygal(dates, timeseries):
+def plot_timeseries_pygal(dates, allseries, key, title):
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
+        title=f"COVID {title}", x_title=None, y_title=None,
+        height=300,
         show_x_guides=False, show_y_guides=False,
         x_value_formatter=lambda dt: dt.strftime('%b %d'))
-    datetimeline.add("Cases", list(zip(dates, timeseries['cases'])))
+
+    # Don't add title (1st arg) here: it adds it as a legend on the left side
+    # which then messes up the alignment of the three charts.
+    datetimeline.add(None, list(zip(dates, allseries[key])))
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
-    [datetime(2017, 1, 30, 0, 0, n) for n in range(0, 60)]
-
-    outfile = '/tmp/covid.svg'
-    with open(outfile, 'wb') as outfp:
-        outfp.write(datetimeline.render())
+    outfile = f'/tmp/covid-{key}.svg'
+    datetimeline.render_to_file(outfile)
     print("Saved to", outfile)
+
+
+def plot_allseries_pygal(dates, allseries):
+    plot_timeseries_pygal(dates, allseries, 'cases', 'Cases')
+    plot_timeseries_pygal(dates, allseries, 'newcases', 'New Cases')
+    plot_timeseries_pygal(dates, allseries, 'deaths', 'Deaths')
+
+    outfile = "/tmp/covid.html"
+    with open(outfile, "w") as outfp:
+        outfp.write('''<!DOCTYPE html>
+<html>
+  <head>
+    <title>COVID-19 Cases in New Mexico</title>
+  </head>
+  <body>
+    <h1>COVID-19 Cases in New Mexico</h1>
+    <figure>
+        <embed type="image/svg+xml" src="covid-cases.svg" />
+        <embed type="image/svg+xml" src="covid-newcases.svg" />
+        <embed type="image/svg+xml" src="covid-deaths.svg" />
+    </figure>
+  </body>
+</html>
+''')
+        print("Saved to", outfile)
 
 
 # Location can be something like "NM, USA" or "Bernalillo County, NM, USA"
@@ -158,9 +185,9 @@ if __name__ == '__main__':
         sys.exit(0)
 
     try:
-        dates, timeseries = get_timeseries(args.locations[0])
-        # plot_timeseries_matplotlib(dates, timeseries)
-        plot_timeseries_pygal(dates, timeseries)
+        dates, allseries = get_allseries(args.locations[0])
+        # plot_allseries_matplotlib(dates, allseries)
+        plot_allseries_pygal(dates, allseries)
 
     except IndexError:
         parser.print_help()
