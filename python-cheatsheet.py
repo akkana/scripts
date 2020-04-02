@@ -1137,6 +1137,13 @@ p.sort_stats('time').print_stats(30)
 # Matplotlib tips
 ################################################################
 
+#
+# To create interactive browser/javascript plots, 2 options:
+# mpld3 is very powerful, but has to come from pip (the Debian
+# version doesn't work and Ubuntu doesn't even have it);
+# pygal is more available, possibly less powerful but very simple.
+#
+
 ax1 = fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
 
 # Trimming all the spurious whitespace:
