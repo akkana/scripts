@@ -48,39 +48,47 @@ def show_locations(matches):
             print(k)
 
 
-def append_or_zero(lis, key, dic):
-    if key in dic:
-        lis.append(dic[key])
-    else:
-        lis.append(0)
-
-
 def get_timeseries(location):
     dates = []
-    cases = []
-    newcases = []
-    deaths = []
-    recovered = []
+    timeseries = {
+        'dates': [],
+        'cases': [],
+        'newcases': [],
+        'deaths': [],
+        'recovered': []
+    }
+
+    def append_or_zero(timeseries, key, dic):
+        if key in dic:
+            timeseries[key].append(dic[key])
+        else:
+            timeseries[key].append(0)
 
     for d in covid_data[location]['dates']:
         dates.append(datetime.datetime.strptime(d, '%Y-%m-%d'))
-        append_or_zero(cases, 'cases', covid_data[location]['dates'][d])
-        if len(cases) >= 2:
-            newcases.append(cases[-1] - cases[-2])
+        append_or_zero(timeseries, 'cases',
+                       covid_data[location]['dates'][d])
+        if len(timeseries['cases']) >= 2:
+            timeseries['newcases'].append(timeseries['cases'][-1]
+                                          - timeseries['cases'][-2])
         else:
-            newcases.append(0)
-        append_or_zero(deaths, 'deaths', covid_data[location]['dates'][d])
-        append_or_zero(recovered, 'recovered', covid_data[location]['dates'][d])
+            timeseries['newcases'].append(0)
+        append_or_zero(timeseries, 'deaths',
+                       covid_data[location]['dates'][d])
+        append_or_zero(timeseries, 'recovered',
+                       covid_data[location]['dates'][d])
 
-    # pprint(dates)
-    # pprint(cases)
+    return dates, timeseries
+
+
+def plot_timeseries_matplotlib(dates, timeseries):
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, figsize=(10, 10))
-    ax1.plot(dates, cases, label='Total cases')
+    ax1.plot(dates, timeseries['cases'], label='Total cases')
     ax1.set_title('Total cases')
-    ax2.plot(dates, newcases, color='green', label='New cases')
+    ax2.plot(dates, timeseries['newcases'], color='green', label='New cases')
     ax2.set_title('New cases')
-    ax3.plot(dates, deaths, color="red", label='Deaths')
+    ax3.plot(dates, timeseries['deaths'], color="red", label='Deaths')
     ax3.set_title('Deaths')
 
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -96,20 +104,26 @@ def get_timeseries(location):
 # that include a pattern.
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Do some stuff")
+    parser = argparse.ArgumentParser(
+        description="Plot COVID-19 data by location")
     parser.add_argument('-L', "--show-locations", dest="show_locations",
                         default=False, action="store_true",
                         help="Show all available locations")
     parser.add_argument('locations', nargs='*',
                         help="Locations to show")
     args = parser.parse_args(sys.argv[1:])
-    print("args:", args)
-    print("locations:", args.locations)
 
     if args.show_locations:
         show_locations(args.locations)
         sys.exit(0)
 
-    get_timeseries(args.locations[0])
+    try:
+        dates, timeseries = get_timeseries(args.locations[0])
+        plot_timeseries_matplotlib(dates, timeseries)
+
+    except IndexError:
+        parser.print_help()
+        sys.exit(1)
+
 
 
