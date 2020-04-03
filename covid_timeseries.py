@@ -61,8 +61,7 @@ def fetch_data():
         return json.loads(infp.read())
 
 
-def show_locations(matches):
-    print("matches:", matches)
+def show_locations(covid_data, matches):
     for k in covid_data.keys():
         if matches:
             for m in matches:
@@ -146,7 +145,7 @@ def date_labels(start, end):
     return labels
 
 
-def plot_timeseries_pygal(dates, allseries, key, title):
+def plot_timeseries_pygal(dates, allseries, key, title, region):
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
         title=f"COVID {title}", x_title=None, y_title=None,
@@ -160,7 +159,7 @@ def plot_timeseries_pygal(dates, allseries, key, title):
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
-    outfile = f'{DATA_DIR}/covid-{key}.svg'
+    outfile = f'{DATA_DIR}/covid-{key}-{region}.svg'
 
     # datetimeline.render_to_file(outfile)
     svg = datetimeline.render()
@@ -177,29 +176,30 @@ def plot_timeseries_pygal(dates, allseries, key, title):
         print("Saved to", outfile)
 
 
-def plot_allseries_pygal(dates, allseries, outfile):
-    plot_timeseries_pygal(dates, allseries, 'cases', 'Cases')
-    plot_timeseries_pygal(dates, allseries, 'newcases', 'New Cases')
-    plot_timeseries_pygal(dates, allseries, 'deaths', 'Deaths')
+def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
+    region = regiontitle.replace(', ', '-').replace(' ', '-')
+    plot_timeseries_pygal(dates, allseries, f'cases', 'Cases', region)
+    plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
+    plot_timeseries_pygal(dates, allseries, f'deaths', 'Deaths', region)
 
-    html_out = '''<!DOCTYPE html>
+    html_out = f'''<!DOCTYPE html>
 <html>
   <head>
-    <title>COVID-19 Cases in New Mexico</title>
+    <title>COVID-19 Cases in {regiontitle}</title>
   </head>
   <body>
-    <h1>COVID-19 Cases in New Mexico</h1>
+    <h1>COVID-19 Cases in {regiontitle}</h1>
     <figure>
-        <embed type="image/svg+xml" src="covid-cases.svg" />
-        <embed type="image/svg+xml" src="covid-newcases.svg" />
-        <embed type="image/svg+xml" src="covid-deaths.svg" />
+        <embed type="image/svg+xml" src="covid-cases-{region}.svg" />
+        <embed type="image/svg+xml" src="covid-newcases-{region}.svg" />
+        <embed type="image/svg+xml" src="covid-deaths-{region}.svg" />
     </figure>
   </body>
 </html>
 '''
-    if outfile:
-        if not outfile.startswith('/'):
-            outfile = os.path.join(DATA_DIR, outfile)
+
+    if save_file:
+        outfile = f"covid-{region}.html"
         with open(outfile, "w") as outfp:
             outfp.write(html_out)
             if verbose:
@@ -224,8 +224,9 @@ def main():
         DATA_DIR = os.path.dirname(os.getenv('SCRIPT_FILENAME'))
 
         covid_data = fetch_data()
-        dates, allseries = get_allseries(covid_data, 'NM, USA')
-        plot_allseries_pygal(dates, allseries, None)
+        region = 'NM, USA'
+        dates, allseries = get_allseries(covid_data, region)
+        plot_allseries_pygal(dates, allseries, region, False)
 
     else:
         verbose = True
@@ -238,15 +239,17 @@ def main():
                             help="Locations to show")
         args = parser.parse_args(sys.argv[1:])
 
+        covid_data = fetch_data()
+
         if args.show_locations:
-            show_locations(args.locations)
+            show_locations(covid_data, args.locations)
             sys.exit(0)
 
-        covid_data = fetch_data()
         try:
             dates, allseries = get_allseries(covid_data, args.locations[0])
+
             # plot_allseries_matplotlib(dates, allseries)
-            plot_allseries_pygal(dates, allseries, "covid.html")
+            plot_allseries_pygal(dates, allseries, args.locations[0], True)
 
         except IndexError:
             parser.print_help()
