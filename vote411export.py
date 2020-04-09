@@ -18,7 +18,6 @@ class Candidate:
         '''name, lastname, party are strings
            questions and answers are lists
         '''
-        self.name = name
         # For comparing, use lowercase, collapse multiple spaces,
         # and remove any dots after middle initials.
         # It's unpredictable whether a candidate without a middle name
@@ -26,14 +25,34 @@ class Candidate:
         # file, and our uploading was completely inconsistent about
         # whether middle initials have a dot after them.
         self.comparename = re.sub('\.', '',
-                                  re.sub(' +', ' ', self.name.lower()))
+                                  re.sub(' +', ' ', name.lower()))
+
+        self.name = name
+
+        # OPTIONAL: Convert name to title case.
+        # THIS COULD INTRODUCE ERRORS, e.g. MacPhee would become Macphee.
+        # If using this option, be sure to proofread carefully!
+        if self.name.isupper():
+            self.name = self.name.title()
+
+        # OPTIONAL: Add a . after a single initial that lacks one.
+        self.name = re.sub(' ([A-Z]) ', ' \\1. ', self.name)
 
         if self.comparename.endswith(' (write-in)'):
             self.comparename = self.comparename[:-11]
         self.lastname = lastname
 
         self.office = office
-        self.party = party
+
+        if party == 'Dem':
+            self.party = 'Democrat'
+        elif party == 'Rep':
+            self.party = 'Democrat'
+        elif party == 'Lib' or party == 'L':
+            self.party = 'Libertarian'
+        else:
+            self.party = party
+
         self.questions = questions
         self.answers = answers
 
@@ -320,8 +339,13 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
         for candidate in sort_candidates(candidates, order):
             if candidate.office != cur_office:
                 cur_office = candidate.office
-                formatter.add_office(cur_office,
-                                     html_converter.handle(row[desc_i]).strip())
+                print_office = candidate.office \
+                                      .replace('NM', 'N.M.') \
+                                      .replace('DISTRICT', 'District')
+                desc = html_converter.handle(row[desc_i]) \
+                                     .strip() \
+                                     .replace('NM', 'N.M.')
+                formatter.add_office(print_office, desc)
             candidate.output(formatter)
 
         formatter.save('savedoc.docx')
