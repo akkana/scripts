@@ -194,6 +194,11 @@ def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
         <embed type="image/svg+xml" src="covid-newcases-{region}.svg" />
         <embed type="image/svg+xml" src="covid-deaths-{region}.svg" />
     </figure>
+
+    <p>
+    Source code: <a href="https://github.com/akkana/scripts/blob/master/covid_timeseries.py">covid_timeseries.py</a>.
+    <p>
+    Uses data from the <a href="https://github.com/covidatlas/coronadatascraper">Corona Data Scraper</a> project.
   </body>
 </html>
 '''
