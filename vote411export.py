@@ -14,7 +14,7 @@ html_converter.body_width = 0
 
 
 class Candidate:
-    def __init__(self, name, lastname, party, questions, answers):
+    def __init__(self, name, lastname, office, party, questions, answers):
         '''name, lastname, party are strings
            questions and answers are lists
         '''
@@ -31,6 +31,8 @@ class Candidate:
         if self.comparename.endswith(' (write-in)'):
             self.comparename = self.comparename[:-11]
         self.lastname = lastname
+
+        self.office = office
         self.party = party
         self.questions = questions
         self.answers = answers
@@ -84,7 +86,7 @@ class HtmlFormatter:
 <head>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>asdf</title>
+<title>Voter Guide</title>
 </head>
 
 <body>
@@ -203,10 +205,12 @@ def sort_candidates(candidates, order):
         return candidates.sort()
 
     sorted_candidates = []
+    num_prezzies = 0
 
     for cand_o in order:
         # Vote411 doesn't export presidential candidates for some reason.
         if cand_o['Contest'] == 'President of the United States':
+            num_prezzies += 1
             continue
 
         fullname = ' '.join([cand_o['First Name'],
@@ -227,15 +231,11 @@ def sort_candidates(candidates, order):
             print(f"Couldn't find {fullname} ({cand_o['Contest']} {cand_o['District']})")
 
     # Done. Did we find everybody?
-    if len(sorted_candidates) != len(order):
+    if len(sorted_candidates) != len(order) - num_prezzies:
         print("Eek, didn't get everybody!")
         print("\nSorted:", len(sorted_candidates))
-        # for c in sorted_candidates:
-        #     print(c.name)
         print("Order file has:", len(order))
         print()
-        # for c in candidates:
-        #     print(c.name)
 
         sys.exit(1)
 
@@ -277,28 +277,24 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
         party_i = columnnames.index('Party Affiliation')
         question1_i = columnnames.index('Question 1')
 
-        formatter = None
+        if fmt == 'text':
+            formatter = TextFormatter()
+        elif fmt == 'html':
+            formatter = HtmlFormatter()
+        elif fmt == 'docx':
+            formatter = DocxFormatter()
+
         candidates = []
 
         for row in reader:
             # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
             # ID	Name	Last Name	Private Email	Contact Name	Security Code	Party Affiliation	Race/Referendum	Description of Race/Referendum	Category of Race/Referendum	Occupation	Mailing Address	Campaign Phone	Website	Street address	Campaign Email	Facebook	Twitter	OCD	facebook	Question 1	Guide Answer 1	Print Answer 1	Question 2	Guide Answer 2	Print Answer 2	...
 
-            if not formatter:
-                if fmt == 'text':
-                    formatter = TextFormatter()
-                elif fmt == 'html':
-                    formatter = HtmlFormatter()
-                elif fmt == 'docx':
-                    formatter = DocxFormatter()
-
-                formatter.add_office(row[office_i],
-                                     html_converter.handle(row[desc_i]).strip())
-
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
             # question, Guide Answer, Print Answer.
-            # Print Answers are always blank, I don't know what they're for.
+            # Print Answers are always blank; apparently that column is for
+            # some leagues that have different answers for their printed VG.
             questions = []
             answers = []
             questionnum = 1
@@ -314,12 +310,18 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                 questionnum += 1
 
             candidates.append(Candidate(row[name_i], row[lastname_i],
-                                        row[party_i], questions, answers))
+                                        row[office_i], row[party_i],
+                                        questions, answers))
 
         # Done with loop over tab-separated lines. All candidates are read.
         # candidates.sort()
 
+        cur_office = None
         for candidate in sort_candidates(candidates, order):
+            if candidate.office != cur_office:
+                cur_office = candidate.office
+                formatter.add_office(cur_office,
+                                     html_converter.handle(row[desc_i]).strip())
             candidate.output(formatter)
 
         formatter.save('savedoc.docx')
