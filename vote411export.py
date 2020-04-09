@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
+# Export the "Tab-Delimited, Candidate Full Export" from
+# Vote411/lwv.thevoterguide.org, and format it appropriately
+# for a printed voter guide.
+
 import csv
 import docx
 import html2text
+import re
 
 html_converter = html2text.HTML2Text()
 html_converter.body_width = 0
@@ -14,6 +19,17 @@ class Candidate:
            questions and answers are lists
         '''
         self.name = name
+        # For comparing, use lowercase, collapse multiple spaces,
+        # and remove any dots after middle initials.
+        # It's unpredictable whether a candidate without a middle name
+        # will have two spaces or one between the names in the export
+        # file, and our uploading was completely inconsistent about
+        # whether middle initials have a dot after them.
+        self.comparename = re.sub('\.', '',
+                                  re.sub(' +', ' ', self.name.lower()))
+
+        if self.comparename.endswith(' (write-in)'):
+            self.comparename = self.comparename[:-11]
         self.lastname = lastname
         self.party = party
         self.questions = questions
@@ -177,8 +193,72 @@ class DocxFormatter:
         self.doc.save(outfile)
         print("Saved to", outfile)
 
+
+def sort_candidates(candidates, order):
+    """Sort candidates according to the order in which they appear
+       in the order list, if any; otherwise, alphabetically.
+    """
+    if not order:
+        print("Sorting alphabetically")
+        return candidates.sort()
+
+    sorted_candidates = []
+
+    for cand_o in order:
+        # Vote411 doesn't export presidential candidates for some reason.
+        if cand_o['Contest'] == 'President of the United States':
+            continue
+
+        fullname = ' '.join([cand_o['First Name'],
+                             cand_o['Middle Name'],
+                             cand_o['Last Name']])
+
+        # Candidate may or may not have a middle name, so collapse
+        # that extra space.
+        fullname = re.sub(' +', ' ', fullname.lower())
+        # print("Looking for", fullname)
+        foundit = False
+        for cand_c in candidates:
+            if cand_c.comparename == fullname:
+                sorted_candidates.append(cand_c)
+                foundit = True
+                break
+        if not foundit:
+            print(f"Couldn't find {fullname} ({cand_o['Contest']} {cand_o['District']})")
+
+    # Done. Did we find everybody?
+    if len(sorted_candidates) != len(order):
+        print("Eek, didn't get everybody!")
+        print("\nSorted:", len(sorted_candidates))
+        # for c in sorted_candidates:
+        #     print(c.name)
+        print("Order file has:", len(order))
+        print()
+        # for c in candidates:
+        #     print(c.name)
+
+        sys.exit(1)
+
+    return sorted_candidates
+
+
 # Read tab-separated files
-def convert_vote411_file(filename, fmt='text'):
+def convert_vote411_file(filename, fmt='text', orderfile=None):
+    # Read the orderfile, if any:
+    order = []
+    if orderfile:
+        with open(orderfile) as orderfp:
+            reader = csv.DictReader(orderfp)
+            for row in reader:
+                order.append(row)
+                # Each row has: Contest,District,County,
+                #               First Name,Middle Name,Last Name,
+                #               Party,Ballot Order,Status
+                # We'll do an inefficient search through it for each
+                # candidate, because performance is completely unimportant
+                # so no point in complicating the code with
+                # pointless optimization.
+
     with open(filename) as csvfp:
         reader = csv.reader(csvfp, delimiter='\t')
 
@@ -237,9 +317,9 @@ def convert_vote411_file(filename, fmt='text'):
                                         row[party_i], questions, answers))
 
         # Done with loop over tab-separated lines. All candidates are read.
-        candidates.sort()
+        # candidates.sort()
 
-        for candidate in candidates:
+        for candidate in sort_candidates(candidates, order):
             candidate.output(formatter)
 
         formatter.save('savedoc.docx')
@@ -252,12 +332,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Convert Vote411 tab-separated files to text or docx")
     parser.add_argument('-F', "--format", dest="format", default='text',
                         action="store", help="Output format: text, html, docx")
+    parser.add_argument('-o', "--orderfile", dest="orderfile", default=None,
+                        help="A CSV file listing all candidates in order")
     parser.add_argument('infiles', nargs='+',
                         help="Input files, in tab-separated format")
     args = parser.parse_args(sys.argv[1:])
 
     for f in args.infiles:
-        convert_vote411_file(f, fmt=args.format)
+        convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
 
 
 
