@@ -83,7 +83,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
     if filename == '-':
         fil = sys.stdin
     else:
-        fil = open(filename, , encoding="utf-8", errors='replace')
+        fil = open(filename, encoding="utf-8", errors='replace')
     print("All?", all)
 
     if not casematch:
