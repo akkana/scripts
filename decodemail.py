@@ -83,7 +83,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
     if filename == '-':
         fil = sys.stdin
     else:
-        fil = open(filename, errors='replace')
+        fil = open(filename, , encoding="utf-8", errors='replace')
     print("All?", all)
 
     if not casematch:
@@ -117,7 +117,15 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
 
             # It's not a continuation line. Print output, and either
             # exit, or clear output and go back to looking for headers.
-            print(output)
+            try:
+                print(output)
+            except UnicodeEncodeError as e:
+                # output is ultimately whatever type that comes from
+                # email.header.decode_header, and printing it can
+                # raise a UnicodeEncodeError because python is so insistent
+                # on using ascii codec despite locale being en_US.UTF-8.
+                print("Type causing exception was", type(output))
+                raise(e)
             if all:
                 output = ''
             else:
@@ -148,17 +156,22 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         print("No such header", header_wanted, "in", filename)
         return
 
-if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+all = False
+
+if len(sys.argv) > 2:
+    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+        print(Usage)
+        sys.exit(1)
+
+    # A -a argument means don't stop at the first header,
+    # decode all matching headers in the file.
+    if sys.argv[1] == '-a':
+        all = True
+        sys.argv = sys.argv[1:]
+
+if len(sys.argv) <= 1:
     print(Usage)
     sys.exit(1)
-
-# A -a argument means don't stop at the first header,
-# decode all matching headers in the file.
-if sys.argv[1] == '-a':
-    all = True
-    sys.argv = sys.argv[1:]
-else:
-    all = False
 
 header_wanted = sys.argv[1]
 
