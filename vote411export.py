@@ -47,7 +47,7 @@ class Candidate:
         if party == 'Dem':
             self.party = 'Democrat'
         elif party == 'Rep':
-            self.party = 'Democrat'
+            self.party = 'Republican'
         elif party == 'Lib' or party == 'L':
             self.party = 'Libertarian'
         else:
