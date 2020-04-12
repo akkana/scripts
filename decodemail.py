@@ -84,7 +84,6 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         fil = sys.stdin
     else:
         fil = open(filename, encoding="utf-8", errors='replace')
-    print("All?", all)
 
     if not casematch:
         header_wanted = header_wanted.lower()
@@ -110,7 +109,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
         if output:
             if testline.startswith(' ') or testline.startswith('\t'):
                 # It's a continuation line: keep appending.
-                output += ' ' + decode_piece(line.strip())
+                output += decode_piece(line.strip())
                 # XXX should probably remember the header we're currently
                 # matching, and decode_and_split with that header.
                 continue
@@ -118,13 +117,14 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
             # It's not a continuation line. Print output, and either
             # exit, or clear output and go back to looking for headers.
             try:
-                print(output)
+                print(output.encode('utf-8', "surrogatepass"))
             except UnicodeEncodeError as e:
                 # output is ultimately whatever type that comes from
                 # email.header.decode_header, and printing it can
                 # raise a UnicodeEncodeError because python is so insistent
                 # on using ascii codec despite locale being en_US.UTF-8.
-                print("Type causing exception was", type(output))
+                print("Type causing exception was", type(output),
+                      file=sys.stderr)
                 raise(e)
             if all:
                 output = ''
