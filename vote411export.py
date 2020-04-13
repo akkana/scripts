@@ -304,6 +304,7 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
             formatter = DocxFormatter()
 
         candidates = []
+        race_descriptions = {}
 
         for row in reader:
             # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
@@ -332,6 +333,12 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                                         row[office_i], row[party_i],
                                         questions, answers))
 
+            if candidates[-1].office not in race_descriptions:
+                race_descriptions[candidates[-1].office] = \
+                    html_converter.handle(row[desc_i]) \
+                                  .strip() \
+                                  .replace('NM', 'N.M.')
+
         # Done with loop over tab-separated lines. All candidates are read.
         # candidates.sort()
 
@@ -345,7 +352,8 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                 desc = html_converter.handle(row[desc_i]) \
                                      .strip() \
                                      .replace('NM', 'N.M.')
-                formatter.add_office(print_office, desc)
+                formatter.add_office(print_office,
+                                     race_descriptions[candidate.office])
             candidate.output(formatter)
 
         formatter.save('savedoc.docx')
