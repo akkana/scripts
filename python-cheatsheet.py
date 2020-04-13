@@ -1223,6 +1223,10 @@ print("Hello, world", end='', file=sys.stderr)
 >>> 'piñon'.encode('utf-8')
 b'pi\xc3\xb1on'
 
+# But if there might be an emoji involved, for some reason, plain utf-8
+# isn't enough and you need this:
+print(output.encode('utf-8', "surrogatepass"))
+
 # For a while, you could just pass encoding as a second argument
 # in type coercion; This has changed in more recent python3,
 # so don't use it any more.
