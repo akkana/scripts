@@ -204,11 +204,11 @@ def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
 '''
 
     if save_file:
-        outfile = f"covid-{region}.html"
+        outfile = f'{DATA_DIR}/covid-{region}.html'
         with open(outfile, "w") as outfp:
             outfp.write(html_out)
             if verbose:
-                print("Saved to", outfile)
+                print("\nHTML file:", outfile)
     else:
         print('Content-type: text/html\n')
         print(html_out)
