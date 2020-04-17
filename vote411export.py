@@ -221,7 +221,7 @@ def sort_candidates(candidates, order):
     """
     if not order:
         print("Sorting alphabetically")
-        return candidates.sort()
+        return sorted(candidates)
 
     sorted_candidates = []
     num_prezzies = 0
@@ -340,11 +340,15 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                                   .replace('NM', 'N.M.')
 
         # Done with loop over tab-separated lines. All candidates are read.
-        # candidates.sort()
+        # print(len(candidates), "candidates")
 
         cur_office = None
+        num_for_office = 0
         for candidate in sort_candidates(candidates, order):
             if candidate.office != cur_office:
+                if cur_office:
+                    print(num_for_office, "running for", cur_office)
+                    num_for_office = 0
                 cur_office = candidate.office
                 print_office = candidate.office \
                                       .replace('NM', 'N.M.') \
@@ -354,6 +358,7 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                                      .replace('NM', 'N.M.')
                 formatter.add_office(print_office,
                                      race_descriptions[candidate.office])
+            num_for_office += 1
             candidate.output(formatter)
 
         formatter.save('savedoc.docx')
