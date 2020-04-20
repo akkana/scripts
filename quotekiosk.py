@@ -133,6 +133,9 @@ class AutoSizerWindow(Gtk.Window):
             elif ext in IMAGE_EXTS:
                 self.imagefile = newcontent
 
+        else:
+            self.content = newcontent
+
         if self.content:
             self.content = self.content.strip()
 
@@ -237,7 +240,7 @@ class AutoSizerWindow(Gtk.Window):
 
     def parse_colors(self, c):
         try:
-            if len(c) = 3:
+            if len(c) == 3:
                 return c
         except:
             pass
@@ -248,6 +251,8 @@ class AutoSizerWindow(Gtk.Window):
             if c.startswith('#'):
                 blah
             gdk_parse_blah(c)
+        except:
+            pass
 
     def parse_colors(self, colors):
         try:
@@ -256,7 +261,7 @@ class AutoSizerWindow(Gtk.Window):
         except TypeError:
             try:
                 fg, bg = colors.split(':')
-            except AttributeError, ValueError:
+            except (AttributeError, ValueError):
                 raise RuntimeError("Don't know how to unpack colors:"
                                    + str(colors))
 
