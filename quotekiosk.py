@@ -25,10 +25,10 @@ import re
 import gc
 from pathlib import Path
 
-import html2text
-# html2text adds line breaks unless told not to:
-html_converter = html2text.HTML2Text()
-html_converter.body_width = 0
+# import html2text
+# # html2text adds line breaks unless told not to:
+# html_converter = html2text.HTML2Text()
+# html_converter.body_width = 0
 
 IMAGE_EXTS = ( '.jpg', '.jpeg', '.png', '.gif', '.tif' )
 
@@ -52,13 +52,14 @@ class AutoSizerWindow(Gtk.Window):
     """A window that can resize its content, either text or image,
        to fill as much space as possible.
     """
-    def __init__(self, fullscreen=False, fadetime=2, fontname="Serif Italic",
+    def __init__(self, fullscreen=False, fadetime=2, fontname="Serif",
                  colors='yellow:black', border_size=40):
         super().__init__()
 
         self.content_area = None
 
         self.fontname = fontname
+        self.fontdesc = Pango.FontDescription(fontname)
 
         self.use_fullscreen = fullscreen
         if fullscreen:
@@ -72,7 +73,7 @@ class AutoSizerWindow(Gtk.Window):
         # milliseconds, and what fraction to fade during that time.
         if fadetime:
             self.fademillis = 50
-            self.fadefrac = fadetime * 10 / self.fademillis
+            self.fadefrac = fadetime / self.fademillis
         else:
             self.fademillis = 0
             self.fadefrac = 0
@@ -124,7 +125,7 @@ class AutoSizerWindow(Gtk.Window):
                 try:
                     with open(newcontent) as qf:
                         self.content = qf.read()
-                    self.content = html_converter.handle(self.content)
+                        # self.content = html_converter.handle(self.content)
 
                 except FileNotFoundError as e:
                     print("Couldn't read", newcontent, ":", e)
@@ -162,9 +163,9 @@ class AutoSizerWindow(Gtk.Window):
         ctx.set_source_rgba(*self.text_color, self.alpha)
 
         if not self.layout: # or not self.d_alpha or self.alpha == 0:
-            # print("Laying out text")
             self.layout = PangoCairo.create_layout(ctx)
-            self.layout.set_text(self.content, -1)
+            # self.layout.set_text(self.content, -1)
+            self.layout.set_markup(self.content, -1)
 
             # For some reason pango width has to be 1024 times the width.
             # Why? Where does this 1024 come from?
@@ -172,7 +173,7 @@ class AutoSizerWindow(Gtk.Window):
             self.layout.set_width(1024 * (self.width - self.border_size*2))
             self.layout.set_wrap(Pango.WrapMode.WORD_CHAR)
 
-            fontsize = 100
+            fontsize = 300
 
             while fontsize:
                 font = f"{self.fontname} {fontsize}"
@@ -338,7 +339,7 @@ class KioskWindow(AutoSizerWindow):
 
     def new_quote(self):
         choice = random.choice(self.quote_list)
-        print("*** New choice", choice)
+        # print("*** New choice", choice)
 
         self.set_content(choice)
 
@@ -387,7 +388,7 @@ if __name__ == "__main__":
                         dest="fadetime", type=float, default=2.,
                         help='Fade time in seconds (0 = no fade)')
     parser.add_argument('-fn', '--fontname', action="store",
-                        dest="fontname", default='Times New Roman',
+                        dest="fontname", default='Serif',
                         help='Font name')
     parser.add_argument('--colors', action="store",
                         dest="colors", default='yellow:black',
