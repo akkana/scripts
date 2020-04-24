@@ -22,9 +22,9 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
      QWebEngineProfile, QWebEngineSettings
 from PyQt5.QtCore import QAbstractNativeEventFilter
 
-# Use qpdfview for PDFs if it's available:
+# Use qpdf for PDFs if it's available:
 try:
-    import qpdfview
+    import qpdf
     handle_pdf = True
 except:
     handle_pdf = False
@@ -74,7 +74,7 @@ class ReadlineEdit(QLineEdit):
 
 # Only define the PDFBrowserView if we have the modules it requires.
 if handle_pdf:
-    class PDFBrowserView(qpdfview.PDFScrolledWidget):
+    class PDFBrowserView(qpdf.PDFScrolledWidget):
         def __init__(self, browserwin, url, parent=None):
             if url.startswith('file://'):
                 self.theurl = url[7:]

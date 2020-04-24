@@ -506,7 +506,7 @@ qslide2pdf:
     For turning an HTML presentation into a PDF slide deck.
     Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
 
-qpdfview.py:
+qpdf.py:
     A simple PDF viewer for Python-Qt5 using popplerqt5.
 
 quickbrowse.py:
