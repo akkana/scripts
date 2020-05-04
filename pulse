@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# A quickie way to switch audio between internal speakers and a USB hub,
+# using pulseaudio commandline tools.
+
+# Adjust as needed for your specific audio devices.
+# To see your available audio devices: pacmd list-cards
+# For each card, look under "profiles:"
+
+internal_i=$(pactl list short cards | grep pci | awk '{ print $1 }')
+hub_i=$(pactl list short cards | grep USB_PnP_Audio_Device | awk '{ print $1 }')
+
+if [[ $1 == 'hub' ]]; then
+    echo "Directing audio to USB hub"
+    pactl set-card-profile $internal_i off
+    if [[ ! -z $hub_i ]]; then
+        pactl set-card-profile $hub_i output:analog-stereo
+    fi
+
+elif [[ $1 == 'hubmic' ]]; then
+    echo "Directing audio to USB hub with mic enabled"
+    pactl set-card-profile $internal_i off
+    if [[ ! -z $hub_i ]]; then
+        pactl set-card-profile $hub_i output:analog-surround-40+input:analog-stereo
+    fi
+
+elif [[ $1 == 'int' ]]; then
+    echo "Directing audio to internal speakers"
+    if [[ ! -z $hub_i ]]; then
+        pactl set-card-profile $hub_i off
+    fi
+    # Carbon X1 on Ubuntu eoan:
+    # pactl set-card-profile $internal_i output:analog-stereo
+    # Carbon X1 on Ubuntu fossa:
+    pactl set-card-profile $internal_i HiFi
+
+elif [[ $1 == 'intmic' ]]; then
+    echo "Directing audio to internal speakers with mic enabled"
+    if [[ ! -z $hub_i ]]; then
+        pactl set-card-profile $hub_i off
+    fi
+    # Carbon X1 on Ubuntu eoan:
+    pactl set-card-profile $internal_i output:analog-surround-40+input:analog-stereo
+    # Carbon X1 on Ubuntu fossa:
+    pactl set-card-profile $internal_i HiFi
+
+else
+    echo 'Usage: pulse [hub|int|hubmic|intmic]'
+fi
