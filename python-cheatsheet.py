@@ -592,6 +592,8 @@ else:
     d = datetime.datetime.strptime(timestr, '%Y-%m-%d')
 
 # email.utils.parsedate returns a tuple.
+# But be warned it can only parse a full date/time, not just a date,
+# even though the time part of the tuple generally isn't correct.
 t = time.mktime(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
 (y, m, d, h, m, s, weekday, yearday, isdst) = t
 # the last three items of the tuple aren't very useful: typically 0, 1, -1.
@@ -606,6 +608,7 @@ secs_since_epoch = email.utils.mktime_tz(t2)
 # Parse a date in unknown format into a datetime.datetime object
 # Unfortunately dateutil isn't part of the python core,
 # it's a separate package so it adds a dependency.
+# But it's more reliable than email.utils.parsedate.
 #
 import dateutil.parser
 d = dateutil.parser.parse("2012-08-16 14:25:05.265739")
@@ -713,6 +716,9 @@ r = session.get(url)
 # subprocess
 ########################################################
 # Read lines from a subprocess as they appear:
+outstring = subprocess.check_output(['identify', filename)
+
+# More complicated way:
 import subprocess
 
 proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
@@ -1336,8 +1342,17 @@ OR
 When finished:
   setup.py develop --uninstall
 
-Packaging Python Projects:
+Best tutorial I've found on Packaging Python Projects:
 https://packaging.python.org/tutorials/packaging-projects/
+
+Test installing in a virtualenv:
+
+python3 -m venv /tmp/testpythonenv
+source /tmp/testpythonenv/bin/activate
+pip install wheel
+pip install .
+
+Test and make sure it works.
 
 Generate a dist:
 python3 setup.py sdist bdist_wheel
@@ -1350,7 +1365,7 @@ Install and test in a new empty virtualenv.
 python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
   The no-deps is because test pypi may not have all the same dependencies.
   This is supposed to work if you want to test dependencies:
-    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
+      pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
   but it doesn't, at least on Ubuntu, because of
   https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
 
@@ -1359,6 +1374,12 @@ upload to the real PyPI:
 twine upload dist/*
 
 Building and Uploading Sphinx docs:
+Best ever: https://samnicholls.net/2016/06/15/how-to-sphinx-readthedocs/
+
+More official:
+https://dont-be-afraid-to-commit.readthedocs.io/en/latest/documentation.html
+
+This is from 2009 and is probably obsolete:
 https://pythonhosted.org/an_example_pypi_project/buildanduploadsphinx.html
 
 Possibly useful links:
