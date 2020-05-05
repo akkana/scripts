@@ -34,7 +34,6 @@
 
 import sys
 import subprocess
-from pprint import pprint
 
 def parse_cards():
     """Get a list of cards"""
@@ -109,30 +108,48 @@ def mute_unmute(mute, devname, devtype):
                      '1' if mute else '0'])
 
 
-def set_sink(newsink, mute_others=True):
-    sinks = parse_sources_sinks('sink')
-    sinkindex = -1
+def unmute_one(pattern, devtype, mute_others=True):
+    """Make one source or sink active, unmuting it and
+       (optionally) muting all others.
+       pattern is a string (not regexp) to search for in the device description,
+       e.g. "USB" or "HDMI1".
+       devtype is "source" or "sink".
+       If pattern is None or none, mute everything of that type.
+    """
+    devs = parse_sources_sinks(devtype)
+    devindex = -1
+    muteall = (pattern.lower() == "none")
+
     # Make sure there's a match before muting anything
-    for i, sink in enumerate(sinks):
-        if newsink in sink['device.description']:
-            sinkindex = i
-            break
+    if not muteall:
+        for i, dev in enumerate(devs):
+            if pattern in dev['device.description']:
+                devindex = i
+                break
 
-    if sinkindex < 0:
-        print("Didn't find a sink matching", newsink)
-        return
+        if devindex < 0:
+            print(f"Didn't find a {devtype} matching", pattern)
+            return
 
-    for sink in sinks:
-        if newsink in sink['device.description']:
-            mute_unmute(False, sink['name'], 'sink')
+    for dev in devs:
+        if not muteall and newdev in dev['device.description']:
+            mute_unmute(False, dev['name'], devtype)
         elif mute_others:
-            mute_unmute(True, sink['name'], 'sink')
+            mute_unmute(True, dev['name'], devtype)
 
 
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description="Control PulseAudio devices")
+    parser = argparse.ArgumentParser(description="""Control PulseAudio devices.
+
+Provide patterns matching source or sink arguments, e.g.
+--sink USB will unmute any sink that has "USB" in its description.
+Use none to mute every source or every sink.
+
+With no arguments, prints all cards, sources and sinks.
+""",
+                             formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--source', action="store", dest="source",
                         help='Set current source (microphone)')
     parser.add_argument('--sink', action="store", dest="sink",
@@ -141,9 +158,9 @@ if __name__ == '__main__':
 
 
     if args.source:
-        print("Can't set source yet")
+        unmute_one(args.source, 'source')
     elif args.sink:
-        set_sink(args.sink)
+        unmute_one(args.sink, 'sink')
     else:
         cards = parse_cards()
         print("Cards:")
@@ -163,47 +180,3 @@ if __name__ == '__main__':
             print(source['device.description'])
         print()
 
-
-
-'''
-internal_i=$(pactl list short cards | grep pci | awk '{ print $1 }')
-hub_i=$(pactl list short cards | grep USB_PnP_Audio_Device | awk '{ print $1 }')
-
-if [[ $1 == 'hub' ]]; then
-    echo "Directing audio to USB hub"
-    pactl set-card-profile $internal_i off
-    if [[ ! -z $hub_i ]]; then
-        pactl set-card-profile $hub_i output:analog-stereo
-    fi
-
-elif [[ $1 == 'hubmic' ]]; then
-    echo "Directing audio to USB hub with mic enabled"
-    pactl set-card-profile $internal_i off
-    if [[ ! -z $hub_i ]]; then
-        pactl set-card-profile $hub_i output:analog-surround-40+input:analog-stereo
-    fi
-
-elif [[ $1 == 'int' ]]; then
-    echo "Directing audio to internal speakers"
-    if [[ ! -z $hub_i ]]; then
-        pactl set-card-profile $hub_i off
-    fi
-    # Carbon X1 on Ubuntu eoan:
-    # pactl set-card-profile $internal_i output:analog-stereo
-    # Carbon X1 on Ubuntu fossa:
-    pactl set-card-profile $internal_i HiFi
-
-elif [[ $1 == 'intmic' ]]; then
-    echo "Directing audio to internal speakers with mic enabled"
-    if [[ ! -z $hub_i ]]; then
-        pactl set-card-profile $hub_i off
-    fi
-    # Carbon X1 on Ubuntu eoan:
-    pactl set-card-profile $internal_i output:analog-surround-40+input:analog-stereo
-    # Carbon X1 on Ubuntu fossa:
-    pactl set-card-profile $internal_i HiFi
-
-else
-    echo 'Usage: pulse [hub|int|hubmic|intmic]'
-fi
-'''
