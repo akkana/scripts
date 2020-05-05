@@ -220,6 +220,10 @@ imageviewer3.py:
     A generic image viewer widget and image viewer window using GTK3
     via gi, so they can be used with Python 3.
 
+imgcpy.py:
+    Copy a file, suitably downsized, to the clipboard in PNG format
+    so it can be pasted by an app like Discord that uses image pastes.
+
 ipsearch:
     Search for live hosts on the current net, or hosts with a
     particular port open..
