@@ -380,8 +380,8 @@ prettysoup:
     Prettyprint a BeautifulSoup object. Customizable, and avoids
     problems like BS4 prettify() adding spaces in the middle of words.
 
-pulse:
-    The beginnings of a script to switch audio inputs/outputs
+pulse.py:
+    A script to list or switch audio inputs/outputs
     on a system that uses PulseAudio.
 
 pyclip:
