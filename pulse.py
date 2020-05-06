@@ -132,7 +132,7 @@ def unmute_one(pattern, devtype, mute_others=True):
             return
 
     for dev in devs:
-        if not muteall and newdev in dev['device.description']:
+        if not muteall and pattern in dev['device.description']:
             mute_unmute(False, dev['name'], devtype)
         elif mute_others:
             mute_unmute(True, dev['name'], devtype)
@@ -171,12 +171,14 @@ With no arguments, prints all cards, sources and sinks.
         sinks = parse_sources_sinks('sink')
         print('Sinks:')
         for sink in sinks:
-            print(sink['device.description'])
+            print(sink['device.description'],
+                  '(** fallback)' if sink['fallback'] else '')
         print()
 
         sources = parse_sources_sinks('source')
         print('Sources:')
         for source in sources:
-            print(source['device.description'])
+            print(source['device.description'],
+                  '(** fallback)' if source['fallback'] else '')
         print()
 
