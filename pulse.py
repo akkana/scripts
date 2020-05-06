@@ -56,8 +56,8 @@ def parse_sources_sinks(whichtype):
     """
     devs = []
     curdict = None
-    for line in subprocess.check_output(['pacmd',
-                                         f'list-{whichtype}s']).split(b'\n'):
+    cmd = ['pacmd', f'list-{whichtype}s']
+    for line in subprocess.check_output(cmd).split(b'\n'):
         line = line.strip()
         try:
             words = line.split()
@@ -79,10 +79,21 @@ def parse_sources_sinks(whichtype):
 
         elif words[0] == b'name:':
             # Take the second word and remove enclosing <>
-            curdict['name'] = line.split()[1][1:-1].decode()
+            curdict['name'] = words[1][1:-1].decode()
 
         elif words[0] == b'muted:':
-            curdict['muted'] = (line.split()[1] == 'yes')
+            curdict['muted'] = (words[1] == 'yes')
+
+        elif words[0] == b'volume:':
+            if words[1] == b'front-left:':
+                curdict['volume'] = [int(words[2]), int(words[9])]
+            elif words[1] == b'mono:':
+                curdict['volume'] = [int(words[2])]
+            else:
+                print("Can't parse volume line:", words)
+
+        elif words[0] == b'base' and words[1] == b'volume:':
+            curdict['base_volume'] = int(words[2])
 
         elif len(words) >= 2 and words[1] == b'=' \
              and words[0] in [b'alsa.long_card_name',
@@ -138,6 +149,24 @@ def unmute_one(pattern, devtype, mute_others=True):
             mute_unmute(True, dev['name'], devtype)
 
 
+def sink_str(devdict):
+    out = devdict['device.description']
+    if devdict['fallback']:
+        out += ' (--FALLBACK--)'
+    if 'volume' in devdict:
+        try:
+            multiplier = float(devdict['base_volume']) / 65536.
+        except:
+            multiplier = 1.
+        out += ' (' + ', '.join([ str(int(v / 655.36 * multiplier))
+                                  for v in devdict['volume']]) + ')'
+    else:
+        out += ' (volume unknown)'
+    if devdict['muted']:
+        out += ' (MUTED)'
+    return out
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -171,14 +200,12 @@ With no arguments, prints all cards, sources and sinks.
         sinks = parse_sources_sinks('sink')
         print('Sinks:')
         for sink in sinks:
-            print(sink['device.description'],
-                  '(** fallback)' if sink['fallback'] else '')
+            print(sink_str(sink))
         print()
 
         sources = parse_sources_sinks('source')
         print('Sources:')
         for source in sources:
-            print(source['device.description'],
-                  '(** fallback)' if source['fallback'] else '')
+            print(sink_str(source))
         print()
 
