@@ -158,18 +158,18 @@ def parse_sink_inputs():
     return sink_inputs
 
 
-def mute_unmute(mute, devname, devtype):
+def mute_unmute(mute, dev, devtype):
     """Mute (mute=True) or unmute (False) a source (devtype="source")
        or sink ("sink") of a given name.
        pactl set-source-mute $source 1
     """
-    print("muting" if mute else "unmuting", devname)
-    subprocess.call(["pactl", f"set-{devtype}-mute", devname,
+    print("muting" if mute else "unmuting", sub_str(dev['device.description']))
+    subprocess.call(["pactl", f"set-{devtype}-mute", dev['name'],
                      '1' if mute else '0'])
 
 
 def unmute_one(pattern, devtype, mute_others=True):
-    """Make one source or sink active, unmuting it and
+    """Make one source or sink the active fallback, unmuting it and
        (optionally) muting all others.
        pattern is a string (not regexp) to search for in the device description,
        e.g. "USB" or "HDMI1".
@@ -183,6 +183,9 @@ def unmute_one(pattern, devtype, mute_others=True):
     # Make sure there's a match before muting anything
     if not muteall:
         for i, dev in enumerate(devs):
+            if pattern in sub_str(dev['device.description']):
+                devindex = i
+                break
             if pattern in dev['device.description']:
                 devindex = i
                 break
@@ -191,11 +194,20 @@ def unmute_one(pattern, devtype, mute_others=True):
             print(f"Didn't find a {devtype} matching", pattern)
             return
 
-    for dev in devs:
-        if not muteall and pattern in dev['device.description']:
-            mute_unmute(False, dev['name'], devtype)
+        # Set the given device as the fallback
+        print("Setting", sub_str(devs[devindex]['device.description']),
+              "as fallback")
+        subprocess.call(["pactl", f"set-default-{devtype}",
+                         devs[devindex]['index']])
+
+    for i, dev in enumerate(devs):
+        if not muteall and i == devindex:
+            mute_unmute(False, dev, devtype)
         elif mute_others:
-            mute_unmute(True, dev['name'], devtype)
+            mute_unmute(True, dev, devtype)
+
+    print()
+    print_status()
 
 
 def sub_str(s):
@@ -214,7 +226,7 @@ def sub_str(s):
 def sink_or_source_str(devdict):
     """Pretty output for a sink or source.
     """
-    out = sub_str(devdict['device.description'])
+    out = f"{devdict['index']}: sub_str(devdict['device.description'])"
 
     if devdict['fallback']:
         out += ' (--FALLBACK--)'
@@ -275,6 +287,31 @@ def read_config_file():
     return config
 
 
+def print_status():
+    cards = parse_cards()
+    print("Cards:")
+    for card in cards:
+        print(card)
+    print()
+
+    sinks = parse_sources_sinks('sink')
+    print('Sinks:')
+    for sink in sinks:
+        print(sink_or_source_str(sink))
+    print()
+
+    sources = parse_sources_sinks('source')
+    print('Sources:')
+    for source in sources:
+        print(sink_or_source_str(source))
+    print()
+
+    sink_inputs = parse_sink_inputs()
+    print('Currently running (sink inputs):')
+    for si in sink_inputs:
+        print(sink_input_str(si))
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -301,29 +338,10 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
 
     if args.source:
         unmute_one(args.source, 'source')
+
     elif args.sink:
         unmute_one(args.sink, 'sink')
+
     else:
-        cards = parse_cards()
-        print("Cards:")
-        for card in cards:
-            print(card)
-        print()
-
-        sinks = parse_sources_sinks('sink')
-        print('Sinks:')
-        for sink in sinks:
-            print(sink_or_source_str(sink))
-        print()
-
-        sources = parse_sources_sinks('source')
-        print('Sources:')
-        for source in sources:
-            print(sink_or_source_str(source))
-        print()
-
-        sink_inputs = parse_sink_inputs()
-        print('Currently running (sink inputs):')
-        for si in sink_inputs:
-            print(sink_input_str(si))
+        print_status()
 
