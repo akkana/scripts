@@ -10,8 +10,12 @@
 # Uses the termcolor module if it's available to highlight fallbacks
 # and muted devices.
 
-import sys
+import sys, os
 import subprocess
+
+# The configuration, if any, is global.
+config = {}
+
 
 # If python-termcolor is installed, show muted items in red.
 try:
@@ -194,8 +198,23 @@ def unmute_one(pattern, devtype, mute_others=True):
             mute_unmute(True, dev['name'], devtype)
 
 
-def sink_str(devdict):
-    out = devdict['device.description']
+def sub_str(s):
+    """Substitute any matches found in config['subs'].
+    """
+    if 'subs' not in config:
+        return s
+
+    for pair in config['subs']:
+        if pair[0] in s:
+            s = s.replace(pair[0], pair[1])
+
+    return s
+
+
+def sink_or_source_str(devdict):
+    """Pretty output for a sink or source.
+    """
+    out = sub_str(devdict['device.description'])
 
     if devdict['fallback']:
         out += ' (--FALLBACK--)'
@@ -219,9 +238,36 @@ def sink_str(devdict):
 
 
 def sink_input_str(sidict):
+    """Pretty output for a sink input.
+    """
     # return str(sidict)
     return f"{sidict['appname']} {sidict['medianame']} ({sidict['sink']})" \
-        f" --> {by_index['sink'][sidict['sink']]['device.description']}"
+        f" --> {sub_str(by_index['sink'][sidict['sink']]['device.description'])}"
+
+
+def read_config_file():
+    """Read the config file.
+       Currently, the only configuration is a list of substitutions
+       to make the output shorter and more readable.
+    """
+    global config
+    try:
+        with open(os.path.expanduser("~/.config/pulsehelper/config")) as fp:
+            for line in fp:
+                parts = [ p.strip() for p in line.split('=') ]
+                if len(parts) != 2:
+                    print("Config file parse error, line:", line)
+                    continue
+                if 'subs' not in config:
+                    config['subs'] = []
+                config['subs'].append(parts)
+
+    except RuntimeError:
+        print("Yowza")
+        pass
+
+    print("config is", config)
+    return config
 
 
 if __name__ == '__main__':
@@ -234,6 +280,10 @@ Provide patterns matching source or sink arguments, e.g.
 Use none to mute every source or every sink.
 
 With no arguments, prints all cards, sources and sinks.
+
+You can create a ~/.pulsehelper/config file to provide shorter names.
+Lines in that file should look like:
+Super Long Hard To Read PulseAudio Name = Nice Short Name
 """,
                              formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--source', action="store", dest="source",
@@ -242,6 +292,7 @@ With no arguments, prints all cards, sources and sinks.
                         help='Set current sink (speaker)')
     args = parser.parse_args(sys.argv[1:])
 
+    config = read_config_file()
 
     if args.source:
         unmute_one(args.source, 'source')
@@ -257,13 +308,13 @@ With no arguments, prints all cards, sources and sinks.
         sinks = parse_sources_sinks('sink')
         print('Sinks:')
         for sink in sinks:
-            print(sink_str(sink))
+            print(sink_or_source_str(sink))
         print()
 
         sources = parse_sources_sinks('source')
         print('Sources:')
         for source in sources:
-            print(sink_str(source))
+            print(sink_or_source_str(source))
         print()
 
         sink_inputs = parse_sink_inputs()
