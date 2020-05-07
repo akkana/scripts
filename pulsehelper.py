@@ -241,8 +241,15 @@ def sink_input_str(sidict):
     """Pretty output for a sink input.
     """
     # return str(sidict)
-    return f"{sidict['appname']} {sidict['medianame']} ({sidict['sink']})" \
-        f" --> {sub_str(by_index['sink'][sidict['sink']]['device.description'])}"
+    out = f"{sidict['appname']} {sidict['medianame']} --> "
+
+    sink = by_index['sink'][sidict['sink']]
+    out += f"{sub_str(sink['device.description'])}"
+
+    if sink['muted']:
+        out = mutedstring(out)
+
+    return out
 
 
 def read_config_file():
@@ -262,11 +269,9 @@ def read_config_file():
                     config['subs'] = []
                 config['subs'].append(parts)
 
-    except RuntimeError:
-        print("Yowza")
+    except:
         pass
 
-    print("config is", config)
     return config
 
 
@@ -318,7 +323,7 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
         print()
 
         sink_inputs = parse_sink_inputs()
-        print('Sink Inputs:')
+        print('Currently running (sink inputs):')
         for si in sink_inputs:
             print(sink_input_str(si))
 
