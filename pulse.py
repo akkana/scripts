@@ -7,33 +7,17 @@
 # To see your available audio devices: pacmd list-cards
 # For each card, look under "profiles:"
 
-#
-# SOME PULSEAUDIO NOTES:
-#
-# https://brokkr.net/2018/05/24/down-the-drain-the-elusive-default-pulseaudio-sink/
-# has some great info on pulseaudio fallbacks:
-# pacmd list-sinks | grep -e 'name:' -e 'index'
-# puts an asterisk in front of the fallback.
-# There are also some  old comments claiming that you can
-# export PULSE_SINK="sink_name"
-# export PULSE_SOURCE="source_name"
-# Get the names with
-# LANG=C pactl list | grep -A3 'Sink #'
-# then, e.g.,
-#   PULSE_SINK='alsa_output.usb-0c76_USB_PnP_Audio_Device-00.analog-stereo' musicplayer
-#   PULSE_SINK='alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__hw_sofhdadsp__sink' musicplayer
-# In theory, Set the default by noting the index of the sink you want, then
-#   pacmd set-default-sink 1
-# In practice that doesn't work. Maybe it would after editing
-# /etc/pulse/default.pa to set:
-#   load-module module-stream-restore restore_device=false
-#
-# Change a running stream to a different sink:
-#   pacmd list-sink-inputs
-#   pacmd move-sink-input 5 1
-
 import sys
 import subprocess
+
+# If python-termcolor is installed, show muted items in red.
+try:
+    from termcolor import colored
+    def mutedstring(s):
+        return colored(s, 'red')
+except:
+    def mutedstring(s):
+        return f'  ({s})'
 
 def parse_cards():
     """Get a list of cards"""
@@ -50,6 +34,29 @@ def parse_cards():
             elif '.pci' in card:
                 internal_card = card
     return cards
+
+
+def parse_volume(words):
+    if words[1] == b'front-left:':
+        return [int(words[2]), int(words[9])]
+    if words[1] == b'mono:':
+        return [int(words[2])]
+    print("Can't parse volume line:", words)
+    return None
+
+
+def after_equals(line):
+    eq = line.index(b'=')
+    if not eq:
+        return None
+    ret =line[eq+1:].strip().decode()
+    if ret.startswith('"') and ret.endswith('"'):
+        ret = ret[1:-1]
+    return ret.strip()
+
+
+by_index = { 'source': {}, 'sink': {} }
+
 
 def parse_sources_sinks(whichtype):
     """Get a list of sinks or sources. whichtype should be "source" or "sink".
@@ -76,21 +83,18 @@ def parse_sources_sinks(whichtype):
             if curdict:
                 devs.append(curdict)
             curdict = { 'fallback': fallback }
+            curdict['index'] = words[1].decode()
+            by_index[whichtype][curdict['index']] = curdict
 
         elif words[0] == b'name:':
             # Take the second word and remove enclosing <>
             curdict['name'] = words[1][1:-1].decode()
 
         elif words[0] == b'muted:':
-            curdict['muted'] = (words[1] == 'yes')
+            curdict['muted'] = (words[1] == b'yes')
 
         elif words[0] == b'volume:':
-            if words[1] == b'front-left:':
-                curdict['volume'] = [int(words[2]), int(words[9])]
-            elif words[1] == b'mono:':
-                curdict['volume'] = [int(words[2])]
-            else:
-                print("Can't parse volume line:", words)
+            curdict['volume'] = parse_volume(words)
 
         elif words[0] == b'base' and words[1] == b'volume:':
             curdict['base_volume'] = int(words[2])
@@ -99,14 +103,48 @@ def parse_sources_sinks(whichtype):
              and words[0] in [b'alsa.long_card_name',
                               b'device.product.name',
                               b'device.description']:
-            name = ' '.join([w.decode() for w in words[2:]])
-            if name.startswith('"') and name.endswith('"'):
-                name = name[1:-1]
+            name = after_equals(line)
             curdict[words[0].decode()] = name
 
     if curdict:
         devs.append(curdict)
     return devs
+
+
+def parse_sink_inputs():
+    """Parse sink inputs: running programs that are producing audio.
+    """
+    cmd = ['pactl', 'list', 'sink-inputs']
+    sink_inputs = []
+    sink_input = None
+    for line in subprocess.check_output(cmd).split(b'\n'):
+        if line.startswith(b'Sink Input'):
+            if sink_input:
+                sink_inputs.append(sink_input)
+            sink_input = {}
+            continue
+
+        words = line.strip().split()
+        if not words:
+            continue
+
+        if words[0] == b'Sink:':
+            sink_input['sink'] = words[1].decode()
+
+        if words[0] == b'media.name':
+            sink_input['medianame'] = after_equals(line)
+        if words[0] == b'application.name':
+            sink_input['appname'] = after_equals(line)
+
+        if words[0] == b'Mute':
+            sink_input['mute'] = (words[1] != b'No')
+
+        if words[0] == b'Volume':
+            sink_input['volume'] = parse_volume(words)
+
+    if sink_input:
+        sink_inputs.append(sink_input)
+    return sink_inputs
 
 
 def mute_unmute(mute, devname, devtype):
@@ -151,6 +189,7 @@ def unmute_one(pattern, devtype, mute_others=True):
 
 def sink_str(devdict):
     out = devdict['device.description']
+
     if devdict['fallback']:
         out += ' (--FALLBACK--)'
     if 'volume' in devdict:
@@ -162,9 +201,18 @@ def sink_str(devdict):
                                   for v in devdict['volume']]) + ')'
     else:
         out += ' (volume unknown)'
+
     if devdict['muted']:
         out += ' (MUTED)'
+        out = mutedstring(out)
+
     return out
+
+
+def sink_input_str(sidict):
+    # return str(sidict)
+    return f"{sidict['appname']} {sidict['medianame']} ({sidict['sink']})" \
+        f" --> {by_index['sink'][sidict['sink']]['device.description']}"
 
 
 if __name__ == '__main__':
@@ -208,4 +256,9 @@ With no arguments, prints all cards, sources and sinks.
         for source in sources:
             print(sink_str(source))
         print()
+
+        sink_inputs = parse_sink_inputs()
+        print('Sink Inputs:')
+        for si in sink_inputs:
+            print(sink_input_str(si))
 
