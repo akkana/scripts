@@ -7,6 +7,9 @@
 # To see your available audio devices: pacmd list-cards
 # For each card, look under "profiles:"
 
+# Uses the termcolor module if it's available to highlight fallbacks
+# and muted devices.
+
 import sys
 import subprocess
 
@@ -15,9 +18,13 @@ try:
     from termcolor import colored
     def mutedstring(s):
         return colored(s, 'red')
+    def fallbackstring(s):
+        return colored(s, 'green', attrs=['bold'])
 except:
     def mutedstring(s):
         return f'  ({s})'
+    def fallbackstring(s):
+        return '** ' + s
 
 def parse_cards():
     """Get a list of cards"""
@@ -205,6 +212,8 @@ def sink_str(devdict):
     if devdict['muted']:
         out += ' (MUTED)'
         out = mutedstring(out)
+    if devdict['fallback']:
+        out = fallbackstring(out)
 
     return out
 
