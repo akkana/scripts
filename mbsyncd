@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # mbsync seems to work well but, weirdly, doesn't have a daemon mode
 # (surely 95% of users will want to run it that way?)
