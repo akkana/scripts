@@ -27,6 +27,9 @@ def get_domain(domainname):
             return domain
         except socket.timeout:
             print("%s timed out; retrying" % domainname)
+        except whois.parser.PywhoisError:
+            print("No such domain", domainname)
+            return None
     print("Giving up on %s after %d timeouts" % (domainname, RETRIES))
     return None
 
