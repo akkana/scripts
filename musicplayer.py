@@ -1,8 +1,12 @@
 #! /usr/bin/env python
 
 # A simple music player using pygame.
-# Requirements: python-pygame python-id3 python-mutagen
-# Copyright 2015.2019 by Akkana Peck: share and enjoy under the GPLv2 or later.
+# Requirements: python-pygame python-id3
+# Strongly recommended: python-mutagen
+# (uses mutagen for MP3 song length and frequency; without it,
+# some songs may play too fast or too slowly).
+#
+# Copyright 2015.2019,2020 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
 from __future__ import print_function
 
@@ -31,7 +35,7 @@ except:
 try:
     from mutagen.mp3 import MP3
 except:
-    print("No mutagen, won't be able to check song length")
+    print("No mutagen, won't be able to check song length or adjust speeds")
     pass
 
 class MusicWin(Gtk.Window):
@@ -565,6 +569,19 @@ button:hover { background: #dff; border-color: #8bb; }
             self.cur_song_length_str = '?'
 
         try:
+            # First try to adjust the speed. This used to happen
+            # automatically, but now, some songs will play too fast
+            # or too slowly.
+            # This relies on mutagen, so it won't happen if it's not available.
+            try:
+                mp3 = MP3(self.songs[self.song_ptr])
+                # print("New frequency is", mp3.info.sample_rate)
+                mixer.quit()
+                mixer.init(frequency=mp3.info.sample_rate)
+            except NameError:
+                # print("Couldn't adjust speed, maybe mutagen isn't available?")
+                pass
+
             # Then load and play the song.
             mixer.music.load(self.songs[self.song_ptr])
             mixer.music.play()
