@@ -172,31 +172,41 @@ def unmute_one(pattern, devtype, mute_others=True):
     """Make one source or sink the active fallback, unmuting it and
        (optionally) muting all others.
        pattern is a string (not regexp) to search for in the device description,
-       e.g. "USB" or "HDMI1".
+       e.g. "USB" or "HDMI1", or an integer or a string representing an int.
        devtype is "source" or "sink".
        If pattern is None or none, mute everything of that type.
     """
     devs = parse_sources_sinks(devtype)
-    devindex = -1
     muteall = (pattern.lower() == "none")
 
-    # Make sure there's a match before muting anything
+    if type(pattern) is int:
+        devindex = pattern
+
+    elif not muteall:
+        try:
+            devindex = int(pattern)
+        except ValueError:
+            # Make sure there's a match before muting anything
+            devindex = -1
+            for i, dev in enumerate(devs):
+                if pattern in sub_str(dev['device.description']):
+                    devindex = i
+                    break
+                if pattern in dev['device.description']:
+                    devindex = i
+                    break
+
+            if devindex < 0:
+                print(f"Didn't find a {devtype} matching", pattern)
+                return
+
+    # Now either muteall or devindex should be set.
+    # Set the given device as the fallback
     if not muteall:
-        for i, dev in enumerate(devs):
-            if pattern in sub_str(dev['device.description']):
-                devindex = i
-                break
-            if pattern in dev['device.description']:
-                devindex = i
-                break
-
-        if devindex < 0:
-            print(f"Didn't find a {devtype} matching", pattern)
-            return
-
-        # Set the given device as the fallback
         print("Setting", sub_str(devs[devindex]['device.description']),
               "as fallback")
+        print("Calling", ["pactl", f"set-default-{devtype}",
+                         devs[devindex]['index']])
         subprocess.call(["pactl", f"set-default-{devtype}",
                          devs[devindex]['index']])
 
@@ -226,7 +236,7 @@ def sub_str(s):
 def sink_or_source_str(devdict):
     """Pretty output for a sink or source.
     """
-    out = f"{devdict['index']}: sub_str(devdict['device.description'])"
+    out = f"{devdict['index']}: {sub_str(devdict['device.description'])}"
 
     if devdict['fallback']:
         out += ' (--FALLBACK--)'
@@ -319,6 +329,7 @@ if __name__ == '__main__':
 
 Provide patterns matching source or sink arguments, e.g.
 --sink USB will unmute any sink that has "USB" in its description.
+Or specify the number of the source or sink.
 Use none to mute every source or every sink.
 
 With no arguments, prints all cards, sources and sinks.
