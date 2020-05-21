@@ -11,22 +11,30 @@
 
 from __future__ import print_function
 
-import sys, os, string
+import glob
+import sys, os
 
 def search_for_keywords(grepdirs, orpats, andpats, notpats, separate) :
     """Inside grepdirs, open files named Tags or Keywords.
        Search those lines looking for matches in the keywords for pats.
+       Each item in grepdirs may be a shell-style pattery, like 20??
+       (the style used by python's glob module):
+       first we'll try to match the item exactly, then if not,
+       try to match it as a pattern.
+       ~ is allowed.
     """
     results = []
-    for d in grepdirs:
-        for root, dirs, files in os.walk(d) :
-            if not files :
-                continue
-            for f in files :
-                if f == "Tags" or f == "Keywords":
-                    search_for_keywords_in(root, f, orpats, andpats, notpats,
-                                           separate, results)
-                    break   # Would prefer to break out of this root, not f
+    for pat in grepdirs:
+        for d in glob.glob(os.path.expanduser(pat)):
+            for root, dirs, files in os.walk(d) :
+                if not files :
+                    continue
+                for f in files :
+                    if f == "Tags" or f == "Keywords":
+                        search_for_keywords_in(root, f,
+                                               orpats, andpats, notpats,
+                                               separate, results)
+                        break   # XXX would prefer to break out of root, not f
     return results
 
 def search_for_keywords_in(d, f, orpats, andpats, notpats, separate,
@@ -99,7 +107,7 @@ if __name__ == "__main__":
     # Sadly, we can't use argparse if we want to be able to use -term
     # to indicate "don't search for that term".
     def Usage():
-        print('''Usage: %s [-s] condition [condition ...]
+        print('''Usage: %s [-s] [-d dirs] condition [condition ...]
 
 Search for files matching patterns in Tags or Keywords files.
 Will search recursively under the current directory unless -d is specified.
@@ -111,9 +119,11 @@ Conditions can include three types of patterns:
 
 Optional arguments:
   -d dir,dir,dir  comma-separated list of directories to use (else .)
+                  Each dir may be a shell-style pattern, e.g. 19??,20??
   -s, --separate  print separate lines from different tag files
 
-Copyright 1009,2014 by Akkana Peck; share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0]))
+Copyright 1009,2014,2020 by Akkana Peck.
+Share and enjoy under the GPL v2 or later.''' % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
     args = sys.argv[1:]
