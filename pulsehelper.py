@@ -217,7 +217,6 @@ def unmute_one(pattern, devtype, mute_others=True):
             mute_unmute(True, dev, devtype)
 
     print()
-    print_status()
 
 
 def sub_str(s):
@@ -334,7 +333,7 @@ Use none to mute every source or every sink.
 
 With no arguments, prints all cards, sources and sinks.
 
-You can create a ~/.pulsehelper/config file to provide shorter names.
+You can create a ~/.config/pulsehelper/config file to provide shorter names.
 Lines in that file should look like:
 Super Long Hard To Read PulseAudio Name = Nice Short Name
 """,
@@ -350,9 +349,8 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
     if args.source:
         unmute_one(args.source, 'source')
 
-    elif args.sink:
+    if args.sink:
         unmute_one(args.sink, 'sink')
 
-    else:
-        print_status()
+    print_status()
 
