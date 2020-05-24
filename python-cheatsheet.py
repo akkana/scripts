@@ -215,6 +215,7 @@ r = r'abc\def'
 c = 'abc\\def'
 r == c    # True
 
+
 # Replace non-breaking spaces in unicode (python3):
 s = s.replace("\u00A0"," ")
 
@@ -233,16 +234,51 @@ filename = 'file' + str(num) + '.txt'
 # Conversion Specifier:
 filename = 'file%s.txt' % num
 
+#############################
 # Formatted string literals, Python 3.6+
 print(f'Fly to {name}: {lat}N {lon}E')
 print(f'The value of pi is approximately {math.pi:.3f}.')
 
 # str and repr in formatted string literals
 >>> animals = 'eels'
->>> print(f'My hovercraft is full of {animals!s}.')    # applies str()
+>>> print(f'My hovercraft is full of {animals!s}.')  # applies str() (default)
 My hovercraft is full of eels.
->>> print(f'My hovercraft is full of {animals!r}.')    # applies repr()
+>>> print(f'My hovercraft is full of {animals!r}.')  # applies repr()
 My hovercraft is full of 'eels'.
+
+# More formatted string literals tricks:
+# Escaping braces
+>>> f"{{74}}"
+'{74}'
+
+# decimals and field widths
+>>> f'{math.pi:.2f}'
+'3.14'
+>>> f'{5:>3d}'
+'  5'
+>>> f'{5:0>3d}'    # you can fill with any character, not just 0
+'005'
+
+# Right, left and center alignment
+>>> f'{123:10d}'
+'       123'
+>>> f'{123:<10d}'
+'123       '
+>>> f'{123:^10d}'
+'   123    '
+
+# Other bases
+>>> f'{255:x}'
+'ff'
+>>> f'{255:o}'
+'377'
+>>> f'{255:b}'
+'11111111'
+
+# Adding commas
+>>> f'{1234567:,}'
+'1,234,567'
+
 
 # Python 3.8+:
 # https://stribny.name/blog/2019/06/debugging-python-programs
@@ -716,7 +752,8 @@ r = session.get(url)
 # subprocess
 ########################################################
 # Read lines from a subprocess as they appear:
-outstring = subprocess.check_output(['identify', filename)
+outstring = subprocess.check_output(['identify', filename))
+# To suppress stderr, add stderr=subprocess.DEVNULL
 
 # More complicated way:
 import subprocess
