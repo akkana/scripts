@@ -247,6 +247,10 @@ langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).
 
+losalamosmtgs.py:
+    Scrape the Los Alamos legistar page to find out about upcoming
+    county meetings and find out what's on their agendas.
+
 louder:
     Increase alsa system volume by a small increment. Symlink it to
     another name like "quieter" and it will decrease instead.
