@@ -668,8 +668,22 @@ one_month_from_now = today + datetime.timedelta(days=days_this_month)
 calendar.monthrange(year, month)[1]
 # monthrange returns weekday of the first day and number of days in the month.
 
-# Or do it using only datatime:
+# Or do it using only datetime:
 (datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
+
+#
+# Timezones:
+#
+# Take an unaware datetime and turn it into one in a timezone:
+import pytz
+mt = pytz.timezone('America/Denver')
+unaware = datetime.datetime(2020, 5, 26, 10, 0)    # or strptime
+localtime = mt.localize(unaware)
+# and then convert that to UTC
+utc = localtime.astimezone(pytz.utc)
+
+# Note that strptime cannot parse timezone names -- don't be misled
+# by the documentation mentioning %Z, it lies.
 
 ########################################################
 # Threading and multiprocessing
@@ -729,7 +743,7 @@ for t in soup.findAll(style=True)
 soup.findAll(lambda tag: 'style' in tag.attrs)
 
 ########################################################
-# Handling cookies with Requests
+# Requests
 ########################################################
 
 # To handle cookies with requests, ignore the Requests documentation
@@ -737,6 +751,8 @@ soup.findAll(lambda tag: 'style' in tag.attrs)
 # setting cookies, not fetching them. Instead, use a Session:
 session = requests.Session()
 r = session.get(url)
+
+# requests.text gives a string, requests.content gives bytes
 
 ########################################################
 # Some handy utility classes
