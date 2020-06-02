@@ -15,6 +15,7 @@ import tempfile
 import json
 import os
 import pytz
+# from pprint import pprint
 
 
 # Where to start: the public legistar meeting list
@@ -190,6 +191,7 @@ def write_rss20_file(mtglist):
 
     for mtg in mtglist:
         lastmod = None
+        changestr = ""
         mtg['cleanname'] = mtgdic_to_cleanname(mtg)
 
         if mtg["Agenda"]:
@@ -214,8 +216,10 @@ def write_rss20_file(mtglist):
         if agenda_html != oldhtml:
             with open(agendafile, 'wb') as outfp:
                 outfp.write(agenda_html)
-            # Mark it as modified today
+            # Mark it as changed
             lastmod = now
+            changestr += "<p>The agenda has changed.</p>"
+            print(mtg['cleanname'], "Agenda changed")
 
         jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
         if os.path.exists(jsonfile):
@@ -226,19 +230,29 @@ def write_rss20_file(mtglist):
                 # mtg doesn't have lastmod, so to make sure that
                 # doesn't trigger a change, copy it:
                 mtg['lastmod'] = oldmtg['lastmod']
-                if oldmtg != mtg:
-                    print("Changes since", jsonfile, "!")
-                    print("old:", oldmtg)
-                    print("new:", mtg)
+
+                changed_keys = {key for key in oldmtg.keys() & mtg
+                                if oldmtg[key] != mtg[key]}
+                if changed_keys:
                     lastmod = now
+                    changestr += "<p>Changed: " + ', '.join(changed_keys) \
+                        + "</p>"
+
                 elif not lastmod:
                     lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
                                                          RSS_DATE_FORMAT)
-            except:
+            except RuntimeError:
+                print("Error reading jsonfile")
+                changestr += "Error reading jsonfile<p>"
                 lastmod = now
 
         else:
             lastmod = now
+
+        # The meeting has already been saved to JSON,
+        # so it's safe to add other keys to it now.
+        # Save the change string to put it in the RSS later.
+        mtg['changestr'] = changestr
 
         # Either way, this meeting is still listed:
         # note it so it won't be cleaned from the directory.
@@ -274,6 +288,8 @@ def write_rss20_file(mtglist):
         for mtg in mtglist:
             desc = f"""The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
 """
+            if mtg['changestr']:
+                desc += "<p>" + mtg['changestr'] + '\n';
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
                 desc = f"""<![CDATA[{desc}<p>There is an agenda: <a href="{RSS_URL}{mtg['cleanname']}.html">Agenda link</a><br/></p>]]>"""
@@ -281,7 +297,7 @@ def write_rss20_file(mtglist):
                 desc += "<p>No agenda is available.</p>"
             print(f"""<item>
    <title>{mtg['Name']} on {mtg["Meeting Date"]}</title>
-   <guid isPermaLink="false">{mtg['cleanname']}</guid>
+   <guid isPermaLink="false">{mtg['cleanname']}.{lastmod.strftime("%Y%m%d-%H%M")}</guid>
    <link>{link}</link>
    <description>{desc}
    </description>
