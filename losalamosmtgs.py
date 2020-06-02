@@ -187,15 +187,41 @@ def write_rss20_file(mtglist):
 
     print("\n==== Generating RSS for", len(mtglist), "meetings")
     active_meetings = ["index.rss"]
-    lastmod = None
+
     for mtg in mtglist:
+        lastmod = None
+        mtg['cleanname'] = mtgdic_to_cleanname(mtg)
+
+        if mtg["Agenda"]:
+            print(mtg["cleanname"], "has an agenda: fetching it")
+            agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"])
+
+        # RSS doesn't deal well with feeds where some items have
+        # a <link> and others don't. So make an empty file to keep
+        # RSS readers happy.
+        else:
+            agenda_html = b"<html><body><p>No agenda available.</body></html>"
+
+        agendafile = os.path.join(RSS_DIR, mtg['cleanname'] + ".html")
+
+        # See if there was already an agenda there:
+        if os.path.exists(agendafile):
+            with open(agendafile, "rb") as oldfp:
+                oldhtml = oldfp.read()
+        else:
+            oldhtml = ""
+
+        if agenda_html != oldhtml:
+            with open(agendafile, 'wb') as outfp:
+                outfp.write(agenda_html)
+            # Mark it as modified today
+            lastmod = now
+
         jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
         if os.path.exists(jsonfile):
             try:
                 with open(jsonfile) as jsonfp:
                     oldmtg = json.loads(jsonfp.read())
-
-                # XXX fetch agenda and check for changes here
 
                 # mtg doesn't have lastmod, so to make sure that
                 # doesn't trigger a change, copy it:
@@ -205,7 +231,7 @@ def write_rss20_file(mtglist):
                     print("old:", oldmtg)
                     print("new:", mtg)
                     lastmod = now
-                else:
+                elif not lastmod:
                     lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
                                                          RSS_DATE_FORMAT)
             except:
@@ -293,21 +319,6 @@ def mtgdic_to_cleanname(mtgdic):
 
 if __name__ == '__main__':
     meetings = parse_meeting_list()
-
-    for mtg in meetings:
-        if mtg["Agenda"]:
-            html = get_html_agenda_pdftohtml(mtg["Agenda"])
-
-        # RSS doesn't deal well with feeds where some items have
-        # a <link> and others don't. So make an empty file to keep
-        # RSS readers happy.
-        else:
-            html = b"<html><body><p>No agenda available.</body></html>"
-
-        mtg['cleanname'] = mtgdic_to_cleanname(mtg)
-        agendafile = os.path.join(RSS_DIR, mtg['cleanname'] + ".html")
-        with open(agendafile, 'wb') as outfp:
-            outfp.write(html)
 
     write_rss20_file(meetings)
 
