@@ -292,7 +292,7 @@ def write_rss20_file(mtglist):
                 desc += "<p>" + mtg['changestr'] + '\n';
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
-                desc = f"""<![CDATA[{desc}<p>There is an agenda: <a href="{RSS_URL}{mtg['cleanname']}.html">Agenda link</a><br/></p>]]>"""
+                desc = f"""{desc}<p><b>There is an agenda</b></p>>"""
             else:
                 desc += "<p>No agenda is available.</p>"
             print(f"""<item>
