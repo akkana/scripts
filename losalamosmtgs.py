@@ -170,10 +170,32 @@ def get_html_agenda_pdftohtml(agendaloc):
         html = htmlfp.read()
 
     # Replace the grey
-    html = html.replace(b'<body bgcolor="#A0A0A0" vlink="blue" link="blue">',
-                        b'<body>')
+    soup = BeautifulSoup(html, "lxml")
+    body = soup.body
+    del body["bgcolor"]
+    del body["vlink"]
+    del body["link"]
 
-    return html
+    # html = html.replace(b'<body bgcolor="#A0A0A0" vlink="blue" link="blue">',
+    #                     b'<body>')
+
+    # # Get rid of special style on divs that have style like
+    # # "position:relative;width:918px;height:1188px;"
+    # # -- that comes from pdftohtml.
+    # divs = soup.findAll(style=True)
+    # for d in divs:
+    #     if 'width' in d["style"]:
+    #         del d["style"]
+
+    for tag in soup.findAll('style'):
+        tag.extract()
+    for tag in soup.findAll('div'):
+        del tag["style"]
+    for tag in soup.findAll('p'):
+        del tag["style"]
+        # Consider also deleting tag["class"]
+
+    return soup.prettify(encoding='utf-8')
 
 
 VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
