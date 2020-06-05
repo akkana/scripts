@@ -40,19 +40,13 @@ class AnalemmaWindow(Gtk.Window):
         self.width = 0
         self.height = 0
         # Even if we're actually showing the moon, call the object self.sun.
-        if self.lunar:
-            self.sun = ephem.Moon()
-        else:
-            self.sun = ephem.Sun()
+        self.sun = ephem.Moon() if self.lunar else ephem.Sun()
         self.sinusoidal = False
 
         self.sun_color = (1, 1, 0)
         self.backside_color = (1, .7, 0)
         self.text_color = (1, 1, 0)
-        if background:
-            self.background_color = background
-        else:
-            self.background_color = (0, 0, .6, 1)
+        self.background_color = background if background else (0, 0, .6, 1)
         self.special_dot_size = 5
 
     def draw_sun_position(self, date):
@@ -398,7 +392,7 @@ Latest sunset: %s
         ctx.set_source_rgba(*background)
         if self.sinusoidal:
             self.draw_rectangle(0, 0, self.width, self.height)
-            for f in range(0, int(math.pi * 100)):
+            for f in range(int(math.pi * 100)):
                 theta = f/200.
                 (x, y) = self.project_sinusoidal(math.pi/2, theta)
                 self.draw_rectangle(x, y, self.width - 2*x, 4)
@@ -431,7 +425,7 @@ Latest sunset: %s
 
             # For testing, try replacing 30 with, say, 5000 to see the
             # motion of the moon over many years.
-            for i in range(0, 30):
+            for _ in range(30):
                 self.draw_sun_position(transit)
 
                 # Also draw lunar analemmas 4 hours earlier and later:

@@ -101,7 +101,7 @@ class NOAAWeatherMean(WeatherMean) :
                     self.tots[field][month] += val
                     self.num_obs[field][month] += 1
 
-def findstations(stationnames) :
+def findstations(stationnames):
     '''Search through ish-history.txt for given station names.
        stationnames is a list of strings like 'KSJC'
        and we return a dictionary of lists of the first two numbers from the
@@ -115,12 +115,11 @@ def findstations(stationnames) :
     '''
     result = {}
     ish = open('ish-history.txt')
-    for line in ish :
-        for station in stationnames :
-            if station not in result.keys() :
-                if station == line[52:56] :
-                    result[station] = [ line[0:6], line[7:12],
-                                        line[13:43].strip() ]
+    for line in ish:
+        for station in stationnames:
+            if station not in result.keys() and station == line[52:56]:
+                result[station] = [ line[0:6], line[7:12],
+                                    line[13:43].strip() ]
     ish.close()
     return result
 

@@ -48,11 +48,11 @@ def convert_file(filename, destdir):
 def altertags(soup):
     counter = 1
     for tag in soup.body.find_all(re.compile("^(p|h[1-6])")):
-         new_tag = soup.new_tag("span", id="kobo.%d.1" % counter)
-         counter = counter + 1
-         tag.wrap(new_tag)
-         tag.unwrap()
-         new_tag.wrap(tag)
+        new_tag = soup.new_tag("span", id="kobo.%d.1" % counter)
+        counter += 1
+        tag.wrap(new_tag)
+        tag.unwrap()
+        new_tag.wrap(tag)
 
 if __name__ == '__main__':
     if len(sys.argv) <= 1:

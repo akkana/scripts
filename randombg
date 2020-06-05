@@ -42,7 +42,7 @@ while True:
         height = int(parts[1])
         break
 fp.close()
-if not width or not height:
+if not (width and height):
     print("Couldn't find screen dimensions!")
     sys.exit(1)
 

@@ -307,10 +307,7 @@ class AutoSizerWindow(Gtk.Window):
 
         self.content_area.queue_draw()
 
-        if self.d_alpha:
-            return True
-
-        return False
+        return bool(self.d_alpha)
 
     def key_press(self, widget, event):
         """Handle a key press event anywhere in the window"""

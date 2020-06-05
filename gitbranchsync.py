@@ -177,8 +177,7 @@ def list_branches(repo, add_tracking=False):
     local_only = []              # local, no remote of same name
     remote_only = []             # remote, no local of same name
 
-    for branch in localbranches:
-        lb = localbranches[branch]
+    for branch, lb in localbranches.items():
         if lb.tracking_branch():
             tracking_branches.append(lb.name)
         elif lb.name in remotebranches:
@@ -280,7 +279,7 @@ Update a repo so remote branches are tracked: %(prog)s -ft
     args = parser.parse_args()
 
     # By default (no arguments specified), do -cl, i.e. check and list.
-    if not args.list and not args.check and not args.track:
+    if not (args.list or args.check or args.track):
         args.list = True
         args.check = True
 

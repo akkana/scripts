@@ -33,11 +33,7 @@ class OppRetroWindow(Gtk.Window, oppretro.OppRetro):
         oppretro.OppRetro.__init__(self, location)
         Gtk.Window.__init__(self)
 
-        if background:
-            self.background_color = background
-        else:
-            self.background_color = (0, 0, .3, 1)
-
+        self.background_color = background if background else (0, 0, .3, 1)
         self.planet_color = (1, 1, .5, 1)
 
         self.save_all_points = True

@@ -72,9 +72,9 @@ def playList(lis) :
 def tweet(args):
     matches = getMatchingFiles(args)
     # If we have more than one, prompt the user:
-    while len(matches) > 1 :
+    while len(matches) > 1:
         # Prettyprint the list of matches so the user can choose.
-        for m in range(0, len(matches)) :
+        for m in range(len(matches)):
             dot = matches[m].rfind(".")
             if dot < 0 :
                 continue

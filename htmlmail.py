@@ -161,7 +161,7 @@ def compose_email_msg(recipients, sender, html, text=None,
     return msg
 
 def contains_non_ascii_characters(s):
-    return not all(ord(c) < 128 for c in s)
+    return any(ord(c) >= 128 for c in s)
 
 def encode_header(header_txt):
     if contains_non_ascii_characters(header_txt):

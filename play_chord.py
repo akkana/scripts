@@ -235,7 +235,7 @@ def parse_chord(ns, default_duration=300):
     chord = None
     for ns in indnotes:
         if ns[0] in Notes:
-            if len(ns) > 1 and (ns[1] == 'b' or ns[1] == '#'):
+            if len(ns) > 1 and ns[1] in ['b', '#']:
                 # It's a sharp or flat
                 freqlist.append(Notes[ns[:2]])
                 ns = ns[2:]
@@ -306,7 +306,7 @@ def main():
     if len(sys.argv) <= 1:
         return play_some_chords()
 
-    if sys.argv[1].lower() == "-h" or sys.argv[1].lower() == "--help":
+    if sys.argv[1].lower() in ["-h", "--help"]:
         print("Usage: %s [scale|imperial|cmajor|other note string]") % os.path.basename(sys.argv[0])
         return
 
@@ -314,7 +314,7 @@ def main():
         # Play a scale
         return play_notes("C D E F G A2 B2 C2")
 
-    if sys.argv[1].lower() == "imperial" or sys.argv[1].lower() == "empire":
+    if sys.argv[1].lower() in ["imperial", "empire"]:
         # Play the first line of the Imperial March
         return play_notes("G G G Eb:.75 Bb2:.25 G Eb:.75 Bb2:.25 G")
 

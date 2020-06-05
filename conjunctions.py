@@ -56,10 +56,7 @@ planets = [
 
 planets_by_name = ["Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
 
-planets_up = {}
-for planet in planets:
-    planets_up[planet.name] = None
-
+planets_up = {planet.name: None for planet in planets}
 saw_conjunction = False
 visible_planets = []
 
@@ -223,11 +220,7 @@ class Conjunction:
                 if hour > sepdate_tuple[3]:
                     sepdate_tuple[2] -= 1
                 sepdate_tuple[3] = hour
-                if hour > 12:
-                    hourstr = str(hour-12) + " pm"
-                else:
-                    hourstr = str(hour) + " am"
-
+                hourstr = str(hour-12) + " pm" if hour > 12 else str(hour) + " am"
                 seps = "POSSIBLE OCCULTATION around " + hourstr
             else:
                 seps = sepstr(minsep)
@@ -350,12 +343,8 @@ def finish_planet(p, d, observer, output_format):
     observer.date = d
     transit = observer.previous_transit(body) - ephem.hour * timezone
     transit = list(ephem.Date(transit).tuple())
-    if transit[3] < 3 or transit[3] > 12:
-        when = "evening"
-    else:
-        when = "morning"
-
-    if p == "Venus" or p == "Mercury":
+    when = "evening" if transit[3] < 3 or transit[3] > 12 else "morning"
+    if p in ["Venus", "Mercury"]:
         if when == "evening":
             isvis = p + " is visible in the early evening sky."
         else:
@@ -386,28 +375,33 @@ def finish_planet(p, d, observer, output_format):
             isvis += '.'
         crescents[p] = [ None, None ]
 
-    if output_format == "csv" or output_format == "sql":
-        if p != 'Moon':
-            if web_image[p]:
-                img = web_image[p][0]
-                cred = web_image[p][1]
-                w = web_image[p][2]
-                h = web_image[p][3]
-            else:
-                img = ""
-                cred = ""
-                w = ""
-                h = ""
+    if (
+        output_format == "csv"
+        and p != 'Moon'
+        or output_format != "csv"
+        and output_format == "sql"
+        and p != 'Moon'
+    ):
+        if web_image[p]:
+            img = web_image[p][0]
+            cred = web_image[p][1]
+            w = web_image[p][2]
+            h = web_image[p][3]
+        else:
+            img = ""
+            cred = ""
+            w = ""
+            h = ""
 
-            if output_format == "csv":
-                print("%s,%s,%s,,%s,,%s,%s,%s,%s" % \
-                      (p, datestr(planets_up[p]), datestr(d), isvis,
-                       img, w, h, cred))
-            else:
-                print("('%s', 'astronomy', 'naked eye', '%s', '%s', '%s', '%s', %s, %s, '%s' )," % \
-                      (p, datestr(planets_up[p]), datestr(d), isvis,
-                       img, w, h, cred))
-    else:
+        if output_format == "csv":
+            print("%s,%s,%s,,%s,,%s,%s,%s,%s" % \
+                  (p, datestr(planets_up[p]), datestr(d), isvis,
+                   img, w, h, cred))
+        else:
+            print("('%s', 'astronomy', 'naked eye', '%s', '%s', '%s', '%s', %s, %s, '%s' )," % \
+                  (p, datestr(planets_up[p]), datestr(d), isvis,
+                   img, w, h, cred))
+    elif output_format not in ["csv", "sql"]:
         print(datestr(planets_up[p]), "to", datestr(d), ":", isvis)
 
     planets_up[p] = None

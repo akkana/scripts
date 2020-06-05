@@ -32,11 +32,7 @@ class BirdCodes:
         fields = next(reader)
         code4 = fields.index('4code')
         name = fields.index('name')
-        if 'sci_name' in fields:
-            sciname = fields.index('sci_name')
-        else:
-            sciname = None
-
+        sciname = fields.index('sci_name') if 'sci_name' in fields else None
         for fields in reader:
             if sciname:
                 self.allbirds[fields[code4]] = (fields[name], fields[sciname])
@@ -53,11 +49,7 @@ class BirdCodes:
         fields = next(reader)
         code4 = fields.index('4code')
         name = fields.index('name')
-        if 'sci_name' in fields:
-            sciname = fields.index('sci_name')
-        else:
-            sciname = None
-
+        sciname = fields.index('sci_name') if 'sci_name' in fields else None
         for fields in reader:
             if fields[code4] in self.allbirds:
                 continue
@@ -83,10 +75,7 @@ class BirdCodes:
         return None
 
     def match_codes(self, matchcodes):
-        matches = []
-        for code in matchcode:
-            matches.append(self.match_code(code))
-        return matches
+        return [self.match_code(code) for code in matchcode]
 
     def match_name(self, matchname, fuzzy=True):
         matchname = matchname.upper()

@@ -355,11 +355,7 @@ if __name__ == '__main__':
     #full_res = [3648, 2736]
     full_res = [1024, 768]
 
-    if have_rangefinder:
-        rangefinder = ME007.ME007(trigger=23, echo=24)
-    else:
-        rangefinder = None
-
+    rangefinder = ME007.ME007(trigger=23, echo=24) if have_rangefinder else None
     md = MotionDetectorViewer(test_res=res, test_borders=test_borders,
                               full_res=full_res,
                               localdir=localdir, remotedir=remotedir,

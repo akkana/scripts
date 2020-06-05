@@ -112,7 +112,7 @@ def key_press(e):
     """Exit on ctrl-q. Any other key dismisses this plot and shows
        the next one.
     """
-    if e.key == 'ctrl+q' or e.key == 'q':
+    if e.key in ['ctrl+q', 'q']:
         sys.exit(0)
 
     # Matplotlib has no way to distinguish printable keys

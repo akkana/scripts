@@ -258,11 +258,7 @@ class PDFScrolledWidget(QScrollArea):
         """
         if not self.vscrollbar:
             self.vscrollbar = self.verticalScrollBar()
-        if self.vscrollbar:
-            vscrollbarwidth = self.vscrollbar.width()
-        else:
-            vscrollbarwidth = 14
-
+        vscrollbarwidth = self.vscrollbar.width() if self.vscrollbar else 14
         # Getting the size of a widget is tricky.
         # self.widget().width(), for some reason, gives the width minus 12
         # pixels, while self.widget().sizeHint().width() gives the

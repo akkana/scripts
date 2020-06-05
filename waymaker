@@ -51,10 +51,7 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
 
     for ent in entries:
         print('<wpt lat="%f" lon="%f">' % (ent[0], ent[1]), file=fp)
-        if omit_address:
-            addy = '\n'.join(ent[2].split('\n')[2:])
-        else:
-            addy = ent[2]
+        addy = '\n'.join(ent[2].split('\n')[2:]) if omit_address else ent[2]
         print('<name>%s</name>' % addy, file=fp)
         print('</wpt>', file=fp)
 
@@ -208,11 +205,7 @@ def read_description_file(filename):
         if re.search('\S{27,}', line):
             print("Skipping long line: '%s'" % line)
             continue
-        if cur_ent[2]:
-            cur_ent[2] += '\n' + cgi.escape(line)
-        else:
-            cur_ent[2] += cgi.escape(line)
-
+        cur_ent[2] += '\n' + cgi.escape(line) if cur_ent[2] else cgi.escape(line)
     if cur_ent:
         entries.append(cur_ent)
 

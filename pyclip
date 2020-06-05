@@ -93,7 +93,7 @@ def get_selection():
         if selection_string != None:
             break
 
-    if selection_string == None:
+    if selection_string is None:
         print("Nothing worked, sorry")
         sys.exit(1)
     else:

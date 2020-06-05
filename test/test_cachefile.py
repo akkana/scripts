@@ -37,13 +37,10 @@ class TestCache(Cachefile):
                         'int': 99, 'str': "Goodbye", 'float': 1000. }
                    ]
         elif day.year == 2018 and day.month == 2:
-            data = []
-            for hour in range(24):
-                data.append( { 'time': datetime.datetime(2018, 2, day.day,
+            return [{ 'time': datetime.datetime(2018, 2, day.day,
                                                          hour, 0, 0),
                                'int': hour, 'str': "Hello, world",
-                               'float': day.day + hour/100. })
-            return data
+                               'float': day.day + hour/100. } for hour in range(24)]
         else:
             morning = self.day_start(day)
             return [ { 'time': morning + datetime.timedelta(hours=2),
@@ -72,12 +69,10 @@ class CacheTests(unittest.TestCase):
     # executed prior to each test
     def setUp(self):
         self.cache.clean_cachedir()
-        pass
 
     # executed after each test
     def tearDown(self):
         self.cache.clean_cachedir()
-        pass
 
 
     def test_cache_just_starttime(self):

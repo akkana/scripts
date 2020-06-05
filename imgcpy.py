@@ -52,11 +52,7 @@ if __name__ == '__main__':
 
     img = sys.argv[1]
 
-    if len(sys.argv) > 2:
-        width = int(sys.argv[2])
-    else:
-        width = 600
-
+    width = int(sys.argv[2]) if len(sys.argv) > 2 else 600
     copy_to_clip(img, width)
 
 

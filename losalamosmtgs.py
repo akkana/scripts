@@ -75,10 +75,7 @@ def parse_meeting_list(only_past=False):
                 # If there's an Agenda URL, make it absolute.
                 a = field.find("a")
                 href = a.get("href")
-                if href:
-                    dic[fieldnames[i]] = urljoin(MEETING_LIST_URL, href)
-                else:
-                    dic[fieldnames[i]] = None
+                dic[fieldnames[i]] = urljoin(MEETING_LIST_URL, href) if href else None
             else:
                 dic[fieldnames[i]] = field.text.strip()
 
@@ -338,10 +335,7 @@ def write_rss20_file(mtglist):
            and not f.endswith('.html'):
             continue
         def is_active(f):
-            for act in active_meetings:
-                if f.startswith(act):
-                    return True
-            return False
+            return any(f.startswith(act) for act in active_meetings)
         if not is_active(f):
             print("removing", f)
             os.unlink(f)

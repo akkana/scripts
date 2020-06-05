@@ -133,9 +133,7 @@ def init_map():
     '''
     bbox = { 'lllon': -119, 'urlon': -64, 'lllat': 22.0, 'urlat': 50. }
 
-    m = map_from_bounding_box(bbox)
-
-    return m
+    return map_from_bounding_box(bbox)
 
 def show_map():
     # This gets rid of most of the extra horizontal whitespace,

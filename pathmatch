@@ -11,14 +11,14 @@
 
 import sys, string, os, types
 
-def getMatchingFiles(pat, files) :
+def getMatchingFiles(pat, files):
     matches = []
     lc = pat.lower()
-    for fil in range(0, len(files)) :
+    for file in files:
         #print "Looking for", lc, "in", files[fil]
-        callfile = files[fil].lower()
-        if (callfile.find(lc) >= 0) :
-            matches.append(files[fil])
+        callfile = file.lower()
+        if (callfile.find(lc) >= 0):
+            matches.append(file)
     return matches
 
 def findPatInPath(pat, pathdirs) :

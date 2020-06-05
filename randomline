@@ -29,11 +29,7 @@ def randomline(fp):
 if __name__ == '__main__':
     random.seed()
 
-    if len(sys.argv) > 1:
-        fp = open(sys.argv[1])
-    else:
-        fp = sys.stdin
-
+    fp = open(sys.argv[1]) if len(sys.argv) > 1 else sys.stdin
     print(randomline(fp))
 
 

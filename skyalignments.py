@@ -171,10 +171,7 @@ def read_waypoint_file_CSV(filename):
         for row in reader:
             # Each row is an OrderedDict
             try:
-                if 'elevation' in row:
-                    ele = float(row['elevation'])
-                else:
-                    ele = 0
+                ele = float(row['elevation']) if 'elevation' in row else 0
                 point = [ row['name'],
                           float(row['latitude']), float(row['latitude']),
                           ele ]

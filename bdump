@@ -22,26 +22,26 @@ def Usage() :
     print("Usage: %s [-cxd] file ..." % os.path.basename(sys.argv[0]))
     exit(1)
 
-def parse_opts() :
+def parse_opts():
     global do_char, do_hex, do_dec, file_list, multi_format
     num_formats = 0
-    for i in range(1, len(sys.argv)) :
+    for i in range(1, len(sys.argv)):
         if sys.argv[i][0] != '-' :
             file_list = sys.argv[i:]
             break
-        for c in sys.argv[i][1:] :
-            if c == 'c' :
+        for c in sys.argv[i][1:]:
+            if c == 'c':
                 do_char = True
-                num_formats = num_formats + 1
-            elif c == 'x' :
-                do_hex = True
-                num_formats = num_formats + 1
-            elif c == 'd' :
+                num_formats += 1
+            elif c == 'd':
                 do_dec = True
-                num_formats = num_formats + 1
-            elif c == 'h' :
+                num_formats += 1
+            elif c == 'h':
                 Usage()
 
+            elif c == 'x':
+                do_hex = True
+                num_formats += 1
     if num_formats == 0 :
         do_char = True
         do_hex = True

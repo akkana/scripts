@@ -65,11 +65,7 @@ if __name__ == '__main__':
     except ValueError:
       Usage()
 
-    if len(sys.argv) > 2:
-      message = ' '.join(sys.argv[2:])
-    else:
-      message = "Wake up!"
-
+    message = ' '.join(sys.argv[2:]) if len(sys.argv) > 2 else "Wake up!"
     print("Sleeping for", sleeptime, "seconds with message:", message)
 
     # Return control to the shell before sleeping:

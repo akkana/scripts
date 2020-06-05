@@ -109,7 +109,7 @@ def read_finance_data_alphavantage(ticker, start_date, end_date):
             print("Hit the API frequency limit. Try again in 1 minute...",
                   end='')
             sys.stdout.flush()
-            for i in range(60):
+            for _ in range(60):
                 print(".", end='')
                 sys.stdout.flush()
                 time.sleep(1)

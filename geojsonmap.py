@@ -50,9 +50,7 @@ for feature in json_data['features']:
     ax.add_patch(PolygonPatch(poly, fc=color, ec=BLACK, alpha=0.5, zorder=2 ))
 
 # create legend
-legend_patches = []
-for c in colormap:
-    legend_patches.append(mpatches.Patch(color=colormap[c], label=c))
+legend_patches = [mpatches.Patch(color=colormap[c], label=c) for c in colormap]
 plt.legend(handles=legend_patches, title='Ownership')
 
 plt.tight_layout(pad=0, w_pad=0, h_pad=0)

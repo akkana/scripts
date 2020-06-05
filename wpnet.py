@@ -142,11 +142,7 @@ def get_available_accesspoints(iface):
         words = line.strip().split(maxsplit=4)
 
         # Get the ssid if it's not hidden, else use the MAC
-        if len(words) == 4:
-            ssid = '[%s]' % words[0]
-        else:
-            ssid = words[4]
-
+        ssid = '[%s]' % words[0] if len(words) == 4 else words[4]
         aps[ssid] = { 'MAC': words[0],
                       'flags': words[3],
                       'signal': int(words[2]),

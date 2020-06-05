@@ -94,11 +94,7 @@ class MotionDetector:
         if sensitivity:
             self.test_res = test_res
 
-            if threshold:
-                self.threshold = threshold
-            else:
-                self.threshold = 20
-
+            self.threshold = threshold if threshold else 20
             self.sensitivity = sensitivity
 
             # Should we save debug images, so the user can tell where
@@ -425,10 +421,9 @@ class MotionDetector:
                 for x in range(piece[0][0]-1, piece[0][1]):
                     debug_buf[x, piece[1][0]-1] = (0, 0, 255)
                     debug_buf[x, piece[1][1]-1] = (0, 0, 255)
-                    if changed:
-                        if piece[1][0] > 1:
-                            debug_buf[x, piece[1][0]-2] = (255, 255, 255)
-                            debug_buf[x, piece[1][1]] = (255, 255, 255)
+                    if changed and piece[1][0] > 1:
+                        debug_buf[x, piece[1][0]-2] = (255, 255, 255)
+                        debug_buf[x, piece[1][1]] = (255, 255, 255)
                 for y in range(piece[1][0]-1, piece[1][1]):
                     debug_buf[piece[0][0]-1, y] = (0, 0, 255)
                     debug_buf[piece[0][1]-1, y] = (0, 0, 255)

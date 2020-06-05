@@ -26,9 +26,8 @@ def find_rise_set(observer, body, rise, start, end, targetaz, phase, slop):
             observer.date = observer.next_setting(body)
         body.compute(observer)
 
-        if phase > 0:
-            if abs(body.phase - phase) > PHASESLOP:
-                continue
+        if phase > 0 and abs(body.phase - phase) > PHASESLOP:
+            continue
 
         if abs(body.az - targetaz) < slop:
             print("%s: %.1f at %d%% illuminated" % (observer.date,
@@ -132,11 +131,7 @@ if __name__ == '__main__':
                 ele = re.findall(floatexp, obsparts[2])[0].strip()
             else:
                 ele = '0'
-            if len(obsparts) > 3:
-                obsname = ','.join(obsparts[3:]).strip()
-            else:
-                obsname = 'Custom'
-
+            obsname = ','.join(obsparts[3:]).strip() if len(obsparts) > 3 else 'Custom'
             print("lat", lat, "lon", lon, "ele", ele, "obsname", obsname)
 
             observer = ephem.Observer()
@@ -159,11 +154,7 @@ if __name__ == '__main__':
 
     print("Observer:", observer)
 
-    if args.sun:
-        body = ephem.Sun()
-    else:
-        body = ephem.Moon()
-
+    body = ephem.Sun() if args.sun else ephem.Moon()
     rise = not args.set
     if rise:
         print("Finding %srises" % body.name)

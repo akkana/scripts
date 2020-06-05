@@ -20,7 +20,7 @@ def fetch_temps():
             tmax = piece.high
             tcrit = piece.critical
 
-            if not tcurrent or (not tmax and not tcrit):
+            if not (tcurrent and (tmax or tcrit)):
                 continue
             if not tmax:
                 tmax = tcrit
@@ -38,10 +38,7 @@ def overtemp(temps):
     # if random.randint(0, 5) == 0:
     #     return True
 
-    for quad in temps:
-        if quad[1] > quad[2]:
-            return True
-    return False
+    return any(quad[1] > quad[2] for quad in temps)
 
 def hoglist(delay=3):
     """Return a list of processes using a nonzero CPU percentage
