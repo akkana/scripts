@@ -298,7 +298,7 @@ def write_rss20_file(mtglist):
               file=outfp)
 
         for mtg in mtglist:
-            desc = f"""The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
+            desc = f"""<![CDATA[ The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
 """
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
@@ -310,6 +310,8 @@ def write_rss20_file(mtglist):
 
             print("packet", mtg["Agenda Packets"])
             if mtg["Agenda Packets"]:
+                # The agenda packet links tend to have & in them
+                # and so need to be escaped with CDATA
                 if 'http' in mtg["Agenda Packets"]:
                     desc += f"""<p>There is an <a href="{mtg["Agenda Packets"]}">Agenda Packet</a></p>\n"""
                 else:
@@ -317,6 +319,8 @@ def write_rss20_file(mtglist):
 
             if mtg['Meeting Location']:
                 desc += "<p>" + mtg['Meeting Location'] + "</p>"
+
+            desc += "]]>"
 
             print(f"""<item>
    <title>{mtg['Name']} on {mtg["Meeting Date"]}</title>
