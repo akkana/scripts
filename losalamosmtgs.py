@@ -169,24 +169,14 @@ def get_html_agenda_pdftohtml(agendaloc):
     with open(htmlfile, 'rb') as htmlfp:
         html = htmlfp.read()
 
-    # Replace the grey
+    # Replace the grey background that htmltotext wires in
     soup = BeautifulSoup(html, "lxml")
     body = soup.body
     del body["bgcolor"]
     del body["vlink"]
     del body["link"]
 
-    # html = html.replace(b'<body bgcolor="#A0A0A0" vlink="blue" link="blue">',
-    #                     b'<body>')
-
-    # # Get rid of special style on divs that have style like
-    # # "position:relative;width:918px;height:1188px;"
-    # # -- that comes from pdftohtml.
-    # divs = soup.findAll(style=True)
-    # for d in divs:
-    #     if 'width' in d["style"]:
-    #         del d["style"]
-
+    # Remove all the fixed pixel width styles
     for tag in soup.findAll('style'):
         tag.extract()
     for tag in soup.findAll('div'):
@@ -310,13 +300,24 @@ def write_rss20_file(mtglist):
         for mtg in mtglist:
             desc = f"""The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
 """
-            if mtg['changestr']:
-                desc += "<p>" + mtg['changestr'] + '\n';
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
-                desc = f"""{desc}<p><b>There is an agenda</b></p>>"""
+                desc = f"""{desc}<p><b>**** There is an agenda. ****</b></p>\n"""
             else:
-                desc += "<p>No agenda is available.</p>"
+                desc += "<p>No agenda is available.</p>\n"
+            if mtg['changestr']:
+                desc += "<p>" + mtg['changestr'] + '\n'
+
+            print("packet", mtg["Agenda Packets"])
+            if mtg["Agenda Packets"]:
+                if 'http' in mtg["Agenda Packets"]:
+                    desc += f"""<p>There is an <a href="{mtg["Agenda Packets"]}">Agenda Packet</a></p>\n"""
+                else:
+                    desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
+
+            if mtg['Meeting Location']:
+                desc += "<p>" + mtg['Meeting Location'] + "</p>"
+
             print(f"""<item>
    <title>{mtg['Name']} on {mtg["Meeting Date"]}</title>
    <guid isPermaLink="false">{mtg['cleanname']}.{lastmod.strftime("%Y%m%d-%H%M")}</guid>
