@@ -58,9 +58,7 @@ class PiCamera:
         camdet = subprocess.check_output(["vcgencmd","get_camera"])
         # Returns something like: supported=0 detected=0
         # Strip the newline and check only the last character:
-        if int(camdet.strip()[-1]):
-            return True
-        return False
+        return bool(int(camdet.strip()[-1]))
 
     def take_still(self, outfile='/tmp/still.jpg',
                    res=[640, 480], format=None):
@@ -123,10 +121,7 @@ class PiCamera:
         '''
         if self.verbose:
             print("Res:", res)
-            if res:
-                res_str = "%dx%d" % tuple(res)
-            else:
-                res_str = "(unknown res)"
+            res_str = "%dx%d" % tuple(res) if res else "(unknown res)"
             print("Taking %s photo with picamera module" % res_str)
 
         with picamera.PiCamera(resolution=res) as camera:

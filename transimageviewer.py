@@ -37,7 +37,7 @@ class TransImageViewerWindow(ImageViewerWindow):
         if event.string == " ":
             imagewin.next_image()
             return
-        if event.string == "q":
+        elif event.string == "q":
             gtk.main_quit()
             return
 

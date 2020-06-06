@@ -151,18 +151,16 @@ class SoundPlayer :
             self.curpath = None
         return poll
 
-    def is_done(self) :
+    def is_done(self):
         '''Simpler version of retcode: returns True if the process is
            finished, False otherwise.
         '''
         if not self.current :
             return True
-        if self.poll() != None :
-            return True
-        return False
+        return self.poll() != None
 
-    def wait(self) :
-        if self.current and self.current.poll() == None :
+    def wait(self):
+        if self.current and self.current.poll() is None:
             self.current.wait()
 
 class KeyReader :

@@ -218,7 +218,7 @@ class Cachefile(object):
             starttime = self.day_start(day)
             endtime = self.day_end(day)
 
-        elif not starttime and not endtime:
+        elif not (starttime or endtime):
             # Set back to the beginning of the day:
             starttime = self.day_start(now)
             # and end now.
@@ -235,9 +235,11 @@ class Cachefile(object):
             # Else end at the end of the day we started:
             else:
                 endtime = self.day_end(starttime)
-        elif starttime.year != endtime.year \
-             or starttime.month != endtime.month \
-             or starttime.day != endtime.day:
+        elif not (
+            starttime.year == endtime.year
+            and starttime.month == endtime.month
+            and starttime.day == endtime.day
+        ):
             raise ValueError("time_bounds: %s and %s must start and end on the same day" % (endtime, starttime))
 
         if starttime > endtime:
@@ -260,10 +262,7 @@ class Cachefile(object):
         data = []
 
         if not endtime:
-            if starttime:
-                endtime = self.day_start(starttime)
-            else:
-                endtime = datetime.datetime.now()
+            endtime = self.day_start(starttime) if starttime else datetime.datetime.now()
         if not starttime:
             starttime = self.day_start(endtime)
 

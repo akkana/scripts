@@ -29,10 +29,7 @@ class PresoView(QWebEngineView):
 
         super().__init__()
 
-        if not curviews:
-            self._windows = []
-        else:
-            self._windows = curviews
+        self._windows = [] if not curviews else curviews
         self._windows.append(self)
 
         # Are we making screenshots? TODO: make this a command-line param.
@@ -47,10 +44,7 @@ class PresoView(QWebEngineView):
         # Size of the window we'll actually display.
         # XXX Currently assumes a projector at 1024x768
         # and should be made more general.
-        if show_notes:
-            self.fullwidth = 1366
-        else:
-            self.fullwidth = 1024
+        self.fullwidth = 1366 if show_notes else 1024
         self.fullheight = 768
 
         if zoom != 1.0 :
@@ -109,8 +103,7 @@ class PresoView(QWebEngineView):
         # WebDialog:               A JavaScript-created window
         # WebBrowserBackgroundTab: A new tab that isn't immediately active
 
-        if wintype == QWebEnginePage.WebBrowserWindow or \
-           wintype == QWebEnginePage.WebDialog:
+        if wintype in [QWebEnginePage.WebBrowserWindow, QWebEnginePage.WebDialog]:
             v = PresoView('about:blank', curviews=self._windows)
             # v.resize(640, 480)
             v.show()

@@ -93,8 +93,7 @@ def parse_sources_sinks(whichtype):
         if words[0] == b'index:':    # start a new sink
             if curdict:
                 devs.append(curdict)
-            curdict = { 'fallback': fallback }
-            curdict['index'] = words[1].decode()
+            curdict = {'fallback': fallback, 'index': words[1].decode()}
             by_index[whichtype][curdict['index']] = curdict
 
         elif words[0] == b'name:':

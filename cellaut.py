@@ -74,10 +74,7 @@ class Cellgrid:
         out = ''
         for row in self.grid:
             for cell in row:
-                if self.characters:
-                    out += self.characters[cell]
-                else:
-                    out += '%3d' % cell
+                out += self.characters[cell] if self.characters else '%3d' % cell
             out += '\n'
         return out
 
@@ -126,23 +123,23 @@ class CAWindow:
         if self.running:
             return True
 
-    def key_press_event(self, widget, event) :
-        if event.string == "q" :
-            self.cellgrid.quit()
-            return True
-
-        if event.string == " " :
+    def key_press_event(self, widget, event):
+        if event.string == " ":
             self.cellgrid.update(self.rule)
             self.draw()
             self.running = False
             return True
 
-        if event.string == "c" :
+        elif event.string == "c":
             if self.running:
                 return True
             self.running = True
             gobject.timeout_add(self.timeout, self.idle_handler,
                                 self.drawing_area)
+            return True
+
+        elif event.string == "q":
+            self.cellgrid.quit()
             return True
 
         return False

@@ -82,9 +82,8 @@ def print_conditions(conditions):
 
 def conditions_at_station(stationid):
     r = requests.get('http://api.wunderground.com/api/%s/conditions/q/pws:%s.json' % (wunderkey, stationid))
-    conditions = json.loads(r.text)
     # pprint(conditions)
-    return conditions
+    return json.loads(r.text)
 
 if __name__ == '__main__':
     init_key()

@@ -47,7 +47,7 @@ def count_syllables(word):
                 if verbose: print("new syllable")
                 minsyl += 1
                 maxsyl += 1
-            elif on_vowel and not in_diphthong and c != lastchar:
+            elif not in_diphthong and c != lastchar:
                 # We were already in a vowel.
                 # Don't increment anything except the max count,
                 # and only do that once per diphthong.

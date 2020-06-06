@@ -65,10 +65,7 @@ class OppRetro(object):
         self.planettrack = None
 
     def set_time(self, d):
-        if type(d) is ephem.Date:
-            self.observer.date = d
-        else:
-            self.observer.date = ephem.date(d)
+        self.observer.date = d if type(d) is ephem.Date else ephem.date(d)
 
     def find_opp_and_retro(self, start_date):
         self.observer.date = start_date
@@ -195,7 +192,7 @@ class OppRetro(object):
             print("Difference between opposition and midpoint of retrograde:")
             if (degdiff > 2):
                 print(degdiff, "degrees")
-            elif (degdiff * 60. > 2):
+            elif degdiff > 2 / 60.0:
                 print(degdiff * 60., "arcmin")
             elif (degdiff > 5):
                 print(degdiff * 3600., "arcsec")

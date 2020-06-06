@@ -148,9 +148,9 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
        like foo/bar/baz.jpg.
     """
     path = os.path.normpath(path)
-    lenpath = len(path)
     if recursive:
         file_list = []
+        lenpath = len(path)
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
             for f in files:
@@ -244,7 +244,7 @@ def copyfile(src, dst, move=False):
        doesn't create directories first.
        If move=True, use move rather than copy (remove the src).
     """
-    if not is_android(src) and not is_android(dst):
+    if not (is_android(src) or is_android(dst)):
         if move:
             shutil.move(src, dst)
         else:
@@ -299,10 +299,9 @@ def find_basename_size_match(pair, pairlist):
     match = None
     num_matches = 0
     for i, p in enumerate(pairlist):
-        if os.path.basename(p[0]) == base:
-            if p[1] == pair[1]:
-                match = i
-                num_matches += 1
+        if os.path.basename(p[0]) == base and p[1] == pair[1]:
+            match = i
+            num_matches += 1
     if num_matches == 1:
         return match
     elif num_matches > 1:
@@ -464,11 +463,7 @@ def sync(src, dst, dryrun=True):
         # match books whose titles start with the same name as the dir.
         if not thedir.endswith('/'):
             thedir += '/'
-        for pair in whichlist:
-            if pair[0].startswith(thedir):
-                return True
-
-        return False
+        return any(pair[0].startswith(thedir) for pair in whichlist)
 
     def remember_needed_dirs(f):
         """Check full pathname f (from src_ls) to see if its dirname

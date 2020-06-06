@@ -11,7 +11,7 @@ def remove_empty_tags(soup):
         innerhtml = t.text
         # print "tag", t
         # print "innerHTML", innerhtml
-        if not innerhtml or not innerhtml.strip():
+        if not (innerhtml and innerhtml.strip()):
             t.extract()
 
 def prettyprint(soup):

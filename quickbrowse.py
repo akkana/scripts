@@ -76,11 +76,7 @@ class ReadlineEdit(QLineEdit):
 if handle_pdf:
     class PDFBrowserView(qpdf.PDFScrolledWidget):
         def __init__(self, browserwin, url, parent=None):
-            if url.startswith('file://'):
-                self.theurl = url[7:]
-            else:
-                self.theurl = url
-
+            self.theurl = url[7:] if url.startswith('file://') else url
             super().__init__(self.theurl, parent=parent)
 
         def url(self):
@@ -538,11 +534,7 @@ class BrowserWindow(QMainWindow):
         return super().eventFilter(object, event)
 
     def new_tab(self, url=None):
-        if url:
-            init_name = url[:self.init_tab_name_len]
-        else:
-            init_name = "New tab"
-
+        init_name = url[:self.init_tab_name_len] if url else "New tab"
         if is_pdf(url):
             webview = PDFBrowserView(self, url)
             self.browserviews.append(webview)
@@ -776,7 +768,6 @@ def run_browser():
                         return int(proc)
             except Exception as e:
                 print("Exception", e)
-                pass
         return None
 
     args = parse_args()

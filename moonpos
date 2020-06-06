@@ -32,7 +32,7 @@ def discont_range(start, end, max):
     end = end%max
     if start <= end:
         return list(range(start, end))
-    return list(range(start, max)) + list(range(0, end))
+    return list(range(start, max)) + list(range(end))
 
 def time_zone_offset(ephemdate):
     """Get the timezone offset at a given ephem.date
@@ -250,10 +250,13 @@ def when_rise_set_at_position(body, observer, targetaz, rise_set,
 
         body.compute(observer)
         az = body.az * DEGREES
-        if az >= targetaz - slop and az <= targetaz + slop:
-            if (body.phase > minphase and body.phase < maxphase):
-                results.append([observer.date, observer.horizon*DEGREES, az,
-                                body.phase])
+        if (
+            az >= targetaz - slop
+            and az <= targetaz + slop
+            and (body.phase > minphase and body.phase < maxphase)
+        ):
+            results.append([observer.date, observer.horizon*DEGREES, az,
+                            body.phase])
 
         # Push the date forward a little bit to make sure we get the
         # next rise/set, not this one again.
@@ -335,7 +338,7 @@ if __name__ == '__main__':
         #
         # Predict rise/set times:
         #
-        if args[0] == "rise" or args[0] == "set":
+        if args[0] in ["rise", "set"]:
             try:
                 az = float(args[1])
             except ValueError:
@@ -397,21 +400,14 @@ if __name__ == '__main__':
                                    alt, az, start_hour, end_hour,
                                    startdate, days,
                                    5, minphase, maxphase)
-        if days:
-            timerange = "%d days" % days
-        else:
-            timerange = "year"
+        timerange = "%d days" % days if days else "year"
         print("""The %s will be near %.1f, %.1f 
 between %dh and %dh during the next %s at these times:
 """ % (phasestr, alt, az, start_hour, end_hour, timerange))
 
         print("%26s  %5s  %5s  %s" % ("Date/time range", "Alt", "Az", "Phase"))
         for r in results:
-            if len(r) > 4 and r[4]:
-                phase = "%2d%% illuminated" % r[4]
-            else:
-                phase = 'x'
-
+            phase = "%2d%% illuminated" % r[4] if len(r) > 4 and r[4] else 'x'
             # pargs = tuple(r[0:3] + [phase])
             print("%26s  %5.1f  %5.1f  %s" % (timerange_str(r[0], r[1]),
                                                r[2], r[3], phase))

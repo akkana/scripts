@@ -56,8 +56,6 @@ class EpubBook:
                 break
         if not content:
             raise RuntimeError('No .opf file in %s' % self.filename)
-            return
-
         # Now content is a file handle on the content.opf XML file
         try:
             self.dom = xml.dom.minidom.parse(content)
@@ -180,10 +178,7 @@ class EpubBook:
         if brief:
             outstr += ', '.join(authors) + ' | '
         else:
-            if len(authors) > 1:
-                outstr += "Authors: "
-            else:
-                outstr += "Author: "
+            outstr += "Authors: " if len(authors) > 1 else "Author: "
             outstr += ', '.join(authors) + "\n"
 
         tags = self.get_tags()
@@ -215,17 +210,13 @@ class EpubBook:
             print("Warning: didn't see any subject tags previously")
             parent = self.dom.getElementsByTagName("metadata")[0]
 
-            # If there's no metadata tag, maybe we should add one,
-            # but it might be better to throw an error.
-            if not parent:
-                raise RuntimeError("No metadata tag! Bailing.")
+        # If there's no metadata tag, maybe we should add one,
+        # but it might be better to throw an error.
+        if not parent:
+            raise RuntimeError("No metadata tag! Bailing.")
 
         # Add the new subject tags after the last one.
-        if elements:
-            last_tag_el = elements[-1]
-        else:
-            last_tag_el = None
-
+        last_tag_el = elements[-1] if elements else None
         for new_tag in new_tag_list:
             # Don't add duplicate tags (case-insensitive).
             new_tag_lower = new_tag.lower()

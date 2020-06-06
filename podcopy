@@ -33,19 +33,18 @@ def copy_pods(indir, outdir, playlist=None):
         print("No m3u files in %s" % indir)
         return
 
+    existing_sizes = []
     # Get a list of the files already in the output dir.
     # We'll compare names and sizes to try to avoid duplicate copies.
     if is_android:
         ls_out = androidfiles.listdir(outdir, sizes=True)
         existing_files = []
-        existing_sizes = []
         for e in ls_out:
             existing_files.append(e[0])
             existing_sizes.append(e[1])
     else:
         existing_files = os.listdir(outdir)
 
-        existing_sizes = []
         for f in existing_files:
             statbuf = os.stat(os.path.join(outdir, f))
             existing_sizes.append(statbuf.st_size)
@@ -120,10 +119,6 @@ def copy_pods(indir, outdir, playlist=None):
                 shutil.copyfile(f, os.path.join(outdir, base + ext))
 
 if __name__ == '__main__':
-    if len(sys.argv) > 3:
-        playlist = sys.argv[3]
-    else:
-        playlist = None
-
+    playlist = sys.argv[3] if len(sys.argv) > 3 else None
     copy_pods(sys.argv[1], sys.argv[2], playlist)
 

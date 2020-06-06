@@ -318,7 +318,7 @@ class FontApp(gtk.Window):
         treeView.append_column(column)
 
     def is_font_in_category(self, fontname, catname):
-        for i in range(0, len(self.category_buttons)):
+        for i in range(len(self.category_buttons)):
             if self.category_buttons[i].get_name() == catname:
                 return ( fontname in self.category_fontlists[i] )
         return False
@@ -328,7 +328,7 @@ class FontApp(gtk.Window):
     # else add it.
     #
     def toggle_font_in_category(self, fontname, catname):
-        for i in range(0, len(self.category_buttons)):
+        for i in range(len(self.category_buttons)):
             if self.category_buttons[i].get_name() == catname:
                 if fontname in self.category_fontlists[i]:
                     self.category_fontlists[i].remove(fontname)
@@ -562,7 +562,7 @@ class FontApp(gtk.Window):
         if not self.fancy_list:
             print("set fancy_list=False", file=catfp)
 
-        for i in range(0, len(self.category_buttons)):
+        for i in range(len(self.category_buttons)):
             catname = self.category_buttons[i].get_name()
             print(catname + ":", ', '.join(self.category_fontlists[i]),
                   file=catfp)
@@ -573,10 +573,7 @@ class FontApp(gtk.Window):
         btn.set_sensitive(entry.get_text_length() > 0)
 
     def category_exists(self, catname):
-        for btn in self.category_buttons:
-            if btn.get_name() == catname:
-                return True
-        return False
+        return any(btn.get_name() == catname for btn in self.category_buttons)
 
     def add_category(self, newcat, entry=None):
         if entry:
@@ -616,7 +613,7 @@ class FontApp(gtk.Window):
             btn.get_style_context().remove_class("highlightbtn")
 
     def update_category_buttons(self, fontname):
-        for i in range(0, len(self.category_buttons)):
+        for i in range(len(self.category_buttons)):
             if fontname in self.category_fontlists[i]:
                 self.change_button_color(self.category_buttons[i], True)
                 # Can't call set_active because that invokes the

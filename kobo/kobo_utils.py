@@ -152,9 +152,9 @@ class KoboDB:
             else:
                 allshelves[item["ShelfName"]].append(item["ContentId"])
 
-        for shelf in allshelves:
+        for shelf, value in allshelves.items():
             print("\n===", shelf, "===")
-            for id in allshelves[shelf]:
+            for id in value:
                 book = self.get_book_by_id(id)
                 if not book:
                     print("Eek, book", id, "doesn't exist")

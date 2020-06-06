@@ -72,8 +72,8 @@ def create_window(vol, verticalP) :
 
 # main
 vertical = 0
-if len(sys.argv) > 1 :
-    if sys.argv[1] == "-v" or sys.argv[1] == "-V" :
+if len(sys.argv) > 1:
+    if sys.argv[1] in ["-v", "-V"]:
         vertical = 1
     elif sys.argv[1] != "-h" :
         Usage()

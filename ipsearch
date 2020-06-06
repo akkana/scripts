@@ -40,9 +40,7 @@ def ping(host):
     rv = subprocess.call(["ping", "-q", "-c", "1", "-W", "1", host],
                          stdout = subprocess.PIPE,
                          stderr = subprocess.PIPE)
-    if rv == 0:
-        return True
-    return False
+    return rv == 0
 
 def fping(network):
     """Ping all hosts on the given network.
@@ -158,9 +156,8 @@ def scan(iface, port=None):
             print(hostip, end='\r')
             sys.stdout.flush()
 
-        if port:
-            if not check_port(hostip, port):
-                continue
+        if port and not check_port(hostip, port):
+            continue
 
         if ping_separately:
             pingout = ping(hostip)
@@ -171,11 +168,7 @@ def scan(iface, port=None):
         if not mac:
             continue
 
-        if match_mac:
-            oui = match_mac(mac)
-        else:
-            oui = ''
-
+        oui = match_mac(mac) if match_mac else ''
         try:
             hostname, blah1, blah2 = socket.gethostbyaddr(hostip)
         except:

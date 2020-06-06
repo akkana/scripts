@@ -78,18 +78,6 @@ class BookCoverFixer:
         print("WARNING: Adding new covers doesn't work yet")
         return None
 
-        self.newcoverfile = "/tmp/cover.jpg"
-        width, height = (480, 640)
-        subprocess.call(["convert",
-                         "-size", "%dx%d" % (width, height),
-                         "-background", "white",
-                         "-fill", "black", "-gravity", "center",
-                         "-font", "Times-New-Roman-Bold",
-                         "caption:%s" % ', '.join(self.book.get_titles()),
-                         "-flatten", self.newcoverfile])
-
-        return self.newcoverfile
-
     def save_changes(self):
         print("Saving changes, supposedly")
         print("Replacing %s with %s" % (self.coverzipname, self.newcoverfile))
@@ -191,11 +179,11 @@ class BookCoverFixerWindow(imageviewer.ImageViewerWindow):
         if event.string == "n":
             self.next_book();
             return
-        if event.string == "y":
-            self.do_fix()
-            return
-        if event.string == "q":
+        elif event.string == "q":
             self.quit()
+            return
+        elif event.string == "y":
+            self.do_fix()
             return
 
 if __name__ == "__main__":

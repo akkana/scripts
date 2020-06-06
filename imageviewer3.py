@@ -38,23 +38,22 @@ class ImageViewer(Gtk.DrawingArea):
         #     self.xgc_fg = widget.window.new_gc()
         #     self.xgc_fg.set_rgb_fg_color(Gdk.color_parse("yellow"))
 
-        if True:
-            rect = self.get_allocation()
-            w = rect.width
-            h = rect.height
-            if w != self.width or h != self.height:
-                # get_allocation() gives a number that's too large,
-                # and if we later try to draw_rectangle() with these
-                # dimensions, we'll only get half the rectangle horizontally.
-                # I have no idea why this is happening, but subtracting a
-                # few pixels from allocation width is a temporary workaround.
-                self.width = w    # -5
-                self.height = h
+        rect = self.get_allocation()
+        w = rect.width
+        h = rect.height
+        if w != self.width or h != self.height:
+            # get_allocation() gives a number that's too large,
+            # and if we later try to draw_rectangle() with these
+            # dimensions, we'll only get half the rectangle horizontally.
+            # I have no idea why this is happening, but subtracting a
+            # few pixels from allocation width is a temporary workaround.
+            self.width = w    # -5
+            self.height = h
 
-            # Have we had load_image called, but we weren't ready for it?
-            # Now, theoretically, we are ... so call it again.
-            if w and h and self.cur_img and not self.pixbuf:
-                self.prepare_image()
+        # Have we had load_image called, but we weren't ready for it?
+        # Now, theoretically, we are ... so call it again.
+        if w and h and self.cur_img and not self.pixbuf:
+            self.prepare_image()
 
         self.cr = cr
         self.show_image()
@@ -185,12 +184,6 @@ class ImageViewer(Gtk.DrawingArea):
     def clear(self):
         return
 
-        if not self.xgc_bg:
-            return
-
-        self.window.draw_rectangle(self.xgc_bg, True,
-                                   0, 0, self.width, self.height)
-
     def draw_text(self, label):
         ###### NOT YET UPDATED FOR CAIRO AND GTK3 ############
         if not self.xgc_fg:
@@ -279,7 +272,7 @@ def key_press_event(widget, event, imagewin):
     if event.string == " ":
         imagewin.next_image()
         return
-    if event.string == "q":
+    elif event.string == "q":
         Gtk.main_quit()
         return
 

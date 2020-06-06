@@ -113,20 +113,12 @@ class MonMon:
 
     def active_monitors(self):
         """List monitors xrandr is actually using"""
-        active = []
-        for mname in self.monitors:
-            if mname in self.mon_geom:
-                active.append(mname)
-        return active
+        return [mname for mname in self.monitors if mname in self.mon_geom]
 
 
     def inactive_monitors(self):
         """List monitors that are connected but not being used"""
-        inactive = []
-        for mname in self.monitors:
-            if mname not in self.mon_geom:
-                inactive.append(mname)
-        return inactive
+        return [mname for mname in self.monitors if mname not in self.mon_geom]
 
 
     def connected_monitors(self):
@@ -141,10 +133,7 @@ class MonMon:
 
         try:
             geom = self.mon_geom[mon['name']]
-            if self.laptop_screen == mon['name']:
-                islaptop = "    **laptop"
-            else:
-                islaptop = ""
+            islaptop = "    **laptop" if self.laptop_screen == mon['name'] else ""
             print("%s: %4dx%4d   Position: (%4d, %4d)   mm: %d x %d%s"
                   % (mon['name'],
                      geom['width'], geom['height'], geom['x'], geom['y'],

@@ -21,10 +21,9 @@ format="%25s   %10s %3s %s"
 RETRIES = 1
 
 def get_domain(domainname):
-    for i in range(RETRIES):
+    for _ in range(RETRIES):
         try:
-            domain = whois.whois(name)
-            return domain
+            return whois.whois(name)
         except socket.timeout:
             print("%s timed out; retrying" % domainname)
         except whois.parser.PywhoisError:
@@ -63,8 +62,5 @@ if __name__ == '__main__':
     two_months_from_now = two_months_from_now.date()
     print(format % ("Domain", "Expires", "", "Registrar"))
     for d in domainlist:
-        if d[1] < two_months_from_now:
-            alert = "***"
-        else:
-            alert = ""
+        alert = "***" if d[1] < two_months_from_now else ""
         print(format % (d[0], d[1].strftime('%Y-%m-%d'), alert, d[2]))

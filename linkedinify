@@ -17,7 +17,7 @@ link = primary.wait_for_text()
 link = link.replace("\n", "").replace("&amp;", "&") + \
        "&count=1000&paginationToken="
 
-if len(sys.argv) > 1 and (sys.argv[1] == '-s' or sys.argv[1] == '--same-tab'):
+if len(sys.argv) > 1 and sys.argv[1] in ['-s', '--same-tab']:
     subprocess.call(["firefox", link])
 else:
     subprocess.call(["firefox", "-new-tab", link])

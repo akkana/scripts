@@ -15,9 +15,9 @@ http://www.redmountainsw.com/wordpress/archives/python-subclassing-file-types
         self.fd2 = _fd2
 
     def __del__(self):
-        if self.fd1 != sys.stdout and self.fd1 != sys.stderr:
+        if self.fd1 not in [sys.stdout, sys.stderr]:
             self.fd1.close()
-        if self.fd2 != sys.stdout and self.fd2 != sys.stderr:
+        if self.fd2 not in [sys.stdout, sys.stderr]:
             self.fd2.close()
 
     def write(self, text):

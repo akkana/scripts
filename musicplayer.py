@@ -36,7 +36,6 @@ try:
     from mutagen.mp3 import MP3
 except:
     print("No mutagen, won't be able to check song length or adjust speeds")
-    pass
 
 class MusicWin(Gtk.Window):
     LEFT_KEY = Gdk.KEY_Left
@@ -329,8 +328,7 @@ button:hover { background: #dff; border-color: #8bb; }
         # else must be MusicWin.STOPPED. Nothing to do.
 
     def stop(self, w=None):
-        if self.play_state == MusicWin.PLAYING \
-           or self.play_state == MusicWin.PAUSED:
+        if self.play_state in [MusicWin.PLAYING, MusicWin.PAUSED]:
             mixer.music.stop()
             self.stop_btn.set_label(u"\u25B6") # black right-pointing triangle
             self.stop_btn.set_tooltip_text("Play")
@@ -602,13 +600,13 @@ if __name__ == '__main__':
         rand = None
         backward = False
         if args:
-            if args[0] == '-r' or args[0] == '--random':
+            if args[0] in ['-r', '--random']:
                 rand = True
                 args = args[1:]
-            elif args[0] == '-s' or args[0] == '--sequential':
+            elif args[0] in ['-s', '--sequential']:
                 rand = False
                 args = args[1:]
-            elif args[0] == '-b' or args[0] == '--backward':
+            elif args[0] in ['-b', '--backward']:
                 backward = True
                 rand = False
                 args = args[1:]

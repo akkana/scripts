@@ -73,7 +73,7 @@ class HC_SR04:
 
     def average_distance_in(self, samples=3, verbose=False):
         tot = 0.0
-        for i in xrange(samples):
+        for _ in xrange(samples):
             tot += self.measure_distance_in(verbose)
             time.sleep(0.1)
         return tot / samples

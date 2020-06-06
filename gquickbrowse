@@ -421,7 +421,7 @@ class WebToolbar(gtk.Toolbar):
 
     def zoom_hundred_cb(self, menu_item, web_view):
         """Zoom 100%"""
-        if not (web_view.get_zoom_level() == 1.0):
+        if web_view.get_zoom_level() != 1.0:
             web_view.set_zoom_level(1.0)
 
     def print_cb(self, menu_item, web_view):

@@ -39,11 +39,7 @@ def decode_piece(piece):
     # anything about whether part[0] is str or bytes.
     # So you have to check the type.
     for part in decode_header(piece):
-        if type(part[0]) is bytes:
-            ret += part[0].decode(errors='replace')
-        else:
-            ret += part[0]
-
+        ret += part[0].decode(errors='replace') if type(part[0]) is bytes else part[0]
         # Special case: the header itself comes out with charset None
         # and decode doesn't add a space between it and the next part,
         # even though there was a space in the original. So add one
@@ -159,7 +155,7 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
 all = False
 
 if len(sys.argv) > 2:
-    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+    if sys.argv[1] in ['-h', '--help']:
         print(Usage)
         sys.exit(1)
 

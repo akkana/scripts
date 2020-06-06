@@ -24197,7 +24197,7 @@ def find_mac_in(instr):
         if match:
             fullmac = '%-16s %-17s' % (match.group(), fullmac)
 
-    elif len(instr) == 8 or len(instr) == 17: # nn-nn-nn, nn:nn:nn:nn:nn:nn
+    elif len(instr) in [8, 17]: # nn-nn-nn, nn:nn:nn:nn:nn:nn
         fullmac = instr
         mac = "%2s%2s%2s" % (instr[0:2], instr[3:5], instr[6:8])
 

@@ -86,13 +86,15 @@ class Gphoto :
         if outfile and outfile != '-':
             if outfile[0] == '/':
                 outdir = os.path.split(outfile)[0]
-                if os.stat(outdir).st_dev != os.stat(os.getcwd()).st_dev:
-                    if self.verbose:
-                        print(outfile, "is not on the same filesystem as", \
-                            os.getcwd())
-                        print("Changing directory to", outdir)
-                        os.chdir(outdir)
-                        # XXX should we change back afterward?
+                if (
+                    os.stat(outdir).st_dev != os.stat(os.getcwd()).st_dev
+                    and self.verbose
+                ):
+                    print(outfile, "is not on the same filesystem as", \
+                        os.getcwd())
+                    print("Changing directory to", outdir)
+                    os.chdir(outdir)
+                    # XXX should we change back afterward?
 
             # gphoto2 will also prompt if the target file already exists,
             # so we have to rename or remove it.

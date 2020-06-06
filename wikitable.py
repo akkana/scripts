@@ -28,7 +28,7 @@ def parse_table(inurl, outfile):
             if i == 0:
                 if cells != last_headers:
                     last_headers = cells
-                    writer.writerow(cells)
+                    writer.writerow(last_headers)
                 continue
 
             # print '\t'.join(cells)

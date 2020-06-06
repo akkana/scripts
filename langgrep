@@ -146,10 +146,7 @@ def find_files_in_dir(lang, direc):
 
 
 def langgrep(lang, pattern, grepargs, fil, flags):
-    arglist = ['grep', '-H']
-    arglist.extend(grepargs)
-    arglist.append(pattern)
-    arglist.append(fil)
+    arglist = ['grep', '-H', *grepargs, pattern, fil]
     proc = subprocess.Popen(arglist,
                             shell=False, stdout=subprocess.PIPE)
     pout = proc.communicate()[0]
