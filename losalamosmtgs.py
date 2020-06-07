@@ -15,7 +15,6 @@ import tempfile
 import json
 import os
 import pytz
-# from pprint import pprint
 
 
 # Where to start: the public legistar meeting list
@@ -85,8 +84,6 @@ def parse_meeting_list(only_past=False):
         if "Meeting Date" in dic and "Meeting Time" in dic:
             mtg_datetime = meeting_datetime(dic)
             if only_past and mtg_datetime < utcnow:
-                # print(dic["Name"], "meeting on", mtg_datetime,
-                #       "already happened")
                 continue
 
         upcoming.append(dic)
@@ -205,6 +202,7 @@ def write_rss20_file(mtglist):
         lastmod = None
         changestr = ""
         mtg['cleanname'] = mtgdic_to_cleanname(mtg)
+        print(mtg["cleanname"])
 
         if mtg["Agenda"]:
             print(mtg["cleanname"], "has an agenda: fetching it")
@@ -231,7 +229,9 @@ def write_rss20_file(mtglist):
             # Mark it as changed
             lastmod = now
             changestr += "<p>The agenda has changed.</p>"
-            print(mtg['cleanname'], "Agenda changed")
+            print(mtg['cleanname'], "Agenda changed", "lastmod is", lastmod)
+        else:
+            print("The agenda hasn't changed")
 
         jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
         if os.path.exists(jsonfile):
@@ -249,8 +249,10 @@ def write_rss20_file(mtglist):
                     lastmod = now
                     changestr += "<p>Changed: " + ', '.join(changed_keys) \
                         + "</p>"
+                    print("Keys changed:", changed_keys, "lastmod is", lastmod)
 
                 elif not lastmod:
+                    print("Nothing has changed, keeping lastmod")
                     lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
                                                          RSS_DATE_FORMAT)
             except RuntimeError:
@@ -259,24 +261,29 @@ def write_rss20_file(mtglist):
                 lastmod = now
 
         else:
+            print("It's a new meeting, no previous jsonfile")
             lastmod = now
 
-        # The meeting has already been saved to JSON,
-        # so it's safe to add other keys to it now.
-        # Save the change string to put it in the RSS later.
-        mtg['changestr'] = changestr
+        mtg['lastmod'] = lastmod.strftime(RSS_DATE_FORMAT)
+        mtg['GUID'] = mtg['cleanname'] + '.' + lastmod.strftime("%Y%m%d-%H%M")
 
         # Either way, this meeting is still listed:
         # note it so it won't be cleaned from the directory.
         active_meetings.append(mtg['cleanname'])
 
         # If the meeting is new or something has changed,
-        # (re)write the JSON file.
+        # (re)write the JSON file. Don't save the changestr.
+        if "changestr" in mtg:
+            del mtg["changestr"]
         with open(jsonfile, 'w') as jsonfp:
-            mtg['lastmod'] = lastmod.strftime(RSS_DATE_FORMAT)
             jsonfp.write(json.dumps(mtg))
 
-    # Finally, generate the RSS file.
+        # The meeting has been saved to JSON,
+        # so it's safe to add other keys to it now.
+        # Save the change string to put it in the RSS later.
+        mtg['changestr'] = changestr
+
+    # Finally, generate the index RSS file.
     outfilename = os.path.join(RSS_DIR, "index.rss")
     with open(outfilename, 'w') as outfp:
         gendate = now.strftime(RSS_DATE_FORMAT)
@@ -287,7 +294,7 @@ def write_rss20_file(mtglist):
 <channel>
    <title>Los Alamos County Government Meetings</title>
    <link>{RSS_URL}losalamosmeetings</link>
-   <description>An Unofficial, Non-Sanctioned Listing of Los Alamos Government Meetings, provided by Akkana Peck</description>
+   <description>An Unofficial, Non-Sanctioned Listing of Los Alamos Government Meetings, provided by Akkana Peck.</description>
    <language>en</language>
    <copyright>Public Domain</copyright>
    <ttl>14</ttl>
@@ -308,7 +315,7 @@ def write_rss20_file(mtglist):
             if mtg['changestr']:
                 desc += "<p>" + mtg['changestr'] + '\n'
 
-            print("packet", mtg["Agenda Packets"])
+                # print("packet", mtg["Agenda Packets"])
             if mtg["Agenda Packets"]:
                 # The agenda packet links tend to have & in them
                 # and so need to be escaped with CDATA
@@ -322,9 +329,10 @@ def write_rss20_file(mtglist):
 
             desc += "]]>"
 
+            print("GUID will be", mtg['GUID'], "lastmod is", mtg['lastmod'])
             print(f"""<item>
    <title>{mtg['Name']} on {mtg["Meeting Date"]}</title>
-   <guid isPermaLink="false">{mtg['cleanname']}.{lastmod.strftime("%Y%m%d-%H%M")}</guid>
+   <guid isPermaLink="false">{mtg['GUID']}</guid>
    <link>{link}</link>
    <description>{desc}
    </description>
