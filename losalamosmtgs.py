@@ -29,10 +29,16 @@ RSS_DIR = os.path.expanduser("~/web/los-alamos-meetings")
 if not os.path.exists(RSS_DIR):
     os.makedirs(RSS_DIR)
 
-
 mountain_time = pytz.timezone('America/Denver')
-now = datetime.datetime.utcnow()
 
+# Try to make now an aware datetime.
+# You might think that utcnow() would already be timezone aware,
+# given that it's explicitly UTC, but that would be giving
+# way more credit to the datetime designers than is due.
+# You can't do it with .astimezone(pytz.utc) either, because
+# it converts back to localtime and then converts to utc.
+now = datetime.datetime.utcnow()
+now = now.replace(tzinfo=pytz.utc)
 
 # Format for dates in RSS:
 # This has to be GMT, not %Z, because datetime.strptime just
@@ -79,7 +85,16 @@ def parse_meeting_list(only_past=False):
                 else:
                     dic[fieldnames[i]] = None
             else:
-                dic[fieldnames[i]] = field.text.strip()
+                # Some fields, like Location, have simple formatting in them
+                # such as <br>. But they're also full of formatting
+                # we don't want, like font specifiers and colors,
+                # so ' '.join([str(c) for c in field.contents])
+                # is too much. Might be worth writing a
+                # simplified_html_snippet() some day.
+                # But for now, notice that BS .text puts in \r\n for <br>,
+                # so substitute a <br> back:
+                dic[fieldnames[i]] = field.text.strip().replace('\r\n',
+                                                                '<br>')
 
         if "Meeting Date" in dic and "Meeting Time" in dic:
             mtg_datetime = meeting_datetime(dic)
@@ -101,54 +116,6 @@ def meeting_datetime(mtg):
                                          '%m/%d/%Y %I:%M %p')
     localtime = mountain_time.localize(unaware)
     return localtime.astimezone(pytz.utc)
-
-
-def get_html_agenda_pdfminer(agendaloc):
-    """Convert a PDF agenda to text and/or HTML using pdfminer.
-       pdfminer doesn't give very clean output, so this is optional and
-       the imports are only loaded the first time this function is called.
-       Probably better: pdftohtml -c -s -i -noframes abc.pdf abc.html
-       Returns bytes, not str. I think.
-    """
-    try:
-        fh = open(agendaloc, 'rb')
-    except FileNotFoundError:
-        response = requests.get(agendaloc, stream=True)
-        # response.raw supposedly gives a file handle,
-        # but it's not seekable and pdfminer needs to seek.
-        # fh = response.raw
-        fh = io.BytesIO(response.content)
-
-    try:
-        resource_manager = PDFResourceManager()
-    except UnboundLocalError:
-        from pdfminer.layout import LAParams, LTTextBox
-        from pdfminer.pdfpage import PDFPage
-        from pdfminer.pdfinterp import PDFResourceManager
-        from pdfminer.pdfinterp import PDFPageInterpreter
-        from pdfminer.converter import TextConverter, HTMLConverter
-
-        resource_manager = PDFResourceManager()
-
-    # The fake file object needs to be StringIO for TextConverter,
-    # BytesIO for HTMLConverter.
-    # fake_file_handle = io.StringIO()
-    fake_file_handle = io.BytesIO()
-    converter = HTMLConverter(resource_manager, fake_file_handle,
-                              laparams=LAParams())
-    page_interpreter = PDFPageInterpreter(resource_manager, converter)
-
-    for page in PDFPage.get_pages(fh, caching=True, check_extractable=True):
-        page_interpreter.process_page(page)
-
-    text = fake_file_handle.getvalue()
-
-    # close open handles
-    fh.close()
-    converter.close()
-    fake_file_handle.close()
-
-    return text
 
 
 def get_html_agenda_pdftohtml(agendaloc):
@@ -276,7 +243,7 @@ def write_rss20_file(mtglist):
         if "changestr" in mtg:
             del mtg["changestr"]
         with open(jsonfile, 'w') as jsonfp:
-            jsonfp.write(json.dumps(mtg))
+            jsonfp.write(json.dumps(mtg, indent=4))
 
         # The meeting has been saved to JSON,
         # so it's safe to add other keys to it now.
@@ -304,12 +271,26 @@ def write_rss20_file(mtglist):
 """,
               file=outfp)
 
+        # The meeting list is in date/time order, latest first.
+        # Better to list them in the other order, starting with
+        # meetings today, then meetings tomorrow, etc.
+        # Could sort by keys, 'Meeting Date' and 'Meeting Time',
+        # but since it's already sorted, it's easier just to reverse.
+        mtglist.reverse()
+
         for mtg in mtglist:
+            # Is the meeting in the future? Don't list past meetings.
+            meetingtime = meeting_datetime(mtg)
+            if meetingtime < now:
+                print("Skipping", mtg["Name"], mtg["Meeting Date"],
+                      "because", meetingtime, "<", now)
+                continue
+
             desc = f"""<![CDATA[ The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
 """
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
-                desc = f"""{desc}<p><b>**** There is an agenda. ****</b></p>\n"""
+                desc = f"""{desc}<p> <a href="{mtg["Agenda"]}"<b>**** There is an agenda PDF. ****</b></a><br>(Click on the rss item link to see it as HTML).</p>\n"""
             else:
                 desc += "<p>No agenda is available.</p>\n"
             if mtg['changestr']:
@@ -320,7 +301,7 @@ def write_rss20_file(mtglist):
                 # The agenda packet links tend to have & in them
                 # and so need to be escaped with CDATA
                 if 'http' in mtg["Agenda Packets"]:
-                    desc += f"""<p>There is an <a href="{mtg["Agenda Packets"]}">Agenda Packet</a></p>\n"""
+                    desc += f"""<p>There is an <a href="{mtg["Agenda Packets"]}">Agenda Packet PDF</a></p>\n"""
                 else:
                     desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
 
