@@ -118,18 +118,21 @@ def meeting_datetime(mtg):
     return localtime.astimezone(pytz.utc)
 
 
-def get_html_agenda_pdftohtml(agendaloc):
+def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        removing the idiotic dark grey background pdftohtml has hardcoded in.
+       save_pdf_name is for debugging: if set, save the PDF there
+       and don't delete it.
        Returns bytes, not str.
     """
     r = requests.get(agendaloc, timeout=30)
-    pdffile = os.path.join(tempdir, "agenda.pdf")
-    htmlfile = os.path.join(tempdir, "agenda.html")
-    with open(pdffile, "wb") as pdf_fp:
+    if not save_pdf_filename:
+        save_pdf_filename = os.path.join(tempdir, "agenda.pdf")
+    with open(save_pdf_filename, "wb") as pdf_fp:
         pdf_fp.write(r.content)
+    htmlfile = os.path.join(tempdir, "agenda.html")
     subprocess.call(["pdftohtml", "-c", "-s", "-i", "-noframes",
-                     pdffile, htmlfile])
+                     save_pdf_filename, htmlfile])
     with open(htmlfile, 'rb') as htmlfp:
         html = htmlfp.read()
 
@@ -173,7 +176,12 @@ def write_rss20_file(mtglist):
 
         if mtg["Agenda"]:
             print(mtg["cleanname"], "has an agenda: fetching it")
-            agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"])
+            # XXX TEMPORARY: save the PDF filename, because sometimes
+            # pdftohtml produces an HTML file with no content even
+            # though there's content in the PDF.
+            pdfout = os.path.join(RSS_DIR, mtg['cleanname'] + ".pdf")
+            agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"],
+                                                    save_pdf_filename=pdfout)
 
         # RSS doesn't deal well with feeds where some items have
         # a <link> and others don't. So make an empty file to keep
@@ -337,7 +345,7 @@ def write_rss20_file(mtglist):
             return False
         if not is_active(f):
             print("removing", f)
-            os.unlink(f)
+            os.unlink(os.path.join(RSS_DIR, f))
 
 
 def mtgdic_to_cleanname(mtgdic):
