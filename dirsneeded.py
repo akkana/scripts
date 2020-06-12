@@ -7,6 +7,7 @@
 import subprocess
 import bisect
 from pathlib import Path
+from collections import defaultdict
 import sys
 
 def strace_cmd(cmdargs):
@@ -19,6 +20,7 @@ def strace_cmd(cmdargs):
                                stderr=subprocess.PIPE).stderr
 
     dirlist = []
+    filelist = defaultdict(set)
     for line in straceout.split(b'\n'):
         if line.startswith(b"openat("):
             # Take the string between the first and second " marks
@@ -29,20 +31,31 @@ def strace_cmd(cmdargs):
 
             # Find the file's directory and see if it's already in the list.
             path = Path(line[q1+1:q2].decode()).resolve()
-            if not path.is_dir():
-                path = path.parent
+            if path.is_dir():
+                filename = None
+                pathstr = str(path)
+            else:
+                pathstr = str(path.parent)
+                filelist[pathstr].add(path.name)
 
-            pathstr = str(path)
             # if not file_is_in_dirlist(pathstr, dirlist):
             if pathstr not in dirlist:
                 # How to insert into a list keeping the list sorted
                 bisect.insort(dirlist, pathstr)
 
-    return dirlist
+    # Convert the file lists from sets to sorted lists
+    for d in filelist:
+        filelist[d] = list(filelist[d])
+        filelist[d].sort()
+
+    return dirlist, filelist
 
 
 if __name__ == '__main__':
-    dirlist = strace_cmd(sys.argv[1:])
+    dirlist, filelist = strace_cmd(sys.argv[1:])
     for d in dirlist:
         print(d)
+        if d in filelist:
+            print("   ", '\n    '.join(filelist[d]))
+
 
