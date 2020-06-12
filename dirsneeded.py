@@ -16,7 +16,7 @@ def strace_cmd(cmdargs):
     """
 
     cmdargs.insert(0, "strace")
-    straceout = subprocess.run(cmdargs, stdout=subprocess.DEVNULL,
+    straceout = subprocess.run(cmdargs,  # stdout=subprocess.DEVNULL,
                                stderr=subprocess.PIPE).stderr
 
     dirlist = []
