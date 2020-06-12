@@ -134,6 +134,10 @@ diffiles.py:
     Find files that differ between two directories -- even if
     they've been moved to different places in the directory structure.
 
+dirsneeded.py:
+    Run a program inside strace and check what files and directories
+    are needed during the run. Useful for setting up a chroot.
+
 docx2html, doc2html have been replaced by word2html.
 
 eggtimer:
