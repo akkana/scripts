@@ -387,6 +387,8 @@ total['newvalue']] = total.get(key, 0) + 42
 from collections import defaultdict
 total = defaultdict(int)
 total['newvalue'] += 42
+names = defaultdict(list)
+
 
 # Pairwise loops with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
@@ -767,9 +769,13 @@ r = session.get(url)
 ########################################################
 # subprocess
 ########################################################
-# Read lines from a subprocess as they appear:
-outstring = subprocess.check_output(['identify', filename))
+# Read lines from a subprocess as they appear, both stdout and stderr:
+outstring = subprocess.check_output(arglist)
 # To suppress stderr, add stderr=subprocess.DEVNULL
+# stdout can't be redirected with check_output.
+# To capture only stderr:
+output = subprocess.run(arglist, stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE).stderr
 
 # More complicated way:
 import subprocess
@@ -832,6 +838,19 @@ themodule = __import__(modulename)
 val = getattr(themodule, functionname)()
 
 ########################################################
+# unittest
+########################################################
+# Assuming a test/ subdirectory in the module toplevel:
+
+# Run all tests:
+# python3 -m unittest discover
+# This will run from the top level, so imports will be relative to there.
+
+# Run one test:
+# python -m unittest test.test_mymodule
+
+
+########################################################
 # OS-specific stuff
 ########################################################
 
@@ -888,6 +907,10 @@ def sort_by_last_letter(words):
     # list.sort() modifies the list in place
     words.sort(key = lambda a: a[-1])
     print words
+
+# Speaking of sorting, insert into a list sorted with:
+import bisect
+bisect.insort(thelist, newstr)
 
 #
 # Reduce example
