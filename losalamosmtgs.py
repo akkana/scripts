@@ -167,6 +167,9 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     # a basically empty HTML file. Check for that.
     if not body.text:
         print("**Yikes! Empty HTML from pdftohtml", save_pdf_file)
+        with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_pdf.html"),
+                  "w") as savfp:
+            print(html, file=savfp)
         return html
 
     del body["bgcolor"]
@@ -186,6 +189,9 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     if not body.text:
         print("**Yikes! Our changes to", save_pdf_file,
               "made the HTML empty. Saving original instead.")
+        with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_cleaned.html"),
+                  "w") as savfp:
+            print(soup.prettify(encoding='utf-8'), file=savfp)
         return html
 
     return soup.prettify(encoding='utf-8')
