@@ -4,6 +4,10 @@
 # the agenda at upcoming meetings.
 # Make it available via RSS.
 
+# Suggestion: run this script via crontab:
+# Use crontab -e to add a line like:
+# 45  15  *  *  * python3 /path/tp/htdocs/losalamosmtgs.py > /path/to/htdocs/los-alamos-meetings/LOG 2>&1
+
 import requests
 from bs4 import BeautifulSoup
 import datetime
@@ -17,6 +21,8 @@ import os
 import pytz
 
 
+########## CONFIGURATION ##############
+
 # Where to start: the public legistar meeting list
 MEETING_LIST_URL = "http://losalamos.legistar.com/Calendar.aspx"
 
@@ -28,6 +34,9 @@ RSS_URL = "http://localhost/los-alamos-meetings/"
 RSS_DIR = os.path.expanduser("~/web/los-alamos-meetings")
 if not os.path.exists(RSS_DIR):
     os.makedirs(RSS_DIR)
+
+######## END CONFIGURATION ############
+
 
 mountain_time = pytz.timezone('America/Denver')
 
@@ -58,6 +67,12 @@ def parse_meeting_list(only_past=False):
     r = requests.get(MEETING_LIST_URL, timeout=30)
     soup = BeautifulSoup(r.text, 'lxml')
 
+    # Remove a bunch of spurious tags
+    for badtag in [ "font", "span", "div" ]:
+        badtags = soup.find_all(badtag)
+        for tag in badtags:
+            tag.replace_with_children()
+
     caltbl = soup.find("table",
                        id="ctl00_ContentPlaceHolder1_gridCalendar_ctl00")
 
@@ -84,17 +99,23 @@ def parse_meeting_list(only_past=False):
                     dic[fieldnames[i]] = urljoin(MEETING_LIST_URL, href)
                 else:
                     dic[fieldnames[i]] = None
+
+            elif fieldnames[i] == 'Meeting Location':
+                # The Location field has simple formatting
+                # such as <br>, so can't just take .text, alas.
+                dic[fieldnames[i]] = ' '.join([str(c).strip()
+                                               for c in field.contents]) \
+                                        .strip()
+
+            # The little calendar icon somehow comes out with a name of '2'.
+            # Skip it.
+            elif fieldnames[i] == '2' or not fieldnames[i]:
+                continue
+
+            # Most fields are simple and won't have any formatting.
+            # They are full of nbsps '\u00a0', though.
             else:
-                # Some fields, like Location, have simple formatting in them
-                # such as <br>. But they're also full of formatting
-                # we don't want, like font specifiers and colors,
-                # so ' '.join([str(c) for c in field.contents])
-                # is too much. Might be worth writing a
-                # simplified_html_snippet() some day.
-                # But for now, notice that BS .text puts in \r\n for <br>,
-                # so substitute a <br> back:
-                dic[fieldnames[i]] = field.text.strip().replace('\r\n',
-                                                                '<br>')
+                dic[fieldnames[i]] = field.text.replace('\u00a0', ' ').strip()
 
         if "Meeting Date" in dic and "Meeting Time" in dic:
             mtg_datetime = meeting_datetime(dic)
@@ -107,7 +128,7 @@ def parse_meeting_list(only_past=False):
 
 
 def meeting_datetime(mtg):
-    """Parse the meeting date and time and return an aware UTC time.
+    """Parse the meeting date and time and return an aware localtime.
     """
     # The parsed time is in GMT no matter what and is unaware,
     # because strptime can't create a timezone aware object.
@@ -115,7 +136,8 @@ def meeting_datetime(mtg):
                                          + mtg["Meeting Time"],
                                          '%m/%d/%Y %I:%M %p')
     localtime = mountain_time.localize(unaware)
-    return localtime.astimezone(pytz.utc)
+    # return localtime.astimezone(pytz.utc)
+    return localtime
 
 
 def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
@@ -138,7 +160,15 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
 
     # Replace the grey background that htmltotext wires in
     soup = BeautifulSoup(html, "lxml")
+
     body = soup.body
+
+    # Sometimes pdftohtml mysteriously doesn't work, and gives
+    # a basically empty HTML file. Check for that.
+    if not body.text:
+        print("**Yikes! Empty HTML from pdftohtml", save_pdf_file)
+        return html
+
     del body["bgcolor"]
     del body["vlink"]
     del body["link"]
@@ -151,6 +181,12 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     for tag in soup.findAll('p'):
         del tag["style"]
         # Consider also deleting tag["class"]
+
+    # Or maybe the above changes were what removed the body contents?
+    if not body.text:
+        print("**Yikes! Our changes to", save_pdf_file,
+              "made the HTML empty. Saving original instead.")
+        return html
 
     return soup.prettify(encoding='utf-8')
 
@@ -294,11 +330,17 @@ def write_rss20_file(mtglist):
                       "because", meetingtime, "<", now)
                 continue
 
-            desc = f"""<![CDATA[ The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}.
+            desc = f"""<![CDATA[ The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
+
+            if mtg['Meeting Location']:
+                desc += "<br>Location:" + mtg['Meeting Location']
+
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
-                desc = f"""{desc}<p> <a href="{mtg["Agenda"]}"<b>**** There is an agenda PDF. ****</b></a><br>(Click on the rss item link to see it as HTML).</p>\n"""
+                desc = f"""{desc}<p> <a href="{mtg["Agenda"]}"<b>**** There is an agenda PDF. ****</b></a><br>
+(Click on the rss item link to see it as HTML).</p>
+"""
             else:
                 desc += "<p>No agenda is available.</p>\n"
             if mtg['changestr']:
@@ -313,9 +355,7 @@ def write_rss20_file(mtglist):
                 else:
                     desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
 
-            if mtg['Meeting Location']:
-                desc += "<p>" + mtg['Meeting Location'] + "</p>"
-
+            # Close the cdata thingie
             desc += "]]>"
 
             print("GUID will be", mtg['GUID'], "lastmod is", mtg['lastmod'])
