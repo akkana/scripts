@@ -158,19 +158,23 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     with open(htmlfile, 'rb') as htmlfp:
         html = htmlfp.read()
 
-    # Replace the grey background that htmltotext wires in
+    # Make some changes. Primarily,
+    # replace the grey background that htmltotext wires in
     soup = BeautifulSoup(html, "lxml")
 
     body = soup.body
 
     # Sometimes pdftohtml mysteriously doesn't work, and gives
     # a basically empty HTML file. Check for that.
-    if not body.text:
+    bodylen = len(body.text)
+    if not bodylen:
         print("**Yikes! Empty HTML from pdftohtml", save_pdf_file)
         with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_pdf.html"),
                   "w") as savfp:
             print(html, file=savfp)
         return html
+    else:
+        print(bodylen, "characters in body text")
 
     del body["bgcolor"]
     del body["vlink"]
@@ -336,7 +340,7 @@ def write_rss20_file(mtglist):
                       "because", meetingtime, "<", now)
                 continue
 
-            desc = f"""<![CDATA[ The {mtg['Name']} will meet on {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
+            desc = f"""<![CDATA[ The {mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
 
             if mtg['Meeting Location']:
