@@ -59,7 +59,7 @@ class PDFWidget(QLabel):
             self.winwidth = geometry.height() * .75
             self.winheight = geometry.height()
         else:
-            self.geometry = PyQt5.QtCore.QSize(600, 800)
+            self.geometry = QSize(600, 800)
             self.winwidth = 600
             self.winheight = 800
 
