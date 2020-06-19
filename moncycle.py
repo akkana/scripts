@@ -3,6 +3,9 @@
 # Cycle between connected monitors using xrandr.
 # For instance, bind this to XF86Display in your window manager.
 
+# XXX Need to change desktop/screen resolution too.
+# When cycling to a new monitor, also need -s newwxnewh
+
 import sys
 import subprocess
 
@@ -45,11 +48,24 @@ if not connected_mons:
 
 print("Connected monitors:", connected_mons, file=DEBUGFILE)
 
+def mon_connect_str(mondata):
+    """Given a monmon mondata dict, return a list of xrandr
+       connection arguments specifying the preferred geometry
+       if any, otherwise --auto.
+    """
+    if "preferred" in mondata:
+        return [ "--output", mondata["name"],
+                 "--mode", mondata["preferred"],
+                 "-s", mondata["preferred"] ]
+    return [ "--output", mondata["name"], "--auto" ]
+
 # If only one monitor is connected, no-brainer.
+# Except no, not really. Also need -s resolution.
 if len(connected_mons) == 1:
-    print("Only one connected monitor", file=DEBUGFILE)
-    args = ["xrandr", "--output", connected_mons[0], "--auto"]
-    print("calling", args, file=DEBUGFILE)
+    geom = monmon.mon_geom[connected_mons[0]]
+    geomstr = "%dx%d" % (geom['width'], geom['height'])
+    args = ["xrandr"] + mon_connect_str(monmon.monitors[connected_mons[0]])
+    print("Only one monitor: calling", args, file=DEBUGFILE)
     subprocess.call(args)
     sys.exit(0)
 
@@ -80,10 +96,12 @@ if not new_mon:
     sys.exit(1)
 
 args = [ "xrandr" ]
+geomstr = None
 
 for mon in connected_mons:
     if mon == new_mon:
-        args += [ "--output", mon, "--auto" ]
+        args += mon_connect_str(monmon.monitors[mon])
+
     else:
         args += [ "--output", mon, "--off" ]
 

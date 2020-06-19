@@ -30,7 +30,7 @@ import sys
 # Leave debugging info in a file of known location,
 # because if it fails, you won't be able to see any error output,
 # but maybe you can shell in and read what happened.
-DEBUGFILE = open('/tmp/check-monitors.out', 'w')
+DEBUGFILE = None
 
 class MonMon:
 
@@ -69,25 +69,29 @@ class MonMon:
 
         # Loop over the outputs.
         for output in outputs:
-            print("Output info:",
-                  self.dpy.xrandr_get_output_info(output,
-                      self.resources['config_timestamp']), file=DEBUGFILE)
-
             mondata = self.dpy.xrandr_get_output_info(
                 output, self.resources['config_timestamp'])._data
 
             if mondata['mm_width'] <= 0 or mondata['mm_height'] <= 0:
                 # Not an actual monitor; I'm not sure what these are for
                 # but they don't seem to have any useful info
+                print("Not real monitor, skipping", file=DEBUGFILE)
                 continue
+
+            try:
+                prefmode = mondata['modes'][mondata['num_preferred']] - 1
+                mondata['preferred'] = self.allmodes[prefmode]
+            except:
+                print("Couldn't get", mondata['name'], "preferred modes",
+                      file=DEBUGFILE)
 
             name = mondata['name']
             self.monitors[name] = mondata
             if name.startswith('eDP') or name.startswith('LVDS'):
                 self.laptop_screen = name
-                # print("laptop monitor:", name)
 
-            # Figure out if it's cloned or extended, and its xinerama position
+            # Get the geometry, and Figure out if it's cloned or extended,
+            # and its xinerama position
             # https://stackoverflow.com/questions/49136692/python-xlib-how-to-deterministically-tell-whether-display-output-is-in-extendi
             # which references https://www.x.org/wiki/Development/Documentation/HowVideoCardsWork/#index3h3
             # crtcInfo also includes rotation info but I'm not doing anything
@@ -95,7 +99,6 @@ class MonMon:
             try:
                 crtcInfo = self.dpy.xrandr_get_crtc_info(mondata['crtc'],
                                            self.resources['config_timestamp'])
-                # print(crtcInfo)
 
                 self.mon_geom[name] = {
                     'x': crtcInfo.x,
@@ -105,9 +108,11 @@ class MonMon:
                     'mm_width': mondata['mm_width'],
                     'mm_height': mondata['mm_height']
                 }
+
             except XError:
                 # If get_crtc_info fails it means that the monitor is
                 # connected but not active.
+                print("No crtc info", file=DEBUGFILE)
                 pass
 
 
@@ -263,18 +268,14 @@ class MonMon:
 
 
 if __name__ == '__main__':
-    monmon = MonMon()
-
-    monmon.find_monitors()
-
     parser = argparse.ArgumentParser(description="Check and change monitor connections")
 
-    parser.add_argument('-s', "--switch", dest="switch", default=False,
-                        action="store_true",
-                        help="Switch which monitor(s) are connected")
     parser.add_argument('-a', "--allmodes", dest="show_all_modes",
                         default=False, action="store_true",
                         help="Show all modes allowed for each monitor")
+    parser.add_argument('-d', "--debug", dest="debug",
+                        default=False, action="store_true",
+                        help="Debug mode: print comments to stdout, not log file")
     parser.add_argument('-w', "--allwindows", dest="show_all_windows",
                         default=False, action="store_true",
                         help="Show all existing top-level windows")
@@ -284,10 +285,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args(sys.argv[1:])
 
-    if args.switch:
-        print("Would switch!")
+    if args.debug:
+        DEBUGFILE = sys.stderr
+    else:
+        DEBUGFILE = open('/tmp/check-monitors.out', 'w')
 
-    elif args.show_all_windows:
+    monmon = MonMon()
+
+    monmon.find_monitors()
+
+    if args.show_all_windows:
         monmon.print_all_windows()
 
     elif args.orphans:
