@@ -50,13 +50,18 @@ def search_for_keywords(grepdirs, orpats, andpats, notpats,
 
 
 def search_for_keywords_in(d, f, orpats, andpats, notpats, ignorecase):
-    """Search in d/f for lines matching or, and and not pats.
-       Those have lines in a format like:
+    """Search in d (directory)/f (file) for lines matching or,
+       and and not pats. f is a file named Tags or Keywords,
+       and contains lines in a format like:
        [tag ]keyword, keyword: file.jpg file.jpg
+       Also treat the directory name as a tag:
+       return True if the patterns match the directory name.
        Return a list of files.
     """
     results = []
     filetags = {}
+    if d.startswith('./'):
+        d = d[2:]
     with open(os.path.join(d, f)) as fp:
         for line in fp:
             line = line.strip()
@@ -75,15 +80,19 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, ignorecase):
             # actually don't care about that for matching purposes.
 
             for imgfile in parts[1].strip().split():
-                fullpath = os.path.join(d, imgfile)
-                if fullpath.startswith('./'):
-                    fullpath = fullpath[2:]
-                if not os.path.exists(fullpath):
-                    continue
-                if fullpath not in list(filetags.keys()):
-                    filetags[fullpath] = tags
+                filepath = os.path.join(d, imgfile)
+                if not os.path.exists(filepath):
+                    continue    # Don't match files that no longer exist
+                if filepath not in list(filetags.keys()):
+                    filetags[filepath] = tags
                 else:
-                    filetags[fullpath] += ', ' + tags
+                    filetags[filepath] += ', ' + tags
+
+                # Add the name of the directory as a tag.
+                # Might want to make this optional at some point:
+                # let's see how well it works in practice.
+                if d not in filetags[filepath]:
+                    filetags[filepath] += ", " + d
 
     # Now we have a list of tagged files in the directory, and their tags.
     for imgfile in list(filetags.keys()):
