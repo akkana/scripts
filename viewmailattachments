@@ -95,6 +95,11 @@ printset = set(string.printable)
 def isprintable(s):
     return set(s).issubset(printset)
 
+VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
+
+def clean_filename(badstr):
+    return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
+
 def view_message_attachments(fp, tmpdir):
     """View message attachments coming from the file-like object fp.
     """
@@ -130,13 +135,7 @@ def view_message_attachments(fp, tmpdir):
             # Clean up the filename:
             # Windows and especially Mac users are prone to use filenames
             # with spaces, newlines, backspaces etc.
-            newname = ''
-            for c in partfile:
-                if c == ' ':
-                    newname += '_'
-                elif isprintable(c):
-                    newname += c
-            partfile = newname
+            partfile = clean_filename(partfile)
 
         return os.path.join(tmpdir, partfile)
 
@@ -357,6 +356,21 @@ def view_message_attachments(fp, tmpdir):
             fp.close()
 
             htmlfiles.append(htmlfile)
+
+        elif part.get_content_maintype() == "text" and \
+             part.get_content_subtype() == "rtf":
+            partfile = save_tmp_file(part)
+            fileparts = os.path.splitext(partfile)
+            htmlfilename = fileparts[0] + ".html"
+            try:
+                htmlbytes = subprocess.check_output(["unrtf", "--html",
+                                                     partfile])
+                with open(htmlfilename, 'wb') as htmloutfp:
+                    htmloutfp.write(htmlbytes)
+                htmlfiles.append(htmlfilename)
+            except:
+                print("Couldn't run unrtf for RTF part")
+
         elif part.get_content_maintype() == "image" and part not in subparts:
             partfile = save_tmp_file(part)
             htmlfiles.append(partfile)
