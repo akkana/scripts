@@ -166,7 +166,7 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
 
     # Sometimes pdftohtml mysteriously doesn't work, and gives
     # a basically empty HTML file. Check for that.
-    bodylen = len(body.text)
+    bodylen = len(body.text.strip())
     if not bodylen:
         print("**Yikes! Empty HTML from pdftohtml", save_pdf_file)
         with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_pdf.html"),
@@ -175,6 +175,8 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
         return html
     else:
         print(bodylen, "characters in body text")
+        if bodylen < 10:
+            print(f"Body text is: '{body.text}'")
 
     del body["bgcolor"]
     del body["vlink"]
