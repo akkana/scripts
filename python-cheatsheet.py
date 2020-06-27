@@ -602,7 +602,10 @@ now = datetime.datetime.now()
 if (now - time_end).seconds < 7200:
     time_end = now - datetime.timedelta(seconds=7200)
 
-#
+###############
+# Date Parsing
+###############
+
 # Parse a date in RFC 2822 format.
 #
 datetime.datetime.strptime('2016-01-01', '%Y-%m-%d')
@@ -622,7 +625,7 @@ datetime.datetime.utcfromtimestamp(1553010256)
 # You have to strip it off in this way, which seems horrifying
 # but you'll see it recommended all over, and you'd better hope
 # the decimal point is where you expect it and not some other place
-# inside the string:
+# inside the string, and not something else like a comma:
 timestr = '2016-01-01.234'
 if '.' in timestr:
     d = datetime.datetime.strptime(timestr, '%Y-%m-%d.%f')
@@ -673,19 +676,37 @@ calendar.monthrange(year, month)[1]
 # Or do it using only datetime:
 (datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
 
-#
+############
 # Timezones:
-#
-# Take an unaware datetime and turn it into one in a timezone:
+############
+
+# Get the aware current local time in the local timezone:
+localnow = datetime.datetime.now().astimezone()
+# dt.astimezone(tz=None) adjusts to the specified timezone,
+# defaulting to the local one. tz would be a tzinfo object.
+# If dt is unaware, it's presumed to be local, which is why this works.
+
+# and then you can convert other times into that timezone:
+localtz = localnow.tzinfo
+localtime = othertime.astimezone(localtz)
+
+# Operations with pytz -- but pytz apparently has no way of getting the
+# local timezone or looking them up by short string like PDF,
+# only looking them up by the long-form string.
+# I haven't found a way to convert between a pytz.reference.LocalTimezone
+# or a pytz.tzfile and a datetime.timezone you can use for astimezone(),
+# so it's probably easier to stick to datetime unless you really need
+# to look up timezones by long name.
 import pytz
 mt = pytz.timezone('America/Denver')
-unaware = datetime.datetime(2020, 5, 26, 10, 0)    # or strptime
+unaware = datetime.datetime(2020, 5, 26, 10, 0)
 localtime = mt.localize(unaware)
 # and then convert that to UTC
 utc = localtime.astimezone(pytz.utc)
 
-# Note that strptime cannot parse timezone names -- don't be misled
-# by the documentation mentioning %Z, it lies.
+# Note that datetime's strptime cannot parse timezone names --
+# don't be misled by the documentation mentioning %Z, it lies.
+# strftime can print %Z but strptime can't parse it, except UTC.
 
 ########################################################
 # Threading and multiprocessing
