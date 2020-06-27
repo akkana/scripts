@@ -212,6 +212,9 @@ htmlmail.py:
 hypermoon.py:
     Make up silly names for tonight's moon, as a CGI.
 
+icalview.py:
+    Interpret an .ics calendar attachment, including timezones.
+
 intel_backlight.py:
     Tiny script to adjust the backlight on an Intel-based laptop
     that uses /sys/class/backlight/intel_backlight.
