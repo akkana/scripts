@@ -134,6 +134,9 @@ class XchatSoundHandler :
         so you can play different sounds depending on what happened.
         """
 
+        if len(word) < 1:
+            return
+
         # If it's too soon after startup, don't do anything.
         # Then we won't hear a slew of alerts from past scrollback,
         # NickServ 'You are now identified for" messages, etc.
