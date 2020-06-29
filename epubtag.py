@@ -76,7 +76,8 @@ class EpubBook:
         self.dom = None
 
     def get_matches(self, elname, delete_tags=False):
-        """Find matching tags in the OPF DOM.
+        """Internal function:
+           find matching tags in the OPF DOM (e.g. 'dc:title').
            If delete_tags is true, all such tags will be deleted
            along with any children.
         """
@@ -191,7 +192,7 @@ class EpubBook:
             outstr += ', '.join(tags)
         else:
             if tags:
-                outstr += "Tags: "
+                outstr += "Tags:"
                 for tag in tags:
                     outstr += '\n   ' + tag
 
@@ -512,6 +513,8 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         else:
             print()
 
+        imagefiles = []
+
         for f in self.zip.namelist():
             ext = os.path.splitext(f)[-1].lower()
             if ext in self.image_exts:
@@ -522,11 +525,14 @@ Python 2 minidom has trouble encoding non-ASCII characters")
                     print(os.path.basename(outfilename), "already exists")
                     se = os.path.splitext(outfilename)
                     outfilename = se[0] + '-' + str(i) + se[1]
-                outfp = open(outfilename, 'w')
+                outfp = open(outfilename, 'wb')
                 outfp.write(infp.read())
                 print("Extracted", f, "to", outfilename)
+                imagefiles.append(outfilename)
                 infp.close()
                 outfp.close()
+
+        return imagefiles
 
 
 if __name__ == "__main__":
