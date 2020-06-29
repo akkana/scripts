@@ -140,7 +140,7 @@ def meeting_datetime(mtg):
     return localtime
 
 
-def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
+def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        removing the idiotic dark grey background pdftohtml has hardcoded in.
        save_pdf_name is for debugging: if set, save the PDF there
@@ -148,30 +148,41 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
        Returns bytes, not str.
     """
     r = requests.get(agendaloc, timeout=30)
-    if not save_pdf_filename:
-        save_pdf_filename = os.path.join(tempdir, "agenda.pdf")
     with open(save_pdf_filename, "wb") as pdf_fp:
         pdf_fp.write(r.content)
-    htmlfile = os.path.join(tempdir, "agenda.html")
+    htmlfile = save_pdf_filename + ".html"
+    print("Calling", ' '.join(["pdftohtml", "-c", "-s", "-i", "-noframes",
+                               "-enc", "utf-8",
+                               save_pdf_filename, htmlfile]))
     subprocess.call(["pdftohtml", "-c", "-s", "-i", "-noframes",
                      save_pdf_filename, htmlfile])
     with open(htmlfile, 'rb') as htmlfp:
-        html = htmlfp.read()
+        # The files produced by pdftohtml contain '\240' characters,
+        # which are ISO-8859-1 for nbsp.
+        # Adding "-enc", "utf-8" doesn't change that.
+        # If they aren't decoded, BeautifulSoup will freak out
+        # and won't see anything in the file at all.
+        html_bytes = htmlfp.read().decode('ISO-8859-1')
 
     # Make some changes. Primarily,
     # replace the grey background that htmltotext wires in
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html_bytes, "lxml")
 
     body = soup.body
 
     # Sometimes pdftohtml mysteriously doesn't work, and gives
-    # a basically empty HTML file. Check for that.
+    # a basically empty HTML file: everything is using position:absolute
+    # and that makes it invisible to BeautifulSoup.
+    # This seems to be
+    # https://gitlab.freedesktop.org/poppler/poppler/-/issues/417
+    # Check for that.
+    # If all else fails, htmltotext works to extract the text,
+    # and might produce cleaner output anyway.
+    # Or there may be some way to get BS to find those
+    # <p style="position:absolute" tags that it isn't seeing.
     bodylen = len(body.text.strip())
-    if not bodylen:
-        print("**Yikes! Empty HTML from pdftohtml", save_pdf_file)
-        with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_pdf.html"),
-                  "w") as savfp:
-            print(html, file=savfp)
+    if bodylen == 0:
+        print("** Yikes! Empty HTML from pdftohtml", htmlfile)
         return html
     else:
         print(bodylen, "characters in body text")
@@ -195,7 +206,7 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename=None):
     if not body.text:
         print("**Yikes! Our changes to", save_pdf_file,
               "made the HTML empty. Saving original instead.")
-        with open(os.path.join(RSS_DIR, mtg['cleanname'] + "_cleaned.html"),
+        with open(os.path.join(RSS_DIR, save_pdf_filename + "_cleaned.html"),
                   "w") as savfp:
             print(soup.prettify(encoding='utf-8'), file=savfp)
         return html
