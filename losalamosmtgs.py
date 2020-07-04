@@ -220,6 +220,8 @@ def clean_filename(badstr):
     return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
 
 
+NO_AGENDA = b"<html><body><p>No agenda available.</body></html>"
+
 def write_rss20_file(mtglist):
     """Take a list meeting dictionaries and make an RSS file from it.
     """
@@ -246,26 +248,42 @@ def write_rss20_file(mtglist):
         # a <link> and others don't. So make an empty file to keep
         # RSS readers happy.
         else:
-            agenda_html = b"<html><body><p>No agenda available.</body></html>"
+            agenda_html = b""
 
+        # Does the agenda file need to be (re)written?
+        write_agenda_file = False
+
+        # See if there was already an agenda file left from previous runs:
         agendafile = os.path.join(RSS_DIR, mtg['cleanname'] + ".html")
-
-        # See if there was already an agenda there:
         if os.path.exists(agendafile):
             with open(agendafile, "rb") as oldfp:
                 oldhtml = oldfp.read()
-        else:
-            oldhtml = ""
 
-        if agenda_html != oldhtml:
+            if oldhtml == NO_AGENDA:    # no agenda previously
+                if agenda_html:         # but there is now
+                    write_agenda_file = True
+                    changestr += "<p><b>There is now an agenda.</b>"
+
+            else:                       # there was a previous agenda
+                if not agenda_html:     # ... which is gone now
+                    changestr += \
+                        "<p><b>An earlier agenda has been removed!</b>" \
+                        "<p><b>Agenda saved here is the previous agenda.</b>"
+                    # don't write over the old agenda file
+
+                elif agenda_html != oldhtml:  # changed agenda
+                    write_agenda_file = True
+                    changestr += "<p><b>The agenda has changed.</b>"
+
+        if write_agenda_file:
+            if agenda_html:
+                lastmod = now
+            else:
+                agenda_html = NO_AGENDA
+
+            print("Writing a new agenda file")
             with open(agendafile, 'wb') as outfp:
                 outfp.write(agenda_html)
-            # Mark it as changed
-            lastmod = now
-            changestr += "<p>The agenda has changed.</p>"
-            print(mtg['cleanname'], "Agenda changed", "lastmod is", lastmod)
-        else:
-            print("The agenda hasn't changed")
 
         jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
         if os.path.exists(jsonfile):
