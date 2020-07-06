@@ -38,6 +38,7 @@ except:
     print("No mutagen, won't be able to check song length or adjust speeds")
     pass
 
+
 class MusicWin(Gtk.Window):
     LEFT_KEY = Gdk.KEY_Left
     RIGHT_KEY = Gdk.KEY_Right
@@ -60,16 +61,18 @@ class MusicWin(Gtk.Window):
 
         self.configdir = os.path.expanduser('~/.config/musicplayer')
 
-        # If no songs or playlists specified, play from our favorites playlist.
+        # If no songs or playlists specified, play from favorites.m3u.
         if not init_songs:
             self.playlist = os.path.join(self.configdir, "favorites.m3u")
             print("Playing favorites")
             init_songs = [ self.playlist ]
+
         # Did the user specify one single playlist?
         elif len(init_songs) == 1 \
            and init_songs[-1].endswith('.m3u'):
             self.playlist = os.path.join(self.configdir,
                                          os.path.basename(init_songs[-1]))
+
         else:
             self.playlist = os.path.join(self.configdir, 'playlist.m3u')
 
@@ -251,14 +254,18 @@ button:hover { background: #dff; border-color: #8bb; }
 
         mixer.init()
 
+    def add_songs_from_dir(self, d):
+        # XXX Recursively crawl the directory and add every song in it.
+        for root, dirs, files in os.walk(d):
+            for filename in files:
+                if '.' in filename:
+                    self.songs.append(os.path.join(root, filename))
+
     def add_songs_and_directories(self, slist):
         for s in slist:
             if os.path.isdir(s):
-                # XXX Recursively crawl the directory and add every song in it.
-                for root, dirs, files in os.walk(s):
-                    for filename in files:
-                        if '.' in filename:
-                            self.songs.append(os.path.join(root, filename))
+                add_songs_from_dir(s)
+
             elif s.endswith('.m3u'):
                 if os.path.exists(s):
                     self.add_songs_in_playlist(s)
@@ -283,7 +290,16 @@ button:hover { background: #dff; border-color: #8bb; }
         path = os.path.split(playlist)[0]
         with open(playlist) as m3ufile:
             for line in m3ufile:
-                self.songs.append(os.path.join(path, line.strip()))
+                line = line.strip()
+                linepath = os.path.join(path, line)
+                if os.path.isdir(line):
+                    self.add_songs_from_dir(line)
+                elif os.path.isdir(linepath):
+                    self.add_songs_from_dir(linepath)
+                elif os.path.exists(path):
+                    self.songs.append(path)
+                elif os.path.exists(linepath):
+                    self.songs.append(linepath)
 
     def run(self):
         if not self.songs:
@@ -594,6 +610,7 @@ button:hover { background: #dff; border-color: #8bb; }
             del self.songs[self.song_ptr]
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         return True
+
 
 if __name__ == '__main__':
     rc = os.fork()
