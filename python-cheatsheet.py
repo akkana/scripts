@@ -681,7 +681,8 @@ calendar.monthrange(year, month)[1]
 ############
 
 # Get the aware current local time in the local timezone:
-localnow = datetime.datetime.now().astimezone()
+from datetime import datetime
+localnow = datetime.now().astimezone()
 # dt.astimezone(tz=None) adjusts to the specified timezone,
 # defaulting to the local one. tz would be a tzinfo object.
 # If dt is unaware, it's presumed to be local, which is why this works.
@@ -690,23 +691,62 @@ localnow = datetime.datetime.now().astimezone()
 localtz = localnow.tzinfo
 localtime = othertime.astimezone(localtz)
 
-# Operations with pytz -- but pytz apparently has no way of getting the
-# local timezone or looking them up by short string like PDF,
-# only looking them up by the long-form string.
-# I haven't found a way to convert between a pytz.reference.LocalTimezone
-# or a pytz.tzfile and a datetime.timezone you can use for astimezone(),
-# so it's probably easier to stick to datetime unless you really need
-# to look up timezones by long name.
-import pytz
-mt = pytz.timezone('America/Denver')
-unaware = datetime.datetime(2020, 5, 26, 10, 0)
-localtime = mt.localize(unaware)
-# and then convert that to UTC
-utc = localtime.astimezone(pytz.utc)
-
 # Note that datetime's strptime cannot parse timezone names --
 # don't be misled by the documentation mentioning %Z, it lies.
 # strftime can print %Z but strptime can't parse it, except UTC.
+
+# Advice from the datetime maintainer Paul Ganssle on Talk Python to Me:
+# https://talkpython.fm/episodes/show/271/unlock-the-mysteries-of-time-pythons-datetime-that-is
+# https://blog.ganssle.io/
+#
+# recommends not using pytz (which will be dropped in 2 years).
+# Instead, using the new zoneinfo coming in with python 2.9.
+# (backport in pypi), or use dateutil.tz
+
+# A datetime.tzinfo object is a set of rules that include when to switch
+# between DST and ST; it's not just an offset.
+from dateutil import tz
+MT = tz.gettz("America/Denver")
+
+# Timezones have names, but getting them requires a date:
+time_winter = datetime(2020, 2, 14, 12,tzinfo=MT)
+MT.tzname(time_winter)
+# -> 'MST'
+time_summer = datetime(2020, 7, 14, 12,tzinfo=MT)
+MT.tzname(time_summer)
+# -> 'MDT'
+
+# Don't use utcnow or utcfromtimestamp in modern python.
+# They might even be deprecated soon. Instead:
+utcnow = datetime.now(tz=timezone.utc)
+datetime.fromtimestamp(1571595618.0, tz=timezone.utc)
+
+# All pytz code should be migrated over to zoneinfo or dateutil
+# and get on the PEP495 bandwagon.
+# PEP 495: Local time disambiguation: https://www.python.org/dev/peps/pep-0495/
+# https://www.python.org/dev/peps/pep-0495/
+# PEP 615: Support for the IANA Time Zone Database in the Standard Library
+# https://www.python.org/dev/peps/pep-0615/
+
+# Aware datetime arithmetic:
+# https://blog.ganssle.io/articles/2018/02/aware-datetime-arithmetic.html
+from datetime import datetime, timedelta
+ET = tz.gettz("America/New York")
+noon_mt = datetime(2020, 7, 4, 12, tzinfo=MT)
+noon_et = datetime(2020, 7, 4, 12, tzinfo=ET)
+noon_mt - noon_et
+# -> datetime.timedelta(seconds=7200)
+# Keep in mind that timedeltas don't include any timezone info themselves.
+
+# dateutil will handle timezones in ical format (it's also good at parsing)
+# and it has rrules for recurrences. It also has Easter.
+# arrow has humanize, which can give you strings like "an hour ago".
+# Pendulum is slow and not fully backward compat with datetime: don't use.
+# But Adam Kennedy likes pendulum because it can give you aware timedeltas
+# that you can subtract, and iterators over things like weekdays.
+
+# Some reasons not to use pytz:
+# https://blog.ganssle.io/articles/2018/03/pytz-fastest-footgun.html
 
 ########################################################
 # Threading and multiprocessing
@@ -776,6 +816,10 @@ session = requests.Session()
 r = session.get(url)
 
 # requests.text gives a string, requests.content gives bytes
+
+# r.encoding comes from the server,
+# r.apparent_encoding is guessed from the text
+# (either one may be None).
 
 ########################################################
 # Some handy utility classes
