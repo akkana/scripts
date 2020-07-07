@@ -7,12 +7,15 @@
 
 import sys
 
-import pytz
 from icalendar import Calendar
 import datetime
 
+import argparse
+
 
 def read_ics_file(infile):
+    """Parse an ics file into a dictionary.
+    """
     cal = Calendar.from_ical(open(infile, 'rb').read())
 
     # Get the local timezone
@@ -34,7 +37,7 @@ def read_ics_file(infile):
         event['DTSTART'] = component.get('DTSTART').dt
         event['DTEND'] = component.get('DTEND').dt
 
-        # I don't know what the dtstampor exdate are
+        # I don't know what the dtstamp or exdate are. No docs.
         # dtstamp = component.get('DTSTAMP')
         # exdate = component.get('exdate')
 
@@ -45,7 +48,10 @@ def read_ics_file(infile):
 
     return event
 
+
 def print_event(event):
+    """Print in an informal but readable way."""
+
     print(f"START: {event['LOCALSTART'].strftime('%a, %d %b %Y %I:%M %Z')}")
     if event['DTSTART'].tzinfo != event['LOCALSTART'].tzinfo:
         print(f"      ({event['DTSTART'].strftime('%a, %d %b %Y %I:%M %Z')})")
@@ -62,6 +68,26 @@ def print_event(event):
         print("DESCRIPTION", event['DESCRIPTION'])
 
 
+def remind_for_event(ev):
+    """Create a line that can be added to a file for /usr/bin/remind."""
+
+    desc = ev['DESCRIPTION'].replace('\n\n', '\n').replace('\n', ' ||| ')
+    print(f"REM {ev['LOCALSTART'].strftime('%d %m %Y')} +1 MSG {ev['SUMMARY']} ||| LOCATION {ev['LOCATION']} ||| DESCRIPTION: ||| {desc}")
+
+
 if __name__ == '__main__':
-    event = read_ics_file(sys.argv[1])
-    print_event(event)
+    parser = argparse.ArgumentParser(description="Parse ical files")
+    parser.add_argument('-f', action="store", dest="format", default="text",
+                        help='Output format: text (default), remind')
+    parser.add_argument('files', nargs='+', help="Input ical files")
+    args = parser.parse_args(sys.argv[1:])
+    # print("args", args)
+
+    events = [ read_ics_file(f) for f in args.files ]
+
+    for ev in events:
+        if args.format == "remind":
+            remind_for_event(ev)
+
+        else:
+            print_event(ev)
