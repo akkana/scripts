@@ -103,6 +103,9 @@ cleanhtml.py
 colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
 
+comet.py:
+    Look up a comet and compute its position, using Skyfield.
+
 conjunctions.py:
     Predict planetary visibility and conjunctions for a specified
     date range.
