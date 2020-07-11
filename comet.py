@@ -4,7 +4,7 @@
 # This is a brand new function in Skyfield!
 # https://rhodesmill.org/skyfield/kepler-orbits.html
 
-from skyfield.api import load, Topos
+from skyfield.api import Loader, Topos
 from skyfield.data import mpc
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield import almanac
@@ -16,7 +16,7 @@ import argparse
 
 import sys, os
 
-
+load = Loader('~/.cache/skyfield')
 with load.open(mpc.COMET_URL) as f:
     comets = mpc.load_comets_dataframe(f)
 
