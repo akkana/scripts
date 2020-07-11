@@ -567,6 +567,16 @@ parser.print_help()
 >>> f"{dt:%Y-%m-%d %H:%M}"        # Only in Python >= 3.6
 '2019-07-22 19:46'
 
+##################
+# Date Arithmetic
+##################
+
+# Subtracting datetimes gives a datetime.timedelta, and that's also
+# a good way to add or subtract time from a datetime.
+now = datetime.datetime.now()
+if (now - time_end).seconds < 7200:
+    time_end = now - datetime.timedelta(seconds=7200)
+
 #
 # Add N months to a date: same day of month but next month.
 #
@@ -596,11 +606,21 @@ datetime.datetime.now().replace(hour=0, minute=0,
 # Earliest and latest dates:
 datetime.datetime.min, datetime.datetime.max
 
-# Subtracting datetimes gives a datetime.timedelta, and that's also
-# a good way to add or subtract time from a datetime.
-now = datetime.datetime.now()
-if (now - time_end).seconds < 7200:
-    time_end = now - datetime.timedelta(seconds=7200)
+#
+# Calendar.timedelta
+#
+import datetime
+import calendar
+today = datetime.date.today()
+days_this_month = calendar.monthrange(today.year, today.month)[1]
+one_month_from_now = today + datetime.timedelta(days=days_this_month)
+
+# Number of days in a month:
+calendar.monthrange(year, month)[1]
+# monthrange returns weekday of the first day and number of days in the month.
+
+# Or do it using only datetime:
+(datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
 
 ###############
 # Date Parsing
@@ -658,23 +678,7 @@ d = dateutil.parser.parse("6/15/2016 14:25 MDT")
 # Also see the Arrow library, a Datetime replacement
 # that offers super-general date parsing like "an hour ago".
 
-#
-# Calendar.timedelta
-#
-import datetime
-import calendar
-today = datetime.date.today()
-days_this_month = calendar.monthrange(today.year, today.month)[1]
-one_month_from_now = today + datetime.timedelta(days=days_this_month)
-
 # There's also isodate.parse_datetime which I haven't looked into yet.
-
-# Number of days in a month:
-calendar.monthrange(year, month)[1]
-# monthrange returns weekday of the first day and number of days in the month.
-
-# Or do it using only datetime:
-(datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
 
 ############
 # Timezones:
