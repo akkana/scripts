@@ -4,11 +4,13 @@
 # This is a brand new function in Skyfield!
 # https://rhodesmill.org/skyfield/kepler-orbits.html
 
-from skyfield.api import load
+from skyfield.api import load, Topos
 from skyfield.data import mpc
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 
 import dateutil.parser
+
+import argparse
 
 import sys, os
 
@@ -49,13 +51,29 @@ def comet_by_name(namepat):
     return None
 
 
-def calc_comet(comet_df, thetime):
+def calc_comet(comet_df, obstime, earthcoords):
     # Generating a position.
     cometvec = sun + mpc.comet_orbit(comet_df, ts, GM_SUN)
 
-    t = ts.utc(2020, 7, 10)
-    ra, dec, distance = earth.at(t).observe(cometvec).radec()
-    print("RA", ra, "DEC", dec, "distance", distance)
+    cometpos = earth.at(obstime).observe(cometvec)
+    ra, dec, distance = cometpos.radec()
+    print("RA", ra, "   DEC", dec, "   Distance", distance)
+
+    if earthcoords:
+        if len(earthcoords) > 2:
+            elev = earthcoords[2]
+        else:
+            elev = 0
+        topos = Topos(latitude_degrees=earthcoords[0],
+                      longitude_degrees=earthcoords[1],
+                      elevation_m=elev)
+        observer = earth + topos
+        print("Observer at", topos.latitude, "N  ", topos.longitude, "E  ",
+              "Elevation", topos.elevation.m, "m")
+
+        alt, az, distance = \
+            observer.at(obstime).observe(cometvec).apparent().altaz()
+        print("alt-az:", alt, az, distance)
 
 
 def Usage():
@@ -66,13 +84,22 @@ def Usage():
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        Usage()
-    if sys.argv[1] == '-h' or sys.argv[1] == '--help':
-        Usage()
+    parser = argparse.ArgumentParser(
+        description="Look up a comet and compute its position.")
+    parser.add_argument('-t', action="store", dest="time",
+                        help='Time (any format dateutil.parser handles)')
+    parser.add_argument('-c', action="store", dest="coords",
+                        nargs=2, type=float,
+                        help="Observer's Latitude and longitude (degrees)")
+    parser.add_argument('-e', action="store", dest="elev", type=float,
+                        help="Observer's elevation (meters)")
+    parser.add_argument("cometname",
+                        help="Name (full or partial) of a comet")
+    args = parser.parse_args(sys.argv[1:])
+    # print(args)
 
-    if len(sys.argv) > 2:
-        pdate = dateutil.parser.parse(sys.argv[2])
+    if args.time:
+        pdate = dateutil.parser.parse(args.time)
         if not pdate.tzinfo:
             # interpret it locally by default
             pdate = pdate.astimezone()
@@ -82,10 +109,13 @@ if __name__ == '__main__':
     else:
         t = ts.now()
 
-    comet_df = comet_by_name(sys.argv[1])
+    if args.coords and args.elev:
+        args.coords.append(args.elev)
+
+    comet_df = comet_by_name(args.cometname)
 
     if comet_df is not None:
         print(comet_df['designation'], "    ", t.utc_iso())
-        calc_comet(comet_df, t)
+        calc_comet(comet_df, t, args.coords)
 
 
