@@ -101,10 +101,12 @@ def calc_comet(comet_df, obstime, earthcoords, numdays):
                 t = ti.utc_datetime().astimezone()
                 d = t.strftime("%Y-%m-%d")
                 if yi:
-                    risetime =  ti.utc_datetime().astimezone().strftime("%H:%M %Z")
+                    risetime =  ti.utc_datetime().astimezone() \
+                                                 .strftime("%H:%M %Z")
                     riseaz = "%3d°%2d'" % az.dms()[:2]
                 else:
-                    settime =  ti.utc_datetime().astimezone().strftime("%H:%M %Z")
+                    settime =  ti.utc_datetime().astimezone() \
+                                                .strftime("%H:%M %Z")
                     setaz = "%3d°%2d'" % az.dms()[:2]
                 if not datestr:
                     datestr = d
