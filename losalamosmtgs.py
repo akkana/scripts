@@ -18,7 +18,6 @@ import subprocess
 import tempfile
 import json
 import os
-import pytz
 
 
 ########## CONFIGURATION ##############
@@ -38,16 +37,11 @@ if not os.path.exists(RSS_DIR):
 ######## END CONFIGURATION ############
 
 
-mountain_time = pytz.timezone('America/Denver')
+# Make a timezone-aware datetime for now:
+now = datetime.datetime.now().astimezone()
 
-# Try to make now an aware datetime.
-# You might think that utcnow() would already be timezone aware,
-# given that it's explicitly UTC, but that would be giving
-# way more credit to the datetime designers than is due.
-# You can't do it with .astimezone(pytz.utc) either, because
-# it converts back to localtime and then converts to utc.
-now = datetime.datetime.utcnow()
-now = now.replace(tzinfo=pytz.utc)
+# and save the timezone
+localtz = now.tzinfo
 
 # Format for dates in RSS:
 # This has to be GMT, not %Z, because datetime.strptime just
@@ -130,13 +124,13 @@ def parse_meeting_list(only_past=False):
 def meeting_datetime(mtg):
     """Parse the meeting date and time and return an aware localtime.
     """
-    # The parsed time is in GMT no matter what and is unaware,
-    # because strptime can't create a timezone aware object.
+    # The parsed time is in the local time and is unaware,
+    # because strptime can't create a timezone aware object (see above).
     unaware = datetime.datetime.strptime(mtg["Meeting Date"] + " "
                                          + mtg["Meeting Time"],
                                          '%m/%d/%Y %I:%M %p')
-    localtime = mountain_time.localize(unaware)
-    # return localtime.astimezone(pytz.utc)
+    # Make it aware in localtime
+    localtime = unaware.astimezone(localtz)
     return localtime
 
 
@@ -442,4 +436,5 @@ if __name__ == '__main__':
     meetings = parse_meeting_list()
 
     write_rss20_file(meetings)
+
 
