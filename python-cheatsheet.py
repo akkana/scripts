@@ -923,8 +923,11 @@ val = getattr(themodule, functionname)()
 # python3 -m unittest discover
 # This will run from the top level, so imports will be relative to there.
 
-# Run one test:
-# python -m unittest test.test_mymodule
+# Run one test file
+# python -m unittest test.test_epubtags
+
+# Run one test in one class in one file:
+# python -m unittest test.test_epubtags.TestEpubTags.test_epubtags
 
 
 ########################################################
