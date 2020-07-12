@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # Look up a comet and compute its position, using Skyfield.
 # This is a brand new function in Skyfield!
@@ -87,13 +88,36 @@ def calc_comet(comet_df, obstime, earthcoords, numdays):
             alm = almanac.risings_and_settings(eph, cometvec, obstopos)
             t, y = almanac.find_discrete(t0, t1, alm)
 
+            fmt = "%-10s    %-10s %-8s   %-10s %-18s"
+            print(fmt % ("Date", "Rise", "Azimuth", "Set", "Az"))
+            datestr = ''
+            risetime = ''
+            riseaz = ''
+            settime = ''
+            setaz = ''
             for ti, yi in zip(t, y):
                 alt, az, distance = \
                     observer.at(ti).observe(cometvec).apparent().altaz()
                 t = ti.utc_datetime().astimezone()
-                print("%22s %-4s   Aziumuth %-16s  Dist %s" % (
-                    t.strftime("%Y-%m-%d %H:%M %Z"),
-                    'Rise' if yi else 'Set', str(az), str(distance)))
+                d = t.strftime("%Y-%m-%d")
+                if yi:
+                    risetime =  ti.utc_datetime().astimezone().strftime("%H:%M %Z")
+                    riseaz = "%3d°%2d'" % az.dms()[:2]
+                else:
+                    settime =  ti.utc_datetime().astimezone().strftime("%H:%M %Z")
+                    setaz = "%3d°%2d'" % az.dms()[:2]
+                if not datestr:
+                    datestr = d
+                if d != datestr:
+                    print(fmt % (datestr, risetime, riseaz, settime, setaz))
+                    risetime = ''
+                    riseaz = ''
+                    settime = ''
+                    setaz = ''
+                    datestr = d
+
+            if risetime or settime:
+                print(fmt % (datestr, risetime, riseaz, settime, setaz))
 
 
 def Usage():
