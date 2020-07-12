@@ -242,7 +242,7 @@ def write_rss20_file(mtglist):
         # a <link> and others don't. So make an empty file to keep
         # RSS readers happy.
         else:
-            agenda_html = b""
+            agenda_html = b"NO AGENDA YET"
 
         # Does the agenda file need to be (re)written?
         write_agenda_file = False
@@ -268,6 +268,9 @@ def write_rss20_file(mtglist):
                 elif agenda_html != oldhtml:  # changed agenda
                     write_agenda_file = True
                     changestr += "<p><b>The agenda has changed.</b>"
+
+        else:    # No agenda file there previously, probably a new meeting
+            write_agenda_file = True
 
         if write_agenda_file:
             if agenda_html:
