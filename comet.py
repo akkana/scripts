@@ -54,6 +54,69 @@ def comet_by_name(namepat):
     return None
 
 
+def print_event_table(observer, cometvec, alm, t0, t1):
+    """For debugging, Print a chromological table of all rise/set events.
+       Harder to read but useful for debugging and guaranteed to
+       be in chronological order.
+    """
+    t, y = almanac.find_discrete(t0, t1, alm)
+    for ti, yi in zip(t, y):
+        alt, az, distance = \
+            observer.at(ti).observe(cometvec).apparent().altaz()
+        t = ti.utc_datetime().astimezone()
+        d = t.strftime("%Y-%m-%d")
+        print("Rise" if yi else " Set", d, t.strftime("%H:%M %Z"),
+              "%3d°%2d'" % az.dms()[:2])
+
+
+def print_rises_sets(observer, cometvec, alm, t0, t1):
+    """Print rises and sets in separate columns, easier to read."""
+    t, y = almanac.find_discrete(t0, t1, alm)
+
+    fmt = "%-10s    %-10s %-8s   %-10s %-8s   %-14s"
+    print(fmt % ("Date", "Rise", "Azimuth", "Set", "Azimuth",
+                 "Distance"))
+
+    risetime = ''
+    riseaz = ''
+    settime = ''
+    setaz = ''
+    diststr = ''
+    datestr = ''
+
+    for ti, yi in zip(t, y):
+        alt, az, distance = \
+            observer.at(ti).observe(cometvec).apparent().altaz()
+        t = ti.utc_datetime().astimezone()
+        newdatestr = t.strftime("%Y-%m-%d")
+
+        if not datestr:
+            datestr = newdatestr
+
+        elif newdatestr != datestr and (risetime or settime):
+            print(fmt % (datestr, risetime, riseaz, settime, setaz,
+                         str(distance)))
+
+            risetime = ''
+            riseaz = ''
+            settime = ''
+            setaz = ''
+            diststr = ''
+            datestr = newdatestr
+
+        if yi:
+            risetime =  t.strftime("%H:%M %Z")
+            riseaz = "%3d°%2d'" % az.dms()[:2]
+        else:
+            settime =  t.strftime("%H:%M %Z")
+            setaz = "%3d°%2d'" % az.dms()[:2]
+
+    # Print a line for the final date
+    if risetime or settime:
+        print(fmt % (datestr, risetime, riseaz, settime, setaz,
+                     str(distance)))
+
+
 def calc_comet(comet_df, obstime, earthcoords, numdays):
     # Generating a position.
     cometvec = sun + mpc.comet_orbit(comet_df, ts, GM_SUN)
@@ -88,38 +151,9 @@ def calc_comet(comet_df, obstime, earthcoords, numdays):
             alm = almanac.risings_and_settings(eph, cometvec, obstopos)
             t, y = almanac.find_discrete(t0, t1, alm)
 
-            fmt = "%-10s    %-10s %-8s   %-10s %-18s"
-            print(fmt % ("Date", "Rise", "Azimuth", "Set", "Az"))
-            datestr = ''
-            risetime = ''
-            riseaz = ''
-            settime = ''
-            setaz = ''
-            for ti, yi in zip(t, y):
-                alt, az, distance = \
-                    observer.at(ti).observe(cometvec).apparent().altaz()
-                t = ti.utc_datetime().astimezone()
-                d = t.strftime("%Y-%m-%d")
-                if yi:
-                    risetime =  ti.utc_datetime().astimezone() \
-                                                 .strftime("%H:%M %Z")
-                    riseaz = "%3d°%2d'" % az.dms()[:2]
-                else:
-                    settime =  ti.utc_datetime().astimezone() \
-                                                .strftime("%H:%M %Z")
-                    setaz = "%3d°%2d'" % az.dms()[:2]
-                if not datestr:
-                    datestr = d
-                if d != datestr:
-                    print(fmt % (datestr, risetime, riseaz, settime, setaz))
-                    risetime = ''
-                    riseaz = ''
-                    settime = ''
-                    setaz = ''
-                    datestr = d
-
-            if risetime or settime:
-                print(fmt % (datestr, risetime, riseaz, settime, setaz))
+            # print_event_table(observer, cometvec, alm, t0, t1)
+            # print()
+            print_rises_sets(observer, cometvec, alm, t0, t1)
 
 
 def Usage():
