@@ -29,6 +29,8 @@ eph = load('de421.bsp')
 sun = eph['sun']
 earth = eph['earth']
 
+WHICH_TWILIGHT = "Nautical twilight"
+
 
 def comet_by_name(namepat):
     # Exact search: row = comets.loc[cometname]
@@ -77,12 +79,15 @@ def print_rises_sets(observer, cometvec, alm, t0, t1):
     print(fmt % ("Date", "Rise", "Azimuth", "Set", "Azimuth",
                  "Distance"))
 
-    risetime = ''
-    riseaz = ''
-    settime = ''
-    setaz = ''
-    diststr = ''
-    datestr = ''
+    def reset_strings():
+        nonlocal risetime, riseaz, settime, setaz, datestr
+        risetime = ''
+        riseaz = ''
+        settime = ''
+        setaz = ''
+        datestr = ''
+
+    reset_strings()
 
     for ti, yi in zip(t, y):
         alt, az, distance = \
@@ -97,11 +102,7 @@ def print_rises_sets(observer, cometvec, alm, t0, t1):
             print(fmt % (datestr, risetime, riseaz, settime, setaz,
                          str(distance)))
 
-            risetime = ''
-            riseaz = ''
-            settime = ''
-            setaz = ''
-            diststr = ''
+            reset_strings()
             datestr = newdatestr
 
         if yi:
@@ -117,7 +118,76 @@ def print_rises_sets(observer, cometvec, alm, t0, t1):
                      str(distance)))
 
 
-def calc_comet(comet_df, obstime, earthcoords, numdays):
+def find_twilights(adate, alm_twilights):
+    """Find twilight times at dawn and dusk on the given day.
+       Return a skyvec Time.
+    """
+
+    # Convert to an aware datetime in the local timezone
+    t0 = adate.utc_datetime().astimezone()
+
+    # Start at midnight
+    t0 = t0.replace(hour=0, minute=0, second=0, microsecond=0)
+    t1 = t0 + timedelta(days=1)
+
+    times, events = almanac.find_discrete(ts.utc(t0), ts.utc(t1),
+                                              alm_twilights)
+
+    twilights = []
+    # Using Astronomical twilight makes sense, but maybe the
+    # user wants to be a little more ambitious in searching
+    for i, e in enumerate(events):
+        if almanac.TWILIGHTS[e] == WHICH_TWILIGHT:
+            twilights.append(times[i])
+
+    return twilights
+
+
+def svt2str(svt):
+    """SkyView Time to string in local timezone"""
+    return svt.utc_datetime().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+
+
+def print_alt_table(obstime, cometvec, obsvec, alm_twilights):
+    """Print a table of the comet's alt and az for one day
+       during darkness and astronomical twilight,
+       and only when the comet is up.
+    """
+    dawn, dusk = [ t.utc_datetime().astimezone() for t in find_twilights(obstime, alm_twilights) ]
+    t0 = obstime.utc_datetime().astimezone()
+    # Start at midnight
+    t0 = t0.replace(hour=0, minute=0, second=0, microsecond=0)
+    curday = t0.day
+    INCR = timedelta(minutes=15)
+    night = True
+
+    fmt= "%22s %10s %10s"
+    print(fmt % ("Time", "Altitude", "Azimuth"))
+    while t0.day == curday:
+        # print("      Start loop:", t0.strftime("%Y-%m-%d %H:%M %Z"))
+        if night and t0 > dawn and t0 < dusk:
+            print(WHICH_TWILIGHT, "dawn")
+            night = False
+        elif not night and t0 >= dusk:
+            print(WHICH_TWILIGHT, "dusk")
+            night = True
+        if night:
+            t0t = ts.utc(t0)
+            alt, az, distance = \
+                obsvec.at(t0t).observe(cometvec).apparent().altaz()
+            t0s = t0.strftime("%Y-%m-%d %H:%M %Z")
+            if alt.degrees > 0:
+                print(fmt % (t0s, "%3d°%2d'" % alt.dms()[:2],
+                             "%3d°%2d'" % az.dms()[:2]))
+        #     else:
+        #         print(t0s, "too low")
+        # else:
+        #     print(t0.strftime("%Y-%m-%d %H:%M %Z"), "too bright")
+
+        t0 += INCR
+
+
+def calc_comet(comet_df, obstime, earthcoords, numdays=0, alt_table=False):
     # Generating a position.
     cometvec = sun + mpc.comet_orbit(comet_df, ts, GM_SUN)
 
@@ -136,11 +206,15 @@ def calc_comet(comet_df, obstime, earthcoords, numdays):
         print("\nObserver at",
                obstopos.latitude, "N  ", obstopos.longitude, "E  ",
               "Elevation", obstopos.elevation.m, "m")
-        observer = earth + obstopos
+        obsvec = earth + obstopos
 
         alt, az, distance = \
-            observer.at(obstime).observe(cometvec).apparent().altaz()
+            obsvec.at(obstime).observe(cometvec).apparent().altaz()
         print("Altitude", alt, "     Azumuth", az, distance)
+
+        alm_twilights = almanac.dark_twilight_day(eph, obstopos)
+        dawn, dusk = find_twilights(obstime, alm_twilights)
+        print(WHICH_TWILIGHT, ": Dawn", svt2str(dawn), "Dusk", svt2str(dusk))
 
         if numdays:
             print("\nRises and sets over", numdays, "days:")
@@ -151,9 +225,14 @@ def calc_comet(comet_df, obstime, earthcoords, numdays):
             alm = almanac.risings_and_settings(eph, cometvec, obstopos)
             t, y = almanac.find_discrete(t0, t1, alm)
 
-            # print_event_table(observer, cometvec, alm, t0, t1)
-            # print()
-            print_rises_sets(observer, cometvec, alm, t0, t1)
+            print_rises_sets(obsvec, cometvec, alm, t0, t1)
+
+        if alt_table:
+            while True:
+                print_alt_table(obstime, cometvec, obsvec, alm_twilights)
+                alt_table -= 1
+                if  alt_table <= 0:
+                    break
 
 
 def Usage():
@@ -176,6 +255,10 @@ if __name__ == '__main__':
     parser.add_argument('-d', action="store", dest="numdays",
                         type=int, default=0,
                         help="Number of days to show risings/settings")
+    parser.add_argument('-a', "--alttable", dest="near", default=False,
+                        action="store_true",
+                        help="Print a table of altitudes when the comet"
+                             "is low, near the horizon")
     parser.add_argument("cometname",
                         help="Name (full or partial) of a comet")
     args = parser.parse_args(sys.argv[1:])
@@ -200,6 +283,6 @@ if __name__ == '__main__':
     if comet_df is not None:
         print(comet_df['designation'], "    ",
               t.utc_datetime().astimezone().strftime("%Y-%m-%d %H:%M %Z"))
-        calc_comet(comet_df, t, args.coords, args.numdays)
+        calc_comet(comet_df, t, args.coords, args.numdays, args.near)
 
 
