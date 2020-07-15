@@ -228,11 +228,15 @@ def calc_comet(comet_df, obstime, earthcoords, numdays=0, alt_table=False):
             print_rises_sets(obsvec, cometvec, alm, t0, t1)
 
         if alt_table:
+            oneday = timedelta(days=1)
             while True:
                 print_alt_table(obstime, cometvec, obsvec, alm_twilights)
-                alt_table -= 1
-                if  alt_table <= 0:
+                numdays -= 1
+                if  numdays <= 0:
                     break
+                # Add a day: there doesn't seem to be a way to do this
+                # while staying within skyview's Time object.
+                obstime = ts.utc(obstime.utc_datetime() + oneday)
 
 
 def Usage():
