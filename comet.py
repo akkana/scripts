@@ -228,6 +228,7 @@ def calc_comet(comet_df, obstime, earthcoords, numdays=0, alt_table=False):
             print_rises_sets(obsvec, cometvec, alm, t0, t1)
 
         if alt_table:
+            print()
             oneday = timedelta(days=1)
             while True:
                 print_alt_table(obstime, cometvec, obsvec, alm_twilights)
@@ -259,10 +260,10 @@ if __name__ == '__main__':
     parser.add_argument('-d', action="store", dest="numdays",
                         type=int, default=0,
                         help="Number of days to show risings/settings")
-    parser.add_argument('-a', "--alttable", dest="near", default=False,
+    parser.add_argument('-a', "--alttable", dest="alttable", default=False,
                         action="store_true",
-                        help="Print a table of altitudes when the comet"
-                             "is low, near the horizon")
+                        help="Print a table of altitudes "
+                        "when the comet is visible")
     parser.add_argument("cometname",
                         help="Name (full or partial) of a comet")
     args = parser.parse_args(sys.argv[1:])
@@ -287,6 +288,6 @@ if __name__ == '__main__':
     if comet_df is not None:
         print(comet_df['designation'], "    ",
               t.utc_datetime().astimezone().strftime("%Y-%m-%d %H:%M %Z"))
-        calc_comet(comet_df, t, args.coords, args.numdays, args.near)
+        calc_comet(comet_df, t, args.coords, args.numdays, args.alttable)
 
 
