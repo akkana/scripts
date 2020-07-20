@@ -120,10 +120,11 @@ def print_rises_sets(observer, cometvec, alm, t0, t1):
 
 def find_twilights(adate, alm_twilights):
     """Find twilight times at dawn and dusk on the given day.
-       Return a skyvec Time.
+       Return a list of [(datetime in local tz, name)]
+       where the names are something like "Nautical".
     """
 
-    # Convert to an aware datetime in the local timezone
+    # Convert adate to an aware datetime in the local timezone
     t0 = adate.utc_datetime().astimezone()
 
     # Start at midnight
@@ -134,11 +135,9 @@ def find_twilights(adate, alm_twilights):
                                               alm_twilights)
 
     twilights = []
-    # Using Astronomical twilight makes sense, but maybe the
-    # user wants to be a little more ambitious in searching
     for i, e in enumerate(events):
-        if almanac.TWILIGHTS[e] == WHICH_TWILIGHT:
-            twilights.append(times[i])
+        twilights.append((times[i].utc_datetime().astimezone(),
+                          almanac.TWILIGHTS[e]))
 
     return twilights
 
@@ -153,36 +152,48 @@ def print_alt_table(obstime, cometvec, obsvec, alm_twilights):
        during darkness and astronomical twilight,
        and only when the comet is up.
     """
-    dawn, dusk = [ t.utc_datetime().astimezone() for t in find_twilights(obstime, alm_twilights) ]
+    twilights = find_twilights(obstime, alm_twilights)
+    twilight_i = 0
     t0 = obstime.utc_datetime().astimezone()
+
     # Start at midnight
     t0 = t0.replace(hour=0, minute=0, second=0, microsecond=0)
     curday = t0.day
     INCR = timedelta(minutes=15)
     night = True
+    lastalt = None
 
     fmt= "%22s %10s %10s"
     print(fmt % ("Time", "Altitude", "Azimuth"))
     while t0.day == curday:
-        # print("      Start loop:", t0.strftime("%Y-%m-%d %H:%M %Z"))
-        if night and t0 > dawn and t0 < dusk:
-            print(WHICH_TWILIGHT, "dawn", dawn.strftime("%Y-%m-%d %H:%M %Z"))
-            night = False
-        elif not night and t0 >= dusk:
-            print(WHICH_TWILIGHT, "dusk", dawn.strftime("%Y-%m-%d %H:%M %Z"))
-            night = True
+        # Crossed past one of the twilight times?
+        if twilight_i < len(twilights) - 1 and \
+           t0 > twilights[twilight_i][0] and t0 <= twilights[twilight_i+1][0]:
+            twname = twilights[twilight_i][1]
+            if twname.endswith(" twilight"):
+                whichtwi = ("dawn" if t0.hour < 12 else "dusk")
+                twname = twname[:-8] + whichtwi
+
+            print("%18s:" % twname,
+                  twilights[twilight_i][0].strftime("%Y-%m-%d %H:%M %Z"))
+            if twilights[twilight_i][1] == WHICH_TWILIGHT:
+                night = (whichtwi == "dusk")
+
+            twilight_i += 1
+
         if night:
             t0t = ts.utc(t0)
             alt, az, distance = \
                 obsvec.at(t0t).observe(cometvec).apparent().altaz()
             t0s = t0.strftime("%Y-%m-%d %H:%M %Z")
             if alt.degrees > 0:
+                if lastalt and lastalt < 0 and alt.degrees < 2:
+                    print("RISES")
                 print(fmt % (t0s, "%3d°%2d'" % alt.dms()[:2],
                              "%3d°%2d'" % az.dms()[:2]))
-        #     else:
-        #         print(t0s, "too low")
-        # else:
-        #     print(t0.strftime("%Y-%m-%d %H:%M %Z"), "too bright")
+            elif lastalt and lastalt > 0 and lastalt < 2:
+                print("SETS")
+            lastalt = alt.degrees
 
         t0 += INCR
 
@@ -213,8 +224,8 @@ def calc_comet(comet_df, obstime, earthcoords, numdays=0, alt_table=False):
         print("Altitude", alt, "     Azumuth", az, distance)
 
         alm_twilights = almanac.dark_twilight_day(eph, obstopos)
-        dawn, dusk = find_twilights(obstime, alm_twilights)
-        print(WHICH_TWILIGHT, ": Dawn", svt2str(dawn), "Dusk", svt2str(dusk))
+        # dawn, dusk = find_twilights(obstime, alm_twilights)
+        # print(WHICH_TWILIGHT, ": Dawn", svt2str(dawn), "Dusk", svt2str(dusk))
 
         if numdays:
             print("\nRises and sets over", numdays, "days:")
