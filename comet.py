@@ -166,10 +166,10 @@ def print_alt_table(obstime, cometvec, obsvec, alm_twilights):
     while t0.day == curday:
         # print("      Start loop:", t0.strftime("%Y-%m-%d %H:%M %Z"))
         if night and t0 > dawn and t0 < dusk:
-            print(WHICH_TWILIGHT, "dawn")
+            print(WHICH_TWILIGHT, "dawn", dawn.strftime("%Y-%m-%d %H:%M %Z"))
             night = False
         elif not night and t0 >= dusk:
-            print(WHICH_TWILIGHT, "dusk")
+            print(WHICH_TWILIGHT, "dusk", dawn.strftime("%Y-%m-%d %H:%M %Z"))
             night = True
         if night:
             t0t = ts.utc(t0)
