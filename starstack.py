@@ -10,13 +10,23 @@
 import astroalign
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 import sys
+
+# rawpy is optional
+try:
+    import rawpy
+except:
+    pass
 
 
 np.random.seed(seed=12)
 
 
 def register(img1, img2):
+    """Take two images of type numpy.ndarray
+       and align (register) them.
+    """
     # Register the two images
     img_aligned, footprint = astroalign.register(img1, img2)
 
@@ -31,7 +41,7 @@ def register(img1, img2):
     axes[0, 1].axis('off')
     axes[0, 1].set_title("Target Image")
 
-    axes[1, 1].imshow(img2, cmap='gray', interpolation='none',
+    axes[1, 1].imshow(img_aligned, cmap='gray', interpolation='none',
                       origin='lower')
     axes[1, 1].axis('off')
     axes[1, 1].set_title("Source Image aligned with Target")
@@ -75,7 +85,7 @@ def register(img1, img2):
                           linewidth=2)
         axes[0, 1].add_patch(circ)
 
-    axes[1, 1].imshow(img2, cmap='gray',
+    axes[1, 1].imshow(img_aligned, cmap='gray',
                       interpolation='none', origin='lower')
     axes[1, 1].axis('off')
     axes[1, 1].set_title("Source Image aligned with Target")
@@ -89,8 +99,12 @@ def register(img1, img2):
     plt.tight_layout()
     plt.show()
 
-    # Align again
-    img_aligned2 = astroalign.apply_transform(transf, img1, img2)
+    # Align again using the transform.
+    # Could use this to align the other channels after using one
+    # channel to register the two images.
+    # The documentation doesn't mention a footprint being part of the return,
+    # but it is. At least sometimes.
+    img_aligned2, footprint = astroalign.apply_transform(transf, img1, img2)
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     axes[0, 0].imshow(img1, cmap='gray', interpolation='none', origin='lower')
@@ -101,7 +115,8 @@ def register(img1, img2):
     axes[0, 1].axis('off')
     axes[0, 1].set_title("Target Image")
 
-    axes[1, 1].imshow(img2, cmap='gray', interpolation='none', origin='lower')
+    axes[1, 1].imshow(img_aligned2, cmap='gray', interpolation='none',
+                      origin='lower')
     axes[1, 1].axis('off')
     axes[1, 1].set_title("Source Image aligned with Target")
 
@@ -144,14 +159,28 @@ def make_test_images():
     return img, img_rotated
 
 
+def read_image(path):
+    # First try reading as raw, if rawpy is loaded.
+    if 'rawpy' in sys.modules:
+        try:
+            with rawpy.imread(sys.argv[1]) as raw:
+                # raw.postprocess() -> numpy.ndarray of shape (2856, 4290, 3)
+                # Use only the green channel.
+                print("Reading", path, "as raw")
+                return raw.postprocess()[:, :, 1]
+        except rawpy._rawpy.LibRawFileUnsupportedError:
+            pass
+
+    image = Image.open(path)
+    print("Reading", path, "with PIL")
+    return np.asarray(image)[:, :, 1]
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         rgb1, rgb2 = make_test_images()
     else:
-        import rawpy
-        with rawpy.imread(sys.argv[1]) as raw:
-            rgb1 = raw.postprocess()
-        with rawpy.imread(sys.argv[2]) as raw:
-            rgb2 = raw.postprocess()
+        rgb1 = read_image(sys.argv[1])
+        rgb2 = read_image(sys.argv[2])
 
     register(rgb1, rgb2)
