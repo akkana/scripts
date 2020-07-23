@@ -487,6 +487,9 @@ speedtestserver:
     not very useful except as an illustration of how to make
     a mini server in Python. Use delaytest.cgi for actual testing.
 
+starstack.py:
+    Use the astroalign module to align and stack astrophotography images.
+
 tee.py:
     A file-like class that can optionally send output to a log file.
 
