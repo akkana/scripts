@@ -25,8 +25,8 @@ np.random.seed(seed=12)
 
 
 def register(*args):
-    """Take two images of type numpy.ndarray
-       and align (register) them.
+    """Take several images of type numpy.ndarray
+       and align (register) them relative to the first image.
     """
     # Multiple color layers? Use just the green layer for alignment.
     def singlelayer(img):
@@ -40,7 +40,7 @@ def register(*args):
     img_aligned, footprint = astroalign.register(img1, img2)
 
     # Plot the results
-    plot_three(img1, img2, img_aligned)
+    # plot_three(img1, img2, img_aligned)
 
     transf, (pos_img, pos_img_rot) = astroalign.find_transform(img1, img2)
 
@@ -54,7 +54,7 @@ def register(*args):
         for (x1, y1), (x2, y2) in zip(pos_img, pos_img_rot):
             print("(%.2f, %.2f) in source --> (%.2f, %.2f) in target"
                   % (x1, y1, x2, y2))
-    print_stats()
+    # print_stats()
 
     # Plot correspondences
     plot_three(img1, img2, img_aligned,
@@ -64,10 +64,24 @@ def register(*args):
     # Will use this to align the other channels after using one
     # channel to register the two images.
     # The documentation doesn't mention a footprint being part of the return,
-    # but it is. At least sometimes.
-    img_aligned2, footprint = astroalign.apply_transform(transf, img1, img2)
+    # but it is.
+    realigned, footprint = astroalign.apply_transform(transf, img1, img2)
 
-    plot_three(img1, img2, img_aligned2)
+    # plot_three(img1, img2, realigned)
+
+    newshape = args[1].shape
+    if len(newshape) == 2:
+        newshape = args[1].shape + (3,)
+
+    # trying https://stackoverflow.com/a/10445502
+    rgbArray = np.zeros(newshape, 'uint8')
+    for i in range(newshape[-1]):
+        rgbArray[..., i] = realigned
+    img = Image.fromarray(rgbArray)
+
+    outfile = '/tmp/out.jpg'
+    img.save(outfile)
+    print("Saved to", outfile)
 
 
 def make_test_images():
@@ -122,15 +136,22 @@ def read_image(path):
 
 colors = ['r', 'g', 'b', 'y', 'cyan', 'w', 'm']
 
-def plot_three(img1, img2, img3, pos_img=None, pos_img_rot=None, transf=None):
+def plot_three(img1, img2, img3, labels=None,
+               pos_img=None, pos_img_rot=None, transf=None):
+
+    DEFLABELS = ["Target Image", "Target Image",
+                 "Source Image aligned with Target"]
 
     def smalldim(im):
         return min(im.shape)
 
+    if not labels:
+        labels = DEFLABELS
+
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     axes[0, 0].imshow(img1, cmap='gray', interpolation='none', origin='lower')
     axes[0, 0].axis('off')
-    axes[0, 0].set_title("Source Image")
+    axes[0, 0].set_title(labels[0])
     if pos_img is not None:
         circsize = smalldim(img1) / 100
         for (xp, yp), c in zip(pos_img[:len(colors)], colors):
@@ -141,7 +162,7 @@ def plot_three(img1, img2, img3, pos_img=None, pos_img_rot=None, transf=None):
     axes[0, 1].imshow(img2, cmap='gray', interpolation='none',
                       origin='lower')
     axes[0, 1].axis('off')
-    axes[0, 1].set_title("Target Image")
+    axes[0, 1].set_title(labels[1])
     if transf and pos_img_rot is not None:
         circsize = smalldim(img2) / 100
         for (xp, yp), c in zip(pos_img_rot[:len(colors)], colors):
@@ -153,7 +174,7 @@ def plot_three(img1, img2, img3, pos_img=None, pos_img_rot=None, transf=None):
     axes[1, 1].imshow(img3, cmap='gray', interpolation='none',
                       origin='lower')
     axes[1, 1].axis('off')
-    axes[1, 1].set_title("Source Image aligned with Target")
+    axes[1, 1].set_title(labels[2])
     if transf and pos_img_rot is not None:
         circsize = smalldim(img3) / 100
         for (xp, yp), c in zip(pos_img_rot[:len(colors)], colors):
