@@ -11,7 +11,8 @@ import astroalign
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import sys
+import argparse
+import sys, os
 
 # rawpy is optional. PIL can read some raw images (at least Canon cr2),
 # but may not get the same results as rawpy does.
@@ -24,25 +25,68 @@ except:
 np.random.seed(seed=12)
 
 
-def register(*args):
-    """Take several images of type numpy.ndarray
-       and align (register) them relative to the first image.
+def register_all(images, outdir=".", ext="png"):
+    """Register a set of images (filenames) to the first image.
+       Save each image (including the unchanged first one) as a
+       set of png images with a_ prepended to the names.
+       Input images may be filenames, or may already be numpy arrays.
     """
-    # Multiple color layers? Use just the green layer for alignment.
-    def singlelayer(img):
-        if len(img.shape) == 3:
-            return img[:, :, 1]
-        return img
-    img1 = singlelayer(args[0])
-    img2 = singlelayer(args[1])
+    baseimg = read_image(images[0])
+    baselayer = singlelayer(baseimg)
+
+    for i, img in enumerate(images):
+        if i > 0:
+            imgarr = read_image(img)
+            aligned_img = register(imgarr, baselayer)
+        else:
+            # For the first image, don't align it, but do turn it
+            # into a PIL image so it can be saved like the others.
+            aligned_img = Image.fromarray(baseimg)
+
+        print("Aligned image mode:", aligned_img.mode)
+
+        print("shape", aligned_img.width, aligned_img.height)
+        if type(img) is str:
+            fname = os.path.splitext(os.path.basename(img))[0]
+            outfname = f"a_{fname}.{ext}"
+        else:
+            outfname = f"a_img_{i}.{ext}"
+
+        outfname = os.path.join(outdir, outfname)
+
+        if aligned_img.mode != 'RGB':
+            print("Converting monochrome image to save as PNG")
+            aligned_img = aligned_img.convert("RGB")
+
+        aligned_img.save(outfname)
+        if os.path.exists(outfname):
+            print("Overwriting", outfname)
+        else:
+            print("Creating", outfname)
+
+
+# Multiple color layers? Use just the green layer for alignment.
+def singlelayer(img, layer=1):
+    if len(img.shape) == 3:
+        return img[:, :, layer]
+    return img
+
+
+def register(rgbimage, baselayer):
+    """Align an image of type numpy.ndarray to a base image.
+       Input is normally an rgbimage, shape (width, height, 3)
+       but can also be monochrome, (width, height, 1).
+       Return the realigned image as an RGB PIL.Image.
+    """
+    img2 = singlelayer(rgbimage)
 
     # Register the two images
-    img_aligned, footprint = astroalign.register(img1, img2)
+    img_aligned, footprint = astroalign.register(baselayer, img2)
 
     # Plot the results
-    # plot_three(img1, img2, img_aligned)
+    # plot_three(baselayer, img2, img_aligned)
 
-    transf, (pos_img, pos_img_rot) = astroalign.find_transform(img1, img2)
+    transf, (pos_img, pos_img_rot) = astroalign.find_transform(baselayer, img2)
 
     def print_stats():
         print("Rotation: %2d degrees" % (transf.rotation * 180.0 / np.pi))
@@ -57,7 +101,7 @@ def register(*args):
     # print_stats()
 
     # Plot correspondences
-    plot_three(img1, img2, img_aligned,
+    plot_three(baselayer, img2, img_aligned,
                pos_img=pos_img, pos_img_rot=pos_img_rot, transf=transf)
 
     # Align again using the transform.
@@ -65,23 +109,24 @@ def register(*args):
     # channel to register the two images.
     # The documentation doesn't mention a footprint being part of the return,
     # but it is.
-    realigned, footprint = astroalign.apply_transform(transf, img1, img2)
+    # realigned, footprint = astroalign.apply_transform(transf, baselayer, img2)
 
-    # plot_three(img1, img2, realigned)
+    # plot_three(baselayer, img2, realigned)
 
-    newshape = args[1].shape
+    newshape = rgbimage.shape
     if len(newshape) == 2:
-        newshape = args[1].shape + (3,)
+        newshape = rgbimage.shape + (3,)
 
     # trying https://stackoverflow.com/a/10445502
     rgbArray = np.zeros(newshape, 'uint8')
     for i in range(newshape[-1]):
-        rgbArray[..., i] = realigned
-    img = Image.fromarray(rgbArray)
+        layer = singlelayer(rgbimage, i)
+        realigned, footprint = astroalign.apply_transform(transf, baselayer,
+                                                          layer)
 
-    outfile = '/tmp/out.jpg'
-    img.save(outfile)
-    print("Saved to", outfile)
+        rgbArray[..., i] = layer
+
+    return Image.fromarray(rgbArray)
 
 
 def make_test_images():
@@ -118,10 +163,18 @@ def make_test_images():
 
 
 def read_image(path):
+    """If path is a filename, read an image from it into a numpy array.
+       If it's already a numpy array, just return it.
+    """
+    if type(path) is np.ndarray:
+        return path
+    if type(path) is not str and type(path) is not bytes:
+        raise RuntimeError("read_image can't process type " + str(type(path)))
+
     # First try reading as raw, if rawpy is loaded.
     if 'rawpy' in sys.modules:
         try:
-            with rawpy.imread(sys.argv[1]) as raw:
+            with rawpy.imread(path) as raw:
                 # raw.postprocess() -> numpy.ndarray of shape (2856, 4290, 3)
                 # Use only the green channel.
                 print("Reading", path, "as raw")
@@ -190,10 +243,21 @@ def plot_three(img1, img2, img3, labels=None,
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        rgb1, rgb2 = make_test_images()
-    else:
-        rgb1 = read_image(sys.argv[1])
-        rgb2 = read_image(sys.argv[2])
+    parser = argparse.ArgumentParser(description="Stack astronomical images")
+    parser.add_argument('-t', "--test", dest="test", default=False,
+                        action="store_true",
+                help="Test mode: generate images instead of reading files")
+    parser.add_argument('-d', action="store", default='.', dest="dir",
+                        help='Directory to save files (default: .)')
+    parser.add_argument('imagefiles', nargs='*', help="2 or more input images")
+    args = parser.parse_args(sys.argv[1:])
 
-    register(rgb1, rgb2)
+    if args.test:
+        register_all(make_test_images(), outdir=args.dir)
+        sys.exit(0)
+
+    if len(args.imagefiles) < 2:
+        parser.print_help()
+        sys.exit(1)
+
+    register_all(args.imagefiles, outdir=args.dir)
