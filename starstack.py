@@ -21,11 +21,20 @@ try:
 except:
     pass
 
+try:
+    import tifffile
+except:
+    print("Can't import tifffile")
+    pass
 
 np.random.seed(seed=12)
 
 
-def register_all(images, outdir=".", ext="png"):
+# XXX Try exporting in TIFF or OpenRaster to get layers GIMP can import.
+# However, there doesn't seem to be a way to do this from Python.
+# Pillow may be able to save multi-page TIFFs, but pages and layers
+# aren't the same thing and it's not clear that would help.
+def register_all(images, outdir=".", ext="tif"):
     """Register a set of images (filenames) to the first image.
        Save each image (including the unchanged first one) as a
        set of png images with a_ prepended to the names.
@@ -37,15 +46,16 @@ def register_all(images, outdir=".", ext="png"):
     for i, img in enumerate(images):
         if i > 0:
             imgarr = read_image(img)
-            aligned_img = register(imgarr, baselayer)
+            aligned_arr = register(imgarr, baselayer)
+            aligned_img = Image.fromarray(aligned_arr)
         else:
             # For the first image, don't align it, but do turn it
             # into a PIL image so it can be saved like the others.
+            aligned_arr = baseimg
             aligned_img = Image.fromarray(baseimg)
 
-        print("Aligned image mode:", aligned_img.mode)
-
-        print("shape", aligned_img.width, aligned_img.height)
+        # print("Aligned image mode:", aligned_img.mode)
+        # print("shape", aligned_img.width, aligned_img.height)
         if type(img) is str:
             fname = os.path.splitext(os.path.basename(img))[0]
             outfname = f"a_{fname}.{ext}"
@@ -58,11 +68,16 @@ def register_all(images, outdir=".", ext="png"):
             print("Converting monochrome image to save as PNG")
             aligned_img = aligned_img.convert("RGB")
 
-        aligned_img.save(outfname)
+
+        if ext == "tif" and 'tifffile' in sys.modules:
+            print("Adding layer", i, "to layers.tif")
+            tifffile.imwrite('layers.tif', aligned_arr, append=True)
+
         if os.path.exists(outfname):
             print("Overwriting", outfname)
         else:
             print("Creating", outfname)
+        aligned_img.save(outfname)
 
 
 # Multiple color layers? Use just the green layer for alignment.
@@ -76,7 +91,7 @@ def register(rgbimage, baselayer):
     """Align an image of type numpy.ndarray to a base image.
        Input is normally an rgbimage, shape (width, height, 3)
        but can also be monochrome, (width, height, 1).
-       Return the realigned image as an RGB PIL.Image.
+       Return the realigned image as a numpy.ndarray.
     """
     img2 = singlelayer(rgbimage)
 
@@ -101,8 +116,8 @@ def register(rgbimage, baselayer):
     # print_stats()
 
     # Plot correspondences
-    plot_three(baselayer, img2, img_aligned,
-               pos_img=pos_img, pos_img_rot=pos_img_rot, transf=transf)
+    # plot_three(baselayer, img2, img_aligned,
+    #            pos_img=pos_img, pos_img_rot=pos_img_rot, transf=transf)
 
     # Align again using the transform.
     # Will use this to align the other channels after using one
@@ -126,7 +141,7 @@ def register(rgbimage, baselayer):
 
         rgbArray[..., i] = layer
 
-    return Image.fromarray(rgbArray)
+    return rgbArray
 
 
 def make_test_images():
@@ -172,12 +187,37 @@ def read_image(path):
         raise RuntimeError("read_image can't process type " + str(type(path)))
 
     # First try reading as raw, if rawpy is loaded.
+    # rawpy doesn't do a very good job by default, though.
+    # Probably it would need some adjustment of parameters below.
+    # However, a better solution:
+    # - darktable *.cr2 (including dark frame, probably)
+    #   or if that doesn't work (darktable tends to freeze if you start it
+    #   with a list of images), use import/folder... in the lighttable tab.
+    # - lighttable tab: choose the first image
+    # - darkroom tab: fiddle with it until it looks like what you want
+    # - Ctrl-C (this copies the operation history, not the image)
+    # - lighttable tab: Click on each other image in turn and Ctrl-V
+    # - lighttable tab: export selected
+    # This will (by default) export to files under darktable_exported/
+    # which you can then import as layers into GIMP, adjust, and stack.
+    #
+    # Some GIMP layer modes to try: Screen, Addition,
+    # Pin light, LCh *, Luminance
     if 'rawpy' in sys.modules:
         try:
             with rawpy.imread(path) as raw:
                 # raw.postprocess() -> numpy.ndarray of shape (2856, 4290, 3)
                 # Use only the green channel.
                 print("Reading", path, "as raw")
+
+                # Relevant parameters:
+                # https://letmaik.github.io/rawpy/api/rawpy.Params.html#rawpy.Params
+                # no_auto_bright=True
+                # auto_bright_thr=(float): ratio of clipped pixels with auto_bright. Default is 0.01 (1%).
+                # bright (float) – brightness scaling
+                # exp_shift (float) – exposure shift in linear scale. Usable range from 0.25 (2-stop darken) to 8.0 (3-stop lighter).
+                # exp_preserve_highlights (float) – preserve highlights when lightening the image with exp_shift. From 0.0 to 1.0 (full preservation).
+                # gamma (tuple) – pair (power,slope), default is (2.222, 4.5) for rec. BT.709
                 return raw.postprocess()
         except rawpy._rawpy.LibRawFileUnsupportedError:
             pass
