@@ -2,10 +2,37 @@
 
 # Use the astroalign module to align and stack a series of astro images.
 
-# Based on https://share.cocalc.com/share/b66ffe0d5b2bc8ff75ac939486710731c2b030f6/astroalign-124/astroalign-py3.ipynb?viewer=share
-# Note that the cocalc example is apparently based on a different
-# version of astroalign from the one currently in pip,
-# and doesn't expect the footprint second argument from register().
+# Suggested Workflow;
+# If starting with raw images, process them in darktable:
+# - darktable *.cr2 (including dark frame, probably)
+#   or if that doesn't work (darktable tends to freeze if you start it
+#   with a list of images), use import/folder... in the lighttable tab.
+# - lighttable tab: choose the first image
+# - darkroom tab: fiddle with it until it looks like what you want
+# - Ctrl-C (this copies the operation history, not the image)
+# - lighttable tab: Click on each other image in turn and Ctrl-V
+# - lighttable tab: export selected
+# This will (by default) export to files under darktable_exported/
+#
+# You can run this script directly on the raw images, but the import
+# with rawpy is one of two extremes: by default it does an extreme
+# brightness auto-stretch, which leads to incredibly noisy astro images;
+# or with no_auto_bright=True, you get no brightness improvement, so you
+# lose a lot of the extra info stored in the raw file.
+#
+# The output of this script is a sequence of aligned images.
+# astroalign doesn't do a perfect job (though it's quite a bit better
+# than Siril), so I recommend loading the image(s) into GIMP
+# and adjusting the alignment to your liking. Then set all the
+# layer modes except the bottom one to Addition (or for fun, you
+# might want to try Screen, Pin light, Luminance, or one of the LCh *)
+
+# Copyright 2020 by Akkana Peck: Share and enjoy under the GPLv2 or later.
+#
+# Originally based on
+# https://share.cocalc.com/share/b66ffe0d5b2bc8ff75ac939486710731c2b030f6/astroalign-124/astroalign-py3.ipynb?viewer=share
+# (apparently based on an earlier version of astroalign).
+
 
 import astroalign
 import numpy as np
@@ -21,19 +48,16 @@ try:
 except:
     pass
 
+# If the tifffile module is installed and the image extension is .tif
+# save multi-page TIFFs that GIMP can open as layers,
+# instead of separate images.
 try:
     import tifffile
 except:
     print("Can't import tifffile")
     pass
 
-np.random.seed(seed=12)
 
-
-# XXX Try exporting in TIFF or OpenRaster to get layers GIMP can import.
-# However, there doesn't seem to be a way to do this from Python.
-# Pillow may be able to save multi-page TIFFs, but pages and layers
-# aren't the same thing and it's not clear that would help.
 def register_all(images, outdir=".", ext="tif"):
     """Register a set of images (filenames) to the first image.
        Save each image (including the unchanged first one) as a
@@ -42,6 +66,14 @@ def register_all(images, outdir=".", ext="tif"):
     """
     baseimg = read_image(images[0])
     baselayer = singlelayer(baseimg)
+
+    if ext.startswith('.'):
+        ext = ext[1:]
+
+    if ext.lower() == "tif" and 'tifffile' in sys.modules:
+        tiff_multipage = os.path.join(outdir, "layers.tif")
+    else:
+        tiff_multipage = None
 
     for i, img in enumerate(images):
         if i > 0:
@@ -54,35 +86,36 @@ def register_all(images, outdir=".", ext="tif"):
             aligned_arr = baseimg
             aligned_img = Image.fromarray(baseimg)
 
-        # print("Aligned image mode:", aligned_img.mode)
-        # print("shape", aligned_img.width, aligned_img.height)
-        if type(img) is str:
-            fname = os.path.splitext(os.path.basename(img))[0]
-            outfname = f"a_{fname}.{ext}"
-        else:
-            outfname = f"a_img_{i}.{ext}"
-
-        outfname = os.path.join(outdir, outfname)
-
         if aligned_img.mode != 'RGB':
             print("Converting monochrome image to save as PNG")
             aligned_img = aligned_img.convert("RGB")
 
+        if tiff_multipage:
+            if type(img) is str:
+                print("Adding", os.path.basename(img), "to", tiff_multipage)
+            else:
+                print("Adding layer", i, "to", tiff_multipage)
+            tifffile.imwrite(tiff_multipage, aligned_arr, append=True)
 
-        if ext == "tif" and 'tifffile' in sys.modules:
-            print("Adding layer", i, "to layers.tif")
-            tifffile.imwrite('layers.tif', aligned_arr, append=True)
-
-        if os.path.exists(outfname):
-            print("Overwriting", outfname)
         else:
-            print("Creating", outfname)
-        aligned_img.save(outfname)
+            if type(img) is str:
+                fname = os.path.splitext(os.path.basename(img))[0]
+                outfname = f"a_{fname}.{ext}"
+            else:
+                outfname = f"a_img_{i}.{ext}"
+
+            outfname = os.path.join(outdir, outfname)
+
+            if os.path.exists(outfname):
+                print("Overwriting", outfname)
+            else:
+                print("Creating", outfname)
+            aligned_img.save(outfname)
 
 
 # Multiple color layers? Use just the green layer for alignment.
 def singlelayer(img, layer=1):
-    if len(img.shape) == 3:
+    if len(img.shape) >= 3:
         return img[:, :, layer]
     return img
 
@@ -145,6 +178,8 @@ def register(rgbimage, baselayer):
 
 
 def make_test_images():
+    np.random.seed(seed=12)
+
     h, w = img_shape = (200, 200)
     n_stars = 10
     pos_x = np.random.randint(10, w - 10, n_stars)
@@ -189,20 +224,6 @@ def read_image(path):
     # First try reading as raw, if rawpy is loaded.
     # rawpy doesn't do a very good job by default, though.
     # Probably it would need some adjustment of parameters below.
-    # However, a better solution:
-    # - darktable *.cr2 (including dark frame, probably)
-    #   or if that doesn't work (darktable tends to freeze if you start it
-    #   with a list of images), use import/folder... in the lighttable tab.
-    # - lighttable tab: choose the first image
-    # - darkroom tab: fiddle with it until it looks like what you want
-    # - Ctrl-C (this copies the operation history, not the image)
-    # - lighttable tab: Click on each other image in turn and Ctrl-V
-    # - lighttable tab: export selected
-    # This will (by default) export to files under darktable_exported/
-    # which you can then import as layers into GIMP, adjust, and stack.
-    #
-    # Some GIMP layer modes to try: Screen, Addition,
-    # Pin light, LCh *, Luminance
     if 'rawpy' in sys.modules:
         try:
             with rawpy.imread(path) as raw:
@@ -289,15 +310,17 @@ if __name__ == '__main__':
                 help="Test mode: generate images instead of reading files")
     parser.add_argument('-d', action="store", default='.', dest="dir",
                         help='Directory to save files (default: .)')
+    parser.add_argument('-e', action="store", default='tif', dest="ext",
+                        help='Output image file extension (default: tif)')
     parser.add_argument('imagefiles', nargs='*', help="2 or more input images")
     args = parser.parse_args(sys.argv[1:])
 
     if args.test:
-        register_all(make_test_images(), outdir=args.dir)
+        register_all(make_test_images(), outdir=args.dir, ext=args.ext)
         sys.exit(0)
 
     if len(args.imagefiles) < 2:
         parser.print_help()
         sys.exit(1)
 
-    register_all(args.imagefiles, outdir=args.dir)
+    register_all(args.imagefiles, outdir=args.dir, ext=args.ext)
