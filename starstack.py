@@ -92,7 +92,7 @@ class ORAfile:
     def __init__(self, filename):
         self.orafilename = filename
         if os.path.exists(self.orafilename):
-            os.remove(self.orafilename)   # win32 apparently needs that
+            os.remove(self.orafilename)
         self.orafile = zipfile.ZipFile(self.orafilename, 'w',
                                        compression=zipfile.ZIP_STORED)
 
@@ -171,15 +171,13 @@ class ORAfile:
         self.orafile.close()
 
 
-def register_all(images, outdir=".", ext="tif"):
+def register_all(images, outdir=".", ext="tif", layermode="NORMAL",
+                 darkframe=None):
     """Register a set of images (filenames) to the first image.
        Save each image (including the unchanged first one) as a
        set of png images with a_ prepended to the names.
        Input images may be filenames, or may already be numpy arrays.
     """
-    baseimg = read_image(images[0])
-    baselayer = singlelayer(baseimg)
-
     if ext.startswith('.'):
         ext = ext[1:]
 
@@ -194,38 +192,61 @@ def register_all(images, outdir=".", ext="tif"):
         tiff_multipage = None
         orafile = None
 
+    if darkframe:
+        print("Using dark frame", darkframe)
+        darkarr = read_image(darkframe)
+    else:
+        darkarr = None
+
     for i, img in enumerate(images):
         if type(img) is str:
             layername = os.path.basename(img)
         else:
             layername = "layer %d" % i
 
-        if i > 0:
-            imgarr = read_image(img)
-            aligned_arr = register(imgarr, baselayer)
-            aligned_img = Image.fromarray(aligned_arr)
-        else:
-            # For the first image, don't align it, but do turn it
-            # into a PIL image so it can be saved like the others.
+        imgarr = read_image(img)
+
+        # Subtract the dark frame.
+        # XXX This doesn't work right yet: the result has all kinds of
+        # new red and blue pixel noise (fully saturated, not subtle)
+        # and I haven't figured out why.
+        if darkarr is not None:
+            try:
+                print("Subtracting dark frame from", img)
+                imgarr -= darkarr
+            except Exception as e:
+                print("Couldn't subtract dark frame:", e)
+
+        if i == 0:
+            # For the first image, don't align it, just save it
+            # and its base layer
+            baseimg = imgarr
+            baselayer = singlelayer(baseimg)
             aligned_arr = baseimg
-            aligned_img = Image.fromarray(baseimg)
+        else:
+            aligned_arr = register(imgarr, baselayer)
+
+        # Now that the image is registered and has the dark frame subtracted,
+        # turn it into a PIL Image so it can be saved.
+        # This step isn't actually needed for TIFF.
+        aligned_img = Image.fromarray(aligned_arr)
 
         if aligned_img.mode != 'RGB':
             print("Converting monochrome image to save as PNG")
             aligned_img = aligned_img.convert("RGB")
 
         if tiff_multipage:
-            print("Adding", layername, "to", tiff_multipage)
             tifffile.imwrite(tiff_multipage, aligned_arr, append=True)
+            print("Adding", layername, "to", tiff_multipage)
 
         elif orafile:
             if i > 0:
-                mode = "ADDITION"
+                mode = layermode
             else:
                 mode = "NORMAL"
             orafile.store_layer(aligned_img, i, layername, layermode=mode)
-
-            print("Adding", layername, "to", orafile.orafilename)
+            print("Adding", layername, "to", orafile.orafilename,
+                  "in mode", mode)
 
         else:
             if type(img) is str:
@@ -243,7 +264,6 @@ def register_all(images, outdir=".", ext="tif"):
                 print("Creating", outfname, "with", layername)
 
     if orafile:
-        print(aligned_arr.shape)
         # save_thumbnail overwrites its input image, but we're done
         # aligned_img so that's okay.
         # orafile.save_thumbnail(aligned_img)
@@ -447,19 +467,26 @@ if __name__ == '__main__':
     parser.add_argument('-t', "--test", dest="test", default=False,
                         action="store_true",
                 help="Test mode: generate images instead of reading files")
-    parser.add_argument('-d', action="store", default='.', dest="dir",
+    parser.add_argument('-d', action="store", dest="dir", default='.',
                         help='Directory to save files (default: .)')
-    parser.add_argument('-e', action="store", default='tif', dest="ext",
-                        help='Output image file extension (default: tif)')
+    parser.add_argument('-e', action="store",  dest="ext",default='ora',
+                        help='Output image file extension (default: ora')
+    parser.add_argument('-m', action="store",  dest="layermode",
+                        default='ADDITION',
+                        help='Layer mode if using ora (default: ADDITION)')
+    parser.add_argument('-D', action="store",  dest="darkframe",
+                        help='Dark frame')
     parser.add_argument('imagefiles', nargs='*', help="2 or more input images")
     args = parser.parse_args(sys.argv[1:])
 
     if args.test:
-        register_all(make_test_images(), outdir=args.dir, ext=args.ext)
+        register_all(make_test_images(), outdir=args.dir,
+                     ext=args.ext, layermode=args.layermode)
         sys.exit(0)
 
     if len(args.imagefiles) < 2:
         parser.print_help()
         sys.exit(1)
 
-    register_all(args.imagefiles, outdir=args.dir, ext=args.ext)
+    register_all(args.imagefiles, outdir=args.dir, ext=args.ext,
+                 darkframe=args.darkframe, layermode=args.layermode)
