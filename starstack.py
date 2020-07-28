@@ -4,9 +4,10 @@
 
 # Suggested Workflow;
 # If starting with raw images, process them in darktable:
-# - darktable *.cr2 (including dark frame, probably)
+# - darktable *.cr2 (probably including your dark frame,
+#   though this script doesn'tsubtract dark frames yet)
 #   or if that doesn't work (darktable tends to freeze if you start it
-#   with a list of images), use import/folder... in the lighttable tab.
+#   with a list of images), try import/folder... in the lighttable tab.
 # - lighttable tab: choose the first image
 # - darkroom tab: fiddle with it until it looks like what you want
 # - Ctrl-C (this copies the operation history, not the image)
@@ -26,18 +27,31 @@
 # and adjusting the alignment to your liking. Then set all the
 # layer modes except the bottom one to Addition (or for fun, you
 # might want to try Screen, Pin light, Luminance, or one of the LCh *)
+#
+# The image will be easier to load into GIMP if you use .ora or .tif as
+# the export format from this script (ora is the default).
+# For ora, the program will write a single file, layers.ora, which
+# puts all the layers except the bottom one in Addition mode.
+# For tif, the program will write a layers.tif that includes the
+# layers as "pages"; GIMP can import pages as layers, but you'll
+# need to set the layer modes yourself.
+# For any other image format (e.g. png), starstack will write each
+# layer as a separate file.
 
 # Copyright 2020 by Akkana Peck: Share and enjoy under the GPLv2 or later.
 #
 # Originally based on
 # https://share.cocalc.com/share/b66ffe0d5b2bc8ff75ac939486710731c2b030f6/astroalign-124/astroalign-py3.ipynb?viewer=share
 # (apparently based on an earlier version of astroalign).
+# OpenRaster code adapted from Jon Nordby's GIMP OpenRaster file plug-in.
 
 
 import astroalign
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+import zipfile
+import xml.etree.ElementTree as ElementTree
 import argparse
 import sys, os
 
@@ -58,6 +72,105 @@ except:
     pass
 
 
+class ORAfile:
+
+    layermodes_map = {
+        "NORMAL":            "svg:src-over",
+        "ADDITION":          "svg:plus",
+        "MULTIPLY":          "svg:multiply",
+        "SCREEN":            "svg:screen",
+        "OVERLAY":           "svg:overlay",
+        "DARKEN_ONLY_MODE":  "svg:darken",
+        "LIGHTEN_ONLY_MODE": "svg:lighten",
+        "DODGE":             "svg:color-dodge",
+        "BURN":              "svg:color-burn",
+        "HARDLIGHT":         "svg:hard-light",
+        "SOFTLIGHT":         "svg:soft-light",
+        "DIFFERENCE":        "svg:difference",
+    }
+
+    def __init__(self, filename):
+        self.orafilename = filename
+        if os.path.exists(self.orafilename):
+            os.remove(self.orafilename)   # win32 apparently needs that
+        self.orafile = zipfile.ZipFile(self.orafilename, 'w',
+                                       compression=zipfile.ZIP_STORED)
+
+        # First file written must be mimetype:
+        self.write_file_str('mimetype', 'image/openraster')
+
+        self.ETimage = ElementTree.Element('image')
+        self.ETstack = ElementTree.SubElement(self.ETimage, 'stack')
+
+        self.size = None
+
+    def store_layer(self, img, layerno, layername, layerpath=None,
+                    layermode="NORMAL"):
+        """img is a PIL image"""
+        if not self.size:
+            self.size = img.size
+
+            a = self.ETimage.attrib
+            a['w'] = str(img.size[0])
+            a['h'] = str(img.size[1])
+
+        if not layerpath:
+            layerpath = 'data/%d.png' % layerno
+
+        # XXX TEMPORARY: can probably get PIL to write directly to the zip.
+        tmppng = os.path.join("/tmp", 'tmp.png')
+        img.save(tmppng)
+
+        self.orafile.write(tmppng, layerpath)
+        os.remove(tmppng)
+
+        layer = ElementTree.Element('layer')
+        # self.ETstack.append(layer)
+        # Need to insert layers in reverse order: want the first layer
+        # on the bottom, later ones higher.
+        self.ETstack.insert(0, layer)
+        a = layer.attrib
+        a['src'] = layerpath
+        a['name'] = layername
+        a['x'] = "0"
+        a['y'] = "0"
+        a['opacity'] = "1.0"
+        a['composite-op'] = ORAfile.layermodes_map[layermode]
+        a['visibility'] = "visible"
+
+    def save_thumbnail(self, img):
+        """Turn img into a thumbnail for the ORA file.
+           THIS WILL OVERWRITE img WITH A SMALLER VERSION!
+        """
+        if not self.size:
+            raise RuntimeError("Thumbnail before any images have been added")
+        w, h = self.size
+        # should be at most 256x256, without changing aspect ratio
+        if w > h:
+            w, h = 256, max(h*256/w, 1)
+        else:
+            w, h = max(w*256/h, 1), 256
+
+        img.thumbnail((w, h))
+        self.store_layer(img, -1, "Thumbnail",
+                         layerpath="Thumbnails/thumbnail.png")
+
+    def write_file_str(self, fname, data):
+        # work around a permission bug in the zipfile library:
+        # http://bugs.python.org/issue3394
+        zi = zipfile.ZipInfo(fname)
+        zi.external_attr = 0o100644 << 16
+        self.orafile.writestr(zi, data)
+
+    def finish(self):
+        """Finish and write the ORA file"""
+
+        xmldata = ElementTree.tostring(self.ETimage, encoding='UTF-8')
+        self.write_file_str("stack.xml", xmldata)
+
+        self.orafile.close()
+
+
 def register_all(images, outdir=".", ext="tif"):
     """Register a set of images (filenames) to the first image.
        Save each image (including the unchanged first one) as a
@@ -72,10 +185,21 @@ def register_all(images, outdir=".", ext="tif"):
 
     if ext.lower() == "tif" and 'tifffile' in sys.modules:
         tiff_multipage = os.path.join(outdir, "layers.tif")
+        orafile = None
+    elif ext == "ora":
+        print("OpenRaster export")
+        orafile = ORAfile(os.path.join(outdir, "layers.ora"))
+        tiff_multipage = None
     else:
         tiff_multipage = None
+        orafile = None
 
     for i, img in enumerate(images):
+        if type(img) is str:
+            layername = os.path.basename(img)
+        else:
+            layername = "layer %d" % i
+
         if i > 0:
             imgarr = read_image(img)
             aligned_arr = register(imgarr, baselayer)
@@ -91,11 +215,17 @@ def register_all(images, outdir=".", ext="tif"):
             aligned_img = aligned_img.convert("RGB")
 
         if tiff_multipage:
-            if type(img) is str:
-                print("Adding", os.path.basename(img), "to", tiff_multipage)
-            else:
-                print("Adding layer", i, "to", tiff_multipage)
+            print("Adding", layername, "to", tiff_multipage)
             tifffile.imwrite(tiff_multipage, aligned_arr, append=True)
+
+        elif orafile:
+            if i > 0:
+                mode = "ADDITION"
+            else:
+                mode = "NORMAL"
+            orafile.store_layer(aligned_img, i, layername, layermode=mode)
+
+            print("Adding", layername, "to", orafile.orafilename)
 
         else:
             if type(img) is str:
@@ -105,12 +235,21 @@ def register_all(images, outdir=".", ext="tif"):
                 outfname = f"a_img_{i}.{ext}"
 
             outfname = os.path.join(outdir, outfname)
+            aligned_img.save(outfname)
 
             if os.path.exists(outfname):
-                print("Overwriting", outfname)
+                print("Overwriting", outfname, "with", layername)
             else:
-                print("Creating", outfname)
-            aligned_img.save(outfname)
+                print("Creating", outfname, "with", layername)
+
+    if orafile:
+        print(aligned_arr.shape)
+        # save_thumbnail overwrites its input image, but we're done
+        # aligned_img so that's okay.
+        # orafile.save_thumbnail(aligned_img)
+        # finish up
+        orafile.finish()
+        print("Wrote", orafile.orafilename)
 
 
 # Multiple color layers? Use just the green layer for alignment.
@@ -239,7 +378,7 @@ def read_image(path):
                 # exp_shift (float) – exposure shift in linear scale. Usable range from 0.25 (2-stop darken) to 8.0 (3-stop lighter).
                 # exp_preserve_highlights (float) – preserve highlights when lightening the image with exp_shift. From 0.0 to 1.0 (full preservation).
                 # gamma (tuple) – pair (power,slope), default is (2.222, 4.5) for rec. BT.709
-                return raw.postprocess()
+                return raw.postprocess(no_auto_bright=True)
         except rawpy._rawpy.LibRawFileUnsupportedError:
             pass
 
