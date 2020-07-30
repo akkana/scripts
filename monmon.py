@@ -30,7 +30,7 @@ import sys
 # Leave debugging info in a file of known location,
 # because if it fails, you won't be able to see any error output,
 # but maybe you can shell in and read what happened.
-DEBUGFILE = None
+DEBUGFILE = open("/tmp/monmon.out", "a")
 
 class MonMon:
 

@@ -6,6 +6,10 @@
 # XXX Need to change desktop/screen resolution too.
 # When cycling to a new monitor, also need -s newwxnewh
 
+# In dire debugging circumstances:
+# import os
+# os.system("xrandr >/tmp/xrandr.out")
+
 import sys
 import subprocess
 
@@ -31,7 +35,7 @@ def find_in_preferred_list(mon_name, start_from=0):
             return t
     return None
 
-DEBUGFILE = open("/tmp/moncycle", "a")
+DEBUGFILE = open("/tmp/moncycle.out", "a")
 
 print("==== moncycle ===============", file=DEBUGFILE)
 
@@ -62,10 +66,13 @@ def mon_connect_str(mondata):
 # If only one monitor is connected, no-brainer.
 # Except no, not really. Also need -s resolution.
 if len(connected_mons) == 1:
-    geom = monmon.mon_geom[connected_mons[0]]
-    geomstr = "%dx%d" % (geom['width'], geom['height'])
+    if monmon.mon_geom:
+        # Sometimes the single monitor doesn't get a geometry,
+        # but we need to try to connect to it anyway.
+        geom = monmon.mon_geom[connected_mons[0]]
+        if geom:
+            geomstr = "%dx%d" % (geom['width'], geom['height'])
     args = ["xrandr"] + mon_connect_str(monmon.monitors[connected_mons[0]])
-    print("Only one monitor: calling", args, file=DEBUGFILE)
     subprocess.call(args)
     sys.exit(0)
 
