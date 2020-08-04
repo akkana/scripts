@@ -332,9 +332,22 @@ def write_rss20_file(mtglist):
         # Save the change string to put it in the RSS later.
         mtg['changestr'] = changestr
 
-    # Finally, generate the index RSS file.
-    outfilename = os.path.join(RSS_DIR, "index.rss")
-    with open(outfilename, 'w') as outfp:
+    ##############
+    # Finally, generate the index HTML and RSS files.
+
+    # The meeting list is in date/time order, latest first.
+    # Better to list them in the other order, starting with
+    # meetings today, then meetings tomorrow, etc.
+    # Could sort by keys, 'Meeting Date' and 'Meeting Time',
+    # but since it's already sorted, it's easier just to reverse.
+    mtglist.reverse()
+
+    # Open both the RSS and HTML files:
+    outrssfilename = os.path.join(RSS_DIR, "index.rss")
+    outhtmlfilename = os.path.join(RSS_DIR, "index.html")
+    with open(outrssfilename, 'w') as rssfp, \
+         open(outhtmlfilename, 'w') as htmlfp:
+
         gendate = now.strftime(RSS_DATE_FORMAT)
         print(f"""<?xml version="1.0" encoding="iso-8859-1" ?>
 <rss version="2.0"
@@ -351,14 +364,20 @@ def write_rss20_file(mtglist):
    <managingEditor>akk at shallowsky dot com (Akkana Peck)</managingEditor>
    <generator>losalamosmtgs</generator>
 """,
-              file=outfp)
+              file=rssfp)
 
-        # The meeting list is in date/time order, latest first.
-        # Better to list them in the other order, starting with
-        # meetings today, then meetings tomorrow, etc.
-        # Could sort by keys, 'Meeting Date' and 'Meeting Time',
-        # but since it's already sorted, it's easier just to reverse.
-        mtglist.reverse()
+        print(f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html>
+<head>
+<title>Los Alamos County Government Meetings</title>
+</head>
+<body>
+<h1>Los Alamos County Government Meetings</h1>
+<p>
+As of: {gendate}
+
+""", file=htmlfp)
 
         for mtg in mtglist:
             # Is the meeting in the future? Don't list past meetings.
@@ -368,7 +387,9 @@ def write_rss20_file(mtglist):
                       "because", meetingtime, "<", now)
                 continue
 
-            desc = f"""<![CDATA[ The {mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
+            mtgtitle = f"""{mtg['Name']} on {mtg["Meeting Date"]}"""
+
+            desc = f"""The {mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
 
             if mtg['Meeting Location']:
@@ -376,45 +397,62 @@ def write_rss20_file(mtglist):
 
             link = f"{RSS_URL}{mtg['cleanname']}.html"
             if mtg["Agenda"]:
-                desc = f"""{desc}<p> <a href="{mtg["Agenda"]}"<b>**** There is an agenda PDF. ****</b></a><br>
-(Click on the rss item link to see it as HTML).</p>
+                withagenda = " (WITH AGENDA)"
+                desc = f"""{desc}<p>
+<a href="{mtg["Agenda"]}">Agenda PDF</a><br>
+</p>
 """
             else:
                 desc += "<p>No agenda is available.</p>\n"
+                withagenda = " (no agenda)"
+
             if mtg['changestr']:
                 desc += "<p>" + mtg['changestr'] + '\n'
 
-                # print("packet", mtg["Agenda Packets"])
             if mtg["Agenda Packets"]:
                 # The agenda packet links tend to have & in them
                 # and so need to be escaped with CDATA
                 if 'http' in mtg["Agenda Packets"]:
-                    desc += f"""<p>There is an <a href="{mtg["Agenda Packets"]}">Agenda Packet PDF</a></p>\n"""
+                    desc += f"""<p><a href="{mtg["Agenda Packets"]}">Agenda Packet PDF</a></p>\n"""
                 else:
                     desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
 
-            # Close the cdata thingie
-            desc += "]]>"
-
             print("GUID will be", mtg['GUID'], "lastmod is", mtg['lastmod'])
+
+            # Add the item to the RSS
             print(f"""<item>
-   <title>{mtg['Name']} on {mtg["Meeting Date"]}</title>
+   <title>{mtgtitle} {withagenda}</title>
    <guid isPermaLink="false">{mtg['GUID']}</guid>
    <link>{link}</link>
-   <description>{desc}
+   <description><![CDATA[ {desc} ]]
    </description>
    <pubDate>{mtg['lastmod']}</pubDate>
-</item>""", file=outfp)
+</item>""", file=rssfp)
 
-        print("</channel>\n</rss>", file=outfp)
+            # And add it to the HTML
+            if mtg["Agenda"]:
+                print(f"<p><h2>{mtgtitle} {withagenda}</h2>", file=htmlfp)
+                if mtg["Agenda"]:
+                    print(f"""<p><b><a href="{link}">Agenda:
+{mtgtitle}</a></b>""", file=htmlfp)
+                print(f"""<p>
+{desc}
+<p>(Last modified: {gendate}.)
+""",
+                      file=htmlfp)
 
-    print("Wrote", outfilename)
+
+        print("</channel>\n</rss>", file=rssfp)
+        print("</body></html>", file=htmlfp)
+    print("Wrote", outrssfilename, "and", outhtmlfilename)
 
     # Remove obsolete files for meetings no longer listed.
     for f in os.listdir(RSS_DIR):
         # Only clean up .json, .rss, .html:
         if not f.endswith('.json') and not f.endswith('.rss') \
            and not f.endswith('.html'):
+            continue
+        if f.startswith("index"):
             continue
         def is_active(f):
             for act in active_meetings:
