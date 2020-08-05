@@ -389,7 +389,7 @@ As of: {gendate}
 
             mtgtitle = f"""{mtg['Name']} on {mtg["Meeting Date"]}"""
 
-            desc = f"""The {mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
+            desc = f"""{mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
 
             if mtg['Meeting Location']:
@@ -430,16 +430,17 @@ As of: {gendate}
 </item>""", file=rssfp)
 
             # And add it to the HTML
+            print(f"<p><h2>{mtgtitle} {withagenda}</h2>", file=htmlfp)
             if mtg["Agenda"]:
-                print(f"<p><h2>{mtgtitle} {withagenda}</h2>", file=htmlfp)
-                if mtg["Agenda"]:
-                    print(f"""<p><b><a href="{link}">Agenda:
-{mtgtitle}</a></b>""", file=htmlfp)
-                print(f"""<p>
+                print(f'<p><b><a href="{link}">Agenda: {mtgtitle}</a></b>',
+                      file=htmlfp)
+            else:
+                print("<p>No agenda yet", file=htmlfp)
+            print(f"""<p>
 {desc}
 <p>(Last modified: {gendate}.)
 """,
-                      file=htmlfp)
+                  file=htmlfp)
 
 
         print("</channel>\n</rss>", file=rssfp)
