@@ -17,10 +17,11 @@ import string
 import subprocess
 import tempfile
 import json
-import os
+import os, sys
 
 
 ########## CONFIGURATION ##############
+# You can also pass in RSS_URL RSS_DIR as two optional arguments
 
 # Where to start: the public legistar meeting list
 MEETING_LIST_URL = "http://losalamos.legistar.com/Calendar.aspx"
@@ -475,6 +476,11 @@ def mtgdic_to_cleanname(mtgdic):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        RSS_URL = sys.argv[1]
+        if len(sys.argv) > 2:
+            RSS_DIR = sys.argv[2]
+
     meetings = parse_meeting_list()
 
     write_rss20_file(meetings)
