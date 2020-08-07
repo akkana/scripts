@@ -371,12 +371,15 @@ def write_rss20_file(mtglist):
 
 <html>
 <head>
-<title>Los Alamos County Government Meetings</title>
+  <title>Los Alamos County Government Meetings</title>
+  <link rel="alternate" type="application/rss+xml"
+        title="Los Alamos Meetings Feed"
+        href="{RSS_URL}index.rss" />
 </head>
 <body>
 <h1>Los Alamos County Government Meetings</h1>
-<p>
 As of: {gendate}
+ .......... <a href="{RSS_URL}index.rss">Los Alamos Meetings RSS2.0 Feed</a>.
 
 """, file=htmlfp)
 
@@ -425,7 +428,7 @@ As of: {gendate}
    <title>{mtgtitle} {withagenda}</title>
    <guid isPermaLink="false">{mtg['GUID']}</guid>
    <link>{link}</link>
-   <description><![CDATA[ {desc} ]]
+   <description><![CDATA[ {desc} ]]>
    </description>
    <pubDate>{mtg['lastmod']}</pubDate>
 </item>""", file=rssfp)
@@ -478,6 +481,10 @@ def mtgdic_to_cleanname(mtgdic):
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         RSS_URL = sys.argv[1]
+        # RSS_URL is a directory and must end with a slash
+        if not RSS_URL.endswith('/'):
+            RSS_URL += '/'
+
         if len(sys.argv) > 2:
             RSS_DIR = sys.argv[2]
 
