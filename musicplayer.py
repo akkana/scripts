@@ -58,6 +58,10 @@ class MusicWin(Gtk.Window):
         self.song_ptr = -1
 
         self.cur_song_length = 0
+        self.cur_song_length_str = '0'
+
+        # GTK seems to have no way to set a scale without calling the callback.
+        self.ignore_callbacks = False
 
         self.configdir = os.path.expanduser('~/.config/musicplayer')
 
@@ -177,9 +181,21 @@ class MusicWin(Gtk.Window):
         views = Gtk.HBox(spacing=4)
         # views.padding = 8 So frustrating that we can't set this in general!
         mainbox.pack_end(views, False, False, 0)
-        self.time_label = Gtk.Label()
 
-        views.pack_start(self.time_label, False, False, 8)
+        self.time_label = Gtk.Label()
+        views.pack_start(self.time_label, fill=False, expand=False, padding=8)
+
+        # A slider for an adjustable progress indicator
+        self.progress_adj = Gtk.Adjustment(value=0, lower=0, upper=100,
+                                           step_increment=5,
+                                           page_increment=10,
+                                           page_size=0)
+        self.progress_hscale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
+                                         adjustment=self.progress_adj,
+                                         digits=0)
+        self.progress_hscale.connect("value-changed", self.prog_scale_moved)
+        views.pack_start(self.progress_hscale,
+                         fill=True, expand=True, padding=8)
 
         randomBtn = Gtk.ToggleButton(label="Shuffle")
         randomBtn.set_active(self.random)
@@ -264,7 +280,7 @@ button:hover { background: #dff; border-color: #8bb; }
     def add_songs_and_directories(self, slist):
         for s in slist:
             if os.path.isdir(s):
-                add_songs_from_dir(s)
+                self.add_songs_from_dir(s)
 
             elif s.endswith('.m3u'):
                 if os.path.exists(s):
@@ -323,13 +339,18 @@ button:hover { background: #dff; border-color: #8bb; }
         # self.save_playlist()
         Gtk.main_quit()
 
-    def restart(self, w):
+    def restart(self, w=None):
         # mixer.music.rewind() loses all track of the current position.
         # So instead, just stop and start again.
         self.skipped_seconds = 0
         self.stop()
         self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         self.play_state = MusicWin.PLAYING
+
+    def set_scale_slider(self, secs):
+        self.ignore_callbacks = True
+        self.progress_hscale.set_value(secs)
+        self.ignore_callbacks = False
 
     def pause(self, w=None):
         if self.play_state == MusicWin.PLAYING:
@@ -352,7 +373,8 @@ button:hover { background: #dff; border-color: #8bb; }
             self.stop_btn.set_tooltip_text("Play")
             self.play_state = MusicWin.STOPPED
             self.skipped_seconds = 0
-            self.time_label.set_label("0")
+            self.set_time_label(0)
+            self.set_scale_slider(0)
         else:    # Must be stopped already. Play something.
             mixer.music.play()
             self.stop_btn.set_label(u"\u25A0") # black square
@@ -376,12 +398,12 @@ button:hover { background: #dff; border-color: #8bb; }
             self.song_ptr = 0
 
     def next_song(self, w=None):
-        mixer.music.stop()
+        self.stop()
         self.play_state = MusicWin.PLAYING
 
     def prev_song(self, w=None):
         self.song_ptr = (self.song_ptr - 2) % len(self.songs)
-        mixer.music.stop()
+        self.stop()
         self.play_state = MusicWin.PLAYING
 
     def skip(self, sec):
@@ -390,6 +412,14 @@ button:hover { background: #dff; border-color: #8bb; }
         # Supposedly the position argument of play() takes seconds.
         pos += sec
         if pos < 0: pos = 0.
+        self.skipped_seconds = pos
+        mixer.music.play(0, pos)
+
+    def prog_scale_moved(self, event):
+        if self.ignore_callbacks:
+            return
+
+        pos = self.progress_hscale.get_value()
         self.skipped_seconds = pos
         mixer.music.play(0, pos)
 
@@ -545,9 +575,13 @@ button:hover { background: #dff; border-color: #8bb; }
         m = int(sec / 60)
         h = int(sec / 3600)
         if h:
-            return '%d:%02d:%02d' % (h, m, s)
+            return '%2d:%02d:%02d' % (h, m, s)
         else:
-            return '%d:%02d' % (m, s)
+            return '%2d:%02d' % (m, s)
+
+    def set_time_label(self, secs):
+        self.time_label.set_label(self.sec_to_str(secs)
+                                  + " / " + self.cur_song_length_str)
 
     def timer_func(self):
         """The timer func is what does the actual playing of songs."""
@@ -557,15 +591,15 @@ button:hover { background: #dff; border-color: #8bb; }
 
         # Are we still playing the same song?
         if mixer.music.get_busy():
-            # This sadly still isn't right. Sigh.
-            self.time_label.set_label(self.sec_to_str(self.skipped_seconds +
-                                                      (mixer.music.get_pos()
-                                                       /1000))
-                                      + " / " + self.cur_song_length_str)
+            # This is only approximate.
+            secs = self.skipped_seconds + (mixer.music.get_pos()/1000)
+            self.set_time_label(secs)
+            self.set_scale_slider(int(secs))
             return True
 
         # Else time to play the next song.
         self.skipped_seconds = 0
+        self.set_scale_slider(0)
         self.song_ptr = (self.song_ptr + 1) % len(self.songs)
 
         while not os.path.exists(self.songs[self.song_ptr]):
@@ -580,6 +614,10 @@ button:hover { background: #dff; border-color: #8bb; }
             mp3info = MP3(self.songs[self.song_ptr])
             self.cur_song_length = mp3info.info.length
             self.cur_song_length_str = self.sec_to_str(self.cur_song_length)
+
+            # Show the length on the hscale slider
+            self.progress_hscale.set_range(0, self.cur_song_length)
+
         except:
             self.cur_song_length = 0
             self.cur_song_length_str = '?'
@@ -605,6 +643,7 @@ button:hover { background: #dff; border-color: #8bb; }
             # Make sure the buttons are sane:
             self.pause_btn.set_label('||')
             self.stop_btn.set_label(u"\u25A0") # black square
+
         except Exception as e:
             print("Can't play", self.songs[self.song_ptr], ':', str(e))
             del self.songs[self.song_ptr]
