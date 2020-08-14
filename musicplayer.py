@@ -192,7 +192,7 @@ class MusicWin(Gtk.Window):
                                            page_size=0)
         self.progress_hscale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL,
                                          adjustment=self.progress_adj,
-                                         digits=0)
+                                         draw_value=False, digits=0)
         self.progress_hscale.connect("value-changed", self.prog_scale_moved)
         views.pack_start(self.progress_hscale,
                          fill=True, expand=True, padding=8)
@@ -420,6 +420,7 @@ button:hover { background: #dff; border-color: #8bb; }
             return
 
         pos = self.progress_hscale.get_value()
+        self.set_time_label(pos)
         self.skipped_seconds = pos
         mixer.music.play(0, pos)
 
