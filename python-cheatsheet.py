@@ -675,10 +675,12 @@ import dateutil.parser
 d = dateutil.parser.parse("2012-08-16 14:25:05.265739")
 d = dateutil.parser.parse("10/31/2016 14:25")
 d = dateutil.parser.parse("6/15/2016 14:25 MDT")
-# Also see the Arrow library, a Datetime replacement
-# that offers super-general date parsing like "an hour ago".
 
 # There's also isodate.parse_datetime which I haven't looked into yet.
+
+# Arrow is a Datetime replacement that offers humanize()
+# to turn a date into something like "an hour ago",
+# but it doesn't offer similar services for parsing.
 
 ############
 # Timezones:
@@ -704,7 +706,7 @@ localtime = othertime.astimezone(localtz)
 # https://blog.ganssle.io/
 #
 # recommends not using pytz (which will be dropped in 2 years).
-# Instead, using the new zoneinfo coming in with python 2.9.
+# Instead, using the new zoneinfo coming in with python 3.9.
 # (backport in pypi), or use dateutil.tz
 
 # A datetime.tzinfo object is a set of rules that include when to switch
@@ -751,6 +753,10 @@ noon_mt - noon_et
 
 # Some reasons not to use pytz:
 # https://blog.ganssle.io/articles/2018/03/pytz-fastest-footgun.html
+
+# Brandon Rhodes, the author of PyEphem and Skyfield, uses pytz
+# because it's compatible with Python2, which doesn't have dateutil
+# or datetime.now().astimezone() with no argument.
 
 ########################################################
 # Threading and multiprocessing
@@ -905,6 +911,7 @@ if 'foo' in sys.modules:
 else:
     myfoo = None
 
+
 ########################################################
 # Import of runtime-specified modules and functions
 ########################################################
@@ -913,6 +920,13 @@ functionname = 'TheFunction'
 
 themodule = __import__(modulename)
 val = getattr(themodule, functionname)()
+
+# Also, a note on importing:
+# "from pytopo import user_agent" makes a copy of
+# the variable and doesn't see later changes.
+# If you want to see changes, you need to
+# import pytopo and have it be pytopo.user_agent.
+
 
 ########################################################
 # unittest
@@ -1267,6 +1281,20 @@ import sys, pstats
 p = pstats.Stats(filename)
 p.sort_stats('time').print_stats(30)
 
+'''
+<nedbat> If a string has only one reference, += modifies the string in place: O(1).  If the string has other references (r = s), it has to be copied first: O(N) <https://t.co/5pmUI4F4QQ> [@nedbat: Python’s string += is optimized to be fast when it can be, but it’s easy to get the slow (quadratic) behavior, so be careful:
+
+<nedbat> import time
+
+<nedbat> s = ""
+<nedbat> for i in range(2_000_000):
+<nedbat>     s += "x"
+<nedbat>     # r = s      # do this to go slow.
+<nedbat>     if i % 20_000 == 0:
+<nedbat>         print(time.time())]
+'''
+
+
 ################################################################
 # PyEphem
 ################################################################
@@ -1515,22 +1543,27 @@ python3 setup.py sdist bdist_wheel
     (should generate two files in dist/)
 
 Upload to Test PyPI
+  First disable keyring if you don't use Kwallet:
+keyring disable
+  per https://twine.readthedocs.io/en/latest/#disabling-keyring
+  then:
 python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 
-Install and test in a new empty virtualenv.
-python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
-  The no-deps is because test pypi may not have all the same dependencies.
-  This is supposed to work if you want to test dependencies:
-      pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
-  but it doesn't, at least on Ubuntu, because of
-  https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
+Install and test in a new empty virtualenv:
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
 
-If everything works,
-upload to the real PyPI:
+If that doesn't work (e.g. on Ubuntu eoan), try:
+  python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
+  https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
+  The no-deps is because test pypi may not have all the same dependencies.
+
+If everything works, upload to the real PyPI:
 twine upload dist/*
 
 Building and Uploading Sphinx docs:
 Best ever: https://samnicholls.net/2016/06/15/how-to-sphinx-readthedocs/
+but once it's set up, just update the project and it should build automatically
+but check to make sure by logging in to: https://readthedocs.org/dashboard/
 
 More official:
 https://dont-be-afraid-to-commit.readthedocs.io/en/latest/documentation.html
