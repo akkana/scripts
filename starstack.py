@@ -207,12 +207,14 @@ def register_all(images, outdir=".", ext="tif", layermode="NORMAL",
         imgarr = read_image(img)
 
         # Subtract the dark frame.
-        # XXX This doesn't work right yet: the result has all kinds of
-        # new red and blue pixel noise (fully saturated, not subtle)
+        # XXX This doesn't work right yet: for cr2, the result has all kinds
+        # of new red and blue pixel noise (fully saturated, not subtle)
         # and I haven't figured out why.
         if darkarr is not None:
             try:
                 print("Subtracting dark frame from", img)
+                # Couldn't subtract dark frame: operands could not be broadcast together with shapes (4000,6000,3) (4024,6024,3)
+                # imgarr = imgarr - darkarr
                 imgarr -= darkarr
             except Exception as e:
                 print("Couldn't subtract dark frame:", e)
@@ -288,7 +290,12 @@ def register(rgbimage, baselayer):
     img2 = singlelayer(rgbimage)
 
     # Register the two images
-    img_aligned, footprint = astroalign.register(baselayer, img2)
+    try:
+        img_aligned, footprint = astroalign.register(baselayer, img2)
+    except astroalign.MaxIterError:
+        print(astroalign._find_sources(baselayer).shape, "sources")
+        print(astroalign._find_sources(img2).shape, "sources")
+        sys.exit(1)
 
     # Plot the results
     # plot_three(baselayer, img2, img_aligned)
@@ -398,7 +405,7 @@ def read_image(path):
                 # exp_shift (float) – exposure shift in linear scale. Usable range from 0.25 (2-stop darken) to 8.0 (3-stop lighter).
                 # exp_preserve_highlights (float) – preserve highlights when lightening the image with exp_shift. From 0.0 to 1.0 (full preservation).
                 # gamma (tuple) – pair (power,slope), default is (2.222, 4.5) for rec. BT.709
-                return raw.postprocess(no_auto_bright=True)
+                return raw.postprocess(no_auto_bright=False)
         except rawpy._rawpy.LibRawFileUnsupportedError:
             pass
 
@@ -469,8 +476,8 @@ if __name__ == '__main__':
                 help="Test mode: generate images instead of reading files")
     parser.add_argument('-d', action="store", dest="dir", default='.',
                         help='Directory to save files (default: .)')
-    parser.add_argument('-e', action="store",  dest="ext",default='ora',
-                        help='Output image file extension (default: ora')
+    parser.add_argument('-e', action="store",  dest="ext", default='ora',
+                        help='Output image file extension (default: ora)')
     parser.add_argument('-m', action="store",  dest="layermode",
                         default='ADDITION',
                         help='Layer mode if using ora (default: ADDITION)')
