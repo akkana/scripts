@@ -238,14 +238,6 @@ def view_message_attachments(fp, tmpdir):
     else:
         mysubprocess.call(cmd)
 
-                       # "data:text/html,<br><br><br><br><br><h1>Translating documents, please wait ..."
-                       # Use JS if we can figure out how to close or replace
-                       # the "please wait" tab once we have content to show.
-                       # But for now, setTimeout() doesn't work at all
-                       # in newly popped up private windows.
-                       # "javascript:document.writeln('<br><br><br><br><br><h1>Translating documents, please wait ...');setTimeout(function(){alert('hi');}, 500);"
-                     # ])
-
     # Now walk through looking for the real parts:
     # HTML, doc and docx.
     for part in msg.walk():
@@ -278,7 +270,8 @@ def view_message_attachments(fp, tmpdir):
 
             elif part.get_content_subtype() == \
                  "vnd.openxmlformats-officedocument.wordprocessingml.document" \
-                 or part.get_content_subtype() == "msword":
+                 or part.get_content_subtype() == "msword" \
+                 or part.get_content_subtype() == "vnd.oasis.opendocument.text":
                 mysubprocess.call(["unoconv", "-f", "html",
                                    "-T", UNOCONV_STARTUP_TIME,
                                    "-o", htmlfilename, partfile])
