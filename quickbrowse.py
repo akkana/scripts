@@ -236,9 +236,9 @@ class BrowserView(QWebEngineView):
         self.browser_win.progress.hide()
         url = self.browser_win.browserviews[self.browser_win.active_tab].url().toString()
         self.browser_win.progress.hide()
-        if not ok or not url:
-            if not url:
-                url = self.try_url
+        # Don't check ok: it's often false on URLs that loaded perfectly well.
+        if not url:
+            url = self.try_url
             load_failed_error = '''<br><br><br><br><big>" \
                 "Yikes! Load failed for %s</big>''' % url
             view = self.browser_win.browserviews[self.browser_win.active_tab]
