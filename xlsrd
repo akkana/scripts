@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
 
 # Read and print an excel .xls spreadsheet.
 # Thanks to http://scienceoss.com/read-excel-files-from-python/
@@ -25,9 +25,10 @@ def print_sheet(sheetname, sh):
         for colnum in range(sh.ncols):
             # Figure out how many characters this cell needs.
             val = sh.cell(rownum, colnum).value
-            if hasattr(val, 'decode'):
-                val = val.decode('utf-8')
-            print("Val", val)
+            # print("cell is type", type(val))
+            # if hasattr(val, 'decode'):
+            #     val = val.decode('utf-8')
+            # print("Val", val)
 
             # This gets lots of null strings, so filter them out:
             if not val:
@@ -48,9 +49,10 @@ def print_sheet(sheetname, sh):
         # even that is enough. In practice, this works to stdout without
         # needing the encode, but to pipe through grep or redirect to a
         # file it needs the encode.
-        print((fmt % tuple(map(str,
-                   sh.row_values(rownum)))).encode(sys.getdefaultencoding(),
-                                                   'backslashreplace'))
+        # print((fmt % tuple(map(str,
+        #            sh.row_values(rownum)))).encode(sys.getdefaultencoding(),
+        #                                            'backslashreplace'))
+        print(fmt % tuple(sh.row_values(rownum)))
 
 for filename in sys.argv[1:]:
     wb = xlrd.open_workbook(filename)
