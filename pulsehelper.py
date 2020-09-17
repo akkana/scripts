@@ -321,6 +321,25 @@ def print_status():
         print(sink_input_str(si))
 
 
+def get_active_sink_volume():
+    for sink in parse_sources_sinks('sink'):
+        if not sink['fallback']:
+            continue
+        if 'muted' in sink:
+            muted = sink['muted']
+        else:
+            muted = False
+        return int(sink['base_volume']), muted
+
+    return -1
+
+def set_active_sink_volume(newvol):
+    if '%' not in newvol:
+        newvol += '%'
+        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                         newvol])
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -342,15 +361,37 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
                         help='Set current source (microphone)')
     parser.add_argument('--sink', action="store", dest="sink",
                         help='Set current sink (speaker)')
+    parser.add_argument('--getvol', action='store_true', dest='getvol',
+                        help='Get the current volume level for the active sink')
+    parser.add_argument('--setvol', action='store', type=str, dest='setvol',
+                        default=-1,
+                        help='Set the current volume level for the active sink.'
+                             ' A percentage, optionally preceded by + or -.')
+    parser.add_argument('-q', '--quiet',
+                        action="store_true", dest="force_quiet",
+                        help="Don't print status at the end")
     args = parser.parse_args(sys.argv[1:])
 
     config = read_config_file()
 
+    quiet = False
+
+    if args.getvol:
+        print(get_active_sink_volume())
+        quiet = True
+
+    if args.setvol >= 0:
+        print(set_active_sink_volume(args.setvol))
+        quiet = True
+
     if args.source:
         unmute_one(args.source, 'source')
+        quiet = False
 
     if args.sink:
         unmute_one(args.sink, 'sink')
+        quiet = False
 
-    print_status()
+    if not quiet and not args.force_quiet:
+        print_status()
 
