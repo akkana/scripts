@@ -12,10 +12,10 @@
 #   we have a new thread pool available.
 
 import sys
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import socket
-from cookielib import CookieJar
-import StringIO
+from http.cookiejar import CookieJar
+import io
 import gzip
 import datetime
 import traceback
@@ -89,7 +89,7 @@ class UrlDownloader:
         """Resolve the URL, follow any redirects, but don't
            actually download the content.
         """
-        request = urllib2.Request(self.orig_url)
+        request = urllib.request.Request(self.orig_url)
 
         # If we're after the single-page URL, we may need a referrer
         if self.referrer:
@@ -106,9 +106,9 @@ class UrlDownloader:
             # Allow for cookies in the request: some sites, notably nytimes.com,
             # degrade to an infinite redirect loop if cookies aren't enabled.
             cj = CookieJar()
-            opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
         else:
-            opener = urllib2.build_opener()
+            opener = urllib.request.build_opener()
 
         self.response = opener.open(request, timeout=self.timeout)
 
@@ -132,7 +132,7 @@ class UrlDownloader:
 
         # but sadly, that means we need another request object
         # to parse out the host and prefix:
-        real_request = urllib2.Request(self.cururl)
+        real_request = urllib.request.Request(self.cururl)
         real_request.add_header('User-Agent', self.user_agent)
 
         self.host = real_request.get_host()
@@ -150,8 +150,8 @@ class UrlDownloader:
         self.final_url = self.response.geturl()
         if self.final_url != self.cururl:
             if DEBUG:
-                print >>DEBUG, "cururl != final_url!"
-                print >>DEBUG, self.cururl, "!=", self.final_url
+                print("cururl != final_url!", file=DEBUG)
+                print(self.cururl, "!=", self.final_url, file=DEBUG)
 
         # Is the URL gzipped? If so, we'll need to uncompress it.
         self.is_gzip = self.response.info().get('Content-Encoding') == 'gzip'
@@ -166,11 +166,11 @@ class UrlDownloader:
         # html can be undefined here. If so, no point in doing anything else.
         if not html:
             if DEBUG:
-                print >>DEBUG, "Didn't read anything from self.response.read()"
+                print("Didn't read anything from self.response.read()", file=DEBUG)
             raise NoContentError
 
         if self.is_gzip:
-            buf = StringIO.StringIO(html)
+            buf = io.StringIO(html)
             f = gzip.GzipFile(fileobj=buf)
             html = f.read()
 
@@ -189,7 +189,7 @@ class UrlDownloader:
 
         # Save the bytes we just downloaded to the local file path.
         fp = open(self.localpath, 'w')
-        if isinstance(html, unicode):
+        if isinstance(html, str):
             fp.write(html.encode(self.encoding))
         else:
             fp.write(html)
@@ -202,7 +202,7 @@ class UrlDownloader:
            Return self, which includes details like status code and errstring.
         """
         if DEBUG:
-            print >>DEBUG, "Start download", self.orig_url
+            print("Start download", self.orig_url, file=DEBUG)
             DEBUG.flush()
 
         # We must catch all errors here, otherwise they'll go ignored
@@ -220,17 +220,17 @@ class UrlDownloader:
             self.download_body()
             self.status = UrlDownloader.SUCCESS
             if DEBUG:
-                print >>DEBUG, "end download", self.orig_url, \
-                    self.bytes_downloaded, "bytes"
+                print("end download", self.orig_url, \
+                    self.bytes_downloaded, "bytes", file=DEBUG)
                 DEBUG.flush()
 
         except KeyboardInterrupt as e:
             if DEBUG:
-                print >>DEBUG, "Keyboard interrupt"
+                print("Keyboard interrupt", file=DEBUG)
             self.status = UrlDownloader.ERROR
             self.errmsg = str(e)
 
-        except (urllib2.HTTPError, IOError, urllib2.HTTPError,
+        except (urllib.error.HTTPError, IOError, urllib.error.HTTPError,
                 ValueError, socket.timeout, socket.error) as e:
             # The various errors likely to happen:
             # resolve_headers can fail with
@@ -353,18 +353,18 @@ class UrlDownloadQueue:
     def print_status(self):
         """Print a summary of what we did and didn't download successfully.
         """
-        print "\n===== Succeeded:"
+        print("\n===== Succeeded:")
         for u in self.succeeded:
-            print u
+            print(u)
 
-        print "\n===== Failed:"
+        print("\n===== Failed:")
         for u in self.failed:
-            print "%s:\n    %s" % (str(u), u.errmsg)
+            print("%s:\n    %s" % (str(u), u.errmsg))
 
         if len(self.in_progress):
-            print "\n===== Still in progress:"
+            print("\n===== Still in progress:")
             for u in self.in_progress:
-                print u
+                print(u)
 
     def processing(self):
         """Do we still have URLs in our queues that haven't been processed?
@@ -373,11 +373,13 @@ class UrlDownloadQueue:
 
 if __name__ == "__main__":
     """One way to test this:
-    urldownloader.py 'http://localhost/delaytest/?delay=.9&count=10' 'http://localhost/delaytest/?delay=1&count=2' 'http://localhost/delaytest/?delay=2&count=4'
+    urldownloader.py 'http://localhost/delaytest/?delay=.9&count=10' \
+                     'http://localhost/delaytest/?delay=1&count=2' \
+                     'http://localhost/delaytest/?delay=2&count=4'
        using delaytest.cgi for testing delays repeatably.
     """
     import os
-    import urlparse
+    import urllib.parse
     import posixpath
     import time
 
@@ -386,7 +388,7 @@ if __name__ == "__main__":
     dlqueue = UrlDownloadQueue(maxthreads=10)
 
     for url in sys.argv[1:]:
-        parsed = urlparse.urlparse(url)
+        parsed = urllib.parse.urlparse(url)
         # self.scheme = parsed.scheme
         host = parsed.netloc
         rooturlpath = posixpath.normpath(parsed.path)
@@ -395,14 +397,14 @@ if __name__ == "__main__":
             filename = "INDEX"
         if parsed.query:
             filename += '?' + parsed.query
-        print "filename:", filename
+        print("filename:", filename)
         localpath = os.path.join(DOWNLOAD_DIR, "%s-%s" % (host, filename))
 
         dlqueue.add(url=url, localpath=localpath,
                     timeout=50000, allow_cookies=True)
 
     if not os.path.exists(DOWNLOAD_DIR):
-        print "Creating", DOWNLOAD_DIR
+        print("Creating", DOWNLOAD_DIR)
         os.mkdir(DOWNLOAD_DIR)
 
     # print "\nQueue now (len %d):" % len(dlqueue)
@@ -415,7 +417,7 @@ if __name__ == "__main__":
     # Now things are downloading asynchronously.
     # Loop until they're all done.
     while dlqueue.processing():
-        print "processing ..."
+        print("processing ...")
         time.sleep(1)
 
     dlqueue.print_status()
