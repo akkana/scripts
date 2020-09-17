@@ -12,6 +12,13 @@ import re
 html_converter = html2text.HTML2Text()
 html_converter.body_width = 0
 
+# Don't be picky about smartquotes: map them to ascii quotes
+# for matching purposes.
+SMARTQUOTE_CHARMAP = { 0x201c : u'"',
+                       0x201d : u'"',
+                       0x2018 : u"'",
+                       0x2019 : u"'" }
+
 
 class Candidate:
     def __init__(self, name, lastname, office, party, questions, answers):
@@ -25,7 +32,7 @@ class Candidate:
         # file, and our uploading was completely inconsistent about
         # whether middle initials have a dot after them.
         self.comparename = re.sub('\.', '',
-                                  re.sub(' +', ' ', name.lower()))
+                                  re.sub('\s+', ' ', name.lower())).strip()
 
         self.name = name
 
@@ -60,7 +67,11 @@ class Candidate:
                                            if c.isalpha() ])
 
     def output(self, formatter):
-        formatter.add_name_and_party(self.name, f'({self.party})')
+        if self.party:
+            partystr = f'({self.party})'
+        else:
+            partystr = ''
+        formatter.add_name_and_party(self.name, partystr)
 
         for i, q in enumerate(self.questions):
             if not self.answers[i]:
@@ -86,7 +97,8 @@ class TextFormatter:
 
     def add_name_and_party(self, name, party):
         print("*", name)
-        print(party)
+        if party:
+            print(party)
         print()
 
     def add_q_and_a(self, question, answer):
@@ -115,7 +127,9 @@ class HtmlFormatter:
         self.htmlstr += f'<h1>{office}</h1>\n<p>' + description + '\n'
 
     def add_name_and_party(self, name, party):
-        self.htmlstr += f'\n<h2>{name}</h2>\n' + party
+        self.htmlstr += f'\n<h2>{name}</h2>\n'
+        if party:
+            self.htmlstr += party
 
     def add_q_and_a(self, question, answer):
         self.htmlstr += f'<p>\n<b>{question}</b><br />\n' + answer
@@ -176,8 +190,9 @@ class DocxFormatter:
                 self.para = self.doc.add_paragraph('')
             run = self.para.add_run('\n' + name + '\n')
             run.bold = True
-            run.font.size = docx.shared.Pt(self.NAME_SIZE)
-            run = self.para.add_run(party)
+            if party:
+                run.font.size = docx.shared.Pt(self.NAME_SIZE)
+                run = self.para.add_run(party)
             run.font.size = docx.shared.Pt(self.BASE_SIZE)
 
     def add_q_and_a(self, question, answer):
@@ -218,6 +233,7 @@ class DocxFormatter:
 def sort_candidates(candidates, order):
     """Sort candidates according to the order in which they appear
        in the order list, if any; otherwise, alphabetically.
+       Candidates not in the order file will be excluded.
     """
     if not order:
         print("Sorting alphabetically")
@@ -228,35 +244,47 @@ def sort_candidates(candidates, order):
 
     for cand_o in order:
         # Vote411 doesn't export presidential candidates for some reason.
-        if cand_o['Contest'] == 'President of the United States':
-            num_prezzies += 1
-            continue
+        try:
+            if cand_o['Contest'] == 'President of the United States':
+                num_prezzies += 1
+                continue
+        except:
+            pass
 
-        fullname = ' '.join([cand_o['First Name'],
-                             cand_o['Middle Name'],
-                             cand_o['Last Name']])
+        if 'fullname' in cand_o:
+            fullname = cand_o['fullname']
+        else:
+            fullname = ' '.join([cand_o['First Name'],
+                                 cand_o['Middle Name'],
+                                 cand_o['Last Name']])
+        saved_fullname = fullname
+        fulllname = fullname.lower()
 
         # Candidate may or may not have a middle name, so collapse
         # that extra space.
         fullname = re.sub(' +', ' ', fullname.lower())
-        # print("Looking for", fullname)
+
         foundit = False
         for cand_c in candidates:
             if cand_c.comparename == fullname:
                 sorted_candidates.append(cand_c)
                 foundit = True
                 break
+            # else:
+            #     print("    '%s' didn't match '%s'" % (fullname,
+            #                                           cand_c.comparename))
         if not foundit:
-            print(f"Couldn't find {fullname} ({cand_o['Contest']} {cand_o['District']})")
+            print(f"Couldn't find {saved_fullname}")
+            # ({cand_o['Contest']} {cand_o['District']})")
 
     # Done. Did we find everybody?
     if len(sorted_candidates) != len(order) - num_prezzies:
         print("Eek, didn't get everybody!")
-        print("\nSorted:", len(sorted_candidates))
+        print("\nMatched:", len(sorted_candidates))
         print("Order file has:", len(order))
         print()
 
-        sys.exit(1)
+        # sys.exit(1)
 
     return sorted_candidates
 
@@ -267,16 +295,51 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
     order = []
     if orderfile:
         with open(orderfile) as orderfp:
-            reader = csv.DictReader(orderfp)
-            for row in reader:
-                order.append(row)
-                # Each row has: Contest,District,County,
-                #               First Name,Middle Name,Last Name,
-                #               Party,Ballot Order,Status
-                # We'll do an inefficient search through it for each
-                # candidate, because performance is completely unimportant
-                # so no point in complicating the code with
-                # pointless optimization.
+            if orderfile.endswith('.csv'):
+                reader = csv.DictReader(orderfp)
+                for row in reader:
+                    order.append(row)
+                    # Each row has: Contest,District,County,
+                    #               First Name,Middle Name,Last Name,
+                    #               Party,Ballot Order,Status
+                    # We'll do an inefficient search through it for each
+                    # candidate, because performance is completely unimportant
+                    # so no point in complicating the code with
+                    # pointless optimization.
+
+            elif orderfile.endswith('.txt'):
+                # A plain text file listing candidate fullnames, one per line.
+                for line in orderfp:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    order.append({ 'fullname': line })
+
+            elif orderfile.endswith('.cnm'):
+                # Central New Mexico gave me an order file in Word format
+                # that intersperses names of races, names of candidates,
+                # and headers like "Federal/State Candidates List"
+                # with no way to tell them apart.
+                # The candidates mostly have a " - partyname" in them,
+                # so I'll look for that and assume lines with " - "
+                # are candidate names. But some lines with that
+                # aren't candidate names, e.g.
+                # "U.S. Representative – Congressional District 1"
+                # so the best we can do is flag those.
+                # Worse, that hyphen isn't a hyphen, it's \u2013,
+                for line in orderfp:
+                    loc = line.find(" \u2013 ")
+                    if loc <= 0:
+                        continue
+                    order.append({'fullname': line[:loc].strip()})
+
+            # Make the fullnames match the comparenames from the full database,
+            # by removing dots and extra spaces and converting to lowercase.
+            for cand in order:
+                cand['fullname'] = re.sub('\.', '',
+                                          re.sub(' +', ' ',
+                                                 cand['fullname'])) \
+                                                 .translate(SMARTQUOTE_CHARMAP)
 
     with open(filename) as csvfp:
         reader = csv.reader(csvfp, delimiter='\t')
@@ -372,14 +435,12 @@ if __name__ == '__main__':
     parser.add_argument('-F', "--format", dest="format", default='text',
                         action="store", help="Output format: text, html, docx")
     parser.add_argument('-o', "--orderfile", dest="orderfile", default=None,
-                        help="A CSV file listing all candidates in order")
+                        help="A CSV file listing all desired candidates in order")
     parser.add_argument('infiles', nargs='+',
                         help="Input files, in tab-separated format")
     args = parser.parse_args(sys.argv[1:])
 
     for f in args.infiles:
         convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
-
-
 
 
