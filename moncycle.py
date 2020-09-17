@@ -73,6 +73,7 @@ if len(connected_mons) == 1:
         if geom:
             geomstr = "%dx%d" % (geom['width'], geom['height'])
     args = ["xrandr"] + mon_connect_str(monmon.monitors[connected_mons[0]])
+    print("Calling:", args, file=DEBUGFILE)
     subprocess.call(args)
     sys.exit(0)
 
