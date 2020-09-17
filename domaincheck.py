@@ -18,7 +18,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 format="%25s   %10s %3s %s"
-RETRIES = 1
+RETRIES = 3
 
 def get_domain(domainname):
     for i in range(RETRIES):
@@ -26,10 +26,16 @@ def get_domain(domainname):
             domain = whois.whois(name)
             return domain
         except socket.timeout:
-            print("%s timed out; retrying" % domainname)
+            print("%s: timed out, retrying" % domainname)
+        except ConnectionResetError:
+            print("%s: ConnectionResetError, retrying" % domainname)
         except whois.parser.PywhoisError:
-            print("No such domain", domainname)
+            print("%s: No such domain" % domainname)
             return None
+        except Exception as e:
+            print("%s: unexpected Exception on" % domainname)
+            print(e)
+            print("Retrying...")
     print("Giving up on %s after %d timeouts" % (domainname, RETRIES))
     return None
 
