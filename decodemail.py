@@ -13,6 +13,14 @@ import email.utils
 
 from email.header import Header, decode_header
 
+# https://pythonhosted.org/kitchen/unicode-frustrations.html
+# says this should help the codec problem,
+# but that's for python2. In python3 it just prints:
+#   TypeError: write() argument must be str, not bytes
+# import codecs
+# UTF8Writer = codecs.getwriter('utf8')
+# sys.stdout = UTF8Writer(sys.stdout)
+
 Debug = False
 
 progname = os.path.basename(sys.argv[0])
@@ -117,7 +125,9 @@ def decode_file(filename, header_wanted, all=False, casematch=False):
             # It's not a continuation line. Print output, and either
             # exit, or clear output and go back to looking for headers.
             try:
-                print(output.encode('utf-8', "surrogatepass"))
+                # print(output.encode('utf-8', "surrogatepass"))
+                # print(type(output), file=sys.stderr)
+                print(output)
             except UnicodeEncodeError as e:
                 # output is ultimately whatever type that comes from
                 # email.header.decode_header, and printing it can
