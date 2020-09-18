@@ -472,14 +472,17 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
 
         # Did we find everybody?
         if notfound:
+            num_notfound = 0
             notfound_s = ''
             for orphan in notfound:
                 o = orphan.lower().strip()
                 if o in measure_categories:
                     continue
                 notfound_s += "\n    " + o
+                num_notfound += 1
             if notfound_s:
                 print("\nNot found:", notfound_s)
+                print(num_notfound, "lines didn't match")
 
 
 if __name__ == '__main__':
