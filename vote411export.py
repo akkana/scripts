@@ -85,6 +85,30 @@ class Candidate:
     def __lt__(self, other):
         return self.sortkey < other.sortkey
 
+    def __repr__(self):
+        return f"Candidate: {self.name}"
+
+
+class Measure:
+    # Colums: Name starts with "Yes - "
+    #         "Race/Referendum": "Constitutional Amendment 1", "Bond Question A"
+    #         "Description"
+    #         "Category": "Constitutional Amendments", "State Bond Questions"
+    def __init__(self, measurename, description, category):
+        self.measurename = measurename
+        self.desc = html_converter.handle(description) \
+                                     .strip() \
+                                     .replace('NM', 'N.M.')
+        self.category = category
+
+    def output(self, formatter):
+        formatter.add_name_and_party(
+            f'{self.measurename}: {self.desc} ({self.category})', None)
+        formatter.add_q_and_a('', self.desc)
+
+    def __repr__(self):
+        return f"Measure: {self.measurename}"
+
 
 class TextFormatter:
     def __init__(self):
@@ -106,7 +130,7 @@ class TextFormatter:
         print(answer)
         print()
 
-    def save(self, outfile):
+    def save(self, outfile=None):
         pass
 
 
@@ -134,12 +158,11 @@ class HtmlFormatter:
     def add_q_and_a(self, question, answer):
         self.htmlstr += f'<p>\n<b>{question}</b><br />\n' + answer
 
-    def save(self, outfile):
+    def save(self, outfile="savedoc.html"):
         self.htmlstr += '''
 </body>
 </html>
 '''
-        outfile = 'savedoc.html'
         with open(outfile, 'w') as outfp:
             outfp.write(self.htmlstr)
         print('Saved to', outfile)
@@ -225,7 +248,7 @@ class DocxFormatter:
         # not an RGBColor directly
         heading.style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
-    def save(self, outfile):
+    def save(self, outfile="savedoc.docx"):
         self.doc.save(outfile)
         print("Saved to", outfile)
 
@@ -240,17 +263,9 @@ def sort_candidates(candidates, order):
         return sorted(candidates)
 
     sorted_candidates = []
-    num_prezzies = 0
+    notfound = []
 
     for cand_o in order:
-        # Vote411 doesn't export presidential candidates for some reason.
-        try:
-            if cand_o['Contest'] == 'President of the United States':
-                num_prezzies += 1
-                continue
-        except:
-            pass
-
         if 'fullname' in cand_o:
             fullname = cand_o['fullname']
         else:
@@ -259,6 +274,14 @@ def sort_candidates(candidates, order):
                                  cand_o['Last Name']])
         saved_fullname = fullname
         fulllname = fullname.lower()
+
+        # Vote411 doesn't export presidential candidates for some reason.
+        try:
+            if cand_o['Contest'] == 'President of the United States':
+                notfound.append(saved_fullname)
+                continue
+        except:
+            pass
 
         # Candidate may or may not have a middle name, so collapse
         # that extra space.
@@ -274,23 +297,36 @@ def sort_candidates(candidates, order):
             #     print("    '%s' didn't match '%s'" % (fullname,
             #                                           cand_c.comparename))
         if not foundit:
-            print(f"Couldn't find {saved_fullname}")
-            # ({cand_o['Contest']} {cand_o['District']})")
+            # print(f"Not a candidate: {saved_fullname}")
+            notfound.append(saved_fullname)
 
-    # Done. Did we find everybody?
-    if len(sorted_candidates) != len(order) - num_prezzies:
-        print("Eek, didn't get everybody!")
-        print("\nMatched:", len(sorted_candidates))
-        print("Order file has:", len(order))
-        print()
+    return sorted_candidates, notfound
 
-        # sys.exit(1)
 
-    return sorted_candidates
+def sort_measures(measures, order):
+    """Sort measures according to the order in which they appear
+       in the order list, if any; otherwise, alphabetically.
+       Measures not in the order file will be excluded.
+    """
+    if not order:
+        print("Sorting alphabetically")
+        return sorted(measures)
+
+    sorted_measures = []
+    categories = set()
+
+    for measurecat in order:
+        measurecat_l = measurecat["fullname"].lower()
+        for measure_m in measures:
+            if measure_m.category.lower() == measurecat_l:
+                sorted_measures.append(measure_m)
+                categories.add(measure_m.category)
+
+    return sorted_measures, categories
 
 
 # Read tab-separated files
-def convert_vote411_file(filename, fmt='text', orderfile=None):
+def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
     # Read the orderfile, if any:
     order = []
     if orderfile:
@@ -315,24 +351,6 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                         continue
                     order.append({ 'fullname': line })
 
-            elif orderfile.endswith('.cnm'):
-                # Central New Mexico gave me an order file in Word format
-                # that intersperses names of races, names of candidates,
-                # and headers like "Federal/State Candidates List"
-                # with no way to tell them apart.
-                # The candidates mostly have a " - partyname" in them,
-                # so I'll look for that and assume lines with " - "
-                # are candidate names. But some lines with that
-                # aren't candidate names, e.g.
-                # "U.S. Representative – Congressional District 1"
-                # so the best we can do is flag those.
-                # Worse, that hyphen isn't a hyphen, it's \u2013,
-                for line in orderfp:
-                    loc = line.find(" \u2013 ")
-                    if loc <= 0:
-                        continue
-                    order.append({'fullname': line[:loc].strip()})
-
             # Make the fullnames match the comparenames from the full database,
             # by removing dots and extra spaces and converting to lowercase.
             for cand in order:
@@ -341,7 +359,8 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
                                                  cand['fullname'])) \
                                                  .translate(SMARTQUOTE_CHARMAP)
 
-    with open(filename) as csvfp:
+    # Read the tab-separated VOTE411 export file:
+    with open(tsvfilename) as csvfp:
         reader = csv.reader(csvfp, delimiter='\t')
 
         # Get the first line, and use it to figure out important fields
@@ -359,19 +378,33 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
         party_i = columnnames.index('Party Affiliation')
         question1_i = columnnames.index('Question 1')
 
+        # "Contact Name" is only needed to tell ballot measures from candidates
+        # "Category" is only used for measures.
+        contactname_i = columnnames.index('Contact Name')
+        category_i = columnnames.index('Category of Race/Referendum')
+
         if fmt == 'text':
             formatter = TextFormatter()
         elif fmt == 'html':
             formatter = HtmlFormatter()
         elif fmt == 'docx':
             formatter = DocxFormatter()
+        else:
+            raise(RuntimeError(f"Unknown format {fmt}: not text, html, docx"))
 
         candidates = []
+        measures = []
         race_descriptions = {}
 
         for row in reader:
             # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
             # ID	Name	Last Name	Private Email	Contact Name	Security Code	Party Affiliation	Race/Referendum	Description of Race/Referendum	Category of Race/Referendum	Occupation	Mailing Address	Campaign Phone	Website	Street address	Campaign Email	Facebook	Twitter	OCD	facebook	Question 1	Guide Answer 1	Print Answer 1	Question 2	Guide Answer 2	Print Answer 2	...
+
+            # Is it a ballot measure -- Constitutional Amendment, Bond Q, etc?
+            if row[contactname_i].startswith("Yes -"):
+                measures.append(Measure(row[office_i], row[desc_i],
+                                        row[category_i]))
+                continue
 
             # Loop over the questions. They start at index question1_i
             # and there are three columns for each question:
@@ -405,9 +438,20 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
         # Done with loop over tab-separated lines. All candidates are read.
         # print(len(candidates), "candidates")
 
+        # Sort the candidates and measures, and limit them to
+        # what's in the order file.
+        s_measures, measure_categories = sort_measures(measures, order)
+        s_candidates, notfound = sort_candidates(candidates, order)
+        measure_categories = [ c.lower().strip() for c in measure_categories ]
+
+        # First find the measures:
+        for measure in s_measures:
+            print("...", measure)
+            measure.output(formatter)
+
         cur_office = None
         num_for_office = 0
-        for candidate in sort_candidates(candidates, order):
+        for candidate in s_candidates:
             if candidate.office != cur_office:
                 if cur_office:
                     print(num_for_office, "running for", cur_office)
@@ -424,7 +468,18 @@ def convert_vote411_file(filename, fmt='text', orderfile=None):
             num_for_office += 1
             candidate.output(formatter)
 
-        formatter.save('savedoc.docx')
+        formatter.save()
+
+        # Did we find everybody?
+        if notfound:
+            notfound_s = ''
+            for orphan in notfound:
+                o = orphan.lower().strip()
+                if o in measure_categories:
+                    continue
+                notfound_s += "\n    " + o
+            if notfound_s:
+                print("\nNot found:", notfound_s)
 
 
 if __name__ == '__main__':
