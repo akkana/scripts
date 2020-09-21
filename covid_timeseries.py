@@ -143,8 +143,23 @@ def fetch_data(loclist):
                                 lis.append(0)
                             lis.append(val)
 
-                    val = float(datadict["value"])
+                    try:
+                        val = int(datadict["value"])
+                    except:
+                        val = float(datadict["value"])
                     set_list_element(covid_data[locID][ty], dateindex, val)
+
+    # Generate newcases data for all locations
+    for loc in loclist:
+        locID = loc["locationID"]
+        covid_data[locID]["newcases"] = []
+        for i, cases in enumerate(covid_data[locID]["cases"]):
+            if i == 0:
+                covid_data[locID]["newcases"].append(0)
+            else:
+                covid_data[locID]["newcases"].append(
+                    covid_data[locID]["cases"][i] - \
+                    covid_data[locID]["cases"][i-1])
 
     # Now covid_data should look something like:
     # { "iso1:us#iso2:us-nm#fips:35028": {
@@ -213,11 +228,11 @@ def plot_timeseries_pygal(key, loclist):
         print("Saved to", outfile)
 
 
-# def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
 def plot_allseries_pygal(loclist, save_file=True):
     locnames = ", ".join([l["county"] for l in loclist])
     print("locnames:", locnames)
     plot_timeseries_pygal('cases', loclist)
+    plot_timeseries_pygal('newcases', loclist)
     # plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
     plot_timeseries_pygal('deaths', loclist)
 
@@ -228,7 +243,15 @@ def plot_allseries_pygal(loclist, save_file=True):
   </head>
   <body>
     <h1>COVID-19 Cases in {locnames}</h1>
-    <figure>
+'''
+
+    for locdict in loclist:
+        html_out += f"""<b>{locdict["county"]:}</b>
+{covid_data[locdict["locationID"]]["cases"][-1]} cases,
+{covid_data[locdict["locationID"]]["newcases"][-1]} new cases,
+{covid_data[locdict["locationID"]]["deaths"][-1]} deaths<br>"""
+
+    html_out += f'''<figure>
         <embed type="image/svg+xml" src="covid-cases.svg" />
         <embed type="image/svg+xml" src="covid-newcases.svg" />
         <embed type="image/svg+xml" src="covid-deaths.svg" />
