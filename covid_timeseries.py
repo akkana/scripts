@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-# Plot COVID data from the Corona Data Scraper.
+# Plot COVID data from the Covid Atlas, https://covidatlas.com/data
+# (formerly Corona Data Scraper).
 
-import json
+# import json
+import csv
 import argparse
 import requests
 
@@ -19,13 +21,53 @@ import sys, os
 
 verbose = True
 
-DATAFILEURL = 'https://coronadatascraper.com/timeseries-byLocation.json'
+LATEST = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/"
+TIMESERIES = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/timeseries-tidy-small.csv"
+LOCATIONS = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/locations.csv"
 
 DATA_DIR = os.path.expanduser("~/Data/covid")
 
+# Globals for the data:
+covid_data = {}
+dates = []
 
-def fetch_data():
-    datafile = os.path.join(DATA_DIR, 'timeseries-byLocation.json')
+
+def find_locations(loclist):
+    def matches_location(locname, locdict):
+        if locname in locdict["locationID"]:
+            return True
+        if locname in locdict["name"]:
+            return True
+        return False
+
+    locfile = os.path.join(DATA_DIR, "locations.csv")
+    if not os.path.exists(locfile):
+        print("Downloading new location file")
+        r = requests.get(DATAFILEURL)
+        with open(locfile, 'wb') as locfd:
+            locfd.write(r.content)
+
+    locs = []
+
+    with open(locfile) as fp:
+        reader = csv.DictReader(fp)
+        for locdict in reader:
+            if not loclist:
+                locs.append(locdict)
+            else:
+                for locname in loclist:
+                    if matches_location(locname, locdict):
+                        locs.append(locdict)
+
+    return locs
+
+
+def fetch_data(loclist):
+    # I thought dicts didn't need to be declared global,
+    # but apparently they do.
+    global covid_data
+
+    datafile = os.path.join(DATA_DIR, 'timeseries-tidy-small.csv')
     needs_download = True
 
     # Check the data file's last-modified time, and update if needed.
@@ -51,76 +93,60 @@ def fetch_data():
         pass
 
     if needs_download:
-        r = requests.get(DATAFILEURL)
+        r = requests.get(TIMESERIES)
         with open(datafile, 'wb') as datafd:
             datafd.write(r.content)
         if verbose:
             print("Fetched", datafile)
 
+    covid_data = {}
     with open(datafile) as infp:
-        return json.loads(infp.read())
+        reader = csv.DictReader(infp)
+        for datadict in reader:
+            # Does this datadict line cover a location in the loclist?
+            for locdict in loclist:
+                if datadict["locationID"] == locdict["locationID"]:
+                    # Yes, it's in the loc list. Add it.
+                    locID = datadict["locationID"]
+                    if locID not in covid_data:
+                        covid_data[locID] = { "dates": [] }
 
+                    # type is cases, deaths, recovered, growthFactor
+                    ty = datadict["type"]
 
-def show_locations(covid_data, matches):
-    for k in covid_data.keys():
-        if matches:
-            for m in matches:
-                if m in k:
-                    print(k)
-                    break
-        else:
-            print(k)
+                    if ty not in covid_data[locID]:
+                        covid_data[locID][ty] = []
 
+                    # What's the index for this date?
+                    d = datetime.strptime(datadict["date"], '%Y-%m-%d')
+                    try:
+                        dateindex = covid_data[locID]["dates"].index(d)
+                    except:
+                        dateindex = len(covid_data[locID]["dates"])
+                        covid_data[locID]["dates"].append(d)
 
-def get_allseries(covid_data, location):
-    dates = []
-    allseries = {
-        'dates': [],
-        'cases': [],
-        'newcases': [],
-        'deaths': [],
-        'recovered': []
-    }
+                    def set_list_element(lis, index, val):
+                        """Set lis[index] = val,
+                           filling in missing values with zeros as necessary.
+                        """
+                        try:
+                            lis[index] = val
+                            return
+                        except IndexError:
+                            while len(lis) < index:
+                                lis.append(0)
+                            lis.append(val)
 
-    def append_or_zero(allseries, key, dic):
-        if key in dic:
-            allseries[key].append(dic[key])
-        else:
-            allseries[key].append(0)
+                    val = float(datadict["value"])
+                    set_list_element(covid_data[locID][ty], dateindex, val)
 
-    for d in covid_data[location]['dates']:
-        dates.append(datetime.strptime(d, '%Y-%m-%d'))
-        append_or_zero(allseries, 'cases',
-                       covid_data[location]['dates'][d])
-        if len(allseries['cases']) >= 2:
-            allseries['newcases'].append(allseries['cases'][-1]
-                                          - allseries['cases'][-2])
-        else:
-            allseries['newcases'].append(0)
-        append_or_zero(allseries, 'deaths',
-                       covid_data[location]['dates'][d])
-        append_or_zero(allseries, 'recovered',
-                       covid_data[location]['dates'][d])
-
-    return dates, allseries
-
-
-def plot_allseries_matplotlib(dates, allseries):
-
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, figsize=(10, 10))
-    ax1.plot(dates, allseries['cases'], label='Total cases')
-    ax1.set_title('Total cases')
-    ax2.plot(dates, allseries['newcases'], color='green', label='New cases')
-    ax2.set_title('New cases')
-    ax3.plot(dates, allseries['deaths'], color="red", label='Deaths')
-    ax3.set_title('Deaths')
-
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    plt.gca().xaxis.set_major_locator(mdates.DayLocator(interval=5))
-    plt.gcf().autofmt_xdate()
-    plt.tight_layout(pad=2.0, w_pad=10.0, h_pad=3.0)
-
-    plt.show()
+    # Now covid_data should look something like:
+    # { "iso1:us#iso2:us-nm#fips:35028": {
+    #       "dates":  [  "2020-01-22", "2020-01-23", ... ]
+    #       "cases":  [ 0., 1., 3., ...],
+    #       "deaths": [ 0., 0., 0., ...],
+    # }
+    # pprint(covid_data)
 
 
 def date_labels(start, end):
@@ -145,7 +171,11 @@ def date_labels(start, end):
     return labels
 
 
-def plot_timeseries_pygal(dates, allseries, key, title, region):
+def plot_timeseries_pygal(key, title, locdict):
+    locID = locdict["locationID"]
+    locname = locdict["name"]
+    dates = covid_data[locID]["dates"]
+
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
         title=f"COVID {title}", x_title=None, y_title=None,
@@ -155,11 +185,11 @@ def plot_timeseries_pygal(dates, allseries, key, title, region):
 
     # Don't add title (1st arg) here: it adds it as a legend on the left side
     # which then messes up the alignment of the three charts.
-    datetimeline.add(None, list(zip(dates, allseries[key])))
+    datetimeline.add(None, list(zip(dates, covid_data[locID][key])))
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
-    outfile = f'{DATA_DIR}/covid-{key}-{region}.svg'
+    outfile = f'{DATA_DIR}/covid-{key}-{locname}.svg'
 
     # datetimeline.render_to_file(outfile)
     svg = datetimeline.render()
@@ -176,11 +206,14 @@ def plot_timeseries_pygal(dates, allseries, key, title, region):
         print("Saved to", outfile)
 
 
-def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
-    region = regiontitle.replace(', ', '-').replace(' ', '-')
-    plot_timeseries_pygal(dates, allseries, f'cases', 'Cases', region)
-    plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
-    plot_timeseries_pygal(dates, allseries, f'deaths', 'Deaths', region)
+# def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
+def plot_allseries_pygal(locdict, save_file=True):
+    plot_timeseries_pygal('cases', f'Total Cases in {locdict["name"]}', locdict)
+    # plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
+    plot_timeseries_pygal('deaths', f'Deaths in {locdict["name"]}', locdict)
+
+    regiontitle = locdict["name"]
+    region = regiontitle
 
     html_out = f'''<!DOCTYPE html>
 <html>
@@ -198,7 +231,7 @@ def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
     <p>
     Source code: <a href="https://github.com/akkana/scripts/blob/master/covid_timeseries.py">covid_timeseries.py</a>.
     <p>
-    Uses data from the <a href="https://github.com/covidatlas/coronadatascraper">Corona Data Scraper</a> project.
+    Uses data from the <a href="https://covidatlas.com/data">Corona Atlas</a> project.
   </body>
 </html>
 '''
@@ -214,14 +247,13 @@ def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
         print(html_out)
 
 
-# Location can be something like "NM, USA" or "Bernalillo County, NM, USA"
-# Run with -L to see all locations, or -L 'pat' to show all locations
-# that include a pattern.
+# Location can be something like "Los Alamos" or "fips:35028" or just 35028.
+# To show all counties in a state, use "County, New Mexico"
+# Run with -L to see all locations (long list!),
+# or -L 'pat' to show all locations that match a pattern.
 
 def main():
     global verbose, DATA_DIR
-
-    # print("env keys:", os.environ.keys(), file=sys.stderr)
 
     # Run as a CGI?
     if 'REQUEST_URI' in os.environ:
@@ -240,21 +272,25 @@ def main():
         parser.add_argument('-L', "--show-locations", dest="show_locations",
                             default=False, action="store_true",
                             help="Show all available locations")
-        parser.add_argument('locations', nargs='*',
+        parser.add_argument('locations', nargs='+',
                             help="Locations to show")
         args = parser.parse_args(sys.argv[1:])
 
-        covid_data = fetch_data()
+        locs = find_locations(args.locations)
 
         if args.show_locations:
-            show_locations(covid_data, args.locations)
+            for loc in locs:
+                print(loc["name"], loc["locationID"])
             sys.exit(0)
 
-        try:
-            dates, allseries = get_allseries(covid_data, args.locations[0])
+        fetch_data(locs)
+        print("Fetched data")
 
-            # plot_allseries_matplotlib(dates, allseries)
-            plot_allseries_pygal(dates, allseries, args.locations[0], True)
+        try:
+            # dates, allseries = get_allseries(covid_data, args.locations[0])
+
+            loc = locs[0]
+            plot_allseries_pygal(loc)
 
         except IndexError:
             parser.print_help()
