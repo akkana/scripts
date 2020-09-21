@@ -8,12 +8,10 @@ import csv
 import argparse
 import requests
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from pprint import pprint
 
-# import matplotlib.pyplot as plt
-# import matplotlib.dates as mdates
 import pygal
 
 import sys, os
@@ -65,7 +63,7 @@ def find_locations(loclist):
 def fetch_data(loclist):
     # I thought dicts didn't need to be declared global,
     # but apparently they do.
-    global covid_data
+    global covid_data, dates
 
     datafile = os.path.join(DATA_DIR, 'timeseries-tidy-small.csv')
     needs_download = True
@@ -99,6 +97,14 @@ def fetch_data(loclist):
         if verbose:
             print("Fetched", datafile)
 
+    def append_dates_to(d):
+        global dates
+        if not dates:
+            dates = [d]
+            return
+        while d > dates[-1]:
+            dates.append(dates[-1] + timedelta(days=1))
+
     covid_data = {}
     with open(datafile) as infp:
         reader = csv.DictReader(infp)
@@ -109,7 +115,7 @@ def fetch_data(loclist):
                     # Yes, it's in the loc list. Add it.
                     locID = datadict["locationID"]
                     if locID not in covid_data:
-                        covid_data[locID] = { "dates": [] }
+                        covid_data[locID] = { }
 
                     # type is cases, deaths, recovered, growthFactor
                     ty = datadict["type"]
@@ -120,10 +126,10 @@ def fetch_data(loclist):
                     # What's the index for this date?
                     d = datetime.strptime(datadict["date"], '%Y-%m-%d')
                     try:
-                        dateindex = covid_data[locID]["dates"].index(d)
+                        dateindex = dates.index(d)
                     except:
-                        dateindex = len(covid_data[locID]["dates"])
-                        covid_data[locID]["dates"].append(d)
+                        dateindex = len(dates)
+                        append_dates_to(d)
 
                     def set_list_element(lis, index, val):
                         """Set lis[index] = val,
@@ -142,7 +148,6 @@ def fetch_data(loclist):
 
     # Now covid_data should look something like:
     # { "iso1:us#iso2:us-nm#fips:35028": {
-    #       "dates":  [  "2020-01-22", "2020-01-23", ... ]
     #       "cases":  [ 0., 1., 3., ...],
     #       "deaths": [ 0., 0., 0., ...],
     # }
@@ -171,25 +176,27 @@ def date_labels(start, end):
     return labels
 
 
-def plot_timeseries_pygal(key, title, locdict):
-    locID = locdict["locationID"]
-    locname = locdict["name"]
-    dates = covid_data[locID]["dates"]
+def plot_timeseries_pygal(key, loclist):
+    locnames = ", ".join([l["county"] for l in loclist])
 
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
-        title=f"COVID {title}", x_title=None, y_title=None,
+        title = f"{key} in {locnames}",
+        x_title=None, y_title=None,
         height=300,
         show_x_guides=True, show_y_guides=False,
         x_value_formatter=lambda dt: dt.strftime('%b %d'))
 
     # Don't add title (1st arg) here: it adds it as a legend on the left side
     # which then messes up the alignment of the three charts.
-    datetimeline.add(None, list(zip(dates, covid_data[locID][key])))
+    for locdict in loclist:
+        locID = locdict["locationID"]
+        locname = locdict["name"]
+        datetimeline.add(None, list(zip(dates, covid_data[locID][key])))
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
-    outfile = f'{DATA_DIR}/covid-{key}-{locname}.svg'
+    outfile = f'{DATA_DIR}/covid-{key}.svg'
 
     # datetimeline.render_to_file(outfile)
     svg = datetimeline.render()
@@ -207,25 +214,24 @@ def plot_timeseries_pygal(key, title, locdict):
 
 
 # def plot_allseries_pygal(dates, allseries, regiontitle, save_file):
-def plot_allseries_pygal(locdict, save_file=True):
-    plot_timeseries_pygal('cases', f'Total Cases in {locdict["name"]}', locdict)
+def plot_allseries_pygal(loclist, save_file=True):
+    locnames = ", ".join([l["county"] for l in loclist])
+    print("locnames:", locnames)
+    plot_timeseries_pygal('cases', loclist)
     # plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
-    plot_timeseries_pygal('deaths', f'Deaths in {locdict["name"]}', locdict)
-
-    regiontitle = locdict["name"]
-    region = regiontitle
+    plot_timeseries_pygal('deaths', loclist)
 
     html_out = f'''<!DOCTYPE html>
 <html>
   <head>
-    <title>COVID-19 Cases in {regiontitle}</title>
+    <title>COVID-19 Cases in {locnames}</title>
   </head>
   <body>
-    <h1>COVID-19 Cases in {regiontitle}</h1>
+    <h1>COVID-19 Cases in {locnames}</h1>
     <figure>
-        <embed type="image/svg+xml" src="covid-cases-{region}.svg" />
-        <embed type="image/svg+xml" src="covid-newcases-{region}.svg" />
-        <embed type="image/svg+xml" src="covid-deaths-{region}.svg" />
+        <embed type="image/svg+xml" src="covid-cases.svg" />
+        <embed type="image/svg+xml" src="covid-newcases.svg" />
+        <embed type="image/svg+xml" src="covid-deaths.svg" />
     </figure>
 
     <p>
@@ -237,7 +243,7 @@ def plot_allseries_pygal(locdict, save_file=True):
 '''
 
     if save_file:
-        outfile = f'{DATA_DIR}/covid-{region}.html'
+        outfile = f'{DATA_DIR}/covid.html'
         with open(outfile, "w") as outfp:
             outfp.write(html_out)
             if verbose:
@@ -287,10 +293,7 @@ def main():
         print("Fetched data")
 
         try:
-            # dates, allseries = get_allseries(covid_data, args.locations[0])
-
-            loc = locs[0]
-            plot_allseries_pygal(loc)
+            plot_allseries_pygal(locs)
 
         except IndexError:
             parser.print_help()
