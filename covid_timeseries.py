@@ -193,10 +193,12 @@ def date_labels(start, end):
 
 def plot_timeseries_pygal(key, loclist):
     locnames = ", ".join([l["county"] for l in loclist])
+    tot = sum([covid_data[l['locationID']][key][-1] for l in loclist])
+    title = f"{tot} {key} in {locnames}"
 
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
-        title = f"{key} in {locnames}",
+        title=title,
         x_title=None, y_title=None,
         height=300,
         show_x_guides=True, show_y_guides=False,
