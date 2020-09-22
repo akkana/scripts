@@ -30,7 +30,7 @@ covid_data = {}
 dates = []
 
 
-def find_locations(loclist):
+def find_locations(loclist, details=False):
     def matches_location(locname, locdict):
         if locname in locdict["locationID"]:
             return True
@@ -58,6 +58,19 @@ def find_locations(loclist):
                         locs.append(locdict)
 
     return locs
+
+
+def set_list_element(lis, index, val):
+    """Set lis[index] = val,
+       filling in missing values with zeros as necessary.
+    """
+    try:
+        lis[index] = val
+        return
+    except IndexError:
+        while len(lis) < index:
+            lis.append(0)
+        lis.append(val)
 
 
 def fetch_data(loclist):
@@ -131,29 +144,20 @@ def fetch_data(loclist):
                         dateindex = len(dates)
                         append_dates_to(d)
 
-                    def set_list_element(lis, index, val):
-                        """Set lis[index] = val,
-                           filling in missing values with zeros as necessary.
-                        """
-                        try:
-                            lis[index] = val
-                            return
-                        except IndexError:
-                            while len(lis) < index:
-                                lis.append(0)
-                            lis.append(val)
-
                     try:
                         val = int(datadict["value"])
                     except:
                         val = float(datadict["value"])
                     set_list_element(covid_data[locID][ty], dateindex, val)
 
-    # Generate newcases data for all locations
+    # Generate newcases and percapita data for all locations
     for loc in loclist:
         locID = loc["locationID"]
         covid_data[locID]["newcases"] = []
+        covid_data[locID]["percapita"] = []
+        pop = int(loc["population"])
         for i, cases in enumerate(covid_data[locID]["cases"]):
+            covid_data[locID]["percapita"].append(cases / pop)
             if i == 0:
                 covid_data[locID]["newcases"].append(0)
             else:
@@ -194,7 +198,13 @@ def date_labels(start, end):
 def plot_timeseries_pygal(key, loclist):
     locnames = ", ".join([l["county"] for l in loclist])
     tot = sum([covid_data[l['locationID']][key][-1] for l in loclist])
-    title = f"{tot} {key} in {locnames}"
+    # Integer or float?
+    if int(tot) == tot:
+        title = f"{tot} {key} in {locnames}"
+    else:
+        # XXX Is there a way to say "no more than 2 decimal places"
+        # while leaving an option for less?
+        title = f"{tot:.2f} {key} in {locnames}"
 
     datetimeline = pygal.DateTimeLine(
         x_label_rotation=35, truncate_label=-1,
@@ -208,8 +218,19 @@ def plot_timeseries_pygal(key, loclist):
     # which then messes up the alignment of the three charts.
     for locdict in loclist:
         locID = locdict["locationID"]
-        locname = locdict["name"]
-        datetimeline.add(None, list(zip(dates, covid_data[locID][key])))
+
+        # The first argument to add() is the name of the plot,
+        # which will be used for the legend.
+        # But for a single county, the legend just takes away space
+        # from the plot and doesn't add anything, so make the name
+        # empty in that case.
+        if len(loclist) > 1:
+            locname = locdict["county"]
+            if locname.endswith(" County"):
+                locname = locname[:-7]
+        else:
+            locname = None
+        datetimeline.add(locname, list(zip(dates, covid_data[locID][key])))
 
     datetimeline.x_labels = date_labels(dates[0], dates[-1])
 
@@ -235,7 +256,7 @@ def plot_allseries_pygal(loclist, save_file=True):
     print("locnames:", locnames)
     plot_timeseries_pygal('cases', loclist)
     plot_timeseries_pygal('newcases', loclist)
-    # plot_timeseries_pygal(dates, allseries, f'newcases', 'New Cases', region)
+    plot_timeseries_pygal('percapita', loclist)
     plot_timeseries_pygal('deaths', loclist)
 
     html_out = f'''<!DOCTYPE html>
@@ -256,6 +277,7 @@ def plot_allseries_pygal(loclist, save_file=True):
     html_out += f'''<figure>
         <embed type="image/svg+xml" src="covid-cases.svg" />
         <embed type="image/svg+xml" src="covid-newcases.svg" />
+        <embed type="image/svg+xml" src="covid-percapita.svg" />
         <embed type="image/svg+xml" src="covid-deaths.svg" />
     </figure>
 
