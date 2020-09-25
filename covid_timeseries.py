@@ -7,9 +7,11 @@
 import csv
 import argparse
 import requests
+import shutil
 
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta, timezone
 from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse as parsedate
 from pprint import pprint
 
 import pygal
@@ -19,11 +21,20 @@ import sys, os
 
 verbose = True
 
-LATEST = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/"
-TIMESERIES = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/timeseries-tidy-small.csv"
-LOCATIONS = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/locations.csv"
+DATAURL = "https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/"
 
 DATA_DIR = os.path.expanduser("~/Data/covid")
+
+LATEST     = "latest.csv"
+TIMESERIES = "timeseries-tidy-small.csv"
+LOCATIONS  = "locations.csv"
+
+# Data before this UT hour will be considered to be the previous day's data.
+# LATEST is supposedly "updated daily" but no time is specified.
+# Based on one check, it has a 'Last-Modified': 'Tue, 22 Sep 2020 19:03:30 GMT'
+# but will that be typical? Keep checking with
+# curl -I https://liproduction-reportsbucket-bhk8fnhv1s76.s3-us-west-1.amazonaws.com/v1/latest/latest.csv
+DATA_HOUR = 20
 
 # Globals for the data:
 covid_data = {}
@@ -38,10 +49,10 @@ def find_locations(loclist, details=False):
             return True
         return False
 
-    locfile = os.path.join(DATA_DIR, "locations.csv")
+    locfile = os.path.join(DATA_DIR, LOCATIONS)
     if not os.path.exists(locfile):
         print("Downloading new location file")
-        r = requests.get(DATAFILEURL)
+        r = requests.get(DATAURL + LOCATIONS)
         with open(locfile, 'wb') as locfd:
             locfd.write(r.content)
 
@@ -73,52 +84,20 @@ def set_list_element(lis, index, val):
         lis.append(val)
 
 
-def fetch_data(loclist):
-    # I thought dicts didn't need to be declared global,
-    # but apparently they do.
+def append_dates_to(d):
+    global dates
+    if not dates:
+        dates = [d]
+        return
+    while d > dates[-1]:
+        dates.append(dates[-1] + timedelta(days=1))
+
+
+def read_from_datafile(datafile, loclist):
     global covid_data, dates
-
-    datafile = os.path.join(DATA_DIR, 'timeseries-tidy-small.csv')
-    needs_download = True
-
-    # Check the data file's last-modified time, and update if needed.
-    # The coronascraper updates at approximately 9pm PST, 5am UTC.
-    # Use 6 UTC here to be safe.
-    UTC_update_hour = 6
-    try:
-        # last mod time in UTC.
-        filetime = datetime.utcfromtimestamp(os.stat(datafile).st_mtime)
-
-        # Make a datetime for the last occurrence of 6 UTC.
-        utcnow = datetime.utcnow()
-        lastupdate = utcnow.replace(hour=UTC_update_hour, minute=0, second=0)
-        if lastupdate > utcnow:
-            lastupdate -= relativedelta(days=1)
-
-        if lastupdate <= filetime:
-            if verbose:
-                print(datafile, "is cached and up to date")
-            needs_download = False
-
-    except FileNotFoundError:
-        pass
-
-    if needs_download:
-        r = requests.get(TIMESERIES)
-        with open(datafile, 'wb') as datafd:
-            datafd.write(r.content)
-        if verbose:
-            print("Fetched", datafile)
-
-    def append_dates_to(d):
-        global dates
-        if not dates:
-            dates = [d]
-            return
-        while d > dates[-1]:
-            dates.append(dates[-1] + timedelta(days=1))
-
+    dates = []
     covid_data = {}
+
     with open(datafile) as infp:
         reader = csv.DictReader(infp)
         for datadict in reader:
@@ -137,7 +116,8 @@ def fetch_data(loclist):
                         covid_data[locID][ty] = []
 
                     # What's the index for this date?
-                    d = datetime.strptime(datadict["date"], '%Y-%m-%d')
+                    d = datetime.strptime(datadict["date"],
+                                          '%Y-%m-%d').date()
                     try:
                         dateindex = dates.index(d)
                     except:
@@ -148,8 +128,87 @@ def fetch_data(loclist):
                         val = int(datadict["value"])
                     except:
                         val = float(datadict["value"])
-                    set_list_element(covid_data[locID][ty], dateindex, val)
+                    set_list_element(covid_data[locID][ty],
+                                     dateindex, val)
 
+
+def fetch_data(loclist):
+    # I thought dicts didn't need to be declared global,
+    # but apparently they do.
+    global covid_data, dates
+
+    datafile = os.path.join(DATA_DIR, TIMESERIES)
+
+    need_timeseries = False
+    need_latest = False
+
+    try:
+        read_from_datafile(datafile, loclist)
+        last_date = dates[-1]
+    except FileNotFoundError:
+        last_date = date(1970, 1, 1)
+
+    today = datetime.now(tz=timezone.utc).date()
+
+    if last_date < today:
+        print("Don't have any data for today. last_date is", last_date)
+        # Is there a more recent "latest" file?
+        h = requests.head(DATAURL + LATEST)
+        url_date = parsedate(h.headers['last-modified']).date()
+        print("url_date is", url_date)
+        if url_date - last_date > timedelta(days=1):
+            print("Last date is", last_date, "latest file is",
+                  url_date, "-- need to download timeseries")
+
+            print("Multiple days behind -- fetching new timeseries")
+
+            r = requests.get(DATAURL + TIMESERIES)
+            print("Fetched")
+
+            newdatafile = datafile + "-NEW"
+            with open(newdatafile, 'wb') as datafd:
+                datafd.write(r.content)
+            try:
+                os.rename(datafile, datafile + ".bak")
+            except:
+                print("Couldn't rename")
+                pass
+            os.rename(newdatafile, datafile)
+            print("Fetched", TIMESERIES)
+
+        # elif last_date < url_date:
+        else:
+            print("Fetcing one day's data file")
+
+            latestfile = os.path.join(DATA_DIR, 'latest.csv')
+            r = requests.get(DATAURL + LATEST)
+            with open(latestfile, 'wb') as latestfd:
+                latestfd.write(r.content)
+            print("Fetched", LATEST)
+
+            # Append whatever's in the latest to the timeseries
+            shutil.copy(datafile, datafile + ".bak")
+
+            todaystr = datetime.now().strftime("%Y-%m-%d")
+            with open(datafile, "a") as appendfp:
+                with open(latestfile) as infp:
+                    reader = csv.DictReader(infp)
+                    for latestdict in reader:
+                        for locdict in loclist:
+                            if latestdict["locationID"] == locdict["locationID"]:
+                                for key in ("cases", "deaths", "recovered"):
+                                    val = latestdict[key]
+                                    if val:
+                                        print(f"{latestdict['locationID']},{url_date},{key},{val}",
+                                              file=appendfp)
+            print("Appended to", TIMESERIES)
+    else:
+        print("Data files are up to date")
+
+    print("Reading from", datafile)
+    read_from_datafile(datafile, loclist)
+
+    # Whew, data supposedly read!
     # Generate newcases and percapita data for all locations
     for loc in loclist:
         locID = loc["locationID"]
@@ -171,6 +230,9 @@ def fetch_data(loclist):
     #       "deaths": [ 0., 0., 0., ...],
     # }
     # pprint(covid_data)
+    print("Last date is", dates[-1])
+    print("len dates:", len(dates))
+    print("len cases:", len(covid_data[loclist[0]["locationID"]]["cases"]))
 
 
 def date_labels(start, end):
