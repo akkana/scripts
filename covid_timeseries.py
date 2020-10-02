@@ -346,7 +346,7 @@ def plot_allseries_pygal(loclist, save_file=True):
     <p>
     Source code: <a href="https://github.com/akkana/scripts/blob/master/covid_timeseries.py">covid_timeseries.py</a>.
     <p>
-    Uses data from the <a href="https://covidatlas.com/data">Corona Atlas</a> project.
+    Uses data from the <a href="https://covidatlas.com/data">Covid Atlas</a> project.
   </body>
 </html>
 '''
