@@ -1,0 +1,258 @@
+#!/usr/bin/zsh
+
+# Build GIMP.
+# First argument is the version (which is also the name of the
+# build directory), e.g. buildgimp master will use a SRCDIR of
+# $HOME/outsrc/gimp-master and a GIMP_PREFIX of$HOME/run/gimp-master
+#
+# With no args, will assume "master".
+#
+# if clean is specified as the final argument,
+# also update the config.site and
+# run git clean -dfx in any srcdir that wasn't freshly checked out.
+#
+# This also serves as a cheatsheet for how to build GIMP.
+#
+
+GIMPVER="$1"
+if [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
+    GIMPVER=master
+fi
+echo "GIMPVER: $GIMPVER"
+
+export GIMP_PREFIX=$HOME/run/gimp-$GIMPVER
+export SRCDIR=$HOME/outsrc/gimp-$GIMPVER
+
+echo "Using PREFIX of $GIMP_PREFIX"
+echo "Using SRCDIR of $SRCDIR"
+
+usage() {
+    echo "Usage: $0 gimpver [clean]"
+    exit 1
+}
+
+if [ ! -d $GIMP_PREFIX ]; then
+    echo "$GIMP_PREFIX does not exist."
+    usage
+else
+    echo "$GIMP_PREFIX exists"
+fi
+
+if [ ! -d $SRCDIR ]; then
+    echo "$SRCDIR does not exist."
+    usage
+else
+    echo "$SRCDIR exists"
+fi
+
+export PATH="$GIMP_PREFIX/bin:$PATH"
+export PKG_CONFIG_PATH="$GIMP_PREFIX/lib/pkgconfig:$GIMP_PREFIX/share/pkgconfig:$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="$GIMP_PREFIX/lib:$LD_LIBRARY_PATH"
+export ACLOCAL_FLAGS="-I $GIMP_PREFIX/share/aclocal $ACLOCAL_FLAGS"
+
+
+if [[ "${@: -1}" == "clean" ]]; then
+    clean=true
+    echo "Cleaning all directories"
+    mkdir -p $GIMP_PREFIX/share/
+
+    # Overwrite config.site:
+    cat >$GIMP_PREFIX/share/config.site <<EOF
+GIMP_PREFIX=$GIMP_PREFIX
+export PATH="\$GIMP_PREFIX/bin:\$PATH"
+export PKG_CONFIG_PATH="\$GIMP_PREFIX/lib/pkgconfig:\$GIMP_PREFIX/share/pkgconfig:\$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="\$GIMP_PREFIX/lib:\$LD_LIBRARY_PATH"
+export ACLOCAL_FLAGS="-I \$GIMP_PREFIX/share/aclocal \$ACLOCAL_FLAGS"
+export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
+EOF
+else
+    echo "Not cleaning"
+    clean=''
+fi
+exit 0
+
+# Make sure this exits on errors:
+setopt errreturn
+
+
+# XDG_DATA_DIRS is now needed for the GEGL build, but may break the GIMP build.
+# If you set it for the GIMP build, you may encounter problems like:
+# Can't open ./cursors/cursor-color-picker.png: Couldn’t recognize
+# the image file format for file “./cursors/cursor-color-picker.png”
+# It's not clear whether there's a dir you can add to it that would
+# cure this; possibly /usr/local/share ?
+# https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html
+# and https://wiki.archlinux.org/index.php/XDG_Base_Directory
+# both say it defaults to /usr/local/share:/usr/share.
+# The error is only sporadic so it's difficult to test.
+if [[ x$XDG_DATA_DIRS == x ]]; then
+    export XDG_DATA_DIRS=$GIMP_PREFIX/share:/usr/local/share:/usr/share
+else
+    export XDG_DATA_DIRS=$GIMP_PREFIX/share:$XDG_DATA_DIRS
+fi
+
+# meson/ninja are now used for babl and gegl
+meson-build() {
+    # setopt localoptions errreturn doesn't work: use && for everything
+
+    # From Jehan, for Meson/Ninja builds:
+    MESONSRC=$(pwd)
+    BUILD_DIR=$MESONSRC/obj-$(arch)
+    mkdir -p $BUILD_DIR && \
+    cd $BUILD_DIR && \
+    meson -Dprefix=$GIMP_PREFIX --libdir=lib $MESONSRC && \
+    ninja && \
+    ninja install && \
+    cd ..
+}
+
+# update-clone dir repo: if dir already exists, cd there and git pull;
+# if not, git clone and then cd into the new dir.
+# If branch is set, check out that branch.
+# Either way, if $clean is set to true, do a git clean -dfx.
+# Either way, we should end up in the directory with an up-to-date repo.
+#
+# Sets pullstatus=0 if nothing happened, 1 if it pulled anything.
+pull-clone() {
+    repo=$1
+
+    # SRCDIR=$GIMP_PREFIX
+
+    pullstatus=0
+
+    # Find the directory by stripping the extension from the URL basename
+    d=$(basename $repo:r)
+    cd $SRCDIR
+    echo pull_clone: SRCDIR $SRCDIR, repo $repo, ./$d, clean $clean, branch $branch
+
+    # Have we checked out in this directory before?
+    # There's a thing on https://stackoverflow.com/questions/13736385/how-to-write-a-shell-script-that-checks-if-git-repository-is-up-to-date
+    # that says to use
+    #   git fetch origin
+    #   reslog=$(git log HEAD..origin/$branch --oneline)
+    #   if [[ "${reslog}" != "" ]] ; then  ...
+    # but it only works for master, not for branches.
+    # This may be more useful:
+    if [[ -d $d ]]; then
+        cd $d
+        echo_and_do git checkout $branch
+        pullres=$(git pull)
+        echo "Git pulled:" $pullres
+        if [[ x$pullres != 'xAlready up to date.' ]]; then
+            pullstatus=1
+        fi
+        if [[ x"$clean" == xtrue ]]; then
+            echo_and_do git clean -dfx
+            pullstatus=1
+        fi
+    else
+        # New directory, never pulled before
+        echo_and_do git clone $repo
+        cd $d
+        if [[ x$branch != x ]]; then   # no branch
+            echo_and_do git checkout -t origin/$branch
+        fi
+        pullstatus=1
+    fi
+    echo "Pullstatus" $pullstatus
+
+    # If you need to re-run and buld everything, uncomment the next line:
+    # pullstatus=1
+
+    # If these are left set, then any future calls that don't set them
+    # may get a value left over from the last call.
+    unset repo
+    unset branch
+}
+
+#
+# echo_and_do something.
+#
+echo_and_do() {
+  echo "$@"
+  "$@"
+}
+
+# pushd, but not if we're already at the target directory
+# or if we're currently home.
+# Use in other scripts that need to save the previous directory.
+pushd_maybe() {
+    cwd=`pwd`
+    if [[ x$1 == x$cwd ]]; then
+        return
+    fi
+    if [[ x$cwd == x$HOME ]]; then
+        cd $1
+    else
+        pushd $1
+    fi
+}
+
+popd_maybe() {
+    # $dirstack isn't documented anywhere near pushd/popd/dirs,
+    # but it works. Apparently it's documented with the zsh/parameters
+    # module in zshmodules(1).
+    if [[ $#dirstack > 0 ]]; then
+        popd
+    fi
+}
+
+# These two only needed for master builds, not 2.10
+echo '========== mypaint-brushes'
+echo "clean:" $clean
+cd $SRCDIR
+branch=v1.3.x
+pull-clone https://github.com/mypaint/mypaint-brushes.git
+echo "after pull-clone, clean:" $clean
+if [[ $pullstatus == 1 ]]; then
+    ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
+fi
+echo "after building, clean:" $clean
+
+echo '========== libmypaint'
+echo "clean:" $clean
+cd $SRCDIR
+# pull-clone https://github.com/Jehan/mypaint-brushes.git $clean
+branch=libmypaint-v1
+pull-clone https://github.com/mypaint/libmypaint.git
+echo "pullstatus:" $pullstatus
+if [[ $pullstatus == 1 ]]; then
+    ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
+fi
+
+echo '========== babl'
+echo "clean:" $clean
+# cd $SRCDIR/babl
+# meson-build
+# echo "Exiting in
+# exit 0
+# unset branch
+
+cd $SRCDIR
+pull-clone https://gitlab.gnome.org/GNOME/babl.git $clean
+echo "pullstatus:" $pullstatus
+if [[ $pullstatus == 1 ]]; then
+    meson-build
+fi
+
+echo '========== gegl'
+cd $SRCDIR
+pull-clone https://gitlab.gnome.org/GNOME/gegl.git $clean
+echo "pullstatus:" $pullstatus
+if [[ $pullstatus == 1 ]]; then
+    meson-build
+fi
+
+echo '========== gimp'
+cd $SRCDIR
+pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
+echo "pullstatus:" $pullstatus
+if [[ $pullstatus == 1 ]]; then
+    ./autogen.sh --prefix=$GIMP_PREFIX && make -j4 && make install
+fi
+
+unset clean
+unset pullstatus
+unset SRCDIR
+popd_maybe
+

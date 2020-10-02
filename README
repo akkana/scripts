@@ -70,6 +70,9 @@ bookfind.py:
     List books by author optionally year of publication,
     to find new books by particular authors.
 
+buildgimp:
+    Shell script for GIMP's ridiculously complicated build.
+
 cachefile.py:
     A general class for cases where you need to fetch data from some
     slow process, like a web API, and cache it locally for speedier access.
