@@ -113,23 +113,12 @@ class OrbitViewWindow():
                              width=self.width, height=self.height)
         self.canvas.pack()
 
+        tkmaster.bind("<KeyPress-q>", sys.exit)
+
         print(table_header)
 
         # Schedule the first draw
         self.step_draw()
-
-    def draw(self, widget, ctx):
-        # print("Draw")
-
-        # This makes no sense: specified line width has to be one less here
-        # than it does in idle_cb to result in the same line width.
-        ctx.set_line_width(self.line_width-1)
-        for p in planets:
-            if not p["line"]:
-                continue
-            self.canvas.coords(p["line"], p["xypath"])
-
-            # Skip the planet disk position for now
 
     def step_draw(self):
         """Calculate and draw the next position of each planet.
@@ -179,13 +168,20 @@ class OrbitViewWindow():
                         = find_next_opposition(self.time + 2)
 
             xn, yn = self.planet_x_y(hlon, sundist)
+            radius = 10
             p["xypath"].append(int(xn))
             p["xypath"].append(int(yn))
             if p["line"]:
                 self.canvas.coords(p["line"], p["xypath"])
+                self.canvas.coords(p["disk"], xn-radius, yn-radius,
+                                   xn+radius, yn+radius)
+
             else:
                 p["line"] = self.canvas.create_line(xn, yn, xn, yn,
                                                     width=self.linewidth,
+                                                    fill=p["colorname"])
+                p["disk"] = self.canvas.create_oval(xn-radius, yn-radius,
+                                                    xn+radius, yn+radius,
                                                     fill=p["colorname"])
 
             p["path"].append((hlon, sundist, earthdist, size))
