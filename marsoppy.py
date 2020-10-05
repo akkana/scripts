@@ -17,21 +17,20 @@
 
 import ephem
 
-from tkinter import Tk, Canvas, mainloop
+from tkinter import Tk, Canvas, mainloop, LEFT
 
 import math
 import argparse
 import sys
 from datetime import datetime
 
-planets = [
-    { "name": "Earth", "obj": ephem.Sun(), "colorname": "blue",
-      "path": [], "xypath": [],
-      "line": None, "disk": None },
-    { "name": "Mars", "obj": ephem.Mars(), "colorname": "red",
-      "path": [], "xypath": [], "oppositions": [],
-      "line": None, "disk": None },
-]
+earth = { "name": "Earth", "obj": ephem.Sun(), "color": "#08f",
+          "path": [], "xypath": [],
+          "line": None, "disk": None }
+
+mars = { "name": "Mars", "obj": ephem.Mars(), "color": "#f80",
+         "path": [], "xypath": [], "oppositions": [],
+         "line": None, "disk": None }
 
 # oppositions will include date, earth hlon, earth dist, mars hlon, mars dist
 oppositions = []
@@ -111,28 +110,44 @@ class OrbitViewWindow():
         tkmaster =  Tk()
         self.canvas = Canvas(tkmaster, bg="black",
                              width=self.width, height=self.height)
+        # Start with just the Sun
+        sunrad = 20
+        self.canvas.create_oval(self.width/2 - sunrad, self.height/2 - sunrad,
+                                self.width/2 + sunrad, self.height/2 + sunrad,
+                                fill="yellow")
         self.canvas.pack()
 
         tkmaster.bind("<KeyPress-q>", sys.exit)
+        tkmaster.bind("<KeyPress-space>", self.toggle_stepping)
 
         print(table_header)
 
         # Schedule the first draw
         self.step_draw()
 
+    def toggle_stepping(self, key):
+        self.stepping = not self.stepping
+
     def step_draw(self):
         """Calculate and draw the next position of each planet.
         """
+        # If we don't call step_draw at all, we'll never get further key events
+        # that could restart the animation. So just step at a much slower pace.
+        if not self.stepping:
+            self.canvas.after(500, self.step_draw)
+            return
+
         # Adding a float to ephem.Date turns it into a float.
         # You can get back an ephem.Date with: ephem.Date(self.time).
         self.time += self.time_increment
 
-        for p in planets:
+        for p in (earth, mars):
             p["obj"].compute(self.time)
 
             # ephem treats Earth specially, what a hassle!
             # There is no ephem.Earth body; ephem.Sun gives the Earth's
             # hlon as hlon, but I guess we need to use earth_distance.
+            oppy = False
             if p["name"] == "Earth":
                 hlon = p["obj"].hlon
                 sundist = p["obj"].earth_distance
@@ -145,6 +160,7 @@ class OrbitViewWindow():
                 size = p["obj"].size
 
                 if abs(self.time - self.opp_date) <= .5:
+                    oppy = True
                     if self.opp_date < self.closest_date:
                         print(table_format % (self.opp_date, earthdist, size),
                               "Opposition")
@@ -158,17 +174,45 @@ class OrbitViewWindow():
                         print(table_format % (self.opp_date, earthdist, size),
                               "Opposition")
 
-                    # Draw the planet
-                    # ctx.set_operator(cairo.Operator.IN)
-                    # ctx.arc(xn, yn, 10.0, 0, 2*math.pi);
-                    # ctx.stroke()
-                    # ctx.set_operator(cairo.Operator.OVER)
-
-                    self.opp_date, self.closest_date \
-                        = find_next_opposition(self.time + 2)
-
             xn, yn = self.planet_x_y(hlon, sundist)
             radius = 10
+
+            if oppy:
+                # Create outline circles for Mars and Earth at opposition.
+                # xn, yn should be Mars since Earth was done first.
+                self.canvas.create_oval(xn-radius, yn-radius,
+                                        xn+radius, yn+radius,
+                                        outline=p["color"], width=3)
+                earthx = earth["xypath"][-2]
+                earthy = earth["xypath"][-1]
+                self.canvas.create_oval(earthx-radius, earthy-radius,
+                                        earthx+radius, earthy+radius,
+                                        outline=earth["color"], width=3)
+                localtz = datetime.now().astimezone().tzinfo
+                oppdate = ephem.to_timezone(self.opp_date, localtz)
+                opp_str = oppdate.strftime("%Y-%m-%d")
+                if xn < self.width/2:
+                    if yn < self.height / 2:
+                        anchor = "se"
+                    else:
+                        anchor = "ne"
+                    xtxt = xn - radius
+                else:
+                    if yn < self.height / 2:
+                        anchor = "sw"
+                    else:
+                        anchor = "nw"
+                    xtxt = xn + radius
+                txt = self.canvas.create_text(xtxt, yn,
+                                              fill=p["color"], justify=LEFT,
+                                              font=('sans', 14, 'bold'),
+                                              anchor=anchor,
+                                              text=opp_str)
+
+                # Done with this opposition: find the next one.
+                self.opp_date, self.closest_date \
+                    = find_next_opposition(self.time + 2)
+
             p["xypath"].append(int(xn))
             p["xypath"].append(int(yn))
             if p["line"]:
@@ -179,10 +223,10 @@ class OrbitViewWindow():
             else:
                 p["line"] = self.canvas.create_line(xn, yn, xn, yn,
                                                     width=self.linewidth,
-                                                    fill=p["colorname"])
+                                                    fill=p["color"])
                 p["disk"] = self.canvas.create_oval(xn-radius, yn-radius,
                                                     xn+radius, yn+radius,
-                                                    fill=p["colorname"])
+                                                    fill=p["color"])
 
             p["path"].append((hlon, sundist, earthdist, size))
 
@@ -233,7 +277,7 @@ Key bindings:
   space   Start/stop animation
   q       quit""",
         formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('-a', "--au", dest="auscale", type=float, default=2.6,
+    parser.add_argument('-a', "--au", dest="auscale", type=float, default=1.7,
                         action="store",
                         help="""Scale of the window in astronomical units.
 Default is 11, which shows Saturn.
