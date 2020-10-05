@@ -212,6 +212,12 @@ class OrbitViewWindow(Gtk.Window):
                         print(table_format % (self.opp_date, earthdist, size),
                               "Opposition")
 
+                    # Draw the planet
+                    # ctx.set_operator(cairo.Operator.IN)
+                    # ctx.arc(xn, yn, 10.0, 0, 2*math.pi);
+                    # ctx.stroke()
+                    # ctx.set_operator(cairo.Operator.OVER)
+
                     self.opp_date, self.closest_date \
                         = find_next_opposition(self.time + 2)
 
@@ -219,28 +225,26 @@ class OrbitViewWindow(Gtk.Window):
                 ctx.set_source_rgb(*color_to_triplet(p["color"]))
                 ctx.new_path()
 
-                self.planet_segment(ctx, p["path"][-1][0], p["path"][-1][1],
-                                    False)
-                self.planet_segment(ctx, hlon, sundist, True)
+                # Move to end of last segment
+                xl, yl = self.planet_x_y(p["path"][-1][0], p["path"][-1][1])
+                ctx.move_to(xl, yl)
+
+                # ... and draw to new position.
+                xn, yn = self.planet_x_y(hlon, sundist)
+                ctx.line_to(xn, yn)
 
                 ctx.stroke()
                 ctx.close_path()
+                # print("Operator:", ctx.get_operator())
 
             p["path"].append((hlon, sundist, earthdist, size))
 
         # Returning True reschedules the timeout.
         return self.stepping
 
-    def planet_segment(self, ctx, hlon, dist, drawp):
-        """Draw (if drawp) or move to the appropriate place on the screen
-           for the given ra and dist coordinates.
-        """
-        x = dist * self.dist_scale * math.cos(hlon) + self.halfwidth
-        y = dist * self.dist_scale * math.sin(hlon) + self.halfheight
-        if drawp:
-            ctx.line_to(x, y)
-        else:
-            ctx.move_to(x, y)
+    def planet_x_y(self, hlon, dist):
+        return (dist * self.dist_scale * math.cos(hlon) + self.halfwidth,
+                dist * self.dist_scale * math.sin(hlon) + self.halfheight)
 
     def configure(self, widget, event):
         """Window size change: reset the scale factors."""
