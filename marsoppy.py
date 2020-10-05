@@ -31,9 +31,9 @@ import sys
 from datetime import datetime
 
 planets = [
-    { "name": "Earth", "e": ephem.Sun(), "colorname": "blue",
+    { "name": "Earth", "obj": ephem.Sun(), "colorname": "blue",
       "path": [] },
-    { "name": "Mars", "e": ephem.Mars(), "colorname": "red",
+    { "name": "Mars", "obj": ephem.Mars(), "colorname": "red",
       "path": [], "oppositions": [] },
 ]
 
@@ -47,6 +47,42 @@ table_format = "%-20s %10.3f %10.2f"
 # The good thing about standards is that there are so many of them.
 def color_to_triplet(c):
     return c.red / 65535, c.green / 65535, c.blue / 65535
+
+
+def find_next_opposition(start_time):
+    """Find oppsition and time of closest approach for the given time range.
+       Input is the start time, either in ephem.Date or float julian.
+       Output is two ephem.Dates: opposition, closest approach
+    """
+    t = start_time
+    timedelta = ephem.hour * 6
+    mars = ephem.Mars()
+    sun = ephem.Sun()
+    min_dist = 20
+    oppy_date = None
+    closest_date = None
+    last_dlon = None
+
+    # Loop til we've found opposition, plus 15 days.
+    # Opposition is when dlon changes sign and is very small.
+    while not oppy_date or t - oppy_date < 15:
+        mars.compute(t)
+        sun.compute(t)
+        dlon = mars.hlon - sun.hlon
+
+        # Does dlon have the opposite sign from last_dlon?
+        if last_dlon and abs(dlon) < .1 and \
+           (dlon == 0 or (dlon < 0) != (last_dlon < 0)):
+            oppy_date = t
+        if mars.earth_distance < min_dist:
+            closest_date = t
+            min_dist = mars.earth_distance
+
+        if oppy_date and closest_date:
+            return ephem.Date(oppy_date), ephem.Date(closest_date)
+
+        last_dlon = dlon
+        t += timedelta
 
 
 class OrbitViewWindow(Gtk.Window):
@@ -65,8 +101,12 @@ class OrbitViewWindow(Gtk.Window):
         if start_time:
             self.time = start_time
         else:
-            self.time = ephem.Date(datetime.now())
-        print("Start time:", self.time, type(self.time))
+            self.time = ephem.Date(datetime.now()) - ephem.hour * 24 * 7
+        print("Start time:", ephem.Date(self.time))
+
+        self.opp_date, self.closest_date = find_next_opposition(self.time)
+        # print("Next opposition:", self.opp_date)
+        # print("Next closest:", self.closest_date)
 
         self.time_increment = ephem.hour * time_increment * 24
 
@@ -95,6 +135,8 @@ class OrbitViewWindow(Gtk.Window):
         # GLib.idle_add(self.idle_cb)
 
         self.show_all()
+
+        print(table_header)
 
     def draw(self, widget, ctx):
         # print("Draw")
@@ -141,20 +183,37 @@ class OrbitViewWindow(Gtk.Window):
         ctx = self.drawing_area.get_window().cairo_create()
 
         for p in planets:
-            p["e"].compute(self.time)
+            p["obj"].compute(self.time)
             # ephem treats Earth specially, what a hassle!
             # There is no ephem.Earth body; ephem.Sun gives the Earth's
             # hlon as hlon, but I guess we need to use earth_distance.
             if p["name"] == "Earth":
-                hlon = p["e"].hlon
-                sundist = p["e"].earth_distance
+                hlon = p["obj"].hlon
+                sundist = p["obj"].earth_distance
                 earthdist = 0
                 size = 0
             else:
-                hlon = p["e"].hlon
-                sundist = p["e"].sun_distance
-                earthdist = p["e"].earth_distance
-                size = p["e"].size
+                hlon = p["obj"].hlon
+                sundist = p["obj"].sun_distance
+                earthdist = p["obj"].earth_distance
+                size = p["obj"].size
+
+                if abs(self.time - self.opp_date) <= .5:
+                    if self.opp_date < self.closest_date:
+                        print(table_format % (self.opp_date, earthdist, size),
+                              "Opposition")
+                        print(table_format % (self.closest_date,
+                                              earthdist, size),
+                              "Closest approach")
+                    else:
+                        print(table_format % (self.closest_date,
+                                              earthdist, size),
+                              "Closest approach")
+                        print(table_format % (self.opp_date, earthdist, size),
+                              "Opposition")
+
+                    self.opp_date, self.closest_date \
+                        = find_next_opposition(self.time + 2)
 
             if p["path"]:
                 ctx.set_source_rgb(*color_to_triplet(p["color"]))
@@ -167,33 +226,7 @@ class OrbitViewWindow(Gtk.Window):
                 ctx.stroke()
                 ctx.close_path()
 
-            if "oppositions" in p and earthdist < 1:
-                try:
-                    daybefore, yesterday = p["path"][-2:]
-
-                    # Was minus1 a local minimum distance, smaller than both
-                    # minus2 and the current distance?
-                    if yesterday[2] < daybefore[2] and yesterday[2] < earthdist:
-                        print("Opposition on",
-                              ephem.Date(self.time - self.time_increment))
-                        print(table_header)
-                        print(table_format % (
-                            ephem.Date(self.time - self.time_increment * 2),
-                            daybefore[2], daybefore[3]))
-                        print(table_format % (
-                            ephem.Date(self.time - self.time_increment),
-                            yesterday[2], yesterday[3]))
-                        print(table_format % (ephem.Date(self.time),
-                                              earthdist, size))
-                        print()
-
-                except ValueError:
-                    # The first couple of steps will raise ValueError
-                    # because minus1 and minus2 don't yet exist.
-                    pass
-
             p["path"].append((hlon, sundist, earthdist, size))
-            # print("Now", p["name"], "path is", p["path"])
 
         # Returning True reschedules the timeout.
         return self.stepping
@@ -235,33 +268,6 @@ class OrbitViewWindow(Gtk.Window):
         return False
 
 
-def find_opposition(start_time, end_time):
-    """Find oppsition and time of closest approach for the given time range.
-    """
-    t = start_time
-    timedelta = ephem.hour * 6
-    mars = ephem.Mars()
-    sun = ephem.Sun()
-    min_dlon = math.pi
-    min_dist = 20
-    oppy_date = None
-    closest_date = None
-    while t < end_time:
-        mars.compute(t)
-        sun.compute(t)
-        dlon = abs(mars.hlon - sun.hlon)
-        if dlon < min_dlon:
-            oppy_date = t
-            min_dlon = dlon
-        if mars.earth_distance < min_dist:
-            closest_date = t
-            min_dist = mars.earth_distance
-
-        t += timedelta
-
-    return ephem.Date(oppy_date), ephem.Date(closest_date)
-
-
 def print_table():
     """Super quickie hack to print out a table for the current opposition.
        Unrelated to any of the other code in this script.
@@ -269,7 +275,7 @@ def print_table():
     """
     start_date = ephem.Date(datetime.now()) - ephem.hour*24*10
     end_date = start_date + ephem.hour*24*40
-    opp_date, closest_date = find_opposition(start_date, end_date)
+    opp_date, closest_date = find_next_opposition(start_date)
     print("Opposition:", opp_date)
     print("Closest approach:", closest_date)
 
