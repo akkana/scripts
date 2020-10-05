@@ -17,13 +17,7 @@
 
 import ephem
 
-import gi
-gi.require_version('Gtk', '3.0')
-
-from gi.repository import Gtk
-from gi.repository import Gdk
-from gi.repository import GLib
-import cairo
+from tkinter import Tk, Canvas, mainloop
 
 import math
 import argparse
@@ -32,9 +26,11 @@ from datetime import datetime
 
 planets = [
     { "name": "Earth", "obj": ephem.Sun(), "colorname": "blue",
-      "path": [] },
+      "path": [], "xypath": [],
+      "line": None, "disk": None },
     { "name": "Mars", "obj": ephem.Mars(), "colorname": "red",
-      "path": [], "oppositions": [] },
+      "path": [], "xypath": [], "oppositions": [],
+      "line": None, "disk": None },
 ]
 
 # oppositions will include date, earth hlon, earth dist, mars hlon, mars dist
@@ -42,11 +38,6 @@ oppositions = []
 
 table_header = "%-20s %10s %10s" % ("Date", "Distance", "Size")
 table_format = "%-20s %10.3f %10.2f"
-
-# Cairo drawing wants color components to go from 0 to 1; GTK uses 0 to 65535.
-# The good thing about standards is that there are so many of them.
-def color_to_triplet(c):
-    return c.red / 65535, c.green / 65535, c.blue / 65535
 
 
 def find_next_opposition(start_time):
@@ -85,13 +76,11 @@ def find_next_opposition(start_time):
         t += timedelta
 
 
-class OrbitViewWindow(Gtk.Window):
+class OrbitViewWindow():
     def __init__(self, auscale, timestep, time_increment=1, start_time=None):
         """time_increment is in days.
            start_time is a an ephem.Date object.
         """
-        super().__init__()
-
         self.auscale = auscale
         self.timestep = timestep
         self.stepping = True
@@ -110,80 +99,48 @@ class OrbitViewWindow(Gtk.Window):
 
         self.time_increment = ephem.hour * time_increment * 24
 
-        # Paths for each planet. Must save the full path
-        # since we might need to redraw if the window gets covered.
-        self.planet_paths = [ [] for i in range(len(planets)) ]
+        self.linewidth = 3
 
-        # Set up colors
-        self.bg_color = Gdk.color_parse('black')
-        for p in planets:
-            p["color"] = Gdk.color_parse(p["colorname"])
+        self.width = 1024
+        self.height = 768
 
-        self.line_width = 3
+        self.halfwidth = self.width/2.
+        self.halfheight = self.height/2.
+        self.dist_scale = self.halfheight / self.auscale
 
-        self.drawing_area = Gtk.DrawingArea()
-        self.set_default_size(1024, 768)
-        self.add(self.drawing_area)
-
-        GLib.timeout_add(self.timestep, self.idle_cb)
-
-        self.drawing_area.connect('draw', self.draw)
-        self.drawing_area.connect('configure-event', self.configure)
-        self.connect("destroy", Gtk.main_quit)
-        self.connect("key-press-event", self.key_press)
-
-        # GLib.idle_add(self.idle_cb)
-
-        self.show_all()
+        tkmaster =  Tk()
+        self.canvas = Canvas(tkmaster, bg="black",
+                             width=self.width, height=self.height)
+        self.canvas.pack()
 
         print(table_header)
 
+        # Schedule the first draw
+        self.step_draw()
+
     def draw(self, widget, ctx):
         # print("Draw")
-
-        if not ctx:
-            print("Draw with no cairo context")
-            ctx = widget.get_window().cairo_create()
-
-        ctx.set_source_rgb(self.bg_color.red, self.bg_color.green,
-                           self.bg_color.blue)
-        ctx.rectangle(0, 0, self.width, self.height)
-        ctx.fill()
 
         # This makes no sense: specified line width has to be one less here
         # than it does in idle_cb to result in the same line width.
         ctx.set_line_width(self.line_width-1)
         for p in planets:
-            if not p["path"]:
+            if not p["line"]:
                 continue
+            self.canvas.coords(p["line"], p["xypath"])
 
-            ctx.set_source_rgb(*color_to_triplet(p["color"]))
-            self.planet_segment(ctx, *p["path"][0], False)
-            for ra, dist in p["path"][1:]:
-                self.planet_segment(ctx, ra, dist, True)
+            # Skip the planet disk position for now
 
-            ctx.stroke()
-
-    def idle_cb(self):
+    def step_draw(self):
         """Calculate and draw the next position of each planet.
         """
-        if not self.width:
-            print("idle: skipping")
-            return True
-
         # Adding a float to ephem.Date turns it into a float.
         # You can get back an ephem.Date with: ephem.Date(self.time).
         self.time += self.time_increment
 
-        # year = ephem.Date(self.time).triple()[0]
-        # if year > self.year:
-        #     print(year)
-        #     self.year = year
-
-        ctx = self.drawing_area.get_window().cairo_create()
-
         for p in planets:
             p["obj"].compute(self.time)
+
             # ephem treats Earth specially, what a hassle!
             # There is no ephem.Earth body; ephem.Sun gives the Earth's
             # hlon as hlon, but I guess we need to use earth_distance.
@@ -221,55 +178,24 @@ class OrbitViewWindow(Gtk.Window):
                     self.opp_date, self.closest_date \
                         = find_next_opposition(self.time + 2)
 
-            if p["path"]:
-                ctx.set_source_rgb(*color_to_triplet(p["color"]))
-                ctx.new_path()
-
-                # Move to end of last segment
-                xl, yl = self.planet_x_y(p["path"][-1][0], p["path"][-1][1])
-                ctx.move_to(xl, yl)
-
-                # ... and draw to new position.
-                xn, yn = self.planet_x_y(hlon, sundist)
-                ctx.line_to(xn, yn)
-
-                ctx.stroke()
-                ctx.close_path()
-                # print("Operator:", ctx.get_operator())
+            xn, yn = self.planet_x_y(hlon, sundist)
+            p["xypath"].append(int(xn))
+            p["xypath"].append(int(yn))
+            if p["line"]:
+                self.canvas.coords(p["line"], p["xypath"])
+            else:
+                p["line"] = self.canvas.create_line(xn, yn, xn, yn,
+                                                    width=self.linewidth,
+                                                    fill=p["colorname"])
 
             p["path"].append((hlon, sundist, earthdist, size))
 
-        # Returning True reschedules the timeout.
-        return self.stepping
+        if self.stepping:
+            self.canvas.after(self.timestep, self.step_draw)
 
     def planet_x_y(self, hlon, dist):
         return (dist * self.dist_scale * math.cos(hlon) + self.halfwidth,
                 dist * self.dist_scale * math.sin(hlon) + self.halfheight)
-
-    def configure(self, widget, event):
-        """Window size change: reset the scale factors."""
-        # print("configure")
-        self.width, self.height = self.get_size()
-        self.halfwidth = self.width/2.
-        self.halfheight = self.height/2.
-        self.dist_scale = self.halfheight / self.auscale
-
-        # self.draw(widget, None)
-
-    def key_press(self, widget, event):
-        """Handle a key press event anywhere in the window"""
-        # Note: to handle just printables with no modifier keys,
-        # use e.g. if event.string == "q"
-
-        if event.keyval == Gdk.KEY_q:
-            return Gtk.main_quit()
-
-        if event.keyval == Gdk.KEY_space:
-            self.stepping = not self.stepping
-            if self.stepping:
-                GLib.timeout_add(self.timestep, self.idle_cb)
-
-        return False
 
 
 def print_table():
@@ -331,5 +257,5 @@ Controls how fast the orbits are drawn.""")
 
     win = OrbitViewWindow(auscale=args.auscale, timestep=args.timestep)
 
-    Gtk.main()
+    mainloop()
 
