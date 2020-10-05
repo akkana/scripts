@@ -336,6 +336,7 @@ mapping/viewshed2view.py:
 
 marsoppy.py:
     Print and plot Mars oppositions using PyEphem.
+    Also an example of how to use the TkInter Canvas with persistent objects.
 
 multiplot3d.py:
     3D plots in matplotlib of a sequence of functions are so poorly

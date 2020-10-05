@@ -108,6 +108,7 @@ class OrbitViewWindow():
         self.dist_scale = self.halfheight / self.auscale
 
         tkmaster =  Tk()
+        tkmaster.title("Mars Oppositions")
         self.canvas = Canvas(tkmaster, bg="black",
                              width=self.width, height=self.height)
         # Start with just the Sun
@@ -190,7 +191,8 @@ class OrbitViewWindow():
                                         outline=earth["color"], width=3)
                 localtz = datetime.now().astimezone().tzinfo
                 oppdate = ephem.to_timezone(self.opp_date, localtz)
-                opp_str = oppdate.strftime("%Y-%m-%d")
+                opp_str = oppdate.strftime("%Y-%m-%d") + \
+                    '\n%.3f AU\n%.1f"' % (earthdist, size)
                 if xn < self.width/2:
                     if yn < self.height / 2:
                         anchor = "se"
@@ -203,15 +205,28 @@ class OrbitViewWindow():
                     else:
                         anchor = "nw"
                     xtxt = xn + radius
-                txt = self.canvas.create_text(xtxt, yn,
-                                              fill=p["color"], justify=LEFT,
-                                              font=('sans', 14, 'bold'),
-                                              anchor=anchor,
-                                              text=opp_str)
+                ytxt = yn
+
+                txtobj = self.canvas.create_text(xtxt, ytxt,
+                                                 fill="white", justify=LEFT,
+                                                 font=('sans', 14, 'bold'),
+                                                 anchor=anchor,
+                                                 text=opp_str)
+                # Make sure it's not offscreen
+                xt1, yt1, xt2, yt2 = self.canvas.bbox(txtobj)
+                if xt1 < 0:
+                    xtxt -= xt1
+                elif xt2 > self.width:
+                    xtxt -= (xt2 - self.width)
+                if yt1 < 0:
+                    ytxt -= yt1
+                elif yt2 > self.height:
+                     ytxt -= yt2 - self.height
+                self.canvas.coords(txtobj, xtxt, ytxt)
 
                 # Done with this opposition: find the next one.
                 self.opp_date, self.closest_date \
-                    = find_next_opposition(self.time + 2)
+                    = find_next_opposition(self.time + 500)
 
             p["xypath"].append(int(xn))
             p["xypath"].append(int(yn))
