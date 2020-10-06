@@ -338,7 +338,7 @@ Key bindings:
 Default is 11, which shows Saturn.
 2.6 shows Mars, 30 shows some of Pluto, 50 shows all of Pluto.""")
     parser.add_argument('-t', "--timestep", dest="timestep",
-                        type=float, default=30,
+                        type=int, default=30,
                         help="""Time step in milliseconds (default 30).
 Controls how fast the orbits are drawn.""")
     parser.add_argument('-T', "--table", dest="table", action="store_true",
