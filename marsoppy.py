@@ -22,7 +22,7 @@ from tkinter import Tk, Canvas, PhotoImage, mainloop, LEFT
 import math
 import argparse
 import sys, os
-from datetime import datetime
+from datetime import datetime, timezone
 
 ICONDIR = os.path.expanduser("~/Docs/Preso/mars/pix/")
 
@@ -82,18 +82,18 @@ def find_next_opposition(start_time):
 class OrbitViewWindow():
     def __init__(self, auscale, timestep, time_increment=1, start_time=None):
         """time_increment is in days.
-           start_time is a an ephem.Date object.
+           start_time is anything that can be turned into a ephem.Date object.
         """
         self.auscale = auscale
         self.timestep = timestep
         self.stepping = True
 
-        self.year = 0
-
         if start_time:
-            self.time = start_time
+            self.time = ephem.Date(start_time)
         else:
-            self.time = ephem.Date(datetime.now()) - ephem.hour * 24 * 7
+            # Default to starting 30 days before present
+            self.time = ephem.Date(datetime.now(tz=timezone.utc)) \
+                - ephem.hour * 24 * 30
         print("Start time:", ephem.Date(self.time))
 
         self.opp_date, self.closest_date = find_next_opposition(self.time)
@@ -334,23 +334,31 @@ Key bindings:
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-a', "--au", dest="auscale", type=float, default=1.7,
                         action="store",
-                        help="""Scale of the window in astronomical units.
-Default is 11, which shows Saturn.
-2.6 shows Mars, 30 shows some of Pluto, 50 shows all of Pluto.""")
+                        help="""Scale of the window in astronomical units.""")
+
     parser.add_argument('-t', "--timestep", dest="timestep",
                         type=int, default=30,
                         help="""Time step in milliseconds (default 30).
 Controls how fast the orbits are drawn.""")
+
     parser.add_argument('-T', "--table", dest="table", action="store_true",
                         help="Forget all that graphic stuff and just "
                              "print a table of sizes around opposition")
+
+    parser.add_argument("-S", "--start", dest="start", default=None,
+                        help="Start date, YYYY-MM-DD, "
+                             "default: 30 days beforetoday")
+
     args = parser.parse_args(sys.argv[1:])
+    if args.start:
+        args.start = datetime.strptime(args.start, "%Y-%m-%d")
 
     if args.table:
         print_table()
         sys.exit(0)
 
-    win = OrbitViewWindow(auscale=args.auscale, timestep=args.timestep)
+    win = OrbitViewWindow(auscale=args.auscale, start_time=args.start,
+                          timestep=args.timestep)
 
     mainloop()
 
