@@ -17,20 +17,24 @@
 
 import ephem
 
-from tkinter import Tk, Canvas, mainloop, LEFT
+from tkinter import Tk, Canvas, PhotoImage, mainloop, LEFT
 
 import math
 import argparse
-import sys
+import sys, os
 from datetime import datetime
+
+ICONDIR = os.path.expanduser("~/Docs/Preso/mars/pix/")
 
 earth = { "name": "Earth", "obj": ephem.Sun(), "color": "#08f",
           "path": [], "xypath": [],
-          "line": None, "disk": None }
+          "line": None, "disk": None,
+          "imgname": os.path.join(ICONDIR, "tinyearth.png") }
 
 mars = { "name": "Mars", "obj": ephem.Mars(), "color": "#f80",
          "path": [], "xypath": [], "oppositions": [],
-         "line": None, "disk": None }
+         "line": None, "disk": None,
+         "imgname": os.path.join(ICONDIR, "tinymars.png") }
 
 # oppositions will include date, earth hlon, earth dist, mars hlon, mars dist
 oppositions = []
@@ -112,11 +116,30 @@ class OrbitViewWindow():
         self.canvas = Canvas(tkmaster, bg="black",
                              width=self.width, height=self.height)
         # Start with just the Sun
-        sunrad = 20
-        self.canvas.create_oval(self.width/2 - sunrad, self.height/2 - sunrad,
-                                self.width/2 + sunrad, self.height/2 + sunrad,
-                                fill="yellow")
+        try:
+            self.sunimg = PhotoImage(file=os.path.join(ICONDIR, "tinysun.png"))
+            self.canvas.create_image(self.width/2, self.height/2,
+                                     image=self.sunimg)
+        except:
+            sunrad = 20
+            self.canvas.create_oval(self.width/2 - sunrad,
+                                    self.height/2 - sunrad,
+                                    self.width/2 + sunrad,
+                                    self.height/2 + sunrad,
+                                    fill="yellow")
+
         self.canvas.pack()
+
+        # Canvas requires that the app save a reference to PhotoImages:
+        # the canvas doesn't keep the references.
+        try:
+            earth["tinyimg"] = PhotoImage(file=earth["imgname"])
+        except:
+            earth["tinyimg"] = None
+        try:
+            mars["tinyimg"] = PhotoImage(file=mars["imgname"])
+        except:
+            mars["tinyimg"] = None
 
         tkmaster.bind("<KeyPress-q>", sys.exit)
         tkmaster.bind("<KeyPress-space>", self.toggle_stepping)
@@ -181,14 +204,23 @@ class OrbitViewWindow():
             if oppy:
                 # Create outline circles for Mars and Earth at opposition.
                 # xn, yn should be Mars since Earth was done first.
-                self.canvas.create_oval(xn-radius, yn-radius,
-                                        xn+radius, yn+radius,
-                                        outline=p["color"], width=3)
+                # Create the open circle at the bottom of the stacking order.
+                # There may be a way to do this by passing in tags,
+                # but I can't find any documentation on tags.
+                self.canvas.tag_lower(
+                    self.canvas.create_oval(xn-radius, yn-radius,
+                                            xn+radius, yn+radius,
+                                            outline=p["color"], width=3)
+                )
+
                 earthx = earth["xypath"][-2]
                 earthy = earth["xypath"][-1]
-                self.canvas.create_oval(earthx-radius, earthy-radius,
-                                        earthx+radius, earthy+radius,
-                                        outline=earth["color"], width=3)
+                self.canvas.tag_lower(
+                    self.canvas.create_oval(earthx-radius, earthy-radius,
+                                            earthx+radius, earthy+radius,
+                                            outline=earth["color"], width=3)
+                )
+
                 localtz = datetime.now().astimezone().tzinfo
                 oppdate = ephem.to_timezone(self.opp_date, localtz)
                 opp_str = oppdate.strftime("%Y-%m-%d") + \
@@ -232,16 +264,24 @@ class OrbitViewWindow():
             p["xypath"].append(int(yn))
             if p["line"]:
                 self.canvas.coords(p["line"], p["xypath"])
-                self.canvas.coords(p["disk"], xn-radius, yn-radius,
-                                   xn+radius, yn+radius)
+                if p["tinyimg"]:
+                    self.canvas.coords(p["disk"], xn, yn)
+                else:
+                    self.canvas.coords(p["disk"], xn-radius, yn-radius,
+                                       xn+radius, yn+radius)
 
             else:
                 p["line"] = self.canvas.create_line(xn, yn, xn, yn,
                                                     width=self.linewidth,
                                                     fill=p["color"])
-                p["disk"] = self.canvas.create_oval(xn-radius, yn-radius,
-                                                    xn+radius, yn+radius,
-                                                    fill=p["color"])
+                # Use images if there are any, else circles
+                if p["tinyimg"]:
+                    p["disk"] = self.canvas.create_image(xn-radius, yn-radius,
+                                                         image=p["tinyimg"])
+                else:
+                    p["disk"] = self.canvas.create_oval(xn-radius, yn-radius,
+                                                        xn+radius, yn+radius,
+                                                        fill=p["color"])
 
             p["path"].append((hlon, sundist, earthdist, size))
 
