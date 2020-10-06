@@ -724,6 +724,7 @@ MT.tzname(time_summer)
 
 # Don't use utcnow or utcfromtimestamp in modern python.
 # They might even be deprecated soon. Instead:
+from datetime import timezone
 utcnow = datetime.now(tz=timezone.utc)
 datetime.fromtimestamp(1571595618.0, tz=timezone.utc)
 
