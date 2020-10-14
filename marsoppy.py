@@ -80,13 +80,17 @@ def find_next_opposition(start_time):
 
 
 class OrbitViewWindow():
-    def __init__(self, auscale, timestep, time_increment=1, start_time=None):
+    def __init__(self, auscale, timestep, time_increment=1,
+                 start_time=None, stopped=False):
         """time_increment is in days.
            start_time is anything that can be turned into a ephem.Date object.
         """
         self.auscale = auscale
         self.timestep = timestep
-        self.stepping = True
+        if stopped:
+            self.stepping = False
+        else:
+            self.stepping = True
 
         if start_time:
             self.time = ephem.Date(start_time)
@@ -336,18 +340,22 @@ Key bindings:
                         action="store",
                         help="""Scale of the window in astronomical units.""")
 
+    parser.add_argument("-s", "--start", dest="start", default=None,
+                        help="Start date, YYYY-MM-DD, "
+                             "default: 30 days beforetoday")
+
     parser.add_argument('-t', "--timestep", dest="timestep",
                         type=int, default=30,
                         help="""Time step in milliseconds (default 30).
 Controls how fast the orbits are drawn.""")
 
+    parser.add_argument('-S', "--stopped", dest="stopped", action="store_true",
+                        help="Bring up the window but don't immediately "
+                              "start animating: wait for the spacebar.")
+
     parser.add_argument('-T', "--table", dest="table", action="store_true",
                         help="Forget all that graphic stuff and just "
                              "print a table of sizes around opposition")
-
-    parser.add_argument("-S", "--start", dest="start", default=None,
-                        help="Start date, YYYY-MM-DD, "
-                             "default: 30 days beforetoday")
 
     args = parser.parse_args(sys.argv[1:])
     if args.start:
@@ -358,7 +366,7 @@ Controls how fast the orbits are drawn.""")
         sys.exit(0)
 
     win = OrbitViewWindow(auscale=args.auscale, start_time=args.start,
-                          timestep=args.timestep)
+                          timestep=args.timestep, stopped=args.stopped)
 
     mainloop()
 
