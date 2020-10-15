@@ -274,6 +274,10 @@ mac_lookup.p:
     Map MAC network addresses to manufacturers.
     Useful for things like scanning your network to find your Raspberry Pi.
 
+mailgrep:
+    Search for patterns in mailboxes, whether they're mbox (uses grepmail)
+    or maildir (uses grep). Bring up mutt on a folder with matching messages.
+
 masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
