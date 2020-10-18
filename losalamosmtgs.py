@@ -18,6 +18,7 @@ import subprocess
 import tempfile
 import json
 import os, sys
+from lxml.html.diff import htmldiff
 
 
 ########## CONFIGURATION ##############
@@ -133,6 +134,49 @@ def meeting_datetime(mtg):
     # Make it aware in localtime
     localtime = unaware.astimezone(localtz)
     return localtime
+
+
+def diffhtml(before_html, after_html, title=None):
+    """Diffs the two files, and returns an html fragment that wraps
+       differences in <ins> or <del> tags, which you can style as desired.
+       Returns bytes, not str, because everything else works in bytes
+       due to using requests.
+    """
+    if not title:
+        title = "Changed Agenda"
+
+    # lxml.html.htmldiff only accepts strings, not bytes, but these
+    # were read in as bytes because that's what comes from requests;
+    # so translate them.
+    if type(before_html) is bytes:
+        before_html = before_html.decode()
+    if type(after_html) is bytes:
+        after_html = after_html.decode()
+
+    # lxml.html.htmldiff returns fragments, not full documents.
+    # So add a header that includes a style for ins and del.
+    diff = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%s</title>
+<style>
+ins { background: #9ff; }
+del { background: #fbb; }
+</style>
+</head>
+
+<body>
+<h1>%s</h1>
+''' % (title, title)
+
+    diff += htmldiff(before_html, after_html)
+
+    diff += "\n</body></html>\n"
+
+    # encode to return bytes.
+    return diff.encode()
 
 
 def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
@@ -269,6 +313,9 @@ def write_rss20_file(mtglist):
                 elif agenda_html != oldhtml:  # changed agenda
                     write_agenda_file = True
                     changestr += "<p><b>The agenda has changed.</b>"
+                    agenda_html = diffhtml(oldhtml, agenda_html,
+                                           title=mtg['cleanname']
+                                           + " (CHANGED)")
 
         else:    # No agenda file there previously, probably a new meeting
             write_agenda_file = True
@@ -453,17 +500,21 @@ As of: {gendate}
 
     # Remove obsolete files for meetings no longer listed.
     for f in os.listdir(RSS_DIR):
-        # Only clean up .json, .rss, .html:
-        if not f.endswith('.json') and not f.endswith('.rss') \
-           and not f.endswith('.html'):
+        # Only clean up certain extensions:
+        rmexts = [ '.json', '.rss', '.html', '.pdf' ]
+        name, ext = os.path.splitext(f)
+        if ext not in rmexts:
             continue
+
         if f.startswith("index"):
             continue
+
         def is_active(f):
             for act in active_meetings:
                 if f.startswith(act):
                     return True
             return False
+
         if not is_active(f):
             print("removing", f)
             os.unlink(os.path.join(RSS_DIR, f))
