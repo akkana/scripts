@@ -289,11 +289,12 @@ def write_rss20_file(mtglist):
         else:
             agenda_html = b"NO AGENDA YET"
 
-        # Does the agenda file need to be (re)written?
+            # Does the agenda file need to be (re)written?
         write_agenda_file = False
 
         # See if there was already an agenda file left from previous runs:
         agendafile = os.path.join(RSS_DIR, mtg['cleanname'] + ".html")
+        print("Checking agenda file", agendafile)
         if os.path.exists(agendafile):
             with open(agendafile, "rb") as oldfp:
                 oldhtml = oldfp.read()
@@ -301,24 +302,27 @@ def write_rss20_file(mtglist):
             if oldhtml == NO_AGENDA:    # no agenda previously
                 if agenda_html:         # but there is now
                     write_agenda_file = True
-                    changestr += "<p><b>There is now an agenda.</b>"
+                    mtg["withagenda"] = "new"
+                else:
+                    mtg["withagenda"] = "no"
 
             else:                       # there was a previous agenda
                 if not agenda_html:     # ... which is gone now
-                    changestr += \
-                        "<p><b>An earlier agenda has been removed!</b>" \
-                        "<p><b>Agenda saved here is the previous agenda.</b>"
                     # don't write over the old agenda file
+                    mtg["withagenda"] = "removed"
 
                 elif agenda_html != oldhtml:  # changed agenda
                     write_agenda_file = True
-                    changestr += "<p><b>The agenda has changed.</b>"
                     agenda_html = diffhtml(oldhtml, agenda_html,
                                            title=mtg['cleanname']
                                            + " (CHANGED)")
+                    mtg["withagenda"] = "changed"
+                else:
+                    mtg["withagenda"] = "unchanged"
 
         else:    # No agenda file there previously, probably a new meeting
             write_agenda_file = True
+            mtg["withagenda"] = "no"
 
         if write_agenda_file:
             if agenda_html:
@@ -344,7 +348,7 @@ def write_rss20_file(mtglist):
                                 if oldmtg[key] != mtg[key]}
                 if changed_keys:
                     lastmod = now
-                    changestr += "<p>Changed: " + ', '.join(changed_keys) \
+                    changestr = "<p>Changed: " + ', '.join(changed_keys) \
                         + "</p>"
                     print("Keys changed:", changed_keys, "lastmod is", lastmod)
 
@@ -443,22 +447,37 @@ As of: {gendate}
             desc = f"""{mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
 
+            # Set up the change strings for the header and body
+            print("****** mtg:", mtg)
+            if mtg["withagenda"] == "new":
+                agenda_hdr = " (NEW AGENDA)"
+                desc += "<p><b>There is a new agenda.</b>"
+            elif mtg["withagenda"] == "removed":
+                agenda_hdr = " (REMOVED AGENDA)"
+                desc += "<p><b>The agenda has been removed.</b>"
+            elif mtg["withagenda"] == "changed":
+                agenda_hdr = " (CHANGED AGENDA)"
+                desc += "<p><b>The agenda has changed.</b>"
+            elif mtg["withagenda"] == "unchanged":
+                agenda_hdr = ""
+                desc += "<p>The agenda hasn't changed."
+            elif mtg["withagenda"] == "no":
+                agenda_hdr = " (NO AGENDA)"
+                desc += "<p>No agenda yet."
+
             if mtg['Meeting Location']:
-                desc += "<br>Location:" + mtg['Meeting Location']
+                desc += "<p>Location:" + mtg['Meeting Location']
+
+            if mtg['changestr']:
+                desc += "<p>" + mtg['changestr'] + '\n'
 
             link = f"{RSS_URL}{mtg['cleanname']}.html"
+
             if mtg["Agenda"]:
-                withagenda = " (WITH AGENDA)"
                 desc = f"""{desc}<p>
 <a href="{mtg["Agenda"]}">Agenda PDF</a><br>
 </p>
 """
-            else:
-                desc += "<p>No agenda is available.</p>\n"
-                withagenda = " (no agenda)"
-
-            if mtg['changestr']:
-                desc += "<p>" + mtg['changestr'] + '\n'
 
             if mtg["Agenda Packets"]:
                 # The agenda packet links tend to have & in them
@@ -472,7 +491,7 @@ As of: {gendate}
 
             # Add the item to the RSS
             print(f"""<item>
-   <title>{mtgtitle} {withagenda}</title>
+   <title>{mtgtitle} {agenda_hdr}</title>
    <guid isPermaLink="false">{mtg['GUID']}</guid>
    <link>{link}</link>
    <description><![CDATA[ {desc} ]]>
@@ -481,7 +500,7 @@ As of: {gendate}
 </item>""", file=rssfp)
 
             # And add it to the HTML
-            print(f"<p><h2>{mtgtitle} {withagenda}</h2>", file=htmlfp)
+            print(f"<p><h2>{mtgtitle} {agenda_hdr}</h2>", file=htmlfp)
             if mtg["Agenda"]:
                 print(f'<p><b><a href="{link}">Agenda: {mtgtitle}</a></b>',
                       file=htmlfp)
