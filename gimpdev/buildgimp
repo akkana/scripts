@@ -69,11 +69,9 @@ else
     echo "Not cleaning"
     clean=''
 fi
-exit 0
 
 # Make sure this exits on errors:
 setopt errreturn
-
 
 # XDG_DATA_DIRS is now needed for the GEGL build, but may break the GIMP build.
 # If you set it for the GIMP build, you may encounter problems like:

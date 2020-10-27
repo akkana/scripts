@@ -1,0 +1,12 @@
+Helpers for working on development versions of GIMP:
+
+buildgimp:
+    Shell script for GIMP's ridiculously complicated build.
+
+gimprun:
+    Run a locally built version of GIMP, setting all needed environment
+    variables first.
+
+gimpapidocs:
+    Generate HTML documentation from GIMP .gir files.
+

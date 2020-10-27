@@ -4,6 +4,9 @@ A collection of useful scripts and snippets, in various languges.
 Subdirectories:
 ----------------
 
+gimpdev:
+    Helper scripts for working on the development version of GIMP.
+
 jsjupiter:
     My Jupiter's Moons Javascript web app: show the Galilean moons and
     their shadows, and predict transits, shadow transits and eclipses.
@@ -69,9 +72,6 @@ bdump:
 bookfind.py:
     List books by author optionally year of publication,
     to find new books by particular authors.
-
-buildgimp:
-    Shell script for GIMP's ridiculously complicated build.
 
 cachefile.py:
     A general class for cases where you need to fetch data from some

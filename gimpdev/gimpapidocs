@@ -1,0 +1,19 @@
+#!/bin/zsh
+
+DOCDIR=$HOME/src/gimp-plugins/3.0/gimpdoc/
+GIRDIR=$HOME/run/gimp-master/share/gir-1.0/
+
+pushd .
+
+for gir in $(ls $GIRDIR); do
+  lib=$gir:r
+  echo $lib
+  mkdir -p $DOCDIR/$lib
+  cd $DOCDIR/$lib
+  rm -f *
+  g-ir-doc-tool -I $GIRDIR --language=Python -o . $GIRDIR/$gir
+  yelp-build cache *.page
+  yelp-build html .
+done
+
+popd
