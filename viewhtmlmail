@@ -147,7 +147,7 @@ def view_html_message(f, tmpdir):
     # We're done saving the parts. It's time to save the HTML part.
     htmlfile = os.path.join(tmpdir, "viewhtml.html")
     fp = open(htmlfile, 'wb')
-    htmlsrc = html_part.get_payload(decode=True)
+    htmlsrc = html_part.get_payload(decode=True).decode('utf-8')
 
     # Substitute all the filenames for CIDs:
     for sf in subfiles:
@@ -159,7 +159,7 @@ def view_html_message(f, tmpdir):
                          'file://' + sf['filename'],
                          htmlsrc, flags=re.IGNORECASE)
 
-    fp.write(htmlsrc)
+    fp.write(htmlsrc.encode())
     fp.close()
 
     # Now we have the file. Call a browser on it.
