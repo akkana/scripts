@@ -7,9 +7,7 @@ Subdirectories:
 gimpdev:
     Helper scripts for working on the development version of GIMP.
 
-jsjupiter:
-    My Jupiter's Moons Javascript web app: show the Galilean moons and
-    their shadows, and predict transits, shadow transits and eclipses.
+[jsjupiter moved to my webapps repository]
 
 kobo:
     Module of utilities useful with Kobo ebook readers.
