@@ -192,6 +192,8 @@ url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
 url2 = "http://www.crummy.com/software/BeautifulSoup/" \
        "bs3/documentation.html"
 
+# s.find vs s.index: find returns -1 if not found, index raises ValueError
+
 #
 # Fuzzy string match.
 # SequenceMatcher's first argument is a function that returns true for
@@ -1006,6 +1008,12 @@ def sort_by_last_letter(words):
 # Speaking of sorting, insert into a list sorted with:
 import bisect
 bisect.insort(thelist, newstr)
+
+#
+# Iterate over two lists in parallel
+#
+for f, b in zip(foo, bar):
+    print(f, b)
 
 #
 # Reduce example
