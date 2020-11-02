@@ -39,6 +39,8 @@ if not os.path.exists(RSS_DIR):
 ######## END CONFIGURATION ############
 
 
+Verbose = True
+
 # Make a timezone-aware datetime for now:
 now = datetime.datetime.now().astimezone()
 
@@ -55,7 +57,7 @@ RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
 tempdir = tempfile.mkdtemp()
 
 
-def parse_meeting_list(only_past=False):
+def parse_meeting_list(only_future=False):
     """Parse the HTML page listing meetings,
        returning a list of dictionaries for each upcoming meeting
        (but not past ones).
@@ -115,10 +117,18 @@ def parse_meeting_list(only_past=False):
 
         if "Meeting Date" in dic and "Meeting Time" in dic:
             mtg_datetime = meeting_datetime(dic)
-            if only_past and mtg_datetime < utcnow:
+            if only_future and mtg_datetime < utcnow:
                 continue
 
         upcoming.append(dic)
+
+    # The meeting list is in date/time order, latest first.
+    # Better to list them in the other order, starting with
+    # meetings today, then meetings tomorrow, etc.
+    # That's why we couldn't just write meetings from the earlier loop.
+    # Could sort by keys, 'Meeting Date' and 'Meeting Time',
+    # but since it's already sorted, it's easier just to reverse.
+    upcoming.reverse()
 
     return upcoming
 
@@ -187,6 +197,7 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
        Returns bytes, not str.
     """
     r = requests.get(agendaloc, timeout=30)
+
     with open(save_pdf_filename, "wb") as pdf_fp:
         pdf_fp.write(r.content)
     htmlfile = save_pdf_filename + ".html"
@@ -259,146 +270,23 @@ def clean_filename(badstr):
     return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
 
 
-NO_AGENDA = b"<html><body><p>No agenda available.</body></html>"
+NO_AGENDA = b"No agenda available."
 
 def write_rss20_file(mtglist):
-    """Take a list meeting dictionaries and make an RSS file from it.
+    """Take a list meeting dictionaries
+       and make RSS and HTML files from it.
     """
-
-    print("\n==== Generating RSS for", len(mtglist), "meetings")
-    active_meetings = ["index.rss"]
-
-    for mtg in mtglist:
-        lastmod = None
-        changestr = ""
-        mtg['cleanname'] = mtgdic_to_cleanname(mtg)
-        print(mtg["cleanname"])
-
-        if mtg["Agenda"]:
-            print(mtg["cleanname"], "has an agenda: fetching it")
-            # XXX TEMPORARY: save the PDF filename, because sometimes
-            # pdftohtml produces an HTML file with no content even
-            # though there's content in the PDF.
-            pdfout = os.path.join(RSS_DIR, mtg['cleanname'] + ".pdf")
-            agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"],
-                                                    save_pdf_filename=pdfout)
-
-        # RSS doesn't deal well with feeds where some items have
-        # a <link> and others don't. So make an empty file to keep
-        # RSS readers happy.
-        else:
-            agenda_html = b"NO AGENDA YET"
-
-            # Does the agenda file need to be (re)written?
-        write_agenda_file = False
-
-        # See if there was already an agenda file left from previous runs:
-        agendafile = os.path.join(RSS_DIR, mtg['cleanname'] + ".html")
-        print("Checking agenda file", agendafile)
-        if os.path.exists(agendafile):
-            with open(agendafile, "rb") as oldfp:
-                oldhtml = oldfp.read()
-
-            if oldhtml == NO_AGENDA:    # no agenda previously
-                if agenda_html:         # but there is now
-                    write_agenda_file = True
-                    mtg["withagenda"] = "new"
-                else:
-                    mtg["withagenda"] = "no"
-
-            else:                       # there was a previous agenda
-                if not agenda_html:     # ... which is gone now
-                    # don't write over the old agenda file
-                    mtg["withagenda"] = "removed"
-
-                elif agenda_html != oldhtml:  # changed agenda
-                    write_agenda_file = True
-                    agenda_html = diffhtml(oldhtml, agenda_html,
-                                           title=mtg['cleanname']
-                                           + " (CHANGED)")
-                    mtg["withagenda"] = "changed"
-                else:
-                    mtg["withagenda"] = "unchanged"
-
-        else:    # No agenda file there previously, probably a new meeting
-            write_agenda_file = True
-            mtg["withagenda"] = "no"
-
-        if write_agenda_file:
-            if agenda_html:
-                lastmod = now
-            else:
-                agenda_html = NO_AGENDA
-
-            print("Writing a new agenda file")
-            with open(agendafile, 'wb') as outfp:
-                outfp.write(agenda_html)
-
-        jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
-        if os.path.exists(jsonfile):
-            try:
-                with open(jsonfile) as jsonfp:
-                    oldmtg = json.loads(jsonfp.read())
-
-                # mtg doesn't have lastmod, so to make sure that
-                # doesn't trigger a change, copy it:
-                mtg['lastmod'] = oldmtg['lastmod']
-
-                changed_keys = {key for key in oldmtg.keys() & mtg
-                                if oldmtg[key] != mtg[key]}
-                if changed_keys:
-                    lastmod = now
-                    changestr = "<p>Changed: " + ', '.join(changed_keys) \
-                        + "</p>"
-                    print("Keys changed:", changed_keys, "lastmod is", lastmod)
-
-                elif not lastmod:
-                    print("Nothing has changed, keeping lastmod")
-                    lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
-                                                         RSS_DATE_FORMAT)
-            except RuntimeError:
-                print("Error reading jsonfile")
-                changestr += "Error reading jsonfile<p>"
-                lastmod = now
-
-        else:
-            print("It's a new meeting, no previous jsonfile")
-            lastmod = now
-
-        mtg['lastmod'] = lastmod.strftime(RSS_DATE_FORMAT)
-        mtg['GUID'] = mtg['cleanname'] + '.' + lastmod.strftime("%Y%m%d-%H%M")
-
-        # Either way, this meeting is still listed:
-        # note it so it won't be cleaned from the directory.
-        active_meetings.append(mtg['cleanname'])
-
-        # If the meeting is new or something has changed,
-        # (re)write the JSON file. Don't save the changestr.
-        if "changestr" in mtg:
-            del mtg["changestr"]
-        with open(jsonfile, 'w') as jsonfp:
-            jsonfp.write(json.dumps(mtg, indent=4))
-
-        # The meeting has been saved to JSON,
-        # so it's safe to add other keys to it now.
-        # Save the change string to put it in the RSS later.
-        mtg['changestr'] = changestr
+    active_meetings = []
 
     ##############
-    # Finally, generate the index HTML and RSS files.
-
-    # The meeting list is in date/time order, latest first.
-    # Better to list them in the other order, starting with
-    # meetings today, then meetings tomorrow, etc.
-    # Could sort by keys, 'Meeting Date' and 'Meeting Time',
-    # but since it's already sorted, it's easier just to reverse.
-    mtglist.reverse()
-
+    # Generate index HTML and RSS file headerss.
     # Open both the RSS and HTML files:
     outrssfilename = os.path.join(RSS_DIR, "index.rss")
     outhtmlfilename = os.path.join(RSS_DIR, "index.html")
     with open(outrssfilename, 'w') as rssfp, \
          open(outhtmlfilename, 'w') as htmlfp:
+
+        print("\n==== Generating RSS for", len(mtglist), "meetings")
 
         gendate = now.strftime(RSS_DATE_FORMAT)
         print(f"""<?xml version="1.0" encoding="iso-8859-1" ?>
@@ -435,6 +323,7 @@ As of: {gendate}
 """, file=htmlfp)
 
         for mtg in mtglist:
+
             # Is the meeting in the future? Don't list past meetings.
             meetingtime = meeting_datetime(mtg)
             if meetingtime < now:
@@ -442,36 +331,193 @@ As of: {gendate}
                       "because", meetingtime, "<", now)
                 continue
 
+            lastmod = None
+            mtg['cleanname'] = mtgdic_to_cleanname(mtg)
+            cleanname = mtg['cleanname']
+            print("\n====", cleanname)
+
+            if mtg["Agenda"]:      # There is an agenda URL listed
+                print(cleanname, "has an agenda: fetching it")
+                # XXX TEMPORARY: save the PDF filename, because sometimes
+                # pdftohtml produces an HTML file with no content even
+                # though there's content in the PDF.
+                pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
+                try:
+                    agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"],
+                                                save_pdf_filename=pdfout)
+                except urllib3.exceptions.ReadTimeoutError:
+                    print("Timed out on " + agendaloc)
+                    agenda_html = NO_AGENDA
+                    agendastatus = "timeout"
+            else:                   # No previous agenda
+                print(cleanname, "has no agenda to fetch")
+                agenda_html = NO_AGENDA
+            # Now agenda_html is guaranteed to be set, either way.
+
+            # Might need a diff file too:
+            agenda_diff = None
+
+            # Does the agenda file need to be (re)written?
+            write_agenda_file = False
+
+            # See if there was already an agenda file left from previous runs:
+            agendafile = os.path.join(RSS_DIR, cleanname + ".html")
+            print("agenda filename", agendafile)
+
+            try:
+                with open(agendafile, "rb") as oldfp:
+                    oldhtml = oldfp.read()
+
+                if NO_AGENDA in oldhtml:         # no agenda previously
+                    if Verbose:
+                        print("No agenda previously")
+                    if agenda_html != NO_AGENDA: # but there is now
+                        write_agenda_file = True
+                        agendastatus = "new"
+                        print(cleanname, ": new agenda")
+                    else:
+                        agendastatus = "no"
+                        print(cleanname, ": no agenda")
+
+                else:                            # there was a previous agenda
+                    if Verbose:
+                        print("There was a previous agenda: ===============")
+                    if agenda_html == NO_AGENDA:
+                        print(oldhtml)
+                        print("========= but now, ===============")
+                        print(agenda_html)
+
+                        if not agendastatus:
+                            agendastatus = "removed"
+                        print(cleanname, ": removed agenda")
+
+                        # don't write over the old agenda file
+                        write_agenda_file = False
+
+                    elif agenda_html != oldhtml:  # changed agenda
+                        write_agenda_file = True
+
+                        # XXX TEMPORARY: save the previous file,
+                        # to have them available while debugging diffs.
+                        os.rename(agendafile,
+                                  os.path.join(RSS_DIR,
+                                               cleanname + "-old.html"))
+                        # End temporary clause
+
+                        # Since the agenda has changed, make a diff file
+                        # highlighting the parts that changed.
+                        agenda_diff = diffhtml(oldhtml, agenda_html,
+                                               title=cleanname)
+                        agenda_diff_file = os.path.join(RSS_DIR,
+                                            mtg['cleanname'] + "-diff.html")
+                        with open(agenda_diff_file, 'wb') as difffp:
+                            difffp.write(agenda_diff)
+
+                        agendastatus = "changed"
+                        print(cleanname, ": changed agenda")
+                    else:
+                        agendastatus = "unchanged"
+                        print(cleanname, ": unchanged agenda")
+
+            except FileNotFoundError:
+                # No agenda file there previously; probably a new meeting
+                if Verbose:
+                    print("No previous agenda file")
+                write_agenda_file = True
+                if agenda_html == NO_AGENDA:
+                    if Verbose:
+                        print("... and no new agenda now")
+                    agendastatus = "no"
+                else:
+                    if Verbose:
+                        print("but there's an agenda there")
+                    agendastatus = "new"
+
+            # Now agenda_html and agendastatus should be set,
+            # and maybe agenda_diff too.
+
+            # Write the agenda file if it's changed:
+            if write_agenda_file:
+                with open(agendafile, 'wb') as outfp:
+                    outfp.write(agenda_html)
+
+            # Either way, this meeting is still listed:
+            # note it so it won't be cleaned from the directory.
+            active_meetings.append(cleanname)
+
+            # Get the old JSON
+            changestr = ""
+            jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
+            try:
+                with open(jsonfile) as jsonfp:
+                    oldmtg = json.loads(jsonfp.read())
+
+                # mtg doesn't have lastmod, so to make sure that
+                # doesn't trigger a change, copy it:
+                mtg['lastmod'] = oldmtg['lastmod']
+
+                changed_keys = {key for key in oldmtg.keys() & mtg
+                                if oldmtg[key] != mtg[key]}
+                if changed_keys:
+                    lastmod = now
+                    changestr = "<p>Changed: " + ', '.join(changed_keys) \
+                        + "</p>"
+                    print("Keys changed:", changed_keys, "lastmod is", lastmod)
+
+                elif not lastmod:
+                    print("Nothing has changed, keeping lastmod")
+                    lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
+                                                         RSS_DATE_FORMAT)
+            except (RuntimeError, OSError) as e:
+                if os.path.exists(jsonfile):
+                    print("Error reading jsonfile: %s" % e)
+                    changestr += "Error reading jsonfile: %s\n<p>" % e
+                elif Verbose:
+                    print("No JSON file there previously")
+                lastmod = now
+                changestr += "<b>New listing.</b>\n<p>"
+
+            # Update to the real lastmod date before writing JSON
+            mtg['lastmod'] = lastmod.strftime(RSS_DATE_FORMAT)
+            mtg['GUID'] = cleanname + '.' + lastmod.strftime("%Y%m%d-%H%M")
+
+            # If the meeting is new or something has changed,
+            # (re)write the JSON file..
+            with open(jsonfile, 'w') as jsonfp:
+                jsonfp.write(json.dumps(mtg, indent=4))
+
             mtgtitle = f"""{mtg['Name']} on {mtg["Meeting Date"]}"""
 
             desc = f"""{mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
 
             # Set up the change strings for the header and body
-            print("****** mtg:", mtg)
-            if mtg["withagenda"] == "new":
+            if agendastatus == "new":
                 agenda_hdr = " (NEW AGENDA)"
                 desc += "<p><b>There is a new agenda.</b>"
-            elif mtg["withagenda"] == "removed":
+            elif agendastatus == "removed":
                 agenda_hdr = " (REMOVED AGENDA)"
                 desc += "<p><b>The agenda has been removed.</b>"
-            elif mtg["withagenda"] == "changed":
+            elif agendastatus == "changed":
                 agenda_hdr = " (CHANGED AGENDA)"
                 desc += "<p><b>The agenda has changed.</b>"
-            elif mtg["withagenda"] == "unchanged":
+            elif agendastatus == "unchanged":
                 agenda_hdr = ""
                 desc += "<p>The agenda hasn't changed."
-            elif mtg["withagenda"] == "no":
+            elif agendastatus == "no":
                 agenda_hdr = " (NO AGENDA)"
                 desc += "<p>No agenda yet."
 
             if mtg['Meeting Location']:
                 desc += "<p>Location:" + mtg['Meeting Location']
 
-            if mtg['changestr']:
-                desc += "<p>" + mtg['changestr'] + '\n'
+            if changestr:
+                desc += "<p>" + changestr + '\n'
 
-            link = f"{RSS_URL}{mtg['cleanname']}.html"
+            if agenda_diff:
+                link = f"{RSS_URL}{cleanname}-diff.html"
+            else:
+                link = f"{RSS_URL}{cleanname}.html"
 
             if mtg["Agenda"]:
                 desc = f"""{desc}<p>
@@ -504,8 +550,8 @@ As of: {gendate}
             if mtg["Agenda"]:
                 print(f'<p><b><a href="{link}">Agenda: {mtgtitle}</a></b>',
                       file=htmlfp)
-            else:
-                print("<p>No agenda yet", file=htmlfp)
+            # else:
+            #     print("<p>No agenda yet", file=htmlfp)
             print(f"""<p>
 {desc}
 <p>(Last modified: {gendate}.)
@@ -515,6 +561,7 @@ As of: {gendate}
 
         print("</channel>\n</rss>", file=rssfp)
         print("</body></html>", file=htmlfp)
+
     print("Wrote", outrssfilename, "and", outhtmlfilename)
 
     # Remove obsolete files for meetings no longer listed.
