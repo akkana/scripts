@@ -19,12 +19,13 @@
 # macro  index  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
 # macro  pager  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
 
+# TESTING: Use the email file in test/files/htmlmail.eml.
+
 import os, sys
 import re
 import time
 import shutil
 import email, mimetypes
-import tempfile
 import subprocess
 
 def find_first_maildir_file(maildir):
@@ -96,7 +97,7 @@ def view_html_message(f, tmpdir):
         if filename:
             filename = sanitize_filename(filename)
         else:
-            print("No filename; making one up")
+            # print("No filename; making one up")
             ext = mimetypes.guess_extension(part.get_content_type())
             if not ext:
                 # Use a generic bag-of-bits extension
@@ -133,10 +134,10 @@ def view_html_message(f, tmpdir):
                 subfiles.append({ 'filename': filename,
                                   'Content-Id': content_id })
                 counter += 1
-                fp = open(filename, 'w')
-                fp.write(part.get_payload())
-                # print "wrote", os.path.join(tmpdir, filename)
-                fp.close()
+                with open(filename, 'wb') as fp:
+                    fp.write(part.get_payload(decode=True))
+                    # print "wrote", os.path.join(tmpdir, filename)
+
                 break     # no need to look at other keys
 
         if not content_id:
@@ -150,7 +151,10 @@ def view_html_message(f, tmpdir):
     # htmlsrc should be a string.
     # html_part.get_payload() returns string, but it's apparently
     # in straight unicode and doesn't reflect the message's charset.
-    # html_part.get_payload(decode=True) returns bytes.
+    # html_part.get_payload(decode=True) returns bytes,
+    # which (I think) have been decoded as far as email transfer
+    # (e.g. Content-Encoding: base64), which is not the same thing
+    # as charset decoding.
     # (None of this is documented in the python3 version of email;
     # there's no mention of get_payload() at all. Sigh.)
 
@@ -183,6 +187,8 @@ def view_html_message(f, tmpdir):
     # shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
+    import tempfile
+
     tmpdir = tempfile.mkdtemp()
     if len(sys.argv) > 1:
         for f in sys.argv[1:]:
