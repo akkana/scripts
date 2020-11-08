@@ -885,10 +885,9 @@ output = p4.communicate()[0]
 ########################################################
 # Sanitize a filename
 ########################################################
-VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
-
-def clean_filename(badstr):
-    return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
+def sanitize_filename(badstr):
+    return ''.join([x for x in badstr if x.isalpha() or x.isdigit()
+                    or x in '-_.'])
 
 ########################################################
 # CGI: how to tell if something is run as a CGI or locally
