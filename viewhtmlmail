@@ -39,6 +39,12 @@ def find_first_maildir_file(maildir):
                 return os.path.join(root, f)
     return None
 
+# Sanitize a filename to make sure there's nothing dangerous,
+# like ../
+def sanitize_filename(badstr):
+    return ''.join([x for x in badstr if x.isalpha() or x.isdigit()
+                    or x in '-_.'])
+
 def view_html_message(f, tmpdir):
     if f:
         if os.path.isdir(f):
@@ -86,20 +92,16 @@ def view_html_message(f, tmpdir):
 
         # Save it to a file in the temp dir.
         filename = part.get_filename()
-        if not filename:
+
+        if filename:
+            filename = sanitize_filename(filename)
+        else:
             print("No filename; making one up")
             ext = mimetypes.guess_extension(part.get_content_type())
             if not ext:
                 # Use a generic bag-of-bits extension
                 ext = '.bin'
             filename = 'part-%03d%s' % (counter, ext)
-
-        # Applications should really sanitize the given filename so that an
-        # email message can't be used to overwrite important files.
-        # As a first step, guard against ../
-        if '../' in filename:
-            print("Eek! Possible security problem in filename %s" % filename)
-            continue
 
         # Some mailers, apparently including gmail, will attach multiple
         # images to the same mail all with the same name, like "image.png".
@@ -131,8 +133,8 @@ def view_html_message(f, tmpdir):
                 subfiles.append({ 'filename': filename,
                                   'Content-Id': content_id })
                 counter += 1
-                fp = open(filename, 'wb')
-                fp.write(part.get_payload(decode=True))
+                fp = open(filename, 'w')
+                fp.write(part.get_payload())
                 # print "wrote", os.path.join(tmpdir, filename)
                 fp.close()
                 break     # no need to look at other keys
@@ -141,13 +143,22 @@ def view_html_message(f, tmpdir):
             print("%s doesn't have a Content-Id, not saving" % filename)
             # print("keys: %s" % str(part.keys()))
 
-    # for sf in subfiles:
-    #     print sf
-
     # We're done saving the parts. It's time to save the HTML part.
     htmlfile = os.path.join(tmpdir, "viewhtml.html")
     fp = open(htmlfile, 'wb')
-    htmlsrc = html_part.get_payload(decode=True).decode('utf-8', "replace")
+
+    # htmlsrc should be a string.
+    # html_part.get_payload() returns string, but it's apparently
+    # in straight unicode and doesn't reflect the message's charset.
+    # html_part.get_payload(decode=True) returns bytes.
+    # (None of this is documented in the python3 version of email;
+    # there's no mention of get_payload() at all. Sigh.)
+
+    # This works, but assumes UTF-8:
+    # htmlsrc = html_part.get_payload(decode=True).decode('utf-8', "replace")
+
+    # but it's probably better to use the system encoding:
+    htmlsrc = html_part.get_payload(decode=True).decode(errors="replace")
 
     # Substitute all the filenames for CIDs:
     for sf in subfiles:
