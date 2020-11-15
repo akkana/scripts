@@ -181,7 +181,7 @@ class Spider:
             return
 
         # URL encode special characters like spaces:
-        urlpath = urllib.quote(urlparsed.path)
+        urlpath = urllib.quote(urlparsed.path.encode('utf-8'))
 
         # This check must come after the special char substitution.
         if urlpath in self.urls_succeeded or urlpath in self.urls_failed:
