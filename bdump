@@ -57,7 +57,7 @@ def bdump(filename, do_char, do_hex, do_dec) :
 
     if filename :
         try :
-            fp = open(filename, "r")
+            fp = open(filename, "r", errors="replace")
 
         except IOError as e:
             print("Can't open %s:\n%s" % (filename, e))
