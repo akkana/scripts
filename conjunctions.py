@@ -295,7 +295,7 @@ class ConjunctionList:
                 for cc in self.clist[i+1:]:
                     if b1 in cc or b2 in cc:
                         c.merge(cc)
-                        self.clist.delete(cc)
+                        self.clist.remove(cc)
                 return
 
         # It's new, so just add it
@@ -563,7 +563,7 @@ def run(start, end, observer, toolate, output_format):
         d = ephem.date(d + oneday)
 
     if saw_conjunction:
-        conjunctions.closeout()
+        conjunctions.closeout(observer)
     for p in visible_planets:
         if p.name != "Moon":
             finish_planet(p.name, d, observer, output_format)
