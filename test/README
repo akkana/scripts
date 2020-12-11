@@ -1,0 +1,8 @@
+To run all of these tests from the parent (scripts) directory:
+
+python -m unittest discover
+
+To run a single test:
+
+python3 -m unittest -v test.test_waymaker
+

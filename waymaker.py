@@ -8,7 +8,7 @@
 
 import sys, os
 import re
-import cgi
+import html
 import datetime
 import time
 
@@ -16,7 +16,7 @@ import time
 # from googlemaps import GoogleMaps
 import urllib.request, urllib.parse, urllib.error, json
 
-def write_gpx_file(entries, filename, omit_address=False):
+def write_gpx_file(entries, filename, omit_address=False, omit_time=False):
     """Write the list of entries -- each entry is [lat, long, desc] --
        to a GPX file as separate waypoints.
     """
@@ -29,7 +29,8 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xmlns="http://www.topografix.com/GPX/1/0"
 xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd">
 ''')
-    fp.write('<time>%s</time>\n' % datetime.datetime.now().isoformat())
+    if not omit_time:
+        fp.write('<time>%s</time>\n' % datetime.datetime.now().isoformat())
 
     # Calculate our bounds:
     minlat = 91
@@ -59,6 +60,7 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
         print('</wpt>', file=fp)
 
     fp.write('</gpx>\n')
+    fp.close()
 
 #
 # Replacement for googlemaps API:
@@ -195,9 +197,9 @@ def read_description_file(filename):
 
             # and append the address as the first part of the description:
             if line2:
-                cur_ent.append(cgi.escape(line) + '\n' + cgi.escape(line2))
+                cur_ent.append(html.escape(line) + '\n' + html.escape(line2))
             else:
-                cur_ent.append(cgi.escape(line))
+                cur_ent.append(html.escape(line))
 
             continue
 
@@ -209,9 +211,9 @@ def read_description_file(filename):
             print("Skipping long line: '%s'" % line)
             continue
         if cur_ent[2]:
-            cur_ent[2] += '\n' + cgi.escape(line)
+            cur_ent[2] += '\n' + html.escape(line)
         else:
-            cur_ent[2] += cgi.escape(line)
+            cur_ent[2] += html.escape(line)
 
     if cur_ent:
         entries.append(cur_ent)
@@ -230,7 +232,7 @@ if __name__ == "__main__" :
         Usage()
 
     # It would be relatively easy to mess up with autocomplete and
-    # run makeway foo.txt foo.txt. That would be bad.
+    # run waymaker foo.txt foo.txt. That would be bad.
     if not(sys.argv[2].endswith('.gpx')):
         print("Output file %s doesn't end with .gpx" % sys.argv[2])
         Usage()

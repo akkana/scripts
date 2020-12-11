@@ -593,7 +593,7 @@ vote411export.py:
     A script to take an exported format from the LWV VOTE411 site,
     parse it, and produce clean outputs for a printed Voter Guide.
 
-waymaker:
+waymaker.py:
     Take a file and of descriptions, multi-line and separated by blank lines,
     and turn it into a collection of GPX waypoints suitable for import into
     any mapping program (e.g. Osmand or PyTopo).
@@ -647,6 +647,6 @@ xlsrd:
 Testing:
 --------
 
-Only a few of the scripts have tests. Run tests with:
+Only a few of the scripts have tests. Run all tests with:
 
 python3 -m unittest discover
