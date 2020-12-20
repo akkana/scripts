@@ -37,6 +37,8 @@
 ##### end API notes ##################################################
 
 import argparse
+import requests
+import json
 import time
 import sys, os
 
@@ -96,6 +98,73 @@ class Book:
             retstr += ' (Goodreads %d)' % self.goodreads_id
 
         return retstr
+
+
+class OpenLibraryAPI:
+    def __init__(self):
+        self.debug = True
+
+    def book_by_ISBN(self, isbn):
+        return self.books_by_query("isbn=" + isbn)
+
+    def book_by_id(self, bookid):
+        # No special OpenLibrary key, use the isbn
+        return books_by_ISBN(bookid)
+
+    def books_by_author(self, authorname):
+        '''Find books by all authors matching the given name.
+           authorname is a string like "Connie Willis")
+           Order of names probably doesn't matter.
+           Returns two lists: booklists, anthologies
+           each of which consists of triples [year, month, title]
+        '''
+        return self.books_by_query("author=" + authorname.replace(' ', '+'))
+
+    def books_by_query(self, query):
+        booklist = []
+        query = f"http://openlibrary.org/search.json?" + query
+        r = requests.get(query)
+        if r.status_code != 200:
+            if self.debug:
+                raise RuntimeError("Bad status %d on %s" % (r.status_code, url))
+            else:
+                return None
+
+        results = json.loads(r.text)
+        if 'docs' not in results:
+            raise RuntimeError("Badly formatted answer")
+        for r in results["docs"]:
+            try:
+                if "language" in r and 'eng' not in r['language']:
+                    # print("Skipping", r["title"], "because it's in",
+                    #       r['language'])
+                    continue
+
+                if "isbn" not in r:
+                    # print("Skipping", r["title"], "because no isbn"),
+                    continue
+
+                if len(r["author_name"]) > 3:
+                    # print("Skipping", r["title"], "because",
+                    #       len(r["author_name"]), "authors is too many")
+                    continue
+
+                book = Book(r["isbn"][0],
+                            r["title"],
+                            r["author_name"],
+                            None,    # No description
+                            r["first_publish_year"],
+                               # There's also "publish_date" which is a list
+                               # of strings like '1995' and 'January 1, 1996'
+                            0, # openlibrary doesn't have publish month
+                            0)
+                booklist.append(book)
+            except Exception as e:
+                print("EXCEPTION:", e)
+                pprint(r)
+
+        booklist.sort(reverse=True)
+        return booklist, []
 
 
 class ISBNlibAPI:
@@ -381,12 +450,11 @@ def lookup_books(args):
                     continue
 
             print(book)
-            print(book.desc)
+            if book.desc:
+                print(book.desc)
 
-        else:
+        else:    # Look up by author's name
             booklist, anthologies = api.books_by_author(val)
-
-            print("\n====", val)
 
             if args.anthologies:
                 for book in anthologies:
@@ -410,8 +478,10 @@ if __name__ == '__main__':
                         help='year: Show only books from this year or later')
     parser.add_argument('-d', action="store_true", dest="desc",
                         help='description: show Goodreads descriptions')
+    parser.add_argument('-L', action="store_true", dest="ISBNlib",
+                        help='Use the ISBNlib Python library (incomplete)')
     parser.add_argument('-G', action="store_true", dest="Goodreads",
-                        help='Use the Goodreads API (requires API key)')
+                        help='Use the Goodreads API (requires API key, going away)')
     parser.add_argument('-I', action="store_true", dest="ISBN",
                         help='Consider numbers as ISBN13 even if using the Goodreads API')
     parser.add_argument('-D', action="store_true", dest="debug",
@@ -429,11 +499,15 @@ if __name__ == '__main__':
         import requests
         from bs4 import BeautifulSoup
         api = GoodreadsAPI()
-    else:
+    elif args.ISBNlib:    # XXX haven't actually added this flag yet
         if args.debug:
             print("Using Python ISBNlib")
         import isbnlib
         api = ISBNlibAPI()
+    else:
+        if args.debug:
+            print("Using OpenLibrary API")
+        api = OpenLibraryAPI()
 
     if args.debug:
         api.debug = True
