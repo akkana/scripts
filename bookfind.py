@@ -161,6 +161,7 @@ class OpenLibraryAPI:
                 booklist.append(book)
             except Exception as e:
                 print("EXCEPTION:", e)
+                from pprint import pprint
                 pprint(r)
 
         booklist.sort(reverse=True)
