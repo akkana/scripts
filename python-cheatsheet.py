@@ -389,6 +389,7 @@ total['newvalue']] = total.get(key, 0) + 42
 from collections import defaultdict
 total = defaultdict(int)
 total['newvalue'] += 42
+
 names = defaultdict(list)
 
 
@@ -751,8 +752,8 @@ noon_mt - noon_et
 # and it has rrules for recurrences. It also has Easter.
 # arrow has humanize, which can give you strings like "an hour ago".
 # Pendulum is slow and not fully backward compat with datetime: don't use.
-# But Adam Kennedy likes pendulum because it can give you aware timedeltas
-# that you can subtract, and iterators over things like weekdays.
+# But Michael Kennedy likes pendulum because it can give you aware
+# timedeltas that you can subtract, and iterators over things like weekdays.
 
 # Some reasons not to use pytz:
 # https://blog.ganssle.io/articles/2018/03/pytz-fastest-footgun.html
@@ -1462,6 +1463,22 @@ except NameError: pass
 # OR:
 if hasattr(__builtins__, 'raw_input'):
     input = raw_input
+
+################################################################
+# Inheriting from and supplementing a class
+################################################################
+
+## In File AAA.py: define aaa() and bbb().
+## Now, to override just bbb() but keep the original aaa():
+
+## File BBB.py
+
+from AAA import *
+import AAA
+
+def bbb():
+    print("This is BBB:bbb")
+
 
 ################################################################
 # Type hinting
