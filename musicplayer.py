@@ -15,6 +15,10 @@ import time
 import random
 import re
 
+# Gtk needs characters like & escaped in labels,
+# but doesn't seem to provide a way to do that.
+import html
+
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
@@ -28,7 +32,7 @@ from pygame import mixer
 import cgi
 
 try:
-    import ID3
+    from mutagen.id3 import ID3
 except:
     pass
 
@@ -490,45 +494,50 @@ button:hover { background: #dff; border-color: #8bb; }
             fp.write(song + '\n')
         fp.close()
 
+    def set_label_text(self, text, labl):
+        """Use for setting the filename and title labels.
+           Limit content to a fixed number of characters.
+        """
+        if len(text) > self.MAX_FILENAME_LEN:
+            text = text[:self.MAX_FILENAME_LEN]
+        labl.set_label(html.escape(text))
+
     def update_content(self):
         has_title = False
         has_artist = False
 
-        self.filename_labl.set_label('<span class="headline">Headline</span>'
-                                     '<span class="normal">Normal text</span>')
+        # self.filename_labl.set_label('<span class="headline">Headline</span>'
+        #                              '<span class="normal">Normal text</span>')
+
         # Limit the filename size, since GTK doesn't seem able to do that.
         fname_len = len(self.songs[self.song_ptr])
         if fname_len > self.MAX_FILENAME_LEN:
             fname = self.songs[self.song_ptr][fname_len-self.MAX_FILENAME_LEN:]
         else:
             fname = self.songs[self.song_ptr]
-        self.filename_labl.set_label(fname)
+        self.set_label_text(fname, self.filename_labl)
 
         try:
-            id3info = ID3.ID3(self.songs[self.song_ptr])
+            id3info = ID3(self.songs[self.song_ptr])
         except:
-            self.title_labl.set_label(os.path.splitext(
-                os.path.basename(self.songs[self.song_ptr]))[0])
-            self.artist_labl.set_label('-')
-            return
+            id3info = {}
 
-        # for k, v in id3info.items():
-        #     if k == "ARTIST":
-        #         has_artist = True
-        #     elif k == "TITLE":
-        #         has_title = True
-        #     text += '\n' + k + ' : ' + v
+        # The keys in mutagen.ID3 don't seem to be documented anywhere!
+        # This is empirical and will probably break at some point.
 
         try:
-            self.title_labl.set_label(unicode(cgi.escape(id3info['TITLE']),
-                                                         'utf-8',
-                                                         errors='replace'))
-        except KeyError:
-            self.title_labl.set_label(os.path.basename(self.songs[self.song_ptr]))
+            title = id3info['TIT2'].text[0]     # TITLE
+        except:
+            title = os.path.splitext(os.path.basename(
+                self.songs[self.song_ptr]).replace("_", " "))[0]
+        self.set_label_text(title, self.title_labl)
+
         try:
-            self.artist_labl.set_label(cgi.escape(id3info['ARTIST']))
-        except KeyError:
-            self.artist_labl.set_label('-')
+            artist = id3info['TPE1'].text[0]    # ARTIST
+        except:
+            artist = "-"
+        self.set_label_text(artist, self.artist_labl)
+
 
     def key_press_event(self, widget, event):
         if event.keyval == MusicWin.Q_KEY and \
@@ -648,6 +657,8 @@ button:hover { background: #dff; border-color: #8bb; }
         except Exception as e:
             print("Can't play", self.songs[self.song_ptr], ':', str(e))
             del self.songs[self.song_ptr]
+            if not self.songs:
+                sys.exit(1)
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
         return True
 
