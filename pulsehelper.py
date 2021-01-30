@@ -178,14 +178,18 @@ def unmute_one(pattern, devtype, mute_others=True):
     """
     devs = parse_sources_sinks(devtype)
     muteall = (pattern.lower() == "none")
+    devindex = -1
 
-    if type(pattern) is int:
-        devindex = pattern
+    try:
+        patternint = int(pattern)
 
-    elif not muteall:
-        try:
-            devindex = int(pattern)
-        except ValueError:
+        for i, dev in enumerate(devs):
+            if dev["index"] == pattern:
+                devindex = i
+                break
+
+    except ValueError:
+        if not muteall:
             # Make sure there's a match before muting anything
             devindex = -1
             for i, dev in enumerate(devs):
@@ -202,7 +206,7 @@ def unmute_one(pattern, devtype, mute_others=True):
 
     # Now either muteall or devindex should be set.
     # Set the given device as the fallback
-    if not muteall:
+    if not muteall and devindex >= 0:
         print("Setting", sub_str(devs[devindex]['device.description']),
               "as fallback")
         print("Calling", ["pactl", f"set-default-{devtype}",
@@ -282,6 +286,9 @@ def read_config_file():
     try:
         with open(os.path.expanduser("~/.config/pulsehelper/config")) as fp:
             for line in fp:
+                line = line.strip()
+                if not line:
+                    continue
                 parts = [ p.strip() for p in line.split('=') ]
                 if len(parts) != 2:
                     print("Config file parse error, line:", line)
