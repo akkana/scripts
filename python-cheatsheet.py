@@ -580,6 +580,9 @@ now = datetime.datetime.now()
 if (now - time_end).seconds < 7200:
     time_end = now - datetime.timedelta(seconds=7200)
 
+# Setting fixed parts of datetime
+dt.replace(hour=11, minute=59)
+
 #
 # Add N months to a date: same day of month but next month.
 #
