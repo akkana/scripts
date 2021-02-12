@@ -63,12 +63,21 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
     fp.close()
 
 #
-# Replacement for googlemaps API:
-# http://stackoverflow.com/questions/18807114/http-error-403-with-api-id-in-accessing-google-maps
+# Options for geocoding:
 #
-over_query_limit = False
-# Explanation of google's query limit:
-# https://developers.google.com/maps/documentation/business/articles/usage_limits
+# The US Census offers an excellent API and even offers batch geocoding:
+# https://www.census.gov/programs-surveys/geography/technical-documentation/complete-technical-documentation/census-geocoder.html
+# You can use it interactively too:
+# https://geocoding.geo.census.gov/geocoder/
+#
+# If something goes wrong with that, the USPS has made their API free
+# but it requires registration:
+# https://www.usps.com/business/web-tools-apis/#dev
+# https://www.usps.com/business/web-tools-apis/address-information-api.htm
+#
+# Google Maps here used to offer a geocoding API, but it became
+# increasingly restrictive and then stopped working entirely.
+#
 
 def geocode(addr):
     """Geocode using the US Census API.
