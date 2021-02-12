@@ -670,6 +670,9 @@ if __name__ == '__main__':
         rand = None
         backward = False
         if args:
+            if args[0] == '-h' or args[0] == '--help':
+                print("Usage: %s [-r|--random] [-s|--sequential] [-b|--backward]" % os.path.basename(sys.argv[0]))
+                sys.exit(0)
             if args[0] == '-r' or args[0] == '--random':
                 rand = True
                 args = args[1:]
