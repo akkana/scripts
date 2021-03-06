@@ -170,6 +170,15 @@ fincompare.py:
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
 
+fix_agenda.py:
+    Are you in an organization where everyone lives and dies by MS
+    Word, emailing dozens of Word documents around for every meeting,
+    and you'd like to take that pile of documents for the next meeting
+    and convert them to HTML so they can be shared on a website and
+    viewed in a web browser? That's what this script is for.
+    Requires word2html (in this git repo), python-mammoth, unoconv
+    (a part of Libre Office), and BeautifulSoup.
+
 fixbookcover:
     Fix books whose cover doesn't include the title, like many
     Project Gutenberg books.
