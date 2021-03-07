@@ -12,12 +12,16 @@
 ########################################################
 # Interactive Python interpreter
 ########################################################
-# Reload a module you already imported: modulename isn't quoted.
-import modulename
+
+# modulename isn't quoted, and is the name you're using
+# e.g. if import modulename as mn, then imp.reload(mn)
+
+# Python 3.2 or later:
+import imp
+imp.reload(modulename)
+
+# in python2 it was built in:
 reload(modulename)
-# If you've imported it under some other name, use the name you used
-import modulename as mn
-reload(mn)
 
 #############################################################
 # What's available in objects and modules? and type-checking.
