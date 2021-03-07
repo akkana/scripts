@@ -14,19 +14,25 @@ import mammoth
 from bs4 import BeautifulSoup
 import prettysoup
 
-def docx2html(infile, outfile):
+
+def docx2html(infile):
     with open(infile, 'rb') as fp:
         mammout = mammoth.convert_to_html(fp)
     for m in mammout.messages:
         print("Mammoth %s: %s" % (m.type, m.message))
 
-    html = prettyprint_html(mammout.value, infile)
+    return prettyprint_html(mammout.value, infile)
+
+
+def docx2htmlfile(infile, outfile):
+    html = docx2html(infile)
 
     if outfile == "--":
         print(html)
     else:
         with open(outfile, "w") as fp:
             print(html, file=fp)
+
 
 def prettyprint_html(inhtml, filename=''):
     '''Prettyprint some HTML, which is assumed not to
@@ -82,17 +88,22 @@ def doc2html(infile, outfile):
     base, ext = os.path.splitext(infile)
     docxfile = base + ".docx"
     try:
-        # Unoconv always fails the first time: it takes too long for its
-        # server to start up, so it needs a longer timeout:
+        # Unoconv always fails the first time with default args:
+        # it takes too long for its server to start up,
+        # so it needs a longer timeout. See:
         # https://github.com/dagwieers/unoconv/issues/415
-        rv = subprocess.call(["unoconv", "-f", "docx", "-T", "10", "-o", docxfile, infile])
+        rv = subprocess.call(["unoconv", "-f", "docx", "-T", "10",
+                              "-o", docxfile, infile])
     except OSError:
         rv = 1
     if not rv:
-        return docx2html(docxfile, outfile)
+        docx2htmfilel(docxfile, outfile)
+        print("removing", docxfile)
+        os.unlink(docxfile)
+        return
 
     # unoconv failed. Try wvHtml.
-    print("Warning: no unoconv, trying wvHtml instead.")
+    print("Warning: %s: unoconv returned %d. Trying wvHtml" % (infile, rv))
     try:
         rv = subprocess.call(["wvHtml", infile, outfile])
     except OSError:
@@ -129,6 +140,6 @@ if __name__ == "__main__":
         html2html(infile, outfile)
 
     else:
-        docx2html(infile, outfile)
+        docx2htmlfile(infile, outfile)
 
     print("Wrote to %s" % outfile)

@@ -631,7 +631,7 @@ weborphans:
 wikitable.py:
     Parse a data table from a wikipedia page, outputting CSV.
 
-word2html:
+word2html.py:
     Convert .docx or .doc to prettyprinted HTML.
     Uses python-mammoth for docx, and either uniconv + python-mammoth
     or wvHtml for .doc. Uses BeautifulSoup for prettyprinting.
