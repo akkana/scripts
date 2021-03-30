@@ -108,8 +108,10 @@ if __name__ == '__main__':
     length = 16
 
     if len(sys.argv) <= 1:
-        print("Usage: %s cookiefile" % os.path.basename(sys.argv[0]))
-        print("Some possibilities:")
+        print("Usage: %s cookiefile [host]" % os.path.basename(sys.argv[0]))
+        print("host can be a partial pattern, e.g. nytimes.")
+        print("")
+        print("Some cookiefiles found on this system:")
 
         print("\nChrome/Chromium:")
         os.system("/usr/bin/locate */Default/Cookies")
