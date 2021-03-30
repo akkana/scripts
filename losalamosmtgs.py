@@ -57,13 +57,44 @@ RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
 tempdir = tempfile.mkdtemp()
 
 
-def parse_meeting_list(only_future=False):
+upcoming_meetings = []
+
+
+def build_upcoming_meetings_list(only_future=False):
+    # By default, the calendar page only shows the current month,
+    # even when there are meetings scheduled for next month.
+    # To see anything from the upcoming month you have to set cookies
+    # in the HTTP request.
+    # If you do that manually, here are the cookies it sets:
+    # Setting-69-ASP.meetingdetail_aspx.gridMain.SortExpression=Sequence ASC; Setting-69-Calendar Options=info|; Setting-69-Calendar Year=Next Month; Setting-69-Calendar Body=All; Setting-69-ASP.calendar_aspx.gridCalendar.SortExpression=MeetingStartDate DESC; ASP.NET_SessionId=tmk5pfksowfid2t3nqjmpvac; BIGipServerprod_insite_443=874644234.47873.0000
+    # but with any luck, 'Next Month' is the only one that's actually needed.
+    # This has to be done before reading the default page,
+    # to match the decreasing date order of the meetings on each month's page.
+    if now.day > 20:
+        cookiedict = { 'Setting-69-Calendar Year': 'Next Month' }
+        r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+        parse_meeting_list(r.text, only_future)
+
+    # Get the meetings on the default (this month) page.
+    # These will be appended to the global list upcoming_meetings.
+    r = requests.get(MEETING_LIST_URL, timeout=30)
+    parse_meeting_list(r.text, only_future)
+
+    # The meeting list is in date/time order, latest first.
+    # Better to list them in the other order, starting with
+    # meetings today, then meetings tomorrow, etc.
+    # That's why we couldn't just write meetings from the earlier loop.
+    # Could sort by keys, 'Meeting Date' and 'Meeting Time',
+    # but since it's already sorted, it's easier just to reverse.
+    upcoming_meetings.reverse()
+
+
+def parse_meeting_list(page_html, only_future=False):
     """Parse the HTML page listing meetings,
        returning a list of dictionaries for each upcoming meeting
        (but not past ones).
     """
-    r = requests.get(MEETING_LIST_URL, timeout=30)
-    soup = BeautifulSoup(r.text, 'lxml')
+    soup = BeautifulSoup(page_html, 'lxml')
 
     # Remove a bunch of spurious tags
     for badtag in [ "font", "span", "div" ]:
@@ -81,8 +112,6 @@ def parse_meeting_list(only_future=False):
             fieldnames.append(field.text.strip())
         else:
             fieldnames.append(str(i))
-
-    upcoming = []
 
     # Loop over meetings, rows in the table:
     for row in caltbl.tbody.findAll("tr"):
@@ -120,17 +149,7 @@ def parse_meeting_list(only_future=False):
             if only_future and mtg_datetime < utcnow:
                 continue
 
-        upcoming.append(dic)
-
-    # The meeting list is in date/time order, latest first.
-    # Better to list them in the other order, starting with
-    # meetings today, then meetings tomorrow, etc.
-    # That's why we couldn't just write meetings from the earlier loop.
-    # Could sort by keys, 'Meeting Date' and 'Meeting Time',
-    # but since it's already sorted, it's easier just to reverse.
-    upcoming.reverse()
-
-    return upcoming
+        upcoming_meetings.append(dic)
 
 
 def meeting_datetime(mtg):
@@ -605,8 +624,8 @@ if __name__ == '__main__':
         if len(sys.argv) > 2:
             RSS_DIR = sys.argv[2]
 
-    meetings = parse_meeting_list()
+    build_upcoming_meetings_list()
 
-    write_rss20_file(meetings)
+    write_rss20_file(upcoming_meetings)
 
 
