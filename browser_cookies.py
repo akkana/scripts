@@ -29,8 +29,8 @@ def get_firefox_cookies(cookiesfile, url=None):
 
     conn = sqlite3.connect(dbfile.name, timeout=3)
     cur = conn.cursor()
-    # query = "SELECT host, path, isSecure, expiry, name, value FROM moz_cookies"
     sqlquery = "SELECT host, name, value FROM moz_cookies"
+    # Other rows you can get: path, isSecure, expiry.
     if url:
         sqlquery += " WHERE host LIKE '%%%s%%'" % url
     print(sqlquery)
@@ -38,9 +38,9 @@ def get_firefox_cookies(cookiesfile, url=None):
 
     cookies = []
     for item in cur.fetchall():
-        cookies.append
-        print(item)
+        cookies.append(item)
 
+        # Example of how you'd use this with cookielib:
         # c = cookielib.Cookie(0, item[4], item[5],
         #     None, False,
         #     item[0], item[0].startswith('.'), item[0].startswith('.'),
