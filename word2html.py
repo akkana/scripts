@@ -97,7 +97,7 @@ def doc2html(infile, outfile):
     except OSError:
         rv = 1
     if not rv:
-        docx2htmfilel(docxfile, outfile)
+        docx2htmlfile(docxfile, outfile)
         print("removing", docxfile)
         os.unlink(docxfile)
         return
