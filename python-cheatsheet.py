@@ -396,6 +396,18 @@ total['newvalue'] += 42
 
 names = defaultdict(list)
 
+# While we're looking at collections, another useful collection is:
+from collections import namedtuple
+Point = namedtuple('Point', ['x', 'y'])
+p = Point(11, y=22)
+print(p.x, p.y)
+
+EmployeeRecord = namedtuple('EmployeeRecord',
+                            'name, age, title, department, paygrade')
+import csv
+for emp in map(EmployeeRecord._make, csv.reader(open("employees.csv", "rb"))):
+    print(emp.name, emp.title)
+
 
 # Pairwise loops with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
@@ -573,6 +585,10 @@ parser.print_help()
 '2019-07-22T19:46:20.164427'
 >>> f"{dt:%Y-%m-%d %H:%M}"        # Only in Python >= 3.6
 '2019-07-22 19:46'
+
+# Convert datetime to date:
+now = datetime.now()
+today = now.date()
 
 ##################
 # Date Arithmetic
