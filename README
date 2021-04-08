@@ -226,6 +226,11 @@ grebook.py:
     A Python version of grebook, mainly useful to show how to implement
     a multi-stage command pipeline in Python.
 
+headerfooter.py:
+    Take standalone HTML files and add customized headers and footers
+    to make them fit in with a website, replacing anything up to and
+    including <body> and following and including </body>
+
 htmlmail.py:
     Compose and send HTML mail, including image attachments.
 
