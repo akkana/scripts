@@ -5,6 +5,10 @@
 # Here's a wrapper for it that forks into background
 # and runs forever, printing the time each time.
 
+# XXX WISHLIST: catch a signal that starts a refresh.
+# Actually, might this happen automatically
+# because it would wake up from sleep?
+
 from __future__ import print_function
 
 import time
