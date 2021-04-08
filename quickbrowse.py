@@ -589,6 +589,8 @@ class BrowserWindow(QMainWindow):
         if os.environ["HOME"].startswith('/tmp/') and \
            os.getenv('USER') not in os.environ["HOME"]:
             print("Cleaning up: removing %s" % os.environ["HOME"])
+            # XXX This doesn't actually succeed: the directory is still there.
+            # Why?
             shutil.rmtree(os.environ["HOME"])
 
     def close_tab(self, tabindex):
