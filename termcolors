@@ -2,9 +2,6 @@
 
 import sys
 
-# Extra credit: display other formatting
-print('Styles: \033[1mbold\033[0m \033[3mitalic\033[0m \033[4munderline\033[0m \033[9mstrikethrough\033[0m \033[31mred\033[0m\n')
-
 # Display the colors available in a terminal.
 #  given any argument, it'll display 256-color mode as well as 16-color mode.
 
@@ -14,8 +11,9 @@ if len(sys.argv) > 1:
     print("256-color mode:")
     for color in range(0, 256) :
         line = ""
-        for i in range(0, 3) :
-            line += "\033[38;5;%sm%03s\033[m" % (str(color), str(color))
+        # print several copies to make it easier to see the color
+        for i in range(0, 5) :
+            line += "\033[38;5; %sm %03s\033[m" % (str(color), str(color))
         print(line)
     print()
     print("16-color mode (actually only 8):")
@@ -39,3 +37,37 @@ for color in range(0, 8) :
                                                          color, color, color,
                                                          colornames[color])
     print(line)
+
+# Extra credit: display other formatting
+print()
+print('Styles: \033[1mbold\033[0m '
+      '\033[3mitalic\033[0m '
+      '\033[4munderline\033[0m '
+      '033[9mstrikethrough\033[0m '
+      '\033[31mred\033[0m\n')
+
+if len(sys.argv) > 1 and sys.argv[1] == '-all':
+    # Text styles like bold:
+    # https://stackoverflow.com/a/33206814
+
+    print()
+    print("\033[1mEffects:\033[m")
+    print("\\033[4m  Underline on")
+    print("\\033[24m Underline off")
+    print("\\033[1m  Bold on")
+    print("\\033[21m Bold off")
+
+    # Cursor movement
+    print()
+    print("\033[1mMovement:\033[m")
+    print("\033[39m\\033[39m - Reset colour")
+    print("\\033[2K - Clear Line")
+    print("\\033[<L>;<C>H OR \\033[<L>;<C>f puts the cursor at line L and column C.")
+    print("\\033[<N>A Move the cursor up N lines")
+    print("\\033[<N>B Move the cursor down N lines")
+    print("\\033[<N>C Move the cursor forward N columns")
+    print("\\033[<N>D Move the cursor backward N columns")
+    print("\\033[2J Clear the screen, move to (0,0)")
+    print("\\033[K Erase to end of line")
+    print("\\033[s Save cursor position")
+    print("\\033[u Restore cursor position")
