@@ -140,6 +140,8 @@ class MonMon:
 
 
     def print_monitor(self, mon, show_all_modes):
+        """Print a connected monitor.
+        """
         if show_all_modes:
             print("\n%s:" % mon['name'])
             print(", ".join([self.allmodes[m] for m in mon['modes']]))
@@ -160,9 +162,12 @@ class MonMon:
             print("%s: Inactive" % mon['name'])
 
 
-    def print_monitors(self, show_all_modes):
+    def print_monitors(self, show_all_modes, list_monitors):
         for mname in self.monitors:
-            self.print_monitor(self.monitors[mname], show_all_modes)
+            if list_monitors:
+                print(mname)
+            else:
+                self.print_monitor(self.monitors[mname], show_all_modes)
 
 
     def move_window(self, win, newx, newy):
@@ -282,6 +287,9 @@ if __name__ == '__main__':
     parser.add_argument('-o', "--orphans", dest="orphans", default=False,
                         action="store_true",
                         help="Find orphaned windows that are no longer visible, and move them back onscreen")
+    parser.add_argument("--monlist", dest="list_monitors",
+                        default=False, action="store_true",
+                        help="Provide an easily parseable list of available monitors")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -301,7 +309,7 @@ if __name__ == '__main__':
         monmon.find_orphans()
 
     else:
-        monmon.print_monitors(args.show_all_modes)
+        monmon.print_monitors(args.show_all_modes, args.list_monitors)
 
 # XXX It would be nice to be able to enable and disable monitors with this
 # program. However, there's no documentation for how to do that with
