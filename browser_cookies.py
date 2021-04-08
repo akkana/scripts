@@ -11,7 +11,7 @@ from Crypto.Protocol.KDF import PBKDF2
 import keyring
 import shutil
 import tempfile
-from pprint import pprint
+import json
 
 
 def get_firefox_cookies(cookiesfile, url=None):
@@ -37,8 +37,8 @@ def get_firefox_cookies(cookiesfile, url=None):
     cur.execute(sqlquery)
 
     cookies = []
-    for item in cur.fetchall():
-        cookies.append(item)
+    for host, name, value in cur.fetchall():
+        cookies.append({ 'host': host, 'name': name, 'value': value })
 
         # Example of how you'd use this with cookielib:
         # c = cookielib.Cookie(0, item[4], item[5],
@@ -79,12 +79,16 @@ def get_chrome_cookies(cookiesfile, url=None):
         for host_key, name, value, encrypted_value in cursor.fetchall():
             print("Stuff:", stuff)
             if value or (encrypted_value[:3] == b'v10'):
-                cookies.append((name, value))
+                cookies.append({ 'host': host_key,
+                                 'name': name,
+                                 'value': value })
             else:
                 decrypted_value = win32crypt.CryptUnprotectData(
                     encrypted_value, None, None, None, 0)[1].decode('utf-8') \
                     or 'ERROR'
-                cookies.append((host_key, name, decrypted_value))
+                cookies.append({ 'host': host_key,
+                                 'name': name,
+                                 'value': decrypted_value })
 
     elif sys.platform == 'linux':
         my_pass = 'peanuts'.encode('utf8')
@@ -93,10 +97,12 @@ def get_chrome_cookies(cookiesfile, url=None):
         for host_key, name, value, encrypted_value in cursor.fetchall():
             decrypted_tuple = (host_key, name,
                                chrome_decrypt(encrypted_value, key=key))
-            cookies.append(decrypted_tuple)
+            cookies.append({ 'host': decrypted_tuple[0],
+                             'name': decrypted_tuple[1],
+                             'value': decrypted_tuple[2] })
 
     else:
-        print('This tool is only supported by linux and win32')
+        print("Sorry, don't know how to decrypt except on linux and win32")
 
     conn.close()
     return cookies
@@ -136,6 +142,7 @@ if __name__ == '__main__':
         print("Firefox cookies in", cookiefile)
         cookies = get_chrome_cookies(cookiefile, url)
 
-    pprint(cookies)
-    sys.exit(0)
+    # Print cookies in JSON format, prettyprinted
+    print(json.dumps(cookies, indent=4, sort_keys=True))
+
 
