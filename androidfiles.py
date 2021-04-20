@@ -3,6 +3,7 @@
 # Some Python routines to pull and push Android files via ADB,
 # on Android KitKat and late that won't let you mount the filesystem
 # so you can manage it in a sensible way.
+#
 # Refer to android files with the scheme  android:/path/to
 # or if you're not sure where the SD card is mounted, try
 # androidsd:/relative/path and it will try to find the SD card
@@ -25,6 +26,24 @@ import shutil
 import pipes
 import re
 import argparse
+
+# Android has changed the output of ls -lR.
+# Choose one or the other of these, or define your own.
+# And yes, the program should figure it out on its own,
+# which maybe I'll get around to implementing eventually.
+
+# Android Marshmallow indices for ls -lR:
+marshmallow_indices = {
+    "fname": 6,
+    "size": 3,
+}
+# Android 11 indices for ls -lR:
+eleven_indices = {
+    "fname": 7,    # Where the filename starts
+    "size": 4,     # file size
+}
+indices = eleven_indices
+
 
 def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
@@ -102,12 +121,13 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             continue
 
         if line.startswith('-rw'):
-            if nwords < 7:
+            if nwords < indices["fname"]+1:
                 print("Not enough words for a file listing: %s"% l)
                 continue
+
             # Account for filenames with spaces: anything from element 6
             # to the end is the filename.
-            fname = ' '.join(l[6:])
+            fname = ' '.join(l[indices["fname"]:])
 
             if recursive and cur_subdir:
                 fname = posixpath.normpath(posixpath.join(cur_subdir,
@@ -120,9 +140,10 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
                     fname = fname[1:]
             if sizes:
                 try:
-                    file_list.append((fname, int(l[3])))
-                except:
+                    file_list.append((fname, int(l[indices["size"]])))
+                except Exception as e:
                     # This could happen for the initial "Total:" line
+                    # print("exception:", e)
                     pass
             else:
                 file_list.append(fname)
