@@ -27,10 +27,10 @@ import pipes
 import re
 import argparse
 
+
 # Android has changed the output of ls -lR.
 # Choose one or the other of these, or define your own.
-# And yes, the program should figure it out on its own,
-# which maybe I'll get around to implementing eventually.
+# If you leave it blank, androidfiles will try to figure it out.
 
 # Android Marshmallow indices for ls -lR:
 marshmallow_indices = {
@@ -42,8 +42,7 @@ eleven_indices = {
     "fname": 7,    # Where the filename starts
     "size": 4,     # file size
 }
-indices = eleven_indices
-
+indices = None
 
 def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
@@ -92,6 +91,8 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
        If recursive, return a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     """
+    global indices
+
     if path.endswith('/'):
         path = path[:-1]
     lenpath = len(path)
@@ -115,44 +116,63 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             cur_subdir = line[:-1]
             continue
 
+        # if line.startswith('drw'):
+        #     print("%s is a directory" % l[-1])
+        #     continue
+
+        if not line.startswith('-rw'):
+            # print("Not a file or directory: %s" % l)
+            continue
+
+        # The line starts with "-rw" -- it's a file.
+
         l = line.split()
         nwords = len(l)
         if not nwords:
             continue
 
-        if line.startswith('-rw'):
-            if nwords < indices["fname"]+1:
-                print("Not enough words for a file listing: %s"% l)
-                continue
-
-            # Account for filenames with spaces: anything from element 6
-            # to the end is the filename.
-            fname = ' '.join(l[indices["fname"]:])
-
-            if recursive and cur_subdir:
-                fname = posixpath.normpath(posixpath.join(cur_subdir,
-                                                          fname))[lenpath:]
-
-                # Depending on whether the original path ended with a slash,
-                # fname might incorrectly start with one
-                # because lenpath might be too small by one.
-                if fname.startswith('/'):
-                    fname = fname[1:]
-            if sizes:
+        # Figure out which ls format this machine uses, if not already set:
+        if not indices:
+            try:
+                int(l[marshmallow_indices["size"]])
+                indices = marshmallow_indices
+            except (ValueError, TypeError):
                 try:
-                    file_list.append((fname, int(l[indices["size"]])))
-                except Exception as e:
-                    # This could happen for the initial "Total:" line
-                    # print("exception:", e)
+                    int(l[eleven_indices["size"]])
+                    indices = eleven_indices
+                except (ValueError, TypeError):
                     pass
-            else:
-                file_list.append(fname)
+        if not indices:
+            print("ls -lR output matches neither known format.",
+                  file=sys.stderr)
+            return None
 
-        # elif line.startswith('drw'):
-        #     print("%s is a directory" % l[-1])
+        if nwords < indices["fname"]+1:
+            print("Not enough words for a file listing: %s"% l)
+            continue
 
-        # else:
-        #     print("Not a file or directory: %s" % l)
+        # Account for filenames with spaces: anything from element 6
+        # to the end is the filename.
+        fname = ' '.join(l[indices["fname"]:])
+
+        if recursive and cur_subdir:
+            fname = posixpath.normpath(posixpath.join(cur_subdir,
+                                                      fname))[lenpath:]
+
+            # Depending on whether the original path ended with a slash,
+            # fname might incorrectly start with one
+            # because lenpath might be too small by one.
+            if fname.startswith('/'):
+                fname = fname[1:]
+        if sizes:
+            try:
+                file_list.append((fname, int(l[indices["size"]])))
+            except Exception as e:
+                # This could happen for the initial "Total:" line
+                # print("exception:", e)
+                pass
+        else:
+            file_list.append(fname)
 
     if sorted:
         file_list.sort()
