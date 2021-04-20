@@ -86,9 +86,10 @@ def list_dir(path, **kwargs):
 
 def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     """List the contents of the given directory on Android.
-       Returns a list of filenames if sizes=False.
-       If sizes=True, returns a list of tuples (filename, int size).
-       If recursive, return a list of relative paths of leaf names
+       Returns (file_list, dir_list)
+       where file_list is list of filenames if sizes=False.
+       If sizes=True, file_list is a list of tuples (filename, int size).
+       If recursive, file_list is a list of relative paths of leaf names
        like foo/bar/baz.jpg.
     """
     global indices
@@ -105,6 +106,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     proc = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
     stdout_lines = proc.communicate()[0].decode().split('\n')
     file_list = []
+    dir_list = []
     cur_subdir = ''
     for line in stdout_lines:
         line = line.strip()
@@ -115,16 +117,6 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         if recursive and line.endswith(':'):
             cur_subdir = line[:-1]
             continue
-
-        # if line.startswith('drw'):
-        #     print("%s is a directory" % l[-1])
-        #     continue
-
-        if not line.startswith('-rw'):
-            # print("Not a file or directory: %s" % l)
-            continue
-
-        # The line starts with "-rw" -- it's a file.
 
         l = line.split()
         nwords = len(l)
@@ -145,7 +137,19 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         if not indices:
             print("ls -lR output matches neither known format.",
                   file=sys.stderr)
-            return None
+            continue
+
+        if line.startswith('drw'):
+            # It's a directory. Directories on Android don't list size,
+            # so the name index is one less than for files.
+            dir_list.append(l[indices["fname"] - 1])
+            continue
+
+        if not line.startswith('-rw'):
+            # print("Not a file or directory: %s" % l)
+            continue
+
+        # The line starts with "-rw" -- it's a file.
 
         if nwords < indices["fname"]+1:
             print("Not enough words for a file listing: %s"% l)
@@ -176,22 +180,20 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
 
     if sorted:
         file_list.sort()
+        dir_list.sort()
 
-    return file_list
+    return file_list, dir_list
 
 def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     """List the contents of the given local directory,
-       returning the result in the same format list_android_dir would return
-       so we can use them interchangeably.
-       Returns a list of filenames if sizes=False.
-       If sizes=True, returns a list of tuples (filename, int size).
-       If recursive, return a list of relative paths of leaf names
-       like foo/bar/baz.jpg.
+       returning the result in the same format list_android_dir would return,
+       (file_list, dir_list), so they can be used interchangeably.
     """
     path = os.path.normpath(path)
     lenpath = len(path)
+    file_list = []
+    dir_list = []
     if recursive:
-        file_list = []
         for root, dirs, files in os.walk(path):
             root = os.path.normpath(root)
             for f in files:
@@ -215,13 +217,19 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
                     file_list.append(fpath)
 
     else:
-        file_list = os.listdir(path)
+        listing = os.listdir(path)
+        for item in listing:
+            if os.path.isdir(os.path.join(path, item)):
+                dir_list.append(item)
+            else:
+                file_list.append(item)
 
     if sorted:
         file_list.sort()
+        dir_list.sort()
 
     if not sizes:
-        return file_list
+        return file_list, dir_list
 
     # Get the size for each file.
     sizelist = []
@@ -238,7 +246,7 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
                 sizelist.append((filename, 0))
                 sys.exit(0)
 
-    return sizelist
+    return sizelist, dir_list
 
 # Helper routines to copy to/from/on android.
 # These assume the schemas have already been removed.
@@ -406,9 +414,9 @@ def sync(src, dst, dryrun=True):
        If dryrun, just print what is to be done, don't actually do it.
        XXX: basically works but needs to remove empty directories.
     """
-    src_ls = list_dir(src, sorted=True, sizes=True, recursive=True)
+    src_ls, src_dirs = list_dir(src, sorted=True, sizes=True, recursive=True)
     # print("src_ls:", src_ls)
-    dst_ls = list_dir(dst, sorted=True, sizes=True, recursive=True)
+    dst_ls, dst_dirs = list_dir(dst, sorted=True, sizes=True, recursive=True)
 
     # Indices as we loop over the src and dst lists:
     isrc = 0
@@ -635,15 +643,14 @@ Usage:
 
 def parse_args():
     """Parse commandline arguments."""
-    parser = argparse.ArgumentParser(usage=Usage(),
-                                     description="List or sync files between Linux and Android")
+    parser = argparse.ArgumentParser(
+        usage=Usage(),
+        description="List or sync files between Linux and Android")
 
     parser.add_argument('-n', "--dryrun", dest="dryrun", default=False,
                         action="store_true")
-    # Doesn't currently work without recursive,
-    # but might eventually want to make that optional.
-    # parser.add_argument('-r', "--recursive", dest="recursive", default=False,
-    #                     action="store_true")
+    parser.add_argument('-r', "--recursive", dest="recursive", default=False,
+                        action="store_true")
     parser.add_argument('-s', "--sync", dest="sync", default=False,
                         action="store_true")
     parser.add_argument('-z', "--no-size", dest="nosize", default=False,
@@ -661,7 +668,6 @@ def parse_args():
     return args
 
 def main():
-
     args = parse_args()
     # print(args)
 
@@ -671,7 +677,16 @@ def main():
 
     for path in (args.paths):
         print("\n%s :" % path)
-        files = list_dir(path, sizes=(not args.nosize), recursive=True)
+        files, dirs = list_dir(path, sizes=(not args.nosize),
+                               recursive=args.recursive)
+
+        if dirs and not args.recursive:
+            print("Directories:")
+            for d in dirs:
+                print("  ", d)
+            print()
+            print("Files:")
+
         if not args.nosize:
             for f in files:
                 if f[1] < 500:
