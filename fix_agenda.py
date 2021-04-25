@@ -16,13 +16,16 @@
 # Then run this script passing it one argument, the agenda file,
 # e.g. fix_agenda orig/1.0_Agenda_03.06.2021.docx.
 # This will convert all the .doc and .docx files using unoconv
-# into a directory called html, then create an agenda with links
-# to the right places, along with the zip file.
+# into a directory called html, then convert the agenda file to
+# html using mammoth, with links to the right converted files.
+# It will also make a zip file of everything.
 
 from bs4 import BeautifulSoup
 import os, sys
 
 from word2html import docx2html
+
+from difflib import SequenceMatcher
 
 import subprocess
 # uno_env = os.environ.copy()
@@ -41,13 +44,21 @@ def fix_agenda(agenda_infile):
             soup = BeautifulSoup(fp, "lxml")
     elif agenda_ext =='.docx':
         soup = BeautifulSoup(docx2html(agenda_infile), "lxml")
+    else:
+        print("Agenda must be .html or .docx")
+        sys.exit(1)
 
     origdir, agendafilename = os.path.split(agenda_infile)
     basedir, origdirname = os.path.split(origdir)
-    if origdirname != "orig":
+    if origdirname == "orig":
+        htmldir = os.path.join(basedir, "html")
+    elif origdirname == 'html':
+        htmldir = origdirname
+        origdirname = os.path.join(basedir, "orig")
+        origdir = os.path.join(basedir, origdirname)
+    else:
         print("Infile name should be a in a directory named 'orig'")
         sys.exit(1)
-    htmldir = os.path.join(basedir, "html")
 
     origfiles = os.listdir(origdir)
     origbases = [ os.path.splitext(f)[0] for f in origfiles ]
@@ -63,41 +74,80 @@ def fix_agenda(agenda_infile):
 
     nosuchfiles = []
     cantconvert = []
+    converted = []
+    already_converted = []
 
     for em in soup.findAll('em'):
-        # filebase = os.path.splitext(em.text.strip())[0]
-        filebase = em.text.strip()
+        # em_text = os.path.splitext(em.text.strip())[0]
+        em_text = em.text.strip()
 
         # Remove empty <em>s
-        if not filebase:
+        if not em_text:
             em.extract()
             continue
 
         # Strip off any extension, if any.
         # But this doesn't work because there might be dots in the filename,
         # e.g. 10.1_CNM_Report_03.2021
-        # filebase, fileext = os.path.splitext(filebase)
-        # print("Now filebase is", filebase)
+        # em_text, fileext = os.path.splitext(em_text)
 
         # First see if there's an html file by that name
-        if filebase in htmlbases:
-            # print(filebase, "is already html")
-            a = soup.new_tag("a", href="html/" + filebase + ".html")
-            a.string = filebase
+        if em_text in htmlbases:
+            a = soup.new_tag("a", href="html/" + em_text + ".html",
+                             target="_blank")
+            a.string = em_text
             em.contents[0].replace_with(a)
-            filebase = None
+            em_text = None
+            continue
 
         # Not already HTML. Find the original file and convert, if possible.
-        elif filebase in origbases:
-            filename = origfiles[origbases.index(filebase)]
-            f, ext = os.path.splitext(filename)
-            if ext == ".docx" or ext == ".doc":
-                # Use unoconv because it preserves colors,
-                # which mammoth/word2html does not.
-                infile = os.path.join(origdir, filename)
-                htmlfile = filebase + ".html"
-                outfile = os.path.join(htmldir, htmlfile)
+        # Can't just search for em_text in origbases, because
+        # non-technical users seem incapable of understanding
+        # "put the filename in the agenda", and will instead put
+        # something that vaguely resembles the filename, e.g.
+        # the agenda might have "Budget proposal FY 21-23" where
+        # the actual filename is "45. Budget proposal FY 21-23.pdf".
+        # elif em_text in origbases:
+        def fuzzy_search(agendaname, filenames):
+            # First try non-fuzzy, with fingers tightly crossed
+            if agendaname in filenames:
+                return filenames.index(agendaname)
+            # No luck there, try fuzzy matches
+            best_ratio = -1
+            best_match = None
+            for i, filename in enumerate(filenames):
+                if agendaname in filename:
+                    return i
+                r = SequenceMatcher(None, agendaname, filename).ratio()
+                if r > best_ratio:
+                    best_match = i
+                    best_ratio = r
+            if best_ratio > .75:
+                print("Guessing", agendaname, "-->", filenames[best_match])
+                return best_match
+            return -1
 
+        index = fuzzy_search(em_text, origbases)
+        if index < 0:    # No fuzzy match
+            print("Couldn't find a match for", em_text)
+            continue
+
+        # Found a match by searching origbases, returning index.
+        # So the actal original file is origfiles[index].
+
+        origfile = origfiles[index]
+        origbase, ext = os.path.splitext(origfile)
+        if ext == ".docx" or ext == ".doc":
+            # Use unoconv because it preserves colors,
+            # which mammoth/word2html does not.
+            infile = os.path.join(origdir, origfile)
+            # Replace any spaces in the HTML filename with underscores
+            # in case that hasn't already been done.
+            htmlfile = origbase.replace(' ', '_') + ".html"
+            outfile = os.path.join(htmldir, htmlfile)
+
+            # Maybe it's already been converted in an earlier run
+            if not os.path.exists(outfile):
                 # For some reaason, unoconv flakes out when you try to
                 # call it from inside a python script, even if it
                 # works just fine from the shell. The error message is:
@@ -105,45 +155,33 @@ def fix_agenda(agenda_infile):
                 #             and python binary combination in
                 #             /usr/lib/libreoffice
                 # The cure: specify the full path to both python and unoconv.
+                # No one seems to understand why.
                 rv = subprocess.call(["/usr/bin/python3", "/usr/bin/unoconv",
                                       "-f", "html", "-T", "10",
                                       "-o", outfile, infile])
                 if not rv:
-                    a = soup.new_tag("a", href="html/" + htmlfile)
-                    a.string = filebase
-                    em.contents[0].replace_with(a)
-                    print("Converted", filename)
-                    htmlfiles.append(filename)
-                    filebase = None
+                    converted.append(origfile)
                 else:
-                    print("unoconv failed on", filename, "exit code", rv)
+                    cantconvert.append(origfile)
+                    # print("unoconv failed on", filename, "exit code", rv)
             else:
-                cantconvert.append(filename)
-                a = soup.new_tag("a", href="orig/" + filename)
-                a.string = filebase
+                already_converted.append(origfile)
+                # print(outfile, "was already converted")
+
+            if os.path.exists(outfile):
+                htmlfile = "html/" + htmlfile
+                a = soup.new_tag("a", href=htmlfile, target="_blank")
+                a.string = em_text
                 em.contents[0].replace_with(a)
-                filebase = None
-
+                htmlfiles.append(htmlfile)
+                em_text = None
         else:
-            # Couldn't find the file referenced in italics in the agenda.
-            # XXX TODO: try a fuzzy search on origfiles, since the names
-            # in the agenda often don't quite match the actual filenames.
-            nosuchfiles.append(filebase)
-            # Leave the em unchanged, no file to link to.
-
-    if cantconvert:
-        print("Can't convert:")
-        for f in cantconvert:
-            print("    ", f)
-    if nosuchfiles:
-        print("Couldn't find files:")
-        for f in nosuchfiles:
-            print("    ", f)
-
-    agenda_out = os.path.join(basedir, "index.html")
-    with open(agenda_out, "w") as outfp:
-        outfp.write(soup.prettify())
-    print("Wrote agenda", agenda_out)
+            cantconvert.append(origfile)
+            linkfile = "orig/" + origfile
+            a = soup.new_tag("a", href=linkfile, target="_blank")
+            a.string = em_text
+            em.contents[0].replace_with(a)
+            em_text = None
 
     # Make sure all the originals are readable -- mutt insists on
     # saving all attachments as mode 600.
@@ -166,15 +204,49 @@ def fix_agenda(agenda_infile):
     allfiles = [ os.path.join(zipname, "index.html") ] \
         + [ os.path.join(zipname, "html", f) for f in htmlfiles ] \
         + [ os.path.join(zipname, "orig", f) for f in origfiles ]
-    print("allfiles:")
-    for f in allfiles:
-        print("  ", f)
+    # print("allfiles:")
+    # for f in allfiles:
+    #     print("  ", f)
 
     rv = subprocess.call(["zip", os.path.join(zipname, zipfile), *allfiles])
     if not rv:
         print("zip file is:", zipfile)
     else:
         print("Couldn't save zip file")
+
+    # Add a link to the zip file in the agenda:
+    tag = soup.new_tag("hr")
+    soup.body.append(tag)
+    tag = soup.new_tag("a", href=zipfile, target="_blank")
+    tag.string = "Zip file of everything"
+    soup.body.append(tag)
+
+    # Finally, the agenda is ready to write.
+    agenda_out = os.path.join(basedir, "index.html")
+    with open(agenda_out, "w") as outfp:
+        outfp.write(soup.prettify())
+    print("Wrote agenda", agenda_out)
+
+    # Finally, print stats.
+    if already_converted:
+        print("\nAlready converted:")
+        for f in already_converted:
+            print("    ", f)
+
+    if converted:
+        print("\nConverted:")
+        for f in converted:
+            print("    ", f)
+
+    if cantconvert:
+        print("\nCan't convert:")
+        for f in cantconvert:
+            print("    ", f)
+
+    if nosuchfiles:
+        print("\nCouldn't find files:")
+        for f in nosuchfiles:
+            print("    ", f)
 
 
 if __name__ == '__main__':
