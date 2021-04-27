@@ -210,7 +210,7 @@ from difflib import SequenceMatcher
 best_ratio = -1
 best_match = None
 for b in string_list:
-    r = SequenceMatcher(None, matchname, b).ratio()
+    r = SequenceMatcher(None, pattern, b).ratio()
     if r > best_ratio:
         best_match = b
         best_ratio = r
@@ -228,6 +228,76 @@ s = s.replace("\u00A0"," ")
 # Split with a regexp:
 sep = re.compile('[,\s]+')
 sep.split('HB42,SJR1, HR67 SB3')
+
+# Split on multiple characters at once
+re.split(', |_|-|!', thestring)
+# same, but find words:
+re.findall(r"[\w']+", thestring)
+
+################################################################
+# Python3-specific stringy stuff
+################################################################
+
+# Migrate python2 to python3 in place (omit -n to leave a .bak):
+$ 2to3 -wn file_or_directory
+
+# To make print() work in both 2 and 3:
+from __future__ import print_function
+
+# print without a newline and to a file:
+print("Hello, world", end='', file=sys.stderr)
+
+# encode/decode between bytes and str:
+>>> b'string of bytes'.decode()
+'string of bytes'
+
+>>> b'string of bytes'.decode('utf-8')
+'string of bytes'
+
+>>> 'piñon'.encode('utf-8')
+b'pi\xc3\xb1on'
+
+# But if there might be an emoji involved, for some reason, plain utf-8
+# isn't enough and you need this:
+print(output.encode('utf-8', "surrogatepass"))
+
+# For a while, you could just pass encoding as a second argument
+# in type coercion; This has changed in more recent python3,
+# so don't use it any more.
+# I don't know the limits, but it's probably best not to use things like:
+>>> str(b'string of bytes')
+"b'string of bytes'"
+>>> str(b'string of bytes', 'utf-8')
+'string of bytes'
+>>> str(b'pi\xc3\xb1on')
+"b'pi\\xc3\\xb1on'"
+>>> str(b'pi\xc3\xb1on', 'utf-8')
+'piñon'
+>>> bytes('piñon', 'utf-8')
+b'pi\xc3\xb1on'
+
+# Read or write bytes from a file:
+fp = open(filename, 'rb')   # or 'wb'
+
+# Write bytes to a file opened in string mode with .buffer
+if hasattr(sys.stdout, 'buffer')::
+    sys.stdout.buffer.write(b'abc')
+
+# Also, you can specify encoding when opening a file:
+open(path, "w", encoding="utf-8")
+
+# Conditional depending on python version:
+if sys.version[:1] == '2':
+    from urlparse import urlparse
+else:
+    from urllib.parse import urlparse
+
+# Call input everywhere but make that call raw_input if it's python2:
+try: input = raw_input
+except NameError: pass
+# OR:
+if hasattr(__builtins__, 'raw_input'):
+    input = raw_input
 
 #############################
 # All the ways of formatting numbers.
@@ -357,6 +427,10 @@ mylist.pop(i)            # Removes and returns list[i]
 # () turns a list comprehension into a generator:
 >>> ( i*2 for i in range(5) )
 <generator object <genexpr> at 0x7f8fc17db050>
+
+# Dictionary comprehensions:
+({i : chr(65+i) for i in range(4)}
+ # gives {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
 
 # Delete an item from a dictionary:
 del thedic[key]
@@ -984,6 +1058,31 @@ val = getattr(themodule, functionname)()
 # Of course, you can also do this with curses.
 
 ########################################################
+# Fun with generators
+########################################################
+# See http://www.dabeaz.com/generators/
+
+# "yield from" to delegate iteration:
+def countdown(n):
+    while n > 0:
+        yield n
+        n -= 1
+def countup(stop):
+    n = 1
+    while n < stop:
+        yield n
+        n += 1
+def up_and_down(n):
+    yield from countup(n)
+    yield from countdown(n)
+
+# Generator expressions like list comprehensions
+with open("access-log") as wwwlog:
+    bytecolumn = (line.rsplit(None,1)[1] for line in wwwlog)
+    bytes_sent = (int(x) for x in bytecolumn if x != '-')
+    print("Total", sum(bytes_sent))
+
+########################################################
 # Lambda foo
 ########################################################
 
@@ -1116,6 +1215,9 @@ PosixPath('/home/username/pathlib')
 # .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
   # reads and writes don't require open first
 
+# Use pathlib to search the filesystem:
+for filename in Path('/').rglob('*.py'):
+    print(filename)
 
 ################################################################
 # Nonlocal variables, class statics, and closures
@@ -1421,71 +1523,9 @@ ax.tick_params(which='major', length=10, labelrotation=45, color='b')
 # Custom ticks and labels for dates: see mpl_smart_dates.py.
 #
 
-
 ################################################################
-# Python3 differences
+# Python3 only
 ################################################################
-
-# Migrate python2 to python3 in place (omit -n to leave a .bak):
-$ 2to3 -wn file_or_directory
-
-# To make print() work in both 2 and 3:
-from __future__ import print_function
-
-# print without a newline and to a file:
-print("Hello, world", end='', file=sys.stderr)
-
-# encode/decode between bytes and str:
->>> b'string of bytes'.decode()
-'string of bytes'
-
->>> b'string of bytes'.decode('utf-8')
-'string of bytes'
-
->>> 'piñon'.encode('utf-8')
-b'pi\xc3\xb1on'
-
-# But if there might be an emoji involved, for some reason, plain utf-8
-# isn't enough and you need this:
-print(output.encode('utf-8', "surrogatepass"))
-
-# For a while, you could just pass encoding as a second argument
-# in type coercion; This has changed in more recent python3,
-# so don't use it any more.
-# I don't know the limits, but it's probably best not to use things like:
->>> str(b'string of bytes')
-"b'string of bytes'"
->>> str(b'string of bytes', 'utf-8')
-'string of bytes'
->>> str(b'pi\xc3\xb1on')
-"b'pi\\xc3\\xb1on'"
->>> str(b'pi\xc3\xb1on', 'utf-8')
-'piñon'
->>> bytes('piñon', 'utf-8')
-b'pi\xc3\xb1on'
-
-# Read or write bytes from a file:
-fp = open(filename, 'rb')   # or 'wb'
-
-# Write bytes to a file opened in string mode with .buffer
-if hasattr(sys.stdout, 'buffer')::
-    sys.stdout.buffer.write(b'abc')
-
-# Also, you can specify encoding when opening a file:
-open(path, "w", encoding="utf-8")
-
-# Conditional depending on python version:
-if sys.version[:1] == '2':
-    from urlparse import urlparse
-else:
-    from urllib.parse import urlparse
-
-# Call input everywhere but make that call raw_input if it's python2:
-try: input = raw_input
-except NameError: pass
-# OR:
-if hasattr(__builtins__, 'raw_input'):
-    input = raw_input
 
 ################################################################
 # Inheriting from and supplementing a class
