@@ -512,7 +512,7 @@ As of: {gendate}
 
             # Set up the change strings for the header and body
             if agendastatus == "new":
-                agenda_hdr = " (NEW AGENDA)"
+                agenda_hdr = " (AGENDA)"
                 desc += "<p><b>There is a new agenda.</b>"
             elif agendastatus == "removed":
                 agenda_hdr = " (REMOVED AGENDA)"
@@ -524,7 +524,7 @@ As of: {gendate}
                 agenda_hdr = ""
                 desc += "<p>The agenda hasn't changed."
             elif agendastatus == "no":
-                agenda_hdr = " (NO AGENDA)"
+                agenda_hdr = " (no agenda)"
                 desc += "<p>No agenda yet."
 
             if mtg['Meeting Location']:
