@@ -9,6 +9,9 @@
 # androidsd:/relative/path and it will try to find the SD card
 # if it's mounted as /storage/nnnn-nnnn.
 #
+# On Android 10+, non-SD-card files will tend to be under
+# /storage/emulated/0/Android/data/...
+#
 # Note: this isn't well tested at all and is super brittle.
 # Be sure to test it on small directories before using it for
 # any major copies.
@@ -119,30 +122,44 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             continue
 
         l = line.split()
+        if l[0] == 'total':
+            continue
+
         nwords = len(l)
         if not nwords:
+            continue
+
+        if line.startswith('drw'):
+            sizeoffset = -1
+        elif line.startswith('-rw'):
+            sizeoffset = 0
+        else:
             continue
 
         # Figure out which ls format this machine uses, if not already set:
         if not indices:
             try:
-                int(l[marshmallow_indices["size"]])
+                int(l[marshmallow_indices["size"] + sizeoffset])
                 indices = marshmallow_indices
             except (ValueError, TypeError):
                 try:
-                    int(l[eleven_indices["size"]])
+                    int(l[eleven_indices["size"] + sizeoffset])
                     indices = eleven_indices
                 except (ValueError, TypeError):
                     pass
         if not indices:
             print("ls -lR output matches neither known format.",
                   file=sys.stderr)
+            print("Command was:", ' '.join(args))
+            print("sizeoffset:", sizeoffset)
+            print(">>>", line, "<<<")
+            print()
             continue
 
         if line.startswith('drw'):
             # It's a directory. Directories on Android don't list size,
             # so the name index is one less than for files.
-            dir_list.append(l[indices["fname"] - 1])
+            dir_list.append(l[indices["fname"] + sizeoffset])
             continue
 
         if not line.startswith('-rw'):
@@ -177,6 +194,10 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
                 pass
         else:
             file_list.append(fname)
+
+    if not file_list:
+        print("Didn't find any files")
+        print("Command was:", ' '.join(args))
 
     if sorted:
         file_list.sort()
@@ -217,7 +238,12 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
                     file_list.append(fpath)
 
     else:
-        listing = os.listdir(path)
+        try:
+            listing = os.listdir(path)
+        except Exception as e:
+            print("Couldn't list local dir", path)
+            print(e)
+            return None, None
         for item in listing:
             if os.path.isdir(os.path.join(path, item)):
                 dir_list.append(item)
@@ -679,6 +705,10 @@ def main():
         print("\n%s :" % path)
         files, dirs = list_dir(path, sizes=(not args.nosize),
                                recursive=args.recursive)
+
+        if not files:
+            print("No files")
+            continue
 
         if dirs and not args.recursive:
             print("Directories:")
