@@ -16,6 +16,8 @@ import subprocess
 # The configuration, if any, is global.
 config = {}
 
+DEBUG = False
+
 
 # If python-termcolor is installed, show muted items in red.
 try:
@@ -163,9 +165,13 @@ def mute_unmute(mute, dev, devtype):
        or sink ("sink") of a given name.
        pactl set-source-mute $source 1
     """
-    print("muting" if mute else "unmuting", sub_str(dev['device.description']))
-    subprocess.call(["pactl", f"set-{devtype}-mute", dev['name'],
-                     '1' if mute else '0'])
+    args = ["pactl", f"set-{devtype}-mute", dev['name'],
+            '1' if mute else '0']
+    if DEBUG:
+        print("muting" if mute else "unmuting",
+              sub_str(dev['device.description']))
+        print("Calling:", args)
+    subprocess.call(args)
 
 
 def unmute_one(pattern, devtype, mute_others=True):
@@ -207,10 +213,11 @@ def unmute_one(pattern, devtype, mute_others=True):
     # Now either muteall or devindex should be set.
     # Set the given device as the fallback
     if not muteall and devindex >= 0:
-        print("Setting", sub_str(devs[devindex]['device.description']),
-              "as fallback")
-        print("Calling", ["pactl", f"set-default-{devtype}",
-                         devs[devindex]['index']])
+        if DEBUG:
+            print("Setting", sub_str(devs[devindex]['device.description']),
+                  "as fallback")
+            print("Calling", ["pactl", f"set-default-{devtype}",
+                              devs[devindex]['index']])
         subprocess.call(["pactl", f"set-default-{devtype}",
                          devs[devindex]['index']])
 
@@ -220,7 +227,8 @@ def unmute_one(pattern, devtype, mute_others=True):
         elif mute_others:
             mute_unmute(True, dev, devtype)
 
-    print()
+    if DEBUG:
+        print()
 
 
 def sub_str(s):
@@ -304,6 +312,8 @@ def read_config_file():
 
 
 def print_status():
+    """Print all the known inputs, outputs and processes and their stati.
+    """
     cards = parse_cards()
     print("Cards:")
     for card in cards:
@@ -370,6 +380,8 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
                         help='Set current sink (speaker)')
     parser.add_argument('--getvol', action='store_true', dest='getvol',
                         help='Get the current volume level for the active sink')
+    parser.add_argument('-d', '--debug', action='store_true', dest='debug',
+                        help='Get the current volume level for the active sink')
     parser.add_argument('--setvol', action='store', type=str, dest='setvol',
                         default=-1,
                         help='Set the current volume level for the active sink.'
@@ -380,6 +392,9 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
     args = parser.parse_args(sys.argv[1:])
 
     config = read_config_file()
+
+    if args.debug:
+        DEBUG = True
 
     quiet = False
 
