@@ -109,10 +109,11 @@ class MonMon:
                     'mm_height': mondata['mm_height']
                 }
 
-            except XError:
+            except (XError, AttributeError) as e:
                 # If get_crtc_info fails it means that the monitor is
                 # connected but not active.
                 print("No crtc info", file=DEBUGFILE)
+                print(e)
                 pass
 
 
