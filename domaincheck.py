@@ -50,18 +50,17 @@ if __name__ == '__main__':
             print("Can't get expiration date for %s" % name)
             continue
         elif hasattr(domain["expiration_date"], "__len__"):
-            # Sometimes python-whois returns a list of dates,
-            # for unknown reasons.
-            # Check whether they're all the same.
-            expdate = domain["expiration_date"][0].date()
-            for e in domain["expiration_date"][1:]:
-                if e.date() != expdate:
-                    print("Yikes, %s != %s" % (str(e), str(expdate)))
+            # Sometimes python-whois returns a list of two dates,
+            # for undocumented reasons.
+            # Typically they're one day apart, with the second date
+            # being later, but that's probably not safe to count on.
+            # Find the earliest date in the list.
+            expdate = min(domain["expiration_date"])
         else:
-            expdate = domain["expiration_date"].date()
+            expdate = domain["expiration_date"]
 
         if domain:
-            domainlist.append((name, expdate, domain.registrar))
+            domainlist.append((name, expdate.date(), domain.registrar))
 
     domainlist.sort(key = lambda a: a[1])
 
