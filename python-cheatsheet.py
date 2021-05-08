@@ -546,6 +546,19 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
         yield top, dirs, nondirs
 
 ########################################################
+# Class Properties
+########################################################
+
+# Properties let you define a class Rectangle
+# and call rect.width and rect.height but have them call a function.
+
+# Explicitly defining properties:
+# https://github.com/PacktPublishing/Expert-Python-Programming_Second-Edition/blob/master/chapter3/properties_explicit.py
+
+# Simpler syntax with decorators:
+# https://github.com/PacktPublishing/Expert-Python-Programming_Second-Edition/blob/master/chapter3/properties_decorator.py
+
+########################################################
 # Useful regular expressions
 ########################################################
 
@@ -859,88 +872,41 @@ noon_mt - noon_et
 # because it's compatible with Python2, which doesn't have dateutil
 # or datetime.now().astimezone() with no argument.
 
-########################################################
-# Threading and multiprocessing
-########################################################
+################################################################
+# Pathlib, cross-platform replacement for os.path and much more.
+################################################################
 
-# Easy way to schedule something:
+>>> from pathlib import Path, PosixPath
 
-# In a single-threaded environment:
-import sched, time
-def print_time():
-    print "From print_time", time.time()
+# For paths in Python3=only projects, consider using pathlib rather than os.path
+# https://docs.python.org/3/library/pathlib.html#pathlib.Path
+Path.home()    # the user's homedir
 
-if __name__ == '__main__':
-    s = sched.scheduler(time.time, time.sleep)
-    s.enter(5, 1, print_time, ())
-    s.enter(10, 1, print_time, ())
-    s.run()
+>>> rock =  Path('~', 'Music', 'Rock').expanduser()
+>>> rock
+PosixPath('/home/akkana/Music/Rock')
+>>> g = rock.rglob('*.mp3')
+>>> g
+<generator object Path.rglob at 0x7f630d9e48d0>
+>>> list(g)
+# ... list of PosixPath objects
+# rglob is recursive, glob is nonrecursive unless the pattern starts with **/
+# which means “this directory and all subdirectories, recursively”.
 
-# In multi-threaded environments:
-from threading import Timer
-import time
+>>> p = Path()
+>>> p
+PosixPath('.')
+>>> p.resolve()
+PosixPath('/home/username/pathlib')
 
-def run_later(a, b):
-    print("Hello, it's later now, and time is %f" % time.time())
-    print(a, b)
+# Other methods include .mkdir(), .rmdir(), .unlink().rename(), .exists(),
+# .is_dir(), .is_file(), .stat(),
+# .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
+  # reads and writes don't require open first
 
-if __name__ == '__main__':
-    Timer(5, run_later, (1, 2)).start()
-    Timer(11, run_later, (4, 5)).start()
-    for i in range(10):
-          print(i*2)
-          time.sleep(2)
-
-########################################################
-# CSV
-########################################################
-with open(filename) as csvfp:
-    reader = csv.DictReader(csvfp)
-    for row in reader:
-        # Each row is an OrderedDict
-
-
-########################################################
-# BeautifulSoup
-########################################################
-
-Difference between .string and .text:
-  .string returns a NavigableString object, which offers a lot of
-          the same methods tags do.
-  .text returns a unicode object that concatenates  all the child strings.
-
-Useful recent additions: tag.replace_with_children()
-
-# Find tags with inline style attribute:
-for t in soup.findAll(style=True)
-# Harder way, using lambda:
-soup.findAll(lambda tag: 'style' in tag.attrs)
-
-########################################################
-# Requests
-########################################################
-
-# To handle cookies with requests, ignore the Requests documentation
-# that says to use a RequestCookieJar: that's apparently only for
-# setting cookies, not fetching them. Instead, use a Session:
-session = requests.Session()
-r = session.get(url)
-
-# requests.text gives a string, requests.content gives bytes
-
-# r.encoding comes from the server,
-# r.apparent_encoding is guessed from the text
-# (either one may be None).
-
-########################################################
-# Some handy utility classes
-########################################################
-
-# Copying and moving files: shutil.copy and shutil.move
-
-# Handle quoting for something that might need to be passed to a shell:
-# in Python 3, shlex.quote() does it, but if it needs to be compatible
-# with both 2 and 3, use pipes.quote().
+# Use pathlib to search the filesystem:
+for filename in Path('/').rglob('*.py'):
+    print(filename)
 
 ########################################################
 # subprocess
@@ -979,6 +945,90 @@ p3.stdout.close()
 
 output = p4.communicate()[0]
 
+########################################################
+# Threading and multiprocessing
+########################################################
+
+# Easy way to schedule something:
+
+# In a single-threaded environment:
+import sched, time
+def print_time():
+    print "From print_time", time.time()
+
+if __name__ == '__main__':
+    s = sched.scheduler(time.time, time.sleep)
+    s.enter(5, 1, print_time, ())
+    s.enter(10, 1, print_time, ())
+    s.run()
+
+# In multi-threaded environments:
+from threading import Timer
+import time
+
+def run_later(a, b):
+    print("Hello, it's later now, and time is %f" % time.time())
+    print(a, b)
+
+if __name__ == '__main__':
+    Timer(5, run_later, (1, 2)).start()
+    Timer(11, run_later, (4, 5)).start()
+    for i in range(10):
+          print(i*2)
+          time.sleep(2)
+
+########################################################
+# CSV
+########################################################
+
+with open(filename) as csvfp:
+    reader = csv.DictReader(csvfp)
+    for row in reader:
+        # Each row is an OrderedDict
+
+
+########################################################
+# BeautifulSoup
+########################################################
+
+Difference between .string and .text:
+  .string returns a NavigableString object, which offers a lot of
+          the same methods tags do.
+  .text returns a unicode object that concatenates  all the child strings.
+
+Useful recent additions: tag.replace_with_children()
+
+# Find tags with inline style attribute:
+for t in soup.findAll(style=True)
+# Harder way, using lambda:
+soup.findAll(lambda tag: 'style' in tag.attrs)
+
+########################################################
+# Networking and Requests
+########################################################
+
+# To handle cookies with requests, ignore the Requests documentation
+# that says to use a RequestCookieJar: that's apparently only for
+# setting cookies, not fetching them. Instead, use a Session:
+session = requests.Session()
+r = session.get(url)
+
+# requests.text gives a string, requests.content gives bytes
+
+# r.encoding comes from the server,
+# r.apparent_encoding is guessed from the text
+# (either one may be None).
+
+########################################################
+# Some handy utility classes
+########################################################
+
+# Copying and moving files: shutil.copy and shutil.move
+
+# Handle quoting for something that might need to be passed to a shell:
+# in Python 3, shlex.quote() does it, but if it needs to be compatible
+# with both 2 and 3, use pipes.quote().
+
 
 ########################################################
 # Sanitize a filename
@@ -987,9 +1037,10 @@ def sanitize_filename(badstr):
     return ''.join([x for x in badstr if x.isalpha() or x.isdigit()
                     or x in '-_.'])
 
-########################################################
+###########################################################
 # CGI: how to tell if something is run as a CGI or locally
-########################################################
+###########################################################
+
 if 'REQUEST_METHOD' in os.environ:
     print("Run as CGI", file=sys.stderr)
     form = cgi.FieldStorage()
@@ -1015,6 +1066,7 @@ else:
 ########################################################
 # Import of runtime-specified modules and functions
 ########################################################
+
 modulename = 'MyModule'
 functionname = 'TheFunction'
 
@@ -1031,6 +1083,7 @@ val = getattr(themodule, functionname)()
 ########################################################
 # unittest
 ########################################################
+
 # Assuming a test/ subdirectory in the module toplevel:
 
 # Run all tests:
@@ -1182,42 +1235,6 @@ for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "
 # NO -9
 # APPLY -10
 # HELP -11
-
-################################################################
-# Pathlib, cross-platform replacement for os.path and much more.
-################################################################
-
->>> from pathlib import Path, PosixPath
-
-# For paths in Python3=only projects, consider using pathlib rather than os.path
-# https://docs.python.org/3/library/pathlib.html#pathlib.Path
-Path.home()    # the user's homedir
-
->>> rock =  Path('~', 'Music', 'Rock').expanduser()
->>> rock
-PosixPath('/home/akkana/Music/Rock')
->>> g = rock.rglob('*.mp3')
->>> g
-<generator object Path.rglob at 0x7f630d9e48d0>
->>> list(g)
-# ... list of PosixPath objects
-# rglob is recursive, glob is nonrecursive unless the pattern starts with **/
-# which means “this directory and all subdirectories, recursively”.
-
->>> p = Path()
->>> p
-PosixPath('.')
->>> p.resolve()
-PosixPath('/home/username/pathlib')
-
-# Other methods include .mkdir(), .rmdir(), .unlink().rename(), .exists(),
-# .is_dir(), .is_file(), .stat(),
-# .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
-  # reads and writes don't require open first
-
-# Use pathlib to search the filesystem:
-for filename in Path('/').rglob('*.py'):
-    print(filename)
 
 ################################################################
 # Nonlocal variables, class statics, and closures
@@ -1603,6 +1620,8 @@ source ~/pythonenv/envname/bin/activate
 ################################################################
 
 '''
+packaging.python.org is the new authoritative resource.
+
 Installing to a virtualenv (don't use setup.py install):
   pip install .
 
@@ -1611,7 +1630,9 @@ Developing a package in a virtualenv:
 OR
   setup.py develop
 
-When finished:
+This makes links to the live sourcedir, so it will see changes.
+
+When finished, if you don't want the package there any more:
   setup.py develop --uninstall
 
 Best tutorial I've found on Packaging Python Projects:
