@@ -95,6 +95,38 @@ for k in d:
 l = [ [] for i in range(10) ]
 
 ########################################################
+# Conditional import and testing imported libraries
+########################################################
+
+try:
+    import foo
+except:
+    pass
+import sys
+
+if 'foo' in sys.modules:
+    myfoo = foo.Foo()
+else:
+    myfoo = None
+
+########################################################
+# Import of runtime-specified modules and functions
+########################################################
+
+modulename = 'MyModule'
+functionname = 'TheFunction'
+
+themodule = __import__(modulename)
+val = getattr(themodule, functionname)()
+
+# Also, a note on importing:
+# "from pytopo import user_agent" makes a copy of
+# the variable and doesn't see later changes.
+# If you want to see changes, you need to
+# import pytopo and have it be pytopo.user_agent.
+
+
+########################################################
 # Shell One-liners
 ########################################################
 # Python gives unclear errors if you try to make a one-liner that
@@ -1046,38 +1078,6 @@ if 'REQUEST_METHOD' in os.environ:
     form = cgi.FieldStorage()
 else:
     print("Run locally")
-
-########################################################
-# Conditional import and testing imported libraries
-########################################################
-
-try:
-    import foo
-except:
-    pass
-import sys
-
-if 'foo' in sys.modules:
-    myfoo = foo.Foo()
-else:
-    myfoo = None
-
-
-########################################################
-# Import of runtime-specified modules and functions
-########################################################
-
-modulename = 'MyModule'
-functionname = 'TheFunction'
-
-themodule = __import__(modulename)
-val = getattr(themodule, functionname)()
-
-# Also, a note on importing:
-# "from pytopo import user_agent" makes a copy of
-# the variable and doesn't see later changes.
-# If you want to see changes, you need to
-# import pytopo and have it be pytopo.user_agent.
 
 
 ########################################################
