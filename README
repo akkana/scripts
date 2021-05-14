@@ -194,6 +194,10 @@ fotogr:
     Find tagged photos: search for strings in files named Keyword or Tags
     beneath the current directory.
 
+geoipcompare.py:
+    Check several different geoip services and log the varying
+    answers they give.
+
 geojsonmap.py:
     How to plot a geojson file of polygons exported from QGIS.
 
