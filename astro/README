@@ -13,6 +13,12 @@ conjunctions.py:
     Predict planetary visibility and conjunctions for a specified
     date range.
 
+daynightimage.py:
+    Given two rectangular Earth (or other planet) images, for day and night,
+    generate a combined image for a given time, especially
+    solstices and equinoxes.
+    The images can be viewed as-is or wrapped around a globe.
+
 epicycles.py:
     Show planet orbits as they would be viewed from the north ecliptic
     pole in a geocentric universe. Show the Venus Pentagram, etc.
