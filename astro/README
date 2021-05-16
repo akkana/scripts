@@ -1,0 +1,44 @@
+
+--------------------------
+Astronomy-related scripts.
+--------------------------
+
+analemma.py:
+    Plot the analemma from the selected location, using PyEphem and PyGTK.
+
+comet.py:
+    Look up a comet and compute its position, using Skyfield.
+
+conjunctions.py:
+    Predict planetary visibility and conjunctions for a specified
+    date range.
+
+epicycles.py:
+    Show planet orbits as they would be viewed from the north ecliptic
+    pole in a geocentric universe. Show the Venus Pentagram, etc.
+
+hypermoon.py:
+    Make up silly names for tonight's moon, as a CGI.
+
+moonpos:
+    Predict when the moon (or another body) will be at a specified
+    altitude and azimuth during a specified time window.
+
+marsoppy.py:
+    Print and plot Mars oppositions using PyEphem.
+    Also an example of how to use the TkInter Canvas with persistent objects.
+
+oppretro/:
+    Subdirectory: everal different programs to examine Mars' orbit,
+    and also to experiment with various astronomy libraries. See
+    oppretro/README.md for more details.
+
+skyalignments.py:
+    Starting from points in a GPX file, find all combinations of
+    those points that line up with the rising or setting of the sun
+    or full moon around solstices and equinoxes. Meant to show how
+    easy it is for alignments to happen accidentally.
+
+starstack.py:
+    Use the astroalign module to align and stack astrophotography images.
+

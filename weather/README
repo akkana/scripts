@@ -1,0 +1,28 @@
+Weather-Related Scripts:
+------------------------
+
+cwop.py:
+    Download and parse readings from Citizen Weather Observation Program
+    stations.
+
+lanlweather.py:
+    Fetch and plot data from the LANL Weather Machine.
+
+meantemps.py:
+    Print a table of mean temperatures (and other weather data) per month
+    for several locations.
+
+noaatemps.py:
+    Display and plot weather means for a set of stations,
+    by downloading NOAA data files.
+
+awsgoes.py:
+    An example of how to fetch NOAA GOES-16 data from AWS anonymously,
+    and plot it on a matplotlib Basemap map.
+    Useful mainly as an example.
+
+weatherwin:
+    Display a window showing temperature and today's forecast
+    for several cities at once.
+
+... plus some assorted experiments.

@@ -16,11 +16,9 @@ CHATTY = True
 def duckduckgo():
     """Use the DuckDuckGo API to get the current external IP,
        and DDG's GeoIP estimate.
-       Don't use this too much, or they'll cut you off and stop
-       serving you any pages at all!
-       Maybe this policy is explained in
        https://duckduckgo.com/api
-       but I can't say since they won't serve me that page either!
+       Don't use this too much, or they'll cut you off and stop
+       serving you any pages at all for a while.
 
        return ip, city, state, country, zipcode
     """
@@ -92,7 +90,7 @@ def log_entry(ip, city, state, country, zipcode, service):
                   % (city, state, country, zipcode))
         now = datetime.now()
         print('|'.join((city, state, country, zipcode, ip,
-                        now.strftime("%Y-%m-%d"), service)),
+                        now.strftime("%Y-%m-%d %H:%M"), service)),
               file=logfp)
 
 if __name__ == '__main__':
