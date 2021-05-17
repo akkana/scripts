@@ -871,7 +871,11 @@ MT.tzname(time_summer)
 # They might even be deprecated soon. Instead:
 from datetime import timezone
 utcnow = datetime.now(tz=timezone.utc)
-datetime.fromtimestamp(1571595618.0, tz=timezone.utc)
+datetime.fromtimestamp(1571595618.0, tz=timezone.utc
+
+# Take an unaware UTC datetime, like what comes from ephem.Date.datetime()
+# and make it aware:
+observer.date.datetime.replace(tzinfo=timezone.utc))
 
 # All pytz code should be migrated over to zoneinfo or dateutil
 # and get on the PEP495 bandwagon.
