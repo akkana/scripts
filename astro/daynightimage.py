@@ -105,7 +105,7 @@ def combine_images(day_imgfile, night_imgfile, sublon, sublat, out_imgfile):
 def calc_for_date(obstime, out_imgfile):
     print("calc", obstime.datetime())
     sublon, sublat = subsolar_point(obstime)
-    print(sublon, sublat)
+    print("Subsolar point:", sublon, sublat)
     combine_images(dayimgfile, nightimgfile, sublon, sublat, out_imgfile)
     print("Wrote to", out_imgfile)
 

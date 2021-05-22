@@ -19,6 +19,10 @@ daynightimage.py:
     solstices and equinoxes.
     The images can be viewed as-is or wrapped around a globe.
 
+equisolstice.py:
+    Print the next four equinox/solstice events, plus local
+    sunrise/sunset times on those days.
+
 epicycles.py:
     Show planet orbits as they would be viewed from the north ecliptic
     pole in a geocentric universe. Show the Venus Pentagram, etc.
@@ -35,7 +39,7 @@ marsoppy.py:
     Also an example of how to use the TkInter Canvas with persistent objects.
 
 oppretro/:
-    Subdirectory: everal different programs to examine Mars' orbit,
+    Subdirectory: Several different programs to examine Mars' orbit,
     and also to experiment with various astronomy libraries. See
     oppretro/README.md for more details.
 
