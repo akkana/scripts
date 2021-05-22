@@ -20,7 +20,7 @@ NORMAL_SOUND = "pop.wav"
 SUBTLE_SOUND = "SingleClick.wav"
 SPECIAL_SOUND = "akk.wav"
 # Channels silenced by default, because they're too active:
-SILENCED_CHANNELS = [ '#twitter_akkakk', '#python', '##linux',
+SILENCED_CHANNELS = [ '#twitter_akkakk', '#python', '#linux', '##linux',
                       '#raspberrypi', '#ubuntu' ]
 # End configuration.
 
