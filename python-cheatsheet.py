@@ -58,7 +58,7 @@ if isinstance(s, str):
 if type(s) == types.StringType:
     print "It's a string"
 
-# Is something list-like?
+# Is something list-like, iterable?
 if hasattr(l, "__getitem__"):
     print "It's list-like"
 else:
@@ -140,7 +140,10 @@ val = getattr(themodule, functionname)()
 # Pass the program as stdin:
 echo 'import time\nl = range(10)\nfor i in l: print(i)' | python
 
-# Use ANSI quoting n bash, zsh or ksh along with \n:
+# Combining semicolons (e.g. from an import line) and a for loop
+# doesn't work, syntax error.
+# https://stackoverflow.com/questions/2043453/executing-multi-line-statements-in-the-one-line-command-line
+# Instead, use ANSI quoting in bash, zsh or ksh along with \n:
 python -c $'import time\nl = range(10)\nfor i in l: print(i)\n'
 
 # More POSIX compliant: use command substitution:
@@ -1056,6 +1059,66 @@ r = session.get(url)
 # (either one may be None).
 
 ########################################################
+# Enumerators and similar
+########################################################
+
+# Enum Howto: https://docs.python.org/3.10/howto/enum.html
+
+>>> from enum import Enum
+>>> class Weekday(Enum):
+...     MONDAY = 1
+...     TUESDAY = 2
+...     WEDNESDAY = 3
+...     THURSDAY = 4
+...     FRIDAY = 5
+...     SATURDAY = 6
+...     SUNDAY = 7
+...     #
+...     @classmethod
+...     def from_date(cls, date):
+...         return cls(date.isoweekday())
+
+>>> Weekday(3)
+Weekday.WEDNESDAY
+
+>>> print(Weekday.THURSDAY)
+THURSDAY
+
+>>> type(Weekday.MONDAY)
+<enum 'Weekday'>
+>>> isinstance(Weekday.FRIDAY, Weekday)
+True
+
+>>> print(Weekday.TUESDAY.name)
+TUESDAY
+>>> Weekday.WEDNESDAY.value
+3
+
+# Now we can find out what today is! Observe:
+
+>>> from datetime import date
+>>> Weekday.from_date(date.today())
+Weekday.TUESDAY
+
+
+# Named tuples
+
+>>> from collections import namedtuple
+
+>>> Point = namedtuple('Point', ['x', 'y'])
+>>> p = Point(11, y=22)     # instantiate with positional or keyword arguments
+>>> p[0] + p[1]             # indexable like the plain tuple (11, 22)
+33
+>>> x, y = p                # unpack like a regular tuple
+>>> x, y
+(11, 22)
+>>> p.x + p.y               # fields also accessible by name
+33
+>>> p                       # readable __repr__ with a name=value style
+Point(x=11, y=22)
+
+
+########################################################
 # Some handy utility classes
 ########################################################
 
@@ -1625,6 +1688,8 @@ source ~/pythonenv/envname/bin/activate
 
 '''
 packaging.python.org is the new authoritative resource.
+Best tutorial I've found on Packaging Python Projects:
+https://packaging.python.org/tutorials/packaging-projects/
 
 Installing to a virtualenv (don't use setup.py install):
   pip install .
@@ -1638,9 +1703,6 @@ This makes links to the live sourcedir, so it will see changes.
 
 When finished, if you don't want the package there any more:
   setup.py develop --uninstall
-
-Best tutorial I've found on Packaging Python Projects:
-https://packaging.python.org/tutorials/packaging-projects/
 
 Test installing in a virtualenv:
 
