@@ -522,7 +522,12 @@ for emp in map(EmployeeRecord._make, csv.reader(open("employees.csv", "rb"))):
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
 heights = [324, 381, 442]
 for name, height in zip(names, heights):
-    print "%s: %s meters" % (name, height)
+    print("%s: %s meters" % (name, height))
+
+# Same thing with enumerate:
+for i, (name, height) in enumerate(zip(names, heights)):
+    print("%d: %s: %s meters" % (i, name, height))
+
 
 # Or make a dictionary from a zip():
 tall_buildings = dict(zip(names, heights))
