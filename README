@@ -54,6 +54,12 @@ androidfiles.py:
     need to be moved rather than removed and recopied.
     Used by podcopy.
 
+angle-properties.py:
+    Example code for how to use properties in Python,
+    and also how to do operator overloading.
+    Defines an Angle class, which isn't meant to be particularly
+    useful, more a cheatsheet for learning properties.
+
 animate.js:
     Simple code for animating a series of images in javascript.
 

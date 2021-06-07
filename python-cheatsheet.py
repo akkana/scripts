@@ -1118,6 +1118,13 @@ Weekday.TUESDAY
 Point(x=11, y=22)
 
 
+###########################################################
+# Properties
+###########################################################
+
+# See angle-properties.py
+# which shows both property getters/setters, and operator overloading.
+
 ########################################################
 # Some handy utility classes
 ########################################################
