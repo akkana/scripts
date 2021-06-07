@@ -43,6 +43,9 @@ oppretro/:
     and also to experiment with various astronomy libraries. See
     oppretro/README.md for more details.
 
+solsticedrift.py:
+    Plot the drift in solstice times over successive years.
+
 skyalignments.py:
     Starting from points in a GPX file, find all combinations of
     those points that line up with the rising or setting of the sun
