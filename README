@@ -400,10 +400,43 @@ pysync:
 python-cheatsheet.py:
     Cheatsheet and syntax reminders for useful Python features.
 
+qhtmlprint:
+    Convert a set of HTML slides (e.g. in navigate.js) into PDF.
+    For turning an HTML presentation into a PDF slide deck.
+    Unfortunately the QtWebkit libraries this depends on
+    seem to be abandoned; see qslide2pdf for a newer version.
+
+qslide2pdf:
+    Convert a set of HTML slides (e.g. in navigate.js) into PDF.
+    For turning an HTML presentation into a PDF slide deck.
+    Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
+
+qpdf.py:
+    A simple PDF viewer for Python-Qt5 using popplerqt5.
+
 qpreso.py:
     A lightweight presentation program for displaying HTML slides.
     A Python3/Qt5/QtWebEngine version, since python-gtk-webkit
     (used for the older gpreso) is no longer supported.
+
+quickbrowse.py:
+    A minimal browser in python-qtWebEngine. Fast and light,
+    supposedly anonymous, no storage of cookies or other identifying
+    information. Useful for things like viewing URLs from mutt or
+    checking websites that don't work well with a Firefox/NoScript profile.
+    Can be used standalone (ln -s /path/to/quickbrowse.py ~/bin/quickbrowse)
+    and/or as a python module for derived browser-based programs.
+
+quotekiosk.py:
+    Display a series of plaintext quotes in a large, maybe fullscreen,
+    window, as large as possible to fit in the window, changing the quote
+    every so often.
+
+qquotekiosk.py:
+    Display a series of quotes or other content from HTML files,
+    as large as possible to fit in the window, changing the quote
+    every so often, using qpreso.py for the display window.
+    Uses qpreso.py for the HTML display window.
 
 randombg:
     Choose a random background (wallpaper) from a directory named based on
@@ -454,6 +487,9 @@ sinkto:
     email folders etc. to a laptop when preparing for or returning
     from a trip, or just for keeping several machines in sync.
 
+spiderchart.py:
+    A tiny example of spiderweb/radar/radial charts in plotly.
+
 speedtestserver:
     A mini http server that can introduce delays or other glitches
     that are useful for testing http download clients.
@@ -490,39 +526,6 @@ turtlefrac.py:
 tweet:
     Play birdsong from a specific bird. Requires ripped tracks from a
     bird song CD: for example, the Stokes, Cornell or Peterson collections.
-
-qhtmlprint:
-    Convert a set of HTML slides (e.g. in navigate.js) into PDF.
-    For turning an HTML presentation into a PDF slide deck.
-    Unfortunately the QtWebkit libraries this depends on
-    seem to be abandoned; see qslide2pdf for a newer version.
-
-qslide2pdf:
-    Convert a set of HTML slides (e.g. in navigate.js) into PDF.
-    For turning an HTML presentation into a PDF slide deck.
-    Uses Qt5's QWebEngine and PyPDF2. We'll see how long that's supported.
-
-qpdf.py:
-    A simple PDF viewer for Python-Qt5 using popplerqt5.
-
-quickbrowse.py:
-    A minimal browser in python-qtWebEngine. Fast and light,
-    supposedly anonymous, no storage of cookies or other identifying
-    information. Useful for things like viewing URLs from mutt or
-    checking websites that don't work well with a Firefox/NoScript profile.
-    Can be used standalone (ln -s /path/to/quickbrowse.py ~/bin/quickbrowse)
-    and/or as a python module for derived browser-based programs.
-
-quotekiosk.py:
-    Display a series of plaintext quotes in a large, maybe fullscreen,
-    window, as large as possible to fit in the window, changing the quote
-    every so often.
-
-qquotekiosk.py:
-    Display a series of quotes or other content from HTML files,
-    as large as possible to fit in the window, changing the quote
-    every so often, using qpreso.py for the display window.
-    Uses qpreso.py for the HTML display window.
 
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
