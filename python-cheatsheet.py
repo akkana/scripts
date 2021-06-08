@@ -793,7 +793,7 @@ time.mktime(d.timetuple())
 datetime.datetime.fromtimestamp(1553010256)
 datetime.datetime.utcfromtimestamp(1553010256)
 
-# but unfortunately there's no way, with just the Python core,
+# Unfortunately there's no way, with just the Python core,
 # to parse a date that might or might not have decimal seconds.
 # You have to strip it off in this way, which seems horrifying
 # but you'll see it recommended all over, and you'd better hope
@@ -817,6 +817,13 @@ secs_since_epoch = time.mktime(t)
 t2 = time.mktime_tz(email.utils.parsedate("Thu, 11 Aug 2016 14:46:50 GMT")))
 (y, m, d, h, m, s, weekday, yearday, isdst, offset_from_utc) = t2
 secs_since_epoch = email.utils.mktime_tz(t2)
+
+# Epoch to struct time:
+>>> unixtime = time.time()
+>>> time.gmtime(unixtime)
+time.struct_time(tm_year=2021, tm_mon=6, tm_mday=8, tm_hour=1, tm_min=6, tm_sec=24, tm_wday=1, tm_yday=159, tm_isdst=0)
+>>> time.localtime(unixtime)
+time.struct_time(tm_year=2021, tm_mon=6, tm_mday=7, tm_hour=19, tm_min=6, tm_sec=24, tm_wday=0, tm_yday=158, tm_isdst=1)
 
 #
 # Parse a date in unknown format into a datetime.datetime object
