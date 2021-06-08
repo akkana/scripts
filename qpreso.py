@@ -6,6 +6,10 @@
 """Viewer for HTML presentations."""
 
 
+# XXX This saves a bunch of stuff in ~/.local/share/qpreso,
+# should try to avoid that.
+
+
 import sys
 import os
 import argparse
@@ -17,7 +21,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
 class PresoView(QWebEngineView):
 
     def __init__(self, url=None, curviews=None, fullscreen=False, monitor=-1,
-                 zoom=1.0, show_notes=True):
+                 resolution=None, zoom=1.0, show_notes=True):
         """Create a new PresoView. Leave curviews unset unless requesting
            a new window, in which case it must be set to a list of
            existing PresoViews.
@@ -45,7 +49,7 @@ class PresoView(QWebEngineView):
         # Get the screen geometry and set size and position appropriately.
         screens = app.screens()
 
-        # monitor is the number of the monitor where the window should show up.
+        # monitor is the # of the monitor where the window should show up.
         if monitor >= len(screens):
             print("There is no monitor", monitor)
             sys.exit(1)
@@ -57,28 +61,44 @@ class PresoView(QWebEngineView):
 
         geom = screens[monitor].geometry()
 
-        self.displaywidth = geom.width()
-        self.displayheight = geom.height()
+        if resolution:
+            parts = resolution.split('x')
+            self.displaywidth = int(parts[0])
+            if len(parts) > 1:
+                self.displayheight = int(parts[1])
+            elif show_notes:
+                self.displayheight = int(self.displaywidth * 768/1366)
+            else:
+                self.displayheight = int(self.displaywidth * 3 / 4)
 
-        # Fullscreen only in the main window, not popups which will have
-        # an about:blank URL.
-        if url and url != 'about:blank':
-            self.move(geom.left(), geom.top())
-            if (fullscreen or self.displayheight <= 768):
-                # Run fullscreen if the display is XGA or smaller
-                # and it isn't a dialog window,
-                # or if fullscreen was explicitly set.
-                # displaysize = QApplication.desktop.screenGeometry()
-                self.showFullScreen()
+            self.fullwidth = self.displaywidth
+            self.fullheight = self.displayheight
 
-        # Size of the window we'll actually display.
-        # XXX Currently assumes a projector at 1024x768
-        # and should be made more general.
-        if show_notes:
-            self.fullwidth = 1366
+            # print("Resolution", self.displaywidth, self.displayheight)
+
         else:
-            self.fullwidth = 1024
-        self.fullheight = 768
+            self.displaywidth = geom.width()
+            self.displayheight = geom.height()
+
+            # Fullscreen only in the main window, not popups which will have
+            # an about:blank URL.
+            if url and url != 'about:blank':
+                self.move(geom.left(), geom.top())
+                if (fullscreen or self.displayheight <= 768):
+                    # Run fullscreen if the display is XGA or smaller
+                    # and it isn't a dialog window,
+                    # or if fullscreen was explicitly set.
+                    # displaysize = QApplication.desktop.screenGeometry()
+                    self.showFullScreen()
+
+            # Size of the window we'll actually display.
+            # XXX Currently assumes a projector at 1024x768
+            # and should be made more general.
+            if show_notes:
+                self.fullwidth = 1366
+            else:
+                self.fullwidth = 1024
+            self.fullheight = 768
 
         if zoom != 1.0 :
             self.displaywidth = int(self.displaywidth * zoom)
@@ -141,12 +161,18 @@ Tip: For debugging, run with --remote-debugging-port=[portnum]
      and then you can get debug tools with chromium to localhost:[portnum]
      (doesn't seem to work with Firefox's inspector)""",
         formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('-r', "--res", dest="resolution", default=None,
+                        action="store",
+                    help="Run at specified resolution, e.g. 1024 or 1024x1366")
     parser.add_argument('-f', "--fullscreen", dest="fullscreen", default=False,
                         action="store_true",
                         help="Run fullscreen regardless of screen size")
     parser.add_argument('-m', '--monitor', action="store", default=0,
                         dest="monitor", type=int,
                         help='Run fullscreen on this monitor number')
+    parser.add_argument('-n', "--notes", dest="show_notes", default=True,
+                        action="store_false",
+                        help="No notes area")
     parser.add_argument('url', help='The URL to open')
 
     args = parser.parse_known_args()[0]
@@ -178,7 +204,8 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
 
-    pv = PresoView(args.url, fullscreen=args.fullscreen, monitor=args.monitor)
+    pv = PresoView(args.url, fullscreen=args.fullscreen, monitor=args.monitor,
+                   resolution=args.resolution, show_notes=args.show_notes)
     pv.show()
 
     app.exec_()
