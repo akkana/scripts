@@ -32,6 +32,7 @@ class Angle:
              Angle(degrees = 45)
              Angle(1.44)
         """
+        print("Angle constructor: args", args, "kwargs", kwargs)
         if 'radians' in kwargs:
             self.radians = kwargs['radians']
         elif 'degrees' in kwargs:
@@ -47,11 +48,6 @@ class Angle:
     def constrain_radians(self):
         """Make the angle positive and less than 2pi"""
         self._radians %= Angle.TWO_PI
-
-        # while self._radians < 0:
-        #     self._radians += Angle.TWO_PI
-        # while self._radians > Angle.TWO_PI:
-        #     self._radians -= Angle.TWO_PI
 
     @property
     def radians(self):
@@ -76,20 +72,24 @@ class Angle:
         return "<Angle %.1f°>" % (self.degrees)
 
     def __add__(self, a):
-        pass
+        if not hasattr(a, 'radians'):
+            print(a, "not an angle; ", end='')
+            a = Angle(a)
+            print("->", a)
+        return Angle(radians=self.radians+a.radians)
 
 
 if __name__ == '__main__':
     # Values to be passed as non-keyword args
     vals = [.4, 310, -15, 400]
     # and the degrees that should result from each
-    test_angles = [22.918, 310, 345, 40]
+    expected = [22.918, 310, 345, 40]
 
     def too_different(x, y):
         return abs(x - y) > .01
 
     angles = []
-    for (v, ta) in zip(vals, test_angles):
+    for (v, ta) in zip(vals, expected):
         print("\n==== Setting", v)
         ang = Angle(v)
         angles.append(ang)
@@ -98,10 +98,40 @@ if __name__ == '__main__':
         else:
             print(v, "->", ang)
 
-    # print("a1 (.4)  =", a1)
-    # print("a2 (310) =", a2)
-    # print("a3 (-15) =", a3)
+    # Test specifying arguments explicitly
+    print("\n==== Testing explicit constructors")
+    a = Angle(degrees=90)
+    if too_different(a.radians, math.pi/2.):
+        print(a, "should be 90, and radians is", a.radians)
+    if too_different(a.degrees, 90):
+        print(a, "should be 90", a.degrees)
 
-    # print("a1 + a2:", a1 + a2)
-    # print("a1 + a3:", a1 + a3)
+    a = Angle(radians=-math.pi/2.)
+    if too_different(a.radians, math.pi*3//2.):
+        print(a, "in radians is", a.radians)
+    if too_different(a.degrees, 270):
+        print(a, "should be 270", a.degrees)
 
+    print("\n==== Testing addition of two angles")
+    # For addition tests, just use the last angle, which is -90
+
+    expected = [22.918+270, 310-90, 345-90, 40+270]
+    for a1, exp in zip(angles, expected):
+        print("\n", a, "+", a1)
+        sum = a + a1
+        if too_different(sum.degrees, exp):
+            print("************", sum, "!=", exp)
+        else:
+            print("    ====", sum)
+
+    print("\n==== Testing addition of angle + scalar")
+
+    scalars = [ 10, -10., math.pi/2. ]
+    expected = [ 280, 260, 0 ]
+    for v, exp in zip(scalars, expected):
+        print("\n", a, "+", v)
+        sum = a + v
+        if too_different(sum.degrees, exp):
+            print("************", sum, "!=", exp)
+        else:
+            print("    ====", sum)
