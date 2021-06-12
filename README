@@ -185,9 +185,7 @@ fontasia:
     A Linux font chooser and categorizer.
     Also works as a GIMP plug-in font chooser.
 
-fotogr:
-    Find tagged photos: search for strings in files named Keyword or Tags
-    beneath the current directory.
+fotogr.py has moved to my metapho repository.
 
 gitbranchsync.py:
     Display git branches and what they're tracking,
