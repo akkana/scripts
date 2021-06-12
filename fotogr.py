@@ -16,17 +16,29 @@ import re
 import sys, os
 
 
+DEBUG = False
+
+
+TAG_FILE_NAMES = ["Tags", "Keywords"]
+
+
 def search_for_keywords(grepdirs, orpats, andpats, notpats,
                         ignorecase):
-    """Inside grepdirs, open files named Tags or Keywords.
-       Search those lines looking for matches in the keywords for pats.
+    """Generator: return all files inside the given grepdirs
+       which have tags matching the pattern sets.
+
+       Tags are specified in files named Tags or Keywords
+       inside any level of the grepdirs.
+       Search tag lines looking for matches in the keywords for pats.
+
        Each item in grepdirs may be a shell-style pattery, like 20??
        (the style used by python's glob module):
        first we'll try to match the item exactly, then if not,
        try to match it as a pattern.
        ~ is allowed.
     """
-    results = []
+    if DEBUG:
+        print("search_for_keywords", grepdirs)
 
     if ignorecase:
         orpats = [ p.lower() for p in orpats ]
@@ -38,31 +50,47 @@ def search_for_keywords(grepdirs, orpats, andpats, notpats,
             for root, dirs, files in os.walk(d):
                 if not files:
                     continue
-                for f in files:
-                    if f == "Tags" or f == "Keywords":
-                        results += search_for_keywords_in(root, f,
-                                                          orpats,
-                                                          andpats,
-                                                          notpats,
-                                                          ignorecase)
-                        break   # XXX would prefer to break out of root, not f
-    return results
+                for tagfilename in TAG_FILE_NAMES:
+                    try:
+                        for f in search_for_keywords_in(
+                                root,
+                                os.path.join(root, tagfilename),
+                                orpats, andpats, notpats, ignorecase):
+                            yield os.path.normpath(f)
+
+                            # If Tags matched, don't look in Keywords.
+                            # If you decide to change this logic,
+                            # you'll have to define a set of files
+                            # already seen to avoid double reporting.
+                        break
+
+                    except FileNotFoundError:
+                        # The tags file wasn't there
+                        if DEBUG:
+                            print("   file not found",
+                                  os.path.join(root, tagfilename),
+                                  "from", os.getcwd())
+                        pass
 
 
 def search_for_keywords_in(d, f, orpats, andpats, notpats, ignorecase):
-    """Search in d (directory)/f (file) for lines matching or,
-       and and not pats. f is a file named Tags or Keywords,
+    """Generator:
+       Search in d (directory)/f (tagfile) for lines matching or,
+       and, and not pats. f is a path to a file named Tags or Keywords,
        and contains lines in a format like:
-       [tag ]keyword, keyword: file.jpg file.jpg
+       [tag ]keyword[, keyword]: file1.jpg [file2.jpg]
        Also treat the directory name as a tag:
-       return True if the patterns match the directory name.
-       Return a list of files.
+       all files match if the patterns match the directory name.
+       Yield one matching file at a time.
     """
     results = []
     filetags = {}
     if d.startswith('./'):
         d = d[2:]
-    with open(os.path.join(d, f)) as fp:
+    if DEBUG:
+        print("Reading tag file", f)
+
+    with open(f) as fp:
         for line in fp:
             line = line.strip()
             if not line:
@@ -94,14 +122,22 @@ def search_for_keywords_in(d, f, orpats, andpats, notpats, ignorecase):
                 if d not in filetags[filepath]:
                     filetags[filepath] += ", " + d
 
+    if ignorecase:
+        for path in filetags:
+            filetags[path] = filetags[path].lower()
+
     # Now we have a list of tagged files in the directory, and their tags.
     for imgfile in list(filetags.keys()):
         tags = filetags[imgfile]
+        if DEBUG:
+            print(imgfile, ": ", end="")
 
         if has_match(tags, orpats, andpats, notpats, ignorecase):
-            results.append(imgfile)
-
-    return results
+            if DEBUG:
+                print("*** has a match! yielding", imgfile)
+            yield imgfile
+        elif DEBUG:
+            print("No match, continuing")
 
 
 def has_match(tags, orpats, andpats, notpats, ignorecase):
@@ -111,7 +147,9 @@ def has_match(tags, orpats, andpats, notpats, ignorecase):
        tags is a string representing all the tags on one file;
        the *pats are lists.
     """
-    #print "Looking for OR", orpats, "AND", andpats, "NOT", notpats, "IN", tags
+    if DEBUG:
+        print("Tags", tags, ": Looking for \n  OR", orpats,
+              "\n  AND", andpats, "\n  NOT", notpats)
     if ignorecase:
         flags = re.IGNORECASE
     else:
@@ -125,8 +163,10 @@ def has_match(tags, orpats, andpats, notpats, ignorecase):
     if not orpats:
         return True
     for pat in orpats:
+        if DEBUG:
+            print("re.search '%s', '%s'" % (pat, tags))
+        # if pat in tags:
         if re.search(pat, tags, flags):
-        #if pat in tags:
             return True
     return False
 
