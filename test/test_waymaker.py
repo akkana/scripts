@@ -5,7 +5,7 @@ import unittest
 import os
 import shutil
 
-import waymaker
+from mapping import waymaker
 
 
 TMPDIR = '/tmp/test-waymaker'
