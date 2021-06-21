@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-# Very simple PyEphem script to show the next four solstices/equinoxes.
+# PyEphem script to find cities with similar sunrise times
+# to the Los Alamos Nature Center
 
 import ephem
 import ephem.cities
@@ -27,16 +28,17 @@ def subsolar_point(obstime):
     return sun_lon, sun_lat
 
 
-observer = ephem.Observer()
-observer.lat = '35:53.1'     # 35.8849756
-observer.lon = '-106:18.36'  # -106.3061510
-observer.elevation = 2100    # About 7000'
-observer.name = "Los Alamos Nature Center"
+# Add Los Alamos and White Rock to city data:
+# ephem.cities._city_data['Los Alamos'] = ('35.8851668', '-106.3061889', 2165)
+# ephem.cities._city_data['White Rock'] = ('35.8131579', '-106.2189755', 1980)
 
-# La Senda, to match my XEphem settings
-observer.lat = '35:40.50'
-observer.lon = '-106:13.10'
-observer.elevation = 1980
+ephem.cities._city_data["Reykjavik"] = ('64.1466', '21.9426', 0)
+
+peec = ephem.Observer()
+peec.lat = '35:53.1'     # 35.8849756
+peec.lon = '-106:18.36'  # -106.3061510
+peec.elevation = 2100    # About 7000'
+peec.name = "Los Alamos Nature Center"
 
 FMT = "%17s   %-20s %-20s"
 TIMEFMT = "%Y-%m-%d  %H:%M"
@@ -71,14 +73,14 @@ def print_stats(name, ephemtime):
     print(FMT % (name, lt.strftime(TIMEFMT), ut.strftime(TIMEFMT)))
 
     halfdaybefore = ephem.Date(ephemtime - .5)
-    observer.date = halfdaybefore
-    sunrise = observer.next_rising(sun)
-    observer.date = sunrise
-    lt_sunrise, ut_sunrise = local_and_ut(observer.date)
+    peec.date = halfdaybefore
+    sunrise = peec.next_rising(sun)
+    peec.date = sunrise
+    lt_sunrise, ut_sunrise = local_and_ut(peec.date)
 
-    sunset = observer.next_setting(sun)
-    observer.date = sunset
-    lt_sunset, ut_sunset = local_and_ut(observer.date)
+    sunset = peec.next_setting(sun)
+    peec.date = sunset
+    lt_sunset, ut_sunset = local_and_ut(peec.date)
 
     cities = find_similar_cities(halfdaybefore, sunrise, sunset)
 
@@ -127,7 +129,7 @@ def find_similar_cities(halfdaybefore, sunrise, sunset):
 
 
 
-next_solstice = ephem.next_solstice(observer.date)
+next_solstice = ephem.next_solstice(peec.date)
 print_stats("Solstice", next_solstice)
 
 next_equinox = ephem.next_equinox(next_solstice)
