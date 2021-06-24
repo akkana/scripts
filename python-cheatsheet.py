@@ -94,6 +94,25 @@ for k in d:
 # Instead,
 l = [ [] for i in range(10) ]
 
+# There is no such thing as Maximum/minimum integers any more.
+# https://docs.python.org/3.1/whatsnew/3.0.html#integers
+"""The sys.maxint constant was removed, since there is no longer a limit
+to the value of integers. However, sys.maxsize can be used as an integer
+larger than any practical list or string index. It conforms to the
+implementation\u2019s \u201cnatural\u201d integer size and is typically
+the same as sys.maxint in previous releases on the same platform
+(assuming the same build options)."""
+
+# Also from that page, PEP 0238:
+"""An expression like 1/2 returns a float. Use 1//2 to get the
+truncating behavior."""
+
+# Maximum/minimum floats
+>>> sys.float_info.max
+1.7976931348623157e+308
+>>> sys.float_info.min
+2.2250738585072014e-308
+
 ########################################################
 # Conditional import and testing imported libraries
 ########################################################
@@ -890,7 +909,9 @@ datetime.fromtimestamp(1571595618.0, tz=timezone.utc
 
 # Take an unaware UTC datetime, like what comes from ephem.Date.datetime()
 # and make it aware:
-observer.date.datetime.replace(tzinfo=timezone.utc))
+utctime = observer.date.datetime.replace(tzinfo=timezone.utc))
+# Note that despite what "replace" might imply, this does not
+# replace anything in the original object, merely creates a new copy.
 
 # All pytz code should be migrated over to zoneinfo or dateutil
 # and get on the PEP495 bandwagon.
@@ -1533,6 +1554,15 @@ p.sort_stats('time').print_stats(30)
 
 
 ################################################################
+# Math
+################################################################
+
+# smallest, largest floats
+sys.float_info.min
+sys.float_info.max
+
+
+################################################################
 # PyEphem
 ################################################################
 # The documentation on angles is completely wrong and misleading.
@@ -1559,6 +1589,7 @@ p.sort_stats('time').print_stats(30)
 7:00:00.00
 >>> float(seven_hours_from_radians) * 12 / math.pi
 7.0
+
 
 ################################################################
 # Matplotlib tips
@@ -1625,6 +1656,37 @@ ax.tick_params(which='major', length=10, labelrotation=45, color='b')
 #
 # Custom ticks and labels for dates: see mpl_smart_dates.py.
 #
+
+################################################################
+# Pandas
+################################################################
+
+# So far, Pandas is the worst documented, most difficult Python
+# package I've seen so far.
+# But if I ever manage to get it doing anything useful,
+# I'll put that here.
+
+# View a specific row of a dataframe. Accepts slices, or : to include all.
+# https://realpython.com/pandas-dataframe/#accessing-and-modifying-data
+df.loc[11]
+
+# Plot a time series of some random subset of a dataframe.
+# I don't know why it doesn't plot the whole df,
+# or how to get it to do that.
+df.plot(x='datetime', y='temp0')
+
+# Iterate over a dataframe:
+>>> for row_label, row in df.iterrows():
+...     print(row_label, row, sep='\n', end='\n\n')
+...
+
+>>> for col_label, col in df.iteritems():
+...     print(col_label, col, sep='\n', end='\n\n')
+...
+
+>>> for row in df.loc[:, ['name', 'city', 'total']].itertuples():
+...     print(row)
+...
 
 ################################################################
 # Python3 only
