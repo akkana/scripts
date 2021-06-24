@@ -10,7 +10,7 @@ import requests
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
+
 
 # LANL hasn't bothered to get their TLS certificate right.
 # Disable the endless warnings:
@@ -21,22 +21,29 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # served as HTML rather than something more easily parseable.
 from bs4 import BeautifulSoup
 
+
 def c_to_f(t):
     return t * (212.-32.) / 100. + 32.
 
+
 def to_date(d):
-    '''Make sure d is a datetime.date.
+    """Make sure d is a datetime.date.
        This is ridiculously difficult to do with datetime,
        because datetime.date can't be initialized from a datetime
        but datetime.date doesn't have a date() method.
-    '''
+    """
     if hasattr(d, "date"):
         return d.date()
     return d
 
+
+def maxnone(data):
+    return max([x for x in data if x is not None])
+
+
 class LANLWeather(object):
-    '''Fetch and parse data from the LANL weather machine.
-    '''
+    """Fetch and parse data from the LANL weather machine.
+    """
 
     def __init__(self, tower, start, end, keys):
         self.tower = tower
@@ -98,7 +105,7 @@ class LANLWeather(object):
 
 
     def get_data(self):
-        '''Get data from cache if possible. If it's not cached,
+        """Get data from cache if possible. If it's not cached,
            make net data requests to the weather machine.
            Make a separate request for each month,
            since the weather machine refuses requests for more than 3 months.
@@ -107,7 +114,7 @@ class LANLWeather(object):
            We'll request full months even if less is requested,
            and we'll request all keys even if we don't need them all,
            so we can keep a more complete cache.
-        '''
+        """
 
         # Loop over months requested.
         # Start on the first of the month specified by startdate:
@@ -217,7 +224,7 @@ class LANLWeather(object):
 
 
     def make_lanl_request(self, tower, year, month):
-        '''Make a data request for 15-minute data to the LANL weather machine.
+        """Make a data request for 15-minute data to the LANL weather machine.
            tower is a string, like 'ta54'
            keys is a list of keys we're interested in (see request_keys).
            start and end times can be either datetimes or [y, m, d, [h, m, s]]
@@ -225,7 +232,7 @@ class LANLWeather(object):
            The weather machine will only return 3 months worth of 15-minute data
            at a time, and it lags: if you request data for anything in the
            last hour, it bails and returns an empty file.
-        '''
+        """
         # Figure out the end time for the request.
         # If it's this month, then we can only request data
         # up until about an hour ago.
@@ -295,20 +302,20 @@ class LANLWeather(object):
 
 
     def get_fields_and_units(self, lines):
-        '''In LANL data, there's a bunch of boilerplate stuff in the first
+        """In LANL data, there's a bunch of boilerplate stuff in the first
            four lines, so the fields don't come until the fifth line,
            then the sixth line is units. So we can't use the normal
            CSV reader. Return fields, units (two lists of str).
-        '''
+        """
         # Find the indices in the data for each key we're interested in.
         fields = lines[5].split('\t')
         units = lines[6].split('\t')
         return fields, units
 
     def get_start_end_dates(self, lines):
-        '''Do part of what parse_lanl_data does, only for the
+        """Do part of what parse_lanl_data does, only for the
            first and last lines, and return two datetimes.
-        '''
+        """
         fields, units = self.get_fields_and_units(lines)
 
         # We'll need to know the indices for the time values.
@@ -329,9 +336,9 @@ class LANLWeather(object):
 
 
     def parse_lanl_data(self, lines):
-        '''Take a list of lines read either from a cache file
+        """Take a list of lines read either from a cache file
            or a net request, parse them and add them to self.data.
-        '''
+        """
         fields, units = self.get_fields_and_units(lines)
 
         # indices will be a list paralleling self.keys,
@@ -368,10 +375,15 @@ class LANLWeather(object):
             for i, k in enumerate(self.keys):
                 idx = indices[i]
 
-                # Missing data is denoted with a *.
-                # Matplotlib can't deal with None.
+                # Missing data is denoted with a * in LANL data.
+                # Use None in self.data.
+                # Matplotlib is supposed to show None as a break:
+                # https://matplotlib.org/2.0.2/examples/pylab_examples/nan_test.html
+                # That doesn't actually work for me (maybe it only works with
+                # np.nan), but at least matplotlib no longer dies on None.
                 if not l[idx] or l[idx] == '*':
-                    self.data[k].append(0.)
+                    # print("Missing data for", k, "on", d)
+                    self.data[k].append(None)
 
                 # convert temps C -> F
                 elif k.startswith('temp'):
@@ -407,6 +419,9 @@ class LANLWeather(object):
             if not curday:
                 return
 
+            # if curday.month == 6 or curday.month == 7 and curday.year == 2020:
+            #     print(curday, valmin)
+
             if valmin != sys.float_info.max and \
                valmax !=sys.float_info.min:
                 self.data[key_min].append(valmin)
@@ -422,20 +437,18 @@ class LANLWeather(object):
                 curday = newday
                 valmin = sys.float_info.max
                 valmax = sys.float_info.min
-            valmin = min(valmin, val)
-            valmax = max(valmax, val)
+            if val:    # If data isn't missing
+                valmin = min(valmin, val)
+                valmax = max(valmax, val)
 
         end_of_day()
-        print(len(self.data[key_max]), "MAX")
-        print(len(self.data[key_min]), "MIN")
-        print(len(self.data[key_days]), "days")
 
         return key_days, key_max, key_min
 
 
 class LANLWeatherPlots(LANLWeather):
-    '''Plot (as well as fetch and parse) data from the LANL weather machine.
-    '''
+    """Plot (as well as fetch and parse) data from the LANL weather machine.
+    """
 
     def __init__(self, tower, start, end, keys):
         super(LANLWeatherPlots, self).__init__(tower, start, end, keys)
@@ -496,9 +509,10 @@ class LANLWeatherPlots(LANLWeather):
         for i, d in enumerate(self.dates):
             day_of_year = d.timetuple().tm_yday - 1
             # print("Day of year", day_of_year, "timetuple", d.timetuple())
-            avs[day_of_year] += self.data[ws][i]
-            # XXX Note that this will be off by a day in non leap years.
-            datapoints[day_of_year] += 1
+            if self.data[ws][i]:
+                avs[day_of_year] += self.data[ws][i]
+                # XXX Note that this will be off by a day in non leap years.
+                datapoints[day_of_year] += 1
 
         for d, dp in enumerate(datapoints):
             if dp:
@@ -509,12 +523,11 @@ class LANLWeatherPlots(LANLWeather):
                  for d, dp in enumerate(datapoints) ]
 
         plt.plot(days, avs, # '.',
-                 color="green", label='Average wind speed, 2014-present')
+                 color="green", label='Average wind speed')
 
         plt.ylabel('Date (ignore year)')
         plt.ylabel('Wind speed average for day')
         plt.legend(loc='upper left')
-
 
     def plot_winds(self, ws, wd):
         """
@@ -544,7 +557,7 @@ class LANLWeatherPlots(LANLWeather):
         ln2 = axtwin.plot(self.dates, self.data[ws],
                           color='b', label='Wind Speed')
         plt.ylabel('Wind Speed (knots)', multialignment='center')
-        axtwin.set_ylim([0, max(self.data[ws])])
+        axtwin.set_ylim([0, maxnone(self.data[ws])])
 
         # Top label
         lns = ln1 + ln2
@@ -565,7 +578,7 @@ class LANLWeatherPlots(LANLWeather):
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        self.ax3.set_ylim(0, max(self.data[temp]), 4)
+        self.ax3.set_ylim(0, maxnone(self.data[temp]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -574,11 +587,12 @@ class LANLWeatherPlots(LANLWeather):
         """Plot the daily maximum for the more granular data in key."""
         key_days, key_max, key_min = self.find_maxmin(key)
 
-        self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
+        self.ax3 = self.fig.add_subplot(1, 1, 1, sharex=self.ax1)
         self.ax3.plot(self.data[key_days], self.data[key_max],
-                      '-', color='blue', label='Max temp')
-        self.ax3.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
-                        prop={'size': 12})
+                      '-', color='red', label='Max daily temp')
+        self.ax3.plot(self.data[key_days], self.data[key_min],
+                      '-', color='blue', label='Min daily temp')
+        self.ax3.legend(loc='upper left', prop={'size': 12})
         plt.setp(self.ax3.get_xticklabels(), visible=True)
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
@@ -607,6 +621,11 @@ def main():
                         type=lambda s: datetime.datetime.strptime(s,
                                                                   '%Y-%m-%d'))
     # Types of plots
+    parser.add_argument('-m', "--maxmin", dest="maxmin",
+                        default=False,
+                        help="Plot daily max/min temperatures",
+                        action="store_true")
+
     parser.add_argument('-w', "--seasonal_wind", dest="seasonal_wind",
                         default=False,
                         help="Plot seasonal winds",
@@ -631,11 +650,11 @@ def main():
 
     lwp.get_data()
 
-    if args.seasonal_wind:
-        lwp.plot_seasonal_wind('spd1')
-
-    elif False:
+    if args.maxmin:
         lwp.plot_maxmin('temp0')
+
+    elif args.seasonal_wind:
+        lwp.plot_seasonal_wind('spd1')
 
     else:
         lwp.plot_winds('spd1', 'dir1')
