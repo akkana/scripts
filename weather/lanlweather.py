@@ -385,6 +385,54 @@ class LANLWeather(object):
         if to_date(self.dates[-1]) > to_date(self.realend):
             self.realend = self.dates[-1]
 
+    def find_maxmin(self, key):
+        """Find the daily maximum for the more granular data in key.
+           Save it as key_max and key_min, e.g. self.data['temp0_max'].
+           Return key_days, key_max, key_min
+        """
+        key_max = key + "_max"
+        key_min = key + "_min"
+        key_days = key + "_days"
+
+        self.data[key_min] = []
+        self.data[key_max] = []
+        self.data[key_days] = []
+
+        curday = None
+
+        def end_of_day():
+            """Called for each new day, and at the end,
+               to store the current valmin and valmax.
+            """
+            if not curday:
+                return
+
+            if valmin != sys.float_info.max and \
+               valmax !=sys.float_info.min:
+                self.data[key_min].append(valmin)
+                self.data[key_max].append(valmax)
+                self.data[key_days].append(curday)
+            else:
+                print("No data on", curday)
+
+        for dt, val in zip(self.dates, self.data[key]):
+            newday = dt.date()
+            if newday != curday:
+                end_of_day()
+                curday = newday
+                valmin = sys.float_info.max
+                valmax = sys.float_info.min
+            valmin = min(valmin, val)
+            valmax = max(valmax, val)
+
+        end_of_day()
+        print(len(self.data[key_max]), "MAX")
+        print(len(self.data[key_min]), "MIN")
+        print(len(self.data[key_days]), "days")
+
+        return key_days, key_max, key_min
+
+
 class LANLWeatherPlots(LANLWeather):
     '''Plot (as well as fetch and parse) data from the LANL weather machine.
     '''
@@ -504,7 +552,6 @@ class LANLWeatherPlots(LANLWeather):
         axtwin.legend(lns, labs, loc='upper center',
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
 
-
     def plot_temp(self, temp, plot_range=None):
         self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
         self.ax3.plot(self.dates, self.data[temp],
@@ -519,6 +566,27 @@ class LANLWeatherPlots(LANLWeather):
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
         self.ax3.set_ylim(0, max(self.data[temp]), 4)
+
+        # Add a horizontal line for freezing
+        plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
+
+    def plot_maxmin(self, key):
+        """Plot the daily maximum for the more granular data in key."""
+        key_days, key_max, key_min = self.find_maxmin(key)
+
+        self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
+        self.ax3.plot(self.data[key_days], self.data[key_max],
+                      '-', color='blue', label='Max temp')
+        self.ax3.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
+                        prop={'size': 12})
+        plt.setp(self.ax3.get_xticklabels(), visible=True)
+        plt.grid(b=True, which='major', axis='y', color='k',
+                 linestyle='--', linewidth=0.5)
+        plt.ylabel('Temperature', multialignment='center')
+
+        # set_ylim is ignored if you do it this early.
+        # It works if you call it later, just before plt.show().
+        self.ax3.set_ylim(0, max(self.data[key_max]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -545,7 +613,7 @@ def main():
                         action="store_true")
 
     args = parser.parse_args(sys.argv[1:])
-    print("args:", args)
+    # print("args:", args)
 
     if not args.end_date:
         args.end_date = datetime.datetime.now()
@@ -565,6 +633,9 @@ def main():
 
     if args.seasonal_wind:
         lwp.plot_seasonal_wind('spd1')
+
+    elif False:
+        lwp.plot_maxmin('temp0')
 
     else:
         lwp.plot_winds('spd1', 'dir1')
