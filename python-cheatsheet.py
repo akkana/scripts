@@ -279,7 +279,11 @@ r == c    # True
 # Replace non-breaking spaces in unicode (python3):
 s = s.replace("\u00A0"," ")
 
-# Split with a regexp:
+################################################################
+# Regular expressions/regexp:
+################################################################
+
+# Split with a regex:
 sep = re.compile('[,\s]+')
 sep.split('HB42,SJR1, HR67 SB3')
 
@@ -287,6 +291,13 @@ sep.split('HB42,SJR1, HR67 SB3')
 re.split(', |_|-|!', thestring)
 # same, but find words:
 re.findall(r"[\w']+", thestring)
+
+# Match patterns even across newlines:
+re.search('[0-9]+\..*[A-Z]+', teststr, flags=re.DOTALL)
+# Unintuitively, re.DOTALL is the flag that controls this.
+# re.MULTILINE controls whether ^ and $ match line beginnings
+# and ends in the pattern, but doesn't affect whether the
+# search can cross newlines.
 
 ################################################################
 # Python3-specific stringy stuff
@@ -888,18 +899,28 @@ localtime = othertime.astimezone(localtz)
 # Instead, using the new zoneinfo coming in with python 3.9.
 # (backport in pypi), or use dateutil.tz
 
+# Don't create a datetime using tzinfo=! It will give the wrong result:
+>>> dt.datetime(year=2021,month=6,day=25,hour=10,minute=0,tzinfo=pytz.timezone("America/New_York")).astimezone(dt.timezone.utc)
+datetime.datetime(2021, 6, 25, 14, 56, tzinfo=datetime.timezone.utc)
+# Instead, you can do one of these:
+>>> dt.datetime(year=2021,month=6,day=25,hour=10,minute=0).astimezone(pytz.timezone("America/New_York")).astimezone(dt.timezone.utc)
+datetime.datetime(2021, 6, 25, 16, 0, tzinfo=datetime.timezone.utc)
+>>> pytz.timezone("America/New_York").localize(dt.datetime(2021,6,25,10)).astimezone(pytz.utc)
+datetime.datetime(2021, 6, 25, 14, 0, tzinfo=<UTC>)
+
 # A datetime.tzinfo object is a set of rules that include when to switch
 # between DST and ST; it's not just an offset.
 from dateutil import tz
 MT = tz.gettz("America/Denver")
 
 # Timezones have names, but getting them requires a date:
-time_winter = datetime(2020, 2, 14, 12,tzinfo=MT)
+time_winter = datetime(2020, 2, 14, 12, tzinfo=MT)
 MT.tzname(time_winter)
 # -> 'MST'
-time_summer = datetime(2020, 7, 14, 12,tzinfo=MT)
+time_summer = datetime(2020, 7, 14, 12, tzinfo=MT)
 MT.tzname(time_summer)
 # -> 'MDT'
+# But see above comment about not using tzinfo= in the constructor.
 
 # Don't use utcnow or utcfromtimestamp in modern python.
 # They might even be deprecated soon. Instead:
@@ -1063,6 +1084,7 @@ with open(filename) as csvfp:
 # BeautifulSoup
 ########################################################
 
+"""
 Difference between .string and .text:
   .string returns a NavigableString object, which offers a lot of
           the same methods tags do.
@@ -1070,10 +1092,37 @@ Difference between .string and .text:
 
 Useful recent additions: tag.replace_with_children()
 
+Use decompose() rather than extract():
+tag.extract() removes a tag from the tree and returns it.
+tag.decompose() removes it from the  tree and deletes it and its contents.
+
+Whitespace:
+tag.find_next_sibling() and find_previous_sibling() will skip over
+intervening NavigableString whitespace, whereas tag.next_sibling
+and tag.previous_sibling will return the whitespace.
+"""
+
 # Find tags with inline style attribute:
 for t in soup.findAll(style=True)
 # Harder way, using lambda:
 soup.findAll(lambda tag: 'style' in tag.attrs)
+
+# Remove a tag but keep what's inside it:
+for tag in invalid_tags:
+    for match in soup.findAll(tag):
+        match.replaceWithChildren()
+
+# Replace a tag with another tag:
+for b in soup.find_all('b'):
+    b.name = 'strong'
+
+# Delete an attribute but keep the tag:
+del body["bgcolor"]
+del body["style"]
+
+# Join consecutive similar tags:
+# see join_consecutive_tags() in losalamosmeetings.py.
+
 
 ########################################################
 # Networking and Requests
@@ -1735,6 +1784,17 @@ PySonar: a type inferencer and indexer
 Pip reinstall:
     pip install -I
 --force-reinstall isn't enough, you need --upgrade which is -I
+
+List outdated packages:
+pip list --outdated
+
+Upgrade all packages:
+Some people point to things like:
+pip install $(pip list --outdated | tail -n +2 | awk '{ print $1 }') --upgrade
+but that doesn't actually work.
+
+https://coderwall.com/p/quwaxa/update-all-installed-python-packages-with-pip
+has some other suggestions.
 
 Get a list of installed files:
 Basically, you can't. pip show -f packagename
