@@ -9,7 +9,7 @@
 # 45  15  *  *  * python3 /path/tp/htdocs/losalamosmtgs.py > /path/to/htdocs/los-alamos-meetings/LOG 2>&1
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 import datetime
 from urllib.parse import urljoin
 import io
@@ -17,6 +17,7 @@ import string
 import subprocess
 import tempfile
 import json
+import re
 import os, sys
 from lxml.html.diff import htmldiff
 
@@ -107,17 +108,17 @@ def parse_meeting_list(page_html, only_future=False):
 
     # The legend is in the thead
     fieldnames = []
-    for i, field in enumerate(caltbl.thead.findAll("th")):
+    for i, field in enumerate(caltbl.thead.find_all("th")):
         if field.text:
             fieldnames.append(field.text.strip())
         else:
             fieldnames.append(str(i))
 
     # Loop over meetings, rows in the table:
-    for row in caltbl.tbody.findAll("tr"):
+    for row in caltbl.tbody.find_all("tr"):
         dic = {}
         # Loop over columns describing this meeting:
-        for i, field in enumerate(row.findAll("td")):
+        for i, field in enumerate(row.find_all("td")):
             if fieldnames[i].startswith("Agenda"):
                 # If there's an Agenda URL, make it absolute.
                 a = field.find("a")
@@ -210,7 +211,7 @@ del { background: #fbb; }
 
 def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
-       removing the idiotic dark grey background pdftohtml has hardcoded in.
+       then returned cleaned_up bytes (not str).
        save_pdf_name is for debugging: if set, save the PDF there
        and don't delete it.
        Returns bytes, not str.
@@ -220,11 +221,22 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     with open(save_pdf_filename, "wb") as pdf_fp:
         pdf_fp.write(r.content)
     htmlfile = save_pdf_filename + ".html"
-    print("Calling", ' '.join(["pdftohtml", "-c", "-s", "-i", "-noframes",
-                               "-enc", "utf-8",
-                               save_pdf_filename, htmlfile]))
-    subprocess.call(["pdftohtml", "-c", "-s", "-i", "-noframes",
-                     save_pdf_filename, htmlfile])
+    args = [ "pdftohtml", "-c", "-s", "-i", "-noframes",
+             # "-enc", "utf-8",
+             save_pdf_filename, htmlfile ]
+    print("Calling", ' '.join(args))
+    subprocess.call(args)
+
+    return clean_up_htmlfile(htmlfile)
+
+
+def clean_up_htmlfile(htmlfile):
+    """Clean up the scary HTML written by pdftohtml,
+       removing the idiotic dark grey background pdftohtml has hardcoded in,
+       the assortment of absolute-positioned styles,
+       the new-paragraph-for-each-line, etc.
+       Returns bytes, not str.
+    """
     with open(htmlfile, 'rb') as htmlfp:
         # The files produced by pdftohtml contain '\240' characters,
         # which are ISO-8859-1 for nbsp.
@@ -253,34 +265,109 @@ def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     if bodylen == 0:
         print("** Yikes! Empty HTML from pdftohtml", htmlfile)
         return html
-    else:
-        print(bodylen, "characters in body text")
-        if bodylen < 10:
-            print(f"Body text is: '{body.text}'")
+    elif bodylen < 10:
+        print(f"Short! Body text is: '{body.text}'")
 
     del body["bgcolor"]
     del body["vlink"]
     del body["link"]
 
     # Remove all the fixed pixel width styles
-    for tag in soup.findAll('style'):
-        tag.extract()
-    for tag in soup.findAll('div'):
+    for tag in soup.find_all('style'):
+        tag.decompose()
+    for tag in soup.find_all('div'):
         del tag["style"]
-    for tag in soup.findAll('p'):
+    for tag in soup.find_all('p'):
         del tag["style"]
-        # Consider also deleting tag["class"]
 
-    # Or maybe the above changes were what removed the body contents?
+    # Get rid of the pagination
+    pagediv_pat = re.compile('page[0-9]*-div')
+    divs = list(soup.find_all(id=pagediv_pat))
+    for div in divs:
+        div.replace_with_children()
+    # There are also anchors like <a name="8">\n</a>
+    # but they're not really hurting anything.
+
+    # Remove hard line breaks. This is a tough decision:
+    # some line breaks help readability, some hurt it.
+    # for tag in soup.find_all('br'):
+    #     tag.decompose()
+
+    # pdftohtml renders each line as a separate paragraph,
+    # so joining paragraphs helps readability.
+    # Call join_consecutive_tags starting with outer tags and working inward.
+    join_consecutive_tags(soup, 'p')
+    join_consecutive_tags(soup, 'i')
+    join_consecutive_tags(soup, 'b')
+
+    # Now we're done with the class tags, so delete them.
+    for tag in soup.find_all('p'):
+        del tag["class"]
+
+    # Try to identify major headers, to highlight them better.
+    headerpat = re.compile('([0-9]+)\.\s*([A-Z \(\)]+)$', flags=re.DOTALL)
+
+    # This doesn't work. I don't know why. find_all(text=pat) works fine
+    # in simple test cases, but not on the real files.
+    # for b in soup.find_all('b', text=headerpat):
+
+    # Instead, loop over all b tags doing the match explicitly:
+    for b in soup.find_all('b'):
+        m = re.match(headerpat, b.get_text().strip())
+        if not m:
+            continue
+
+        # Can't change text like this
+        # b.text = f"## {m.groups(1)}. {m.groups(2)}"
+
+        # but we can change the tag name:
+        b.name = 'h2'
+
+    pretty_html_bytes = soup.prettify(encoding='utf-8')
+
+    # Testing: maybe the above changes removed the body contents?
+    # (I think this bug is long since fixed.)
     if not body.text:
         print("**Yikes! Our changes to", save_pdf_file,
               "made the HTML empty. Saving original instead.")
         with open(os.path.join(RSS_DIR, save_pdf_filename + "_cleaned.html"),
-                  "w") as savfp:
-            print(soup.prettify(encoding='utf-8'), file=savfp)
+                  "wb") as savfp:
+            savefp.write(pretty_html_bytes)
         return html
 
-    return soup.prettify(encoding='utf-8')
+    return pretty_html_bytes
+
+
+def join_consecutive_tags(soup, tagname, add_spaces=False):
+    """Join consecutive tags of name tag if they have the same attributes.
+       E.g. in <p class="foo">some text</p><p class="foo">different text</p>
+       would produce <p class="foo">some text different text</p>
+       If add_spaces, will add spaces between tags.
+    """
+    to_delete = []
+    paras = list(soup.find_all(tagname))
+    for tag in paras:
+        # Was the previous sibling the same type? Then move children there.
+        sib = tag.find_previous_sibling()
+
+        if sib and sib.name == tagname and sib.attrs == tag.attrs:
+            first = True
+            # Get the list of children first.
+            # Iterating directly over tag.children gets crossed up
+            # when some of the children are moved to another tag.
+            children = list(tag.children)
+            for child in children:
+                # Add a space before the first element,
+                # so contents are separated from the previous tag
+                if add_spaces and first and isinstance(child, NavigableString):
+                    sib.append(NavigableString(' ' + child))
+                else:
+                     sib.append(child)
+                first = False
+            to_delete.append(tag)
+
+    for tag in to_delete:
+        tag.decompose()
 
 
 VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
@@ -382,7 +469,7 @@ As of: {gendate}
 
             # See if there was already an agenda file left from previous runs:
             agendafile = os.path.join(RSS_DIR, cleanname + ".html")
-            print("agenda filename", agendafile)
+            # print("agenda filename", agendafile)
 
             try:
                 with open(agendafile, "rb") as oldfp:
@@ -592,7 +679,8 @@ As of: {gendate}
         if ext not in rmexts:
             continue
 
-        if f.startswith("index"):
+        # Protected files
+        if f.startswith("index") or f.startswith("about"):
             continue
 
         def is_active(f):
