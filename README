@@ -535,6 +535,10 @@ us-wars.py:
 vcalparse:
     Parse and print an icalendar/vcalendar/ICS file using python-vobject.
 
+pip_upgrade.py:
+    Upgrade all Python packages in the current virtualenv.
+    Don't try to upgrade anything in the system Python directories.
+
 viewhtmlmail:
      Take an mbox HTML message (e.g. from mutt), split it using munpack,
      and rewrite it so it can be viewed in an external browser.

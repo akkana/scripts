@@ -993,7 +993,7 @@ PosixPath('.')
 PosixPath('/home/username/pathlib')
 
 # Other methods include .mkdir(), .rmdir(), .unlink().rename(), .exists(),
-# .is_dir(), .is_file(), .stat(),
+# .is_dir(), .is_file(), .stat(), .iterdir(),
 # .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
   # reads and writes don't require open first
 
@@ -1817,10 +1817,18 @@ python3 -m venv ~/pythonenv/envname
 '''
 
 '''
-Optionally, add system-site-packages to either of these.
+Optionally, add --system-site-packages to either of these.
 
 Then activate it:
 source ~/pythonenv/envname/bin/activate
+'''
+
+'''
+Upgrade everything in a venv -- but DON'T DO THIS WITH --system-packages,
+it will try to pip upgrade all your system packages too!
+pip install -U $(pip freeze | awk '{split($0, a, "=="); print a[1]}')
+
+See also my pip_upgrade.py script.
 '''
 
 ################################################################
@@ -1875,6 +1883,13 @@ If that doesn't work (e.g. on Ubuntu eoan), try:
 
 If everything works, upload to the real PyPI:
 twine upload dist/*
+
+Specifying required versions:
+install_requires = [ 'numpy>=1.17', ... ]
+
+Good way to generate requirements.txt if there's already a setup.py:
+pip-compile
+(Uses specific versions, so you may want to edit it afterward.)
 
 Building and Uploading Sphinx docs:
 Best ever: https://samnicholls.net/2016/06/15/how-to-sphinx-readthedocs/
