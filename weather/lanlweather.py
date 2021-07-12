@@ -291,9 +291,19 @@ class LANLWeather(object):
         # r = requests.post('http://www.weather.lanl.gov/'
         #                   'data_request_green_weather.asp',
         #                   data=request_data, headers=headers, verify=False)
-        r = requests.post('https://www.weather.lanl.gov/data_request_green_weather.asp',
+        LANL_URL = 'https://www.weather.lanl.gov/data_request_green_weather.asp'
+        try:
+            r = requests.post(LANL_URL,
                           headers=headers, # cookies=cookies,
                           data=request_data, verify=False)
+        except requests.exceptions.ConnectionError:
+            print("Connection Error on", LANL_URL)
+            from pprint import pprint
+            print("Headers:")
+            pprint(headers)
+            print("Request data:")
+            pprint(request_data)
+            sys.exit(1)
 
         if not r.text:
             raise RuntimeError("Empty response!")
