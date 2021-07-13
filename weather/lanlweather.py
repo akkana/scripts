@@ -47,7 +47,10 @@ class LANLWeather(object):
     """
 
     def __init__(self, stations, start, end, keys):
+        # List of LANL stations, e.g. ta54
         self.stations = stations
+
+        # Which keys will we be requesting and storing, e.g. temp0, spd1
         self.keys = keys
 
         if hasattr(start, 'year'):
@@ -68,8 +71,10 @@ class LANLWeather(object):
         # Where does the data end? Might not be the same as self.end.
         self.realend = self.start
 
-        self.data = {}
         self.dates = []
+
+        # Data is stored as a dict (stations) of dicts (key, e.g. temp0).
+        self.data = {}
 
         # Set up cache directory. Default: ~/.cache/lanlweather
         # but you can change it with the env var LANLWEATHER
@@ -77,6 +82,10 @@ class LANLWeather(object):
         if not self.cachedir:
             self.cachedir = os.path.expanduser("~/.cache/lanlweather")
 
+    # Keys requested when making net requests,
+    # which will then be stored in the cache file.
+    # This includes a lot more data than the plotting routines
+    # currently need, in case we want it later.
     request_keys = [ 'spd1', 'spd2', 'spd3', # Speeds at 12, 23 and 46 m height
                      'sdspd1', 'sdspd2', 'sdspd3', # sdev of wind speeds
                      'dir1', 'dir2', 'dir3', # wind directions 12, 23, 46 m
@@ -116,19 +125,18 @@ class LANLWeather(object):
            so we can keep a more complete cache.
         """
 
-        # Loop over months requested.
         # Start on the first of the month specified by startdate:
-        startday = self.start.replace(day=1)
+        curday = self.start.replace(day=1)
 
         # Loop over requested months
-        while to_date(startday) <= to_date(self.end):
+        while to_date(curday) <= to_date(self.end):
             for tower in self.stations:
                 # print("Station %s %04d-%02d" % (tower,
-                #                                 startday.year,
-                #                                 startday.month))
+                #                                 curday.year,
+                #                                 curday.month))
                 cachefile = os.path.join(self.cachedir,
-                                         "%04d-%02d-%s.csv" % (startday.year,
-                                                               startday.month,
+                                         "%04d-%02d-%s.csv" % (curday.year,
+                                                               curday.month,
                                                                tower))
                 # See if this month and year is already cached.
                 datablob = None
@@ -169,27 +177,29 @@ class LANLWeather(object):
                                                       fileend.year,
                                                       fileend.month,
                                                       fileend.day))
-                            print("Fetching month %d-%d again" % (startday.year,
-                                                                  startday.month))
+                            print("Fetching month %d-%d again" % (curday.year,
+                                                                  curday.month))
                             datablob = None
                             lines = None
 
                 if not datablob:
-                    print("Making request for", startday.year, startday.month)
+                    print("Making request for", curday.year, curday.month)
 
                     datablob = self.make_lanl_request(tower,
-                                                      startday.year,
-                                                      startday.month)
+                                                      curday.year,
+                                                      curday.month)
 
                     # Don't save to cache quite yet: it may not be actual CSV.
                     # But make sure the directory is there.
                     if not os.path.exists(self.cachedir):
                         os.makedirs(self.cachedir)
 
+                # Now the datablob should be here, one way or the other
+
                 try:
                     lines = datablob.split('\n')
 
-                    self.parse_lanl_data(lines)
+                    self.parse_lanl_data(tower, lines)
 
                     # Now, if parsing worked without errors, it's okay to
                     # save to a cached CSV file.
@@ -223,8 +233,7 @@ class LANLWeather(object):
 
                     sys.exit(1)
 
-                startday += relativedelta(months=1)
-
+                curday += relativedelta(months=1)
 
     def make_lanl_request(self, tower, year, month):
         """Make a data request for 15-minute data to the LANL weather machine.
@@ -313,7 +322,6 @@ class LANLWeather(object):
 
         return r.text
 
-
     def get_fields_and_units(self, lines):
         """In LANL data, there's a bunch of boilerplate stuff in the first
            four lines, so the fields don't come until the fifth line,
@@ -347,8 +355,7 @@ class LANLWeather(object):
 
         return startdate, enddate
 
-
-    def parse_lanl_data(self, lines):
+    def parse_lanl_data(self, tower, lines):
         """Take a list of lines read either from a cache file
            or a net request, parse them and add them to self.data.
         """
@@ -358,6 +365,9 @@ class LANLWeather(object):
         # saving the index of each key in the data table we're reading.
         indices = []
 
+        if tower not in self.data:
+            self.data[tower] = {}
+
         for i, k in enumerate(self.keys):
             idx = fields.index(k)
             if idx <= 0:
@@ -365,8 +375,8 @@ class LANLWeather(object):
             indices.append(idx)
 
             # initialize a vector of values for that key, if not already there:
-            if k not in self.data:
-                self.data[k] = []
+            if k not in self.data[tower]:
+                self.data[tower][k] = []
 
         # We'll also need to know the indices for the time values.
         year = fields.index('year')
@@ -396,32 +406,32 @@ class LANLWeather(object):
                 # np.nan), but at least matplotlib no longer dies on None.
                 if not l[idx] or l[idx] == '*':
                     # print("Missing data for", k, "on", d)
-                    self.data[k].append(None)
+                    self.data[tower][k].append(None)
 
                 # convert temps C -> F
                 elif k.startswith('temp'):
-                    self.data[k].append(c_to_f(float(l[idx])))
+                    self.data[tower][k].append(c_to_f(float(l[idx])))
 
                 else:
-                    self.data[k].append(float(l[idx]))
+                    self.data[tower][k].append(float(l[idx]))
 
         # We'll scale to self.end, so in case we rounded down,
         # reset self.end so we don't have extra whitespace on the plot.
         if to_date(self.dates[-1]) > to_date(self.realend):
             self.realend = self.dates[-1]
 
-    def find_maxmin(self, key):
+    def find_maxmin(self, key, tower):
         """Find the daily maximum for the more granular data in key.
-           Save it as key_max and key_min, e.g. self.data['temp0_max'].
+           Save it as key_max and key_min, e.g. self.data[tower]['temp0_max'].
            Return key_days, key_max, key_min
         """
         key_max = key + "_max"
         key_min = key + "_min"
         key_days = key + "_days"
 
-        self.data[key_min] = []
-        self.data[key_max] = []
-        self.data[key_days] = []
+        self.data[tower][key_min] = []
+        self.data[tower][key_max] = []
+        self.data[tower][key_days] = []
 
         curday = None
 
@@ -434,13 +444,13 @@ class LANLWeather(object):
 
             if valmin != sys.float_info.max and \
                valmax !=sys.float_info.min:
-                self.data[key_min].append(valmin)
-                self.data[key_max].append(valmax)
-                self.data[key_days].append(curday)
+                self.data[tower][key_min].append(valmin)
+                self.data[tower][key_max].append(valmax)
+                self.data[tower][key_days].append(curday)
             else:
                 print("No data on", curday)
 
-        for dt, val in zip(self.dates, self.data[key]):
+        for dt, val in zip(self.dates, self.data[tower][key]):
             newday = dt.date()
             if newday != curday:
                 end_of_day()
@@ -547,6 +557,8 @@ class LANLWeatherPlots(LANLWeather):
         """
         ax = self.set_up_subplot(subplot)
 
+        tower = list(self.data.keys())[0]
+
         # Loop over all dates we know about, building an average of the
         # wind for that day of the year.
         avs = [0.0] * 366
@@ -554,8 +566,8 @@ class LANLWeatherPlots(LANLWeather):
         for i, d in enumerate(self.dates):
             day_of_year = d.timetuple().tm_yday - 1
             # print("Day of year", day_of_year, "timetuple", d.timetuple())
-            if self.data[ws][i]:
-                avs[day_of_year] += self.data[ws][i]
+            if self.data[tower][ws][i]:
+                avs[day_of_year] += self.data[tower][ws][i]
                 # XXX Note that this will be off by a day in non leap years.
                 datapoints[day_of_year] += 1
 
@@ -583,9 +595,11 @@ class LANLWeatherPlots(LANLWeather):
         """
         ax = self.set_up_subplot(subplot)
 
+        tower = list(self.data.keys())[0]
+
         # Plot the wind directions first: want it underneath
         wdlabel = "Wind Direction"
-        wdplot = ax.scatter(self.dates, self.data[wd], marker='.',
+        wdplot = ax.scatter(self.dates, self.data[tower][wd], marker='.',
                             s=2, color="orange", label=wdlabel)
 
         plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
@@ -601,10 +615,10 @@ class LANLWeatherPlots(LANLWeather):
         # Plot wind speed on top of wind direction
         axtwin = ax.twinx()
         wslabel = "Wind Speed"
-        wsplot = axtwin.plot(self.dates, self.data[ws],
+        wsplot = axtwin.plot(self.dates, self.data[tower][ws],
                              color='b', label=wslabel)
         plt.ylabel('Wind Speed (knots)', multialignment='center')
-        axtwin.set_ylim([0, maxnone(self.data[ws])])
+        axtwin.set_ylim([0, maxnone(self.data[tower][ws])])
 
         # Top label.
         # To pass plots to legend(), for a line plot you pass the first
@@ -619,7 +633,9 @@ class LANLWeatherPlots(LANLWeather):
     def plot_temp(self, temp, plot_range=None, subplot=None):
         ax = self.set_up_subplot(subplot)
 
-        ax.plot(self.dates, self.data[temp],
+        tower = list(self.data.keys())[0]
+
+        ax.plot(self.dates, self.data[tower][temp],
                 '-', color='blue', label='Ground temperature')
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
                   prop={'size': 12})
@@ -630,7 +646,7 @@ class LANLWeatherPlots(LANLWeather):
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        ax.set_ylim(0, maxnone(self.data[temp]), 4)
+        ax.set_ylim(0, maxnone(self.data[tower][temp]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -640,12 +656,14 @@ class LANLWeatherPlots(LANLWeather):
         """
         ax = self.set_up_subplot(subplot)
 
-        key_days, key_max, key_min = self.find_maxmin(key)
+        tower = list(self.data.keys())[0]
+
+        key_days, key_max, key_min = self.find_maxmin(key, tower)
 
         ax = self.set_up_subplot(subplot)
-        ax.plot(self.data[key_days], self.data[key_max],
+        ax.plot(self.data[tower][key_days], self.data[tower][key_max],
                       '-', color='red', label='Max daily temp')
-        ax.plot(self.data[key_days], self.data[key_min],
+        ax.plot(self.data[tower][key_days], self.data[tower][key_min],
                       '-', color='blue', label='Min daily temp')
         ax.legend(loc='upper left', prop={'size': 12})
         plt.setp(ax.get_xticklabels(), visible=True)
@@ -655,7 +673,7 @@ class LANLWeatherPlots(LANLWeather):
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        ax.set_ylim(0, max(self.data[key_max]), 4)
+        ax.set_ylim(0, max(self.data[tower][key_max]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
