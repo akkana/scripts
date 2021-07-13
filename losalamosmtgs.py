@@ -385,7 +385,7 @@ def write_rss20_file(mtglist):
     active_meetings = []
 
     ##############
-    # Generate index HTML and RSS file headerss.
+    # Generate index HTML and RSS file headers.
     # Open both the RSS and HTML files:
     outrssfilename = os.path.join(RSS_DIR, "index.rss")
     outhtmlfilename = os.path.join(RSS_DIR, "index.html")
@@ -417,6 +417,8 @@ def write_rss20_file(mtglist):
 <html>
 <head>
   <title>Los Alamos County Government Meetings</title>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="alternate" type="application/rss+xml"
         title="Los Alamos Meetings Feed"
         href="{RSS_URL}index.rss" />
