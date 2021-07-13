@@ -510,7 +510,7 @@ class LANLWeatherPlots(LANLWeather):
 
         plt.show()
 
-    def set_up_subplot(self, subplot_triple):
+    def set_up_subplot(self, subplot_triple=None):
         """Set up self.axes and create subplots according to the
            tuple argument, which specifies nrows, ncols, plotnum.
            If subplot == None, set it up as a solo plot.
@@ -531,6 +531,7 @@ class LANLWeatherPlots(LANLWeather):
 
         # Is this axis already set up?
         if self.axes[plotnum]:
+            print("re-using axis", plotnum)
             return self.axes[plotnum]
 
         # Has there already been another axis created? If so, share X.
@@ -630,13 +631,20 @@ class LANLWeatherPlots(LANLWeather):
                       # and spread it out on one line:
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
 
-    def plot_temp(self, temp, plot_range=None, subplot=None):
+    def plot_temp(self, tempkey, plot_range=None, subplot=None, towernum=0):
+        """Plot the given temperature 
+        """
         ax = self.set_up_subplot(subplot)
 
-        tower = list(self.data.keys())[0]
+        tower = list(self.data.keys())[towernum]
 
-        ax.plot(self.dates, self.data[tower][temp],
-                '-', color='blue', label='Ground temperature')
+        if tempkey == 'temp0':
+            templabel = "Ground temperature"
+        else:
+            templabel = tempkey
+        ax.plot(self.dates, self.data[tower][tempkey],
+                '-', color='blue',
+                label='%s %s' % (templabel, self.stations[towernum]))
         ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
                   prop={'size': 12})
         plt.setp(ax.get_xticklabels(), visible=True)
@@ -646,7 +654,7 @@ class LANLWeatherPlots(LANLWeather):
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        ax.set_ylim(0, maxnone(self.data[tower][temp]), 4)
+        ax.set_ylim(0, maxnone(self.data[tower][tempkey]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -677,6 +685,14 @@ class LANLWeatherPlots(LANLWeather):
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
+
+    def compare_stations(self):
+        """Plot temp0 for multiple stations.
+        """
+        n = len(self.stations)
+        ax = self.set_up_subplot()
+        for i, station in enumerate(self.stations):
+            self.plot_temp('temp0', towernum=i)
 
 
 def main():
@@ -737,6 +753,9 @@ def main():
 
     elif args.seasonal_wind:
         lwp.plot_seasonal_wind('spd1')
+
+    elif args.compare_stations:
+        lwp.compare_stations()
 
     else:
         # subplots: nrows, ncols, plotnum
