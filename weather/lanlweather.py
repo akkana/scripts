@@ -38,6 +38,7 @@ def to_date(d):
 
 
 def maxnone(data):
+    """Return max of a list even if there are some Nones in it"""
     return max([x for x in data if x is not None])
 
 
@@ -45,8 +46,8 @@ class LANLWeather(object):
     """Fetch and parse data from the LANL weather machine.
     """
 
-    def __init__(self, tower, start, end, keys):
-        self.tower = tower
+    def __init__(self, stations, start, end, keys):
+        self.stations = stations
         self.keys = keys
 
         if hasattr(start, 'year'):
@@ -98,11 +99,10 @@ class LANLWeather(object):
 
     # List of towers that offer 15-minute reports.
     # This hasn't been checked. Some tower names may be wrong.
-    towers = [ 'mcdn',       # may be ta5
-               'ta6', 'ta49', 'ta53', 'ta54',
-               'ncom',       # North Community
-             ]
-
+    # towers = [ 'mcdn',       # may be ta5
+    #            'ta6', 'ta49', 'ta53', 'ta54',
+    #            'ncom',       # North Community
+    #          ]
 
     def get_data(self):
         """Get data from cache if possible. If it's not cached,
@@ -121,106 +121,109 @@ class LANLWeather(object):
         startday = self.start.replace(day=1)
 
         # Loop over requested months
-        while True:
-            cachefile = os.path.join(self.cachedir,
-                                     "%04d-%02d-%s.csv" % (startday.year,
-                                                           startday.month,
-                                                           self.tower))
-            # See if this month and year is already cached.
-            datablob = None
-            if os.path.exists(cachefile):
-                with open(cachefile) as fp:
-                    datablob = fp.read()
-                    print("Read from cache file", cachefile)
+        while to_date(startday) <= to_date(self.end):
+            for tower in self.stations:
+                # print("Station %s %04d-%02d" % (tower,
+                #                                 startday.year,
+                #                                 startday.month))
+                cachefile = os.path.join(self.cachedir,
+                                         "%04d-%02d-%s.csv" % (startday.year,
+                                                               startday.month,
+                                                               tower))
+                # See if this month and year is already cached.
+                datablob = None
+                if os.path.exists(cachefile):
+                    with open(cachefile) as fp:
+                        datablob = fp.read()
+                        print("Read from cache file", cachefile)
+                        lines = datablob.split('\n')
+                        # If the file ends with a newline (as it will),
+                        # split('\n') will give us a spurious empty final line.
+                        if not lines[-1].strip():
+                            del lines[-1]
+
+                        # But does it cover the entire month?
+                        filestart, fileend = self.get_start_end_dates(lines)
+
+                        # Is filestart > 1, or fileend < last day of month?
+                        last_day_of_month = (datetime.datetime(fileend.year,
+                                                               fileend.month%12 + 1,
+                                                               1)
+                                             - datetime.timedelta(days=1))
+
+                        # If the file is missing days from the given month,
+                        # re-fetch it to get the missing days --
+                        # but if it goes far enough to include today's date,
+                        # don't re-fetch even if it doesn't have all of today.
+                        # We can always fetch again tomorrow.
+                        if (filestart.day > 1 or
+                            (fileend.day < last_day_of_month.day
+                             and fileend.date() < datetime.date.today())):
+                            # Zero out datablob and lines so we'll fetch
+                            # the whole month again.
+                            print("Cache file only contained " \
+                                  "%04d-%02d-%02d through " \
+                                  "%04d-%02d-%02d" % (filestart.year,
+                                                      filestart.month,
+                                                      filestart.day,
+                                                      fileend.year,
+                                                      fileend.month,
+                                                      fileend.day))
+                            print("Fetching month %d-%d again" % (startday.year,
+                                                                  startday.month))
+                            datablob = None
+                            lines = None
+
+                if not datablob:
+                    print("Making request for", startday.year, startday.month)
+
+                    datablob = self.make_lanl_request(tower,
+                                                      startday.year,
+                                                      startday.month)
+
+                    # Don't save to cache quite yet: it may not be actual CSV.
+                    # But make sure the directory is there.
+                    if not os.path.exists(self.cachedir):
+                        os.makedirs(self.cachedir)
+
+                try:
                     lines = datablob.split('\n')
-                    # If the file ends with a newline (as it will),
-                    # split('\n') will give us a spurious empty final line.
-                    if not lines[-1].strip():
-                        del lines[-1]
 
-                    # But does it cover the entire month?
-                    filestart, fileend = self.get_start_end_dates(lines)
+                    self.parse_lanl_data(lines)
 
-                    # Is filestart > 1, or fileend < last day of month?
-                    last_day_of_month = (datetime.datetime(fileend.year,
-                                                           fileend.month%12 + 1,
-                                                           1)
-                                         - datetime.timedelta(days=1))
+                    # Now, if parsing worked without errors, it's okay to
+                    # save to a cached CSV file.
+                    if not os.path.exists(cachefile):
+                        with open(cachefile, "w") as outfile:
+                            outfile.write(datablob)
+                            print(("Saved to cache %s" % cachefile))
 
-                    # If the file is missing days from the given month,
-                    # re-fetch it to get the missing days --
-                    # but if it goes far enough to include today's date,
-                    # don't re-fetch even if it doesn't have all of today.
-                    # We can always fetch again tomorrow.
-                    if (filestart.day > 1 or
-                        (fileend.day < last_day_of_month.day
-                         and fileend.date() < datetime.date.today())):
-                        # Zero out datablob and lines so we'll fetch
-                        # the whole month again.
-                        print("Cache file only contained " \
-                              "%04d-%02d-%02d through " \
-                              "%04d-%02d-%02d" % (filestart.year,
-                                                  filestart.month,
-                                                  filestart.day,
-                                                  fileend.year,
-                                                  fileend.month,
-                                                  fileend.day))
-                        print("Fetching month %d-%d again" % (startday.year,
-                                                              startday.month))
-                        datablob = None
-                        lines = None
+                except Exception as e:
+                    print("Couldn't parse blob in", cachefile)
+                    print(str(e))
 
-            if not datablob:
-                print("Making request for", startday.year, startday.month)
+                    # Save an error file
+                    htmlfilename = cachefile + '.html'
+                    with open(htmlfilename, "w") as htmlfile:
+                        htmlfile.write(datablob)
+                        print("Saved original file to", htmlfilename)
 
-                datablob = self.make_lanl_request(self.tower,
-                                                  startday.year, startday.month)
+                    # Try to parse the error message
+                    soup = BeautifulSoup(datablob, 'lxml')
+                    pagecontent = soup.find(id='pagecontent')
+                    try:
+                        print(("HTML Error: %s" % pagecontent.text))
+                    except:
+                        print("No error message but no data either")
 
-                # Don't save to cache quite yet: it may not be actual CSV.
-                # But make sure the directory is there.
-                if not os.path.exists(self.cachedir):
-                    os.makedirs(self.cachedir)
+                    try:
+                        os.unlink(cachefile)
+                    except:
+                        print("Nothing to unlink")
 
-            try:
-                lines = datablob.split('\n')
+                    sys.exit(1)
 
-                self.parse_lanl_data(lines)
-
-                # Now, if parsing worked without errors, it's okay to
-                # save to a cached CSV file.
-                if not os.path.exists(cachefile):
-                    with open(cachefile, "w") as outfile:
-                        outfile.write(datablob)
-                        print(("Saved to cache %s" % cachefile))
-
-            except Exception as e:
-                print("Couldn't parse blob in", cachefile)
-                print(str(e))
-
-                # Save an error file
-                htmlfilename = cachefile + '.html'
-                with open(htmlfilename, "w") as htmlfile:
-                    htmlfile.write(datablob)
-                    print("Saved original file to", htmlfilename)
-
-                # Try to parse the error message
-                soup = BeautifulSoup(datablob, 'lxml')
-                pagecontent = soup.find(id='pagecontent')
-                try:
-                    print(("HTML Error: %s" % pagecontent.text))
-                except:
-                    print("No error message but no data either")
-
-                try:
-                    os.unlink(cachefile)
-                except:
-                    print("Nothing to unlink")
-
-                sys.exit(1)
-
-            startday += relativedelta(months=1)
-            if to_date(startday) > to_date(self.end):
-                break
+                startday += relativedelta(months=1)
 
 
     def make_lanl_request(self, tower, year, month):
@@ -249,7 +252,7 @@ class LANLWeather(object):
             # set it to the last day of the previous (original) month:
             endtime -= datetime.timedelta(days=1)
 
-        print("make lanl request:", year, month, "01 00:00 to", \
+        print("making lanl request:", tower, year, month, "01 00:00 to", \
             endtime.year, endtime.month, endtime.day, \
             endtime.hour, endtime.minute)
 
@@ -294,8 +297,8 @@ class LANLWeather(object):
         LANL_URL = 'https://www.weather.lanl.gov/data_request_green_weather.asp'
         try:
             r = requests.post(LANL_URL,
-                          headers=headers, # cookies=cookies,
-                          data=request_data, verify=False)
+                              headers=headers, # cookies=cookies,
+                              data=request_data, verify=False)
         except requests.exceptions.ConnectionError:
             print("Connection Error on", LANL_URL)
             from pprint import pprint
@@ -429,9 +432,6 @@ class LANLWeather(object):
             if not curday:
                 return
 
-            # if curday.month == 6 or curday.month == 7 and curday.year == 2020:
-            #     print(curday, valmin)
-
             if valmin != sys.float_info.max and \
                valmax !=sys.float_info.min:
                 self.data[key_min].append(valmin)
@@ -464,8 +464,7 @@ class LANLWeatherPlots(LANLWeather):
         super(LANLWeatherPlots, self).__init__(tower, start, end, keys)
         self.fig = plt.figure(figsize=(15, 5))
 
-        self.ax1 = None
-        self.ax3 = None
+        self.axes = []
 
 
     def show(self):
@@ -486,10 +485,8 @@ class LANLWeatherPlots(LANLWeather):
         # self.ax3.set_adjustable('box-forced')
 
         # This gets rid of the intra-plot whitespace:
-        if self.ax1:
-            self.ax1.set_xlim([self.start, self.realend])
-        if self.ax3:
-            self.ax3.set_xlim([self.start, self.realend])
+        for ax in self.axes:
+            ax.set_xlim([self.start, self.realend])
 
         # This gets rid of some of the extra whitespace between/around plots.
         # pad controls padding at the top, bottom and sides;
@@ -503,14 +500,52 @@ class LANLWeatherPlots(LANLWeather):
 
         plt.show()
 
+    def set_up_subplot(self, subplot_triple):
+        """Set up self.axes and create subplots according to the
+           tuple argument, which specifies nrows, ncols, plotnum.
+           If subplot == None, set it up as a solo plot.
+           Return the matplotlib axis object.
+        """
+        # Single plot?
+        if not subplot_triple:
+            subplot_triple = (1, 1, 1)
 
-    def plot_seasonal_wind(self, ws):
+        if not self.axes:
+            if subplot_triple[1] > 1:
+                raise RuntimeError("Eek, can't handle multiple columns"
+                                   + str(subplot))
+
+            self.axes = [None] * subplot_triple[0]
+
+        plotnum = subplot_triple[2] - 1
+
+        # Is this axis already set up?
+        if self.axes[plotnum]:
+            return self.axes[plotnum]
+
+        # Has there already been another axis created? If so, share X.
+        shareax = None
+        for ax in self.axes:
+            if ax:
+                shareax = ax
+
+        if shareax:
+            self.axes[plotnum] = \
+                self.fig.add_subplot(*subplot_triple, sharex=shareax)
+        else:
+            self.axes[plotnum] = \
+                self.fig.add_subplot(*subplot_triple)
+
+        return self.axes[plotnum]
+
+    def plot_seasonal_wind(self, ws, subplot=None):
         """
         Plot wind speed by season, averaging over all available years.
         Required input:
             ws: Key used for Wind speeds (knots)
         Optional Input:
         """
+        ax = self.set_up_subplot(subplot)
 
         # Loop over all dates we know about, building an average of the
         # wind for that day of the year.
@@ -532,85 +567,95 @@ class LANLWeatherPlots(LANLWeather):
         days = [ datetime.date(curyear, 1, 1) + datetime.timedelta(d)
                  for d, dp in enumerate(datapoints) ]
 
-        plt.plot(days, avs, # '.',
+        ax.plot(days, avs, # '.',
                  color="green", label='Average wind speed')
 
-        plt.ylabel('Date (ignore year)')
+        plt.xlabel('Date (ignore year)')
         plt.ylabel('Wind speed average for day')
-        plt.legend(loc='upper left')
+        ax.legend(loc='upper left')
 
-    def plot_winds(self, ws, wd):
+    def plot_winds(self, ws, wd, subplot=None):
         """
         Required input:
             ws: Key used for Wind speeds (knots)
             wd: Key used for Wind direction (degrees)
         Optional Input:
         """
+        ax = self.set_up_subplot(subplot)
+
         # Plot the wind directions first: want it underneath
-        # so it doesn't overwhelm the wind speed plot.
-        self.ax1 = self.fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
-        ln1 = self.ax1.plot(self.dates, self.data[wd],
-                            '.', color="orange", label='Wind Direction')
+        wdlabel = "Wind Direction"
+        wdplot = ax.scatter(self.dates, self.data[wd], marker='.',
+                            s=2, color="orange", label=wdlabel)
 
         plt.ylabel('Wind Direction\n(degrees)', multialignment='center')
-        self.ax1.set_ylim([0, 360])
+        ax.set_ylim([0, 360])
         # plt.yticks([45, 135, 225, 315], ['NE', 'SE', 'SW', 'NW'])
         plt.yticks([0, 90, 180, 270, 360], ['N', 'E', 'S', 'W', 'N'])
 
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
 
-        plt.setp(self.ax1.get_xticklabels(), visible=True)
+        plt.setp(ax.get_xticklabels(), visible=True)
 
         # Plot wind speed on top of wind direction
-        axtwin = self.ax1.twinx()
-        ln2 = axtwin.plot(self.dates, self.data[ws],
-                          color='b', label='Wind Speed')
+        axtwin = ax.twinx()
+        wslabel = "Wind Speed"
+        wsplot = axtwin.plot(self.dates, self.data[ws],
+                             color='b', label=wslabel)
         plt.ylabel('Wind Speed (knots)', multialignment='center')
         axtwin.set_ylim([0, maxnone(self.data[ws])])
 
-        # Top label
-        lns = ln1 + ln2
-        labs = [l.get_label() for l in lns]
-        axtwin.legend(lns, labs, loc='upper center',
+        # Top label.
+        # To pass plots to legend(), for a line plot you pass the first
+        # element (wsplot[0]), but for a scatter plot you pass the whole
+        # thing (wdplot).
+        axtwin.legend([wsplot[0], wdplot], [wslabel, wdlabel],
+                      # put it on top of the plot:
+                      loc='upper center',
+                      # and spread it out on one line:
                       bbox_to_anchor=(0.5, 1.2), ncol=3, prop={'size': 12})
 
-    def plot_temp(self, temp, plot_range=None):
-        self.ax3 = self.fig.add_subplot(2, 1, 2, sharex=self.ax1)
-        self.ax3.plot(self.dates, self.data[temp],
-                      '-', color='blue', label='Ground temperature')
-        self.ax3.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
-                        prop={'size': 12})
-        plt.setp(self.ax3.get_xticklabels(), visible=True)
+    def plot_temp(self, temp, plot_range=None, subplot=None):
+        ax = self.set_up_subplot(subplot)
+
+        ax.plot(self.dates, self.data[temp],
+                '-', color='blue', label='Ground temperature')
+        ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.22),
+                  prop={'size': 12})
+        plt.setp(ax.get_xticklabels(), visible=True)
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
         plt.ylabel('Temperature', multialignment='center')
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        self.ax3.set_ylim(0, maxnone(self.data[temp]), 4)
+        ax.set_ylim(0, maxnone(self.data[temp]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
 
-    def plot_maxmin(self, key):
-        """Plot the daily maximum for the more granular data in key."""
+    def plot_maxmin(self, key, subplot=None):
+        """Plot the daily maximum for the more granular data in key.
+        """
+        ax = self.set_up_subplot(subplot)
+
         key_days, key_max, key_min = self.find_maxmin(key)
 
-        self.ax3 = self.fig.add_subplot(1, 1, 1, sharex=self.ax1)
-        self.ax3.plot(self.data[key_days], self.data[key_max],
+        ax = self.set_up_subplot(subplot)
+        ax.plot(self.data[key_days], self.data[key_max],
                       '-', color='red', label='Max daily temp')
-        self.ax3.plot(self.data[key_days], self.data[key_min],
+        ax.plot(self.data[key_days], self.data[key_min],
                       '-', color='blue', label='Min daily temp')
-        self.ax3.legend(loc='upper left', prop={'size': 12})
-        plt.setp(self.ax3.get_xticklabels(), visible=True)
+        ax.legend(loc='upper left', prop={'size': 12})
+        plt.setp(ax.get_xticklabels(), visible=True)
         plt.grid(b=True, which='major', axis='y', color='k',
                  linestyle='--', linewidth=0.5)
         plt.ylabel('Temperature', multialignment='center')
 
         # set_ylim is ignored if you do it this early.
         # It works if you call it later, just before plt.show().
-        self.ax3.set_ylim(0, max(self.data[key_max]), 4)
+        ax.set_ylim(0, max(self.data[key_max]), 4)
 
         # Add a horizontal line for freezing
         plt.axhline(y=32, linewidth=.5, linestyle="dashed", color='r')
@@ -641,8 +686,18 @@ def main():
                         help="Plot seasonal winds",
                         action="store_true")
 
-    args = parser.parse_args(sys.argv[1:])
+    parser.add_argument('-c', "--compare_stations", dest="compare_stations",
+                        default=False,
+                        help="Compare several Weather Machine stations",
+                        action="store_true")
+
+    args, stations = parser.parse_known_args(sys.argv[1:])
+    # args = parser.parse_args(sys.argv[1:])
     # print("args:", args)
+    # print("stations:", stations)
+
+    if not stations:
+        stations = ['ta54']
 
     if not args.end_date:
         args.end_date = datetime.datetime.now()
@@ -652,12 +707,11 @@ def main():
 
     if args.end_date <= args.start_date:
         print("Error: start date", args.start_date,
-              "must be earlier than end date", args.end_date)
+              "is later than end date", args.end_date)
         sys.exit(1)
 
-    lwp = LANLWeatherPlots('ta54', args.start_date, args.end_date,
+    lwp = LANLWeatherPlots(stations, args.start_date, args.end_date,
                            ["spd1", "dir1", "temp0"])
-
     lwp.get_data()
 
     if args.maxmin:
@@ -667,8 +721,9 @@ def main():
         lwp.plot_seasonal_wind('spd1')
 
     else:
-        lwp.plot_winds('spd1', 'dir1')
-        lwp.plot_temp('temp0')
+        # subplots: nrows, ncols, plotnum
+        lwp.plot_winds('spd1', 'dir1', subplot=(2, 1, 1))
+        lwp.plot_temp('temp0', subplot=(2, 1, 2))
 
     lwp.show()
 
