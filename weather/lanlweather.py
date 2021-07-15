@@ -12,7 +12,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 
-# LANL hasn't bothered to get their TLS certificate right.
+# LANL has a bad TLS certificate.
 # Disable the endless warnings:
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -318,7 +318,13 @@ class LANLWeather(object):
             sys.exit(1)
 
         if not r.text:
-            raise RuntimeError("Empty response!")
+            print(LANL_URL)
+            from pprint import pprint
+            print("Headers:")
+            pprint(headers)
+            print("Request data:")
+            pprint(request_data)
+            raise RuntimeError("Empty response on %s" % LANL_URL)
 
         return r.text
 
