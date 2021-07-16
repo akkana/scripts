@@ -209,22 +209,29 @@ del { background: #fbb; }
     return diff.encode()
 
 
-def get_html_agenda_pdftohtml(agendaloc, save_pdf_filename):
+def html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        then returned cleaned_up bytes (not str).
        save_pdf_name is for debugging: if set, save the PDF there
        and don't delete it.
        Returns bytes, not str.
     """
-    r = requests.get(agendaloc, timeout=30)
+    if os.path.exists(agendaloc):
+        with open(agendaloc, 'rb') as infp:
+            with open(save_pdf_filename, "wb") as pdf_fp:
+                pdf_fp.write(infp.read())
 
-    with open(save_pdf_filename, "wb") as pdf_fp:
-        pdf_fp.write(r.content)
+    else:
+        r = requests.get(agendaloc, timeout=30)
+
+        with open(save_pdf_filename, "wb") as pdf_fp:
+            pdf_fp.write(r.content)
+
     htmlfile = save_pdf_filename + ".html"
     args = [ "pdftohtml", "-c", "-s", "-i", "-noframes",
              # "-enc", "utf-8",
              save_pdf_filename, htmlfile ]
-    print("Calling", ' '.join(args))
+    # print("Calling", ' '.join(args))
     subprocess.call(args)
 
     return clean_up_htmlfile(htmlfile)
@@ -273,16 +280,16 @@ def clean_up_htmlfile(htmlfile):
     del body["link"]
 
     # Remove all the fixed pixel width styles
-    for tag in soup.find_all('style'):
+    for tag in body.find_all('style'):
         tag.decompose()
-    for tag in soup.find_all('div'):
+    for tag in body.find_all('div'):
         del tag["style"]
-    for tag in soup.find_all('p'):
+    for tag in body.find_all('p'):
         del tag["style"]
 
     # Get rid of the pagination
     pagediv_pat = re.compile('page[0-9]*-div')
-    divs = list(soup.find_all(id=pagediv_pat))
+    divs = list(body.find_all(id=pagediv_pat))
     for div in divs:
         div.replace_with_children()
     # There are also anchors like <a name="8">\n</a>
@@ -290,30 +297,33 @@ def clean_up_htmlfile(htmlfile):
 
     # Remove hard line breaks. This is a tough decision:
     # some line breaks help readability, some hurt it.
-    # for tag in soup.find_all('br'):
+    # for tag in body.find_all('br'):
     #     tag.decompose()
 
     # pdftohtml renders each line as a separate paragraph,
     # so joining paragraphs helps readability.
     # Call join_consecutive_tags starting with outer tags and working inward.
-    join_consecutive_tags(soup, 'p')
-    join_consecutive_tags(soup, 'i')
-    join_consecutive_tags(soup, 'b')
+    # Do this while the p tags still have classes, so paragraphs of
+    # different classes don't get merged.
+    join_consecutive_tags(body, 'p')
+    # return soup.prettify(encoding='utf-8')
+    join_consecutive_tags(body, 'i')
+    join_consecutive_tags(body, 'b')
 
-    # Now we're done with the class tags, so delete them.
-    for tag in soup.find_all('p'):
+    # Now don't need the class tags any more, so delete them.
+    for tag in body.find_all('p'):
         del tag["class"]
 
     # Try to identify major headers, to highlight them better.
-    headerpat = re.compile('([0-9]+)\.\s*([A-Z \(\)]+)$', flags=re.DOTALL)
+    header_pat = re.compile('([0-9]+)\.\s*([A-Z \(\)\/,]+)$', flags=re.DOTALL)
 
     # This doesn't work. I don't know why. find_all(text=pat) works fine
     # in simple test cases, but not on the real files.
-    # for b in soup.find_all('b', text=headerpat):
+    # for b in soup.find_all('b', text=header_pat):
 
     # Instead, loop over all b tags doing the match explicitly:
-    for b in soup.find_all('b'):
-        m = re.match(headerpat, b.get_text().strip())
+    for bold in body.find_all('b'):
+        m = re.match(header_pat, bold.get_text().strip())
         if not m:
             continue
 
@@ -321,14 +331,14 @@ def clean_up_htmlfile(htmlfile):
         # b.text = f"## {m.groups(1)}. {m.groups(2)}"
 
         # but we can change the tag name:
-        b.name = 'h2'
+        bold.name = 'h2'
 
     pretty_html_bytes = soup.prettify(encoding='utf-8')
 
     # Testing: maybe the above changes removed the body contents?
     # (I think this bug is long since fixed.)
     if not body.text:
-        print("**Yikes! Our changes to", save_pdf_file,
+        print("**Yikes! The changes to", save_pdf_file,
               "made the HTML empty. Saving original instead.")
         with open(os.path.join(RSS_DIR, save_pdf_filename + "_cleaned.html"),
                   "wb") as savfp:
@@ -344,30 +354,54 @@ def join_consecutive_tags(soup, tagname, add_spaces=False):
        would produce <p class="foo">some text different text</p>
        If add_spaces, will add spaces between tags.
     """
-    to_delete = []
-    paras = list(soup.find_all(tagname))
-    for tag in paras:
-        # Was the previous sibling the same type? Then move children there.
-        sib = tag.find_previous_sibling()
+    to_merge = []
+    tags = list(soup.find_all(tagname))
+    prev = None
+    sectionnum_pat = re.compile('[0-9A-Z]{,2}\.')
+    for tag in tags:
+        prev = tag.find_previous_sibling()
 
-        if sib and sib.name == tagname and sib.attrs == tag.attrs:
-            first = True
-            # Get the list of children first.
+        # If the two tags have the same parent and the same class,
+        # they should be merged.
+        if prev and prev.attrs == tag.attrs:
+            # First merge in the list?
+            if not to_merge:
+                to_merge.append([prev, tag])
+                continue
+
+            else:
+                # Should these be merged with the last merge?
+                last_group = to_merge[-1]
+                last_tag_merged = last_group[-1]
+                prev_sib = prev.find_previous_sibling()
+
+                # SPECIAL CASE FOR LEGISTAR:
+                # Does it look like a section header?
+                # Don't merge a paragraph that looks like "2."
+                # with whatever was before it.
+                if tag.name == 'p' and re.match(sectionnum_pat, tag.text):
+                    continue
+
+                elif (prev == last_tag_merged and
+                      tag.attrs == last_tag_merged.attrs):
+                    # Continue a group merge of three or more tags
+                    last_group.append(tag)
+                else:
+                    # New pair of mergers, make a new group
+                    to_merge.append([prev, tag])
+        prev = tag
+
+    for group in to_merge:
+        first = group[0]
+        for tag in group[1:]:
             # Iterating directly over tag.children gets crossed up
             # when some of the children are moved to another tag.
             children = list(tag.children)
             for child in children:
-                # Add a space before the first element,
-                # so contents are separated from the previous tag
-                if add_spaces and first and isinstance(child, NavigableString):
-                    sib.append(NavigableString(' ' + child))
-                else:
-                     sib.append(child)
-                first = False
-            to_delete.append(tag)
-
-    for tag in to_delete:
-        tag.decompose()
+                first.append(child)
+            # All of tag's children have been moved to first.
+            # Delete tag.
+            tag.decompose()
 
 
 VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
@@ -452,7 +486,7 @@ As of: {gendate}
                 # though there's content in the PDF.
                 pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
                 try:
-                    agenda_html = get_html_agenda_pdftohtml(mtg["Agenda"],
+                    agenda_html = ghtml_agenda_pdftohtml(mtg["Agenda"],
                                                 save_pdf_filename=pdfout)
                 except urllib3.exceptions.ReadTimeoutError:
                     print("Timed out on " + agendaloc)
@@ -706,6 +740,15 @@ def mtgdic_to_cleanname(mtgdic):
 
 
 if __name__ == '__main__':
+    html_bytes = clean_up_htmlfile('/tmp/rawagenda.html')
+    with open('/tmp/agendaclean.html', 'wb') as outfp:
+        outfp.write(html_bytes)
+    sys.exit(0)
+
+
+
+
+
     if len(sys.argv) > 1:
         RSS_URL = sys.argv[1]
         # RSS_URL is a directory and must end with a slash
