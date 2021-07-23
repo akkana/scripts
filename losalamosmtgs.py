@@ -20,6 +20,7 @@ import json
 import re
 import os, sys
 from lxml.html.diff import htmldiff
+from urllib3.exceptions import ReadTimeoutError
 
 
 ########## CONFIGURATION ##############
@@ -486,9 +487,9 @@ As of: {gendate}
                 # though there's content in the PDF.
                 pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
                 try:
-                    agenda_html = ghtml_agenda_pdftohtml(mtg["Agenda"],
+                    agenda_html = html_agenda_pdftohtml(mtg["Agenda"],
                                                 save_pdf_filename=pdfout)
-                except urllib3.exceptions.ReadTimeoutError:
+                except ReadTimeoutError:
                     print("Timed out on " + agendaloc)
                     agenda_html = NO_AGENDA
                     agendastatus = "timeout"
@@ -740,15 +741,6 @@ def mtgdic_to_cleanname(mtgdic):
 
 
 if __name__ == '__main__':
-    html_bytes = clean_up_htmlfile('/tmp/rawagenda.html')
-    with open('/tmp/agendaclean.html', 'wb') as outfp:
-        outfp.write(html_bytes)
-    sys.exit(0)
-
-
-
-
-
     if len(sys.argv) > 1:
         RSS_URL = sys.argv[1]
         # RSS_URL is a directory and must end with a slash
