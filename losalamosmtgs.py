@@ -461,7 +461,7 @@ def write_rss20_file(mtglist):
 <body>
 <h1>Los Alamos County Government Meetings</h1>
 As of: {gendate}
- ... <a href="about.html">About Los Alamos Meetings (How to Use This Page)
+ ... <a href="about.html">About Los Alamos Meetings (How to Use This Page)</a>
  ... <a href="{RSS_URL}index.rss">Los Alamos Meetings RSS2.0 Feed</a>.
 
 """, file=htmlfp)
