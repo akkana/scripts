@@ -73,7 +73,7 @@ def do_file(filename, patname=None):
                 continue
 
             outstr += foot
-            os.rename(filename, os.path.join("/tmp", filename + ".bak"))
+            os.rename(filename, os.path.join(filename + ".bak"))
             with open(filename, "w") as ofp:
                 ofp.write(outstr)
             print("Did", filename)
