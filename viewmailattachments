@@ -29,6 +29,13 @@ from bs4 import BeautifulSoup
 
 ################################################
 # Some prefs:
+
+# If IMAGE_VIEWER is set, a message that has no multipart/related
+# images will use the image viewer rather than a browser window
+# for images. To use a browser, set IMAGE_VIEWER = None.
+IMAGE_VIEWER = "pho"
+# IMAGE_VIEWER = None
+
 USE_WVHTML_FOR_DOC = False
 BROWSER_ARGS = []
 
@@ -41,7 +48,8 @@ UNOCONV_STARTUP_TIME = "14"
 # like Firefox's -private-window -new-instance ?
 BROWSER_FIRST_ARG = []
 
-# What browser to use:
+# What browser to use. Quickbrowse is a little python-qtwebengine script
+# that comes up a lot faster than firefox and may be more anonymous.
 USE_QUICKBROWSE = True
 
 if USE_QUICKBROWSE:
@@ -112,6 +120,7 @@ def view_message_attachments(fp, tmpdir):
     subparts = []
     htmlfiles = []
     htmlparts = []
+    imgparts = []
 
     def tmp_file_name(part):
         partfile = part.get_filename()
@@ -152,11 +161,17 @@ def view_message_attachments(fp, tmpdir):
     # Walk through the message a first, preliminary time
     # to separate out any images that might be referred to by
     # an HTML part.
+    # At the same time, check whether there are image parts
+    # but no multipart/related. If so, maybe using an image viewer
+    # would be better than a browser window.
     for part in msg.walk():
         # walk() includes the top-level message
         if part == msg:
             # print "  Skipping the top-level message"
             continue
+
+        if part.get_content_maintype() == "image":
+            imgparts.append(part)
 
         if part.get_content_type() != "multipart/related":
             continue
@@ -202,6 +217,13 @@ def view_message_attachments(fp, tmpdir):
     # print "Subfiles:"
     # for sf in subfiles:
     #     print sf
+
+    # Were there image parts but no subfiles? Use an image viewer.
+    if IMAGE_VIEWER and imgparts and not subfiles:
+        imgfilenames = []
+        for part in imgparts:
+            imgfilenames.append(save_tmp_file(part))
+        mysubprocess.call([IMAGE_VIEWER, *imgfilenames])
 
     # Call up the browser window right away,
     # so the user can see something is happening.
@@ -364,7 +386,10 @@ def view_message_attachments(fp, tmpdir):
             except:
                 print("Couldn't run unrtf for RTF part")
 
-        elif part.get_content_maintype() == "image" and part not in subparts:
+        # If it's an image, display it in the browser unless it
+        # was already displayed by IMAGE_VIEWER.
+        elif part.get_content_maintype() == "image" and part not in subparts \
+             and (not IMAGE_VIEWER or part not in imgparts):
             partfile = save_tmp_file(part)
             htmlfiles.append(partfile)
 
