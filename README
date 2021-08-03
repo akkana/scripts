@@ -11,13 +11,13 @@ Subdirectories:
 astro:
     Astronomy-related scripts
 
+ebooks:
+    Module of utilities useful with EPUB ebooks and Kobo ebook readers.
+
 gimpdev:
     Helper scripts for working on the development version of GIMP.
 
 [jsjupiter moved to my webapps repository]
-
-kobo:
-    Module of utilities useful with Kobo ebook readers.
 
 mapping:
     Scripts related to mapping / GIS.
@@ -94,7 +94,8 @@ cairodrawwin.py:
     You can import and subclass it, or use it as a template.
 
 cellaut.py:
-    Simple cellular automata simulation in Python. Slow.
+    Simple cellular automata simulation in Python.
+    Slow, not something you'd want for real simulations.
 
 censusdata.py
     Functions to help in parsing US decadal census data.
@@ -118,7 +119,9 @@ colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
 
 countsyl:
-    Count likely syllables in words, giving best guess and likely max.
+    Experiments in counting likely syllables in words, giving best guess
+    and likely max. Not particularly reliable, but I haven't found a
+    better way.
 
 covid-timeseries.py:
     Plot COVID data from the Corona Data Scraper.
@@ -127,6 +130,7 @@ covid-timeseries.py:
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
+    Useful for writing procmail rules that handle nonascii charsets.
 
 delaytest.cgi:
     A CGI script in Python that spits out some text slowly, with delays.
@@ -153,12 +157,6 @@ docx2html, doc2html have been replaced by word2html.
 eggtimer:
     Pop up a reminder window in a specified number of minutes.
 
-epubtag.py:
-    Display author, title and tag information for ebooks in epub format;
-    or add or modify an ebook's topic tags, title or cover.
-    Can be imported as a module (there are examples in the kobo/ directory
-    and in fixbookcover).
-
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
     did it occur between two given dates?
@@ -176,10 +174,6 @@ fix_agenda.py:
     viewed in a web browser? That's what this script is for.
     Requires word2html (in this git repo), python-mammoth, unoconv
     (a part of Libre Office), and BeautifulSoup.
-
-fixbookcover:
-    Fix books whose cover doesn't include the title, like many
-    Project Gutenberg books.
 
 fontasia:
     A Linux font chooser and categorizer.
@@ -203,14 +197,6 @@ gquickbrowse:
     python2-webkit-GTK, now orphaned and no longer available on newer
     releases. If you don't pass an argument but there's anything in
     the X selection when you run it, it will use that as initial argument.
-
-grebook.sh:
-    A shell script adapted from one by mosh on Stack Exchange
-    to grep in un-DRMed epub (and presumably also mobi) ebooks.
-
-grebook.py:
-    A Python version of grebook, mainly useful to show how to implement
-    a multi-stage command pipeline in Python.
 
 headerfooter.py:
     Take standalone HTML files and add customized headers and footers
