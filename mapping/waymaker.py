@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 
-# Take a file and of descriptions, multi-line and separated by blank lines,
-# and turn it into a collection of GPX waypoints
+# Take a file of descriptions, multi-line and separated by blank lines,
+# 
 # suitable for import into Osmand, PyTopo or other mapping programs.
 # Copyright 2013 by Akkana Peck <akkana@shallowsky.com>.
 # Please share and enjoy under the GPL v2 or later.
+
+"""waymaker: take a file of names and descriptions
+   and turn it into a collection of GPX waypoints.
+
+   file format:
+
+street address
+city, state zip
+comments comments
+more comments
+
+street address
+city, state zip
+still more comments
+"""
 
 import sys, os
 import re
@@ -195,6 +210,7 @@ def read_description_file(filename):
             # So instead, use a local version:
             lat, lon = geocode(addr)
             if not lat:
+                print("Can't geocode", addr)
                 cur_ent = []
                 continue
 
