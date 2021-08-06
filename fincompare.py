@@ -1,5 +1,27 @@
 #!/usr/bin/env python3
 
+'''
+Rewrite this to use plotly:
+https://plotly.com/python/time-series/
+
+import plotly.express as px
+
+df = px.data.stocks()
+fig = px.line(df, x='date', y="GOOG")
+fig.show()
+
+Or plotly plus pandas:
+https://plotly.com/python/plot-data-from-csv/
+
+import pandas as pd
+import plotly.express as px
+
+df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/2014_apple_stock.csv')
+
+fig = px.line(df, x = 'AAPL_x', y = 'AAPL_y', title='Apple Share Prices over time (2014)')
+fig.show()
+'''
+
 # Graph a bunch of financial assets (stocks or mutual funds)
 # specified on the commandline by ticker symbols.
 # (Downloads data from Yahoo finance.)
