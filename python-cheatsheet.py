@@ -16,7 +16,11 @@
 # modulename isn't quoted, and is the name you're using
 # e.g. if import modulename as mn, then imp.reload(mn)
 
-# Python 3.2 or later:
+# Python 3.4 and later:
+import importlib
+importlib.reload(modulename)
+
+# Python 3.2 - 3.3:
 import imp
 imp.reload(modulename)
 
@@ -29,6 +33,7 @@ reload(modulename)
 
 # Show methods in an object
 dir(obj)
+
 # Does a function exist in an object?
 if hasattr(obj, 'attr_name'):
 if 'attr_name' in dir(obj):
@@ -175,7 +180,7 @@ python -c "$(printf %b 'import sys\nfor r in range(10): print("%d:" % r)')"
 # Debugging and stack traces
 ########################################################
 
-# Dump into the debugger:
+# Dump into the debugger (in 3.7 and later):
 breakpoint()
 
 # Print a stack trace -- how did we get here?
@@ -365,7 +370,7 @@ if hasattr(__builtins__, 'raw_input'):
     input = raw_input
 
 #############################
-# All the ways of formatting numbers.
+# ways of formatting numbers.
 # https://docs.python.org/3/tutorial/inputoutput.html
 # For pre-2.6, see https://stackoverflow.com/a/2962966
 
@@ -376,21 +381,9 @@ filename = 'file' + str(num) + '.txt'
 filename = 'file%s.txt' % num
 
 #############################
-# Formatted string literals, Python 3.6+
+# Formatted string literals or f-strings, Python 3.6+
 print(f'Fly to {name}: {lat}N {lon}E')
 print(f'The value of pi is approximately {math.pi:.3f}.')
-
-# str and repr in formatted string literals
->>> animals = 'eels'
->>> print(f'My hovercraft is full of {animals!s}.')  # applies str() (default)
-My hovercraft is full of eels.
->>> print(f'My hovercraft is full of {animals!r}.')  # applies repr()
-My hovercraft is full of 'eels'.
-
-# More formatted string literals tricks:
-# Escaping braces
->>> f"{{74}}"
-'{74}'
 
 # decimals and field widths
 >>> f'{math.pi:.2f}'
@@ -408,6 +401,18 @@ My hovercraft is full of 'eels'.
 >>> f'{123:^10d}'
 '   123    '
 
+# str and repr in formatted string literals
+>>> animals = 'eels'
+>>> print(f'My hovercraft is full of {animals!s}.')  # applies str() (default)
+My hovercraft is full of eels.
+>>> print(f'My hovercraft is full of {animals!r}.')  # applies repr()
+My hovercraft is full of 'eels'.
+
+# More formatted string literals tricks:
+# Escaping braces
+>>> f"{{74}}"
+'{74}'
+
 # Other bases
 >>> f'{255:x}'
 'ff'
@@ -420,15 +425,25 @@ My hovercraft is full of 'eels'.
 >>> f'{1234567:,}'
 '1,234,567'
 
-
-# Python 3.8+:
+# Python 3.8+: shorthand for debugging
 # https://stribny.name/blog/2019/06/debugging-python-programs
 # https://realpython.com/python38-new-features/
 >>> print(f"{i=}, {word=}")
 i=42, word=everything
 
+##### end f-strings
+
 # Justification:
-print(repr(x).rjust(4))
+>>> x = 'ab'
+>>> print(repr(x).rjust(10))
+      'ab'
+>>> print("%10s" % x)
+        ab
+>>> print("%-10s" % x)
+ab        
+>>> print(str(x).rjust(10))
+        ab
+
 
 # Older, pre-3.6 Pythons can use format():
 filename = 'file{0}.txt'.format(num)
@@ -1758,6 +1773,20 @@ def bbb():
 
 
 ################################################################
+# Walrus operator
+################################################################
+
+if (n := len(a)) > 10:
+    print(f"List is too long ({n} elements, expected <= 10)")
+
+# Loop over fixed length blocks
+while (block := f.read(256)) != '':
+    process(block)
+
+[clean_name.title() for name in names
+ if (clean_name := normalize('NFC', name)) in allowed_names]
+
+################################################################
 # Type hinting
 ################################################################
 
@@ -1863,11 +1892,12 @@ pip install .
 Test and make sure it works.
 
 Generate a dist:
+python3 setup.py clean
 python3 setup.py sdist bdist_wheel
     (should generate two files in dist/)
 
 Upload to Test PyPI
-  First disable keyring if you don't use Kwallet:
+  First disable keyring (only need once) if you don't use Kwallet:
 keyring disable
   per https://twine.readthedocs.io/en/latest/#disabling-keyring
   then:
@@ -1911,3 +1941,10 @@ https://realpython.com/python-concurrency/
 https://realpython.com/python-lambda
 https://realpython.com/documenting-python-code/#docstrings-background
 '''
+
+################################################################
+# New stuff in specific Python versions
+################################################################
+
+# https://nedbatchelder.com/blog/202105/whats_in_which_python_3739.html
+# https://python.plainenglish.io/killer-features-by-python-version-c84ca12dba8?gi=ee54e7167a55
