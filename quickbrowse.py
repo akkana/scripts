@@ -15,7 +15,7 @@ import argparse
 import tempfile
 import shutil
 
-from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
+from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
      QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
@@ -262,6 +262,7 @@ class BrowserView(QWebEngineView):
 
     def unzoom(self, factor=.8):
         self.zoom(factor)
+
 
 class BrowserPage(QWebEnginePage):
     def __init__(self, profile, browser_view, browser_window):
@@ -576,6 +577,7 @@ class BrowserWindow(QMainWindow):
             webview.loadFinished.connect(webview.load_finished)
             webview.loadProgress.connect(webview.load_progress)
             webpage.linkHovered.connect(webview.link_hover)
+            webpage.profile().downloadRequested.connect(self.downloadRequested)
 
         return webview
 
@@ -701,6 +703,11 @@ class BrowserWindow(QMainWindow):
         # TODO: To enable/disable buttons, check e.g.
         # self.webview.page().action(QWebEnginePage.Back).isEnabled())
         pass
+
+    def downloadRequested(self, item): # QWebEngineDownloadItem
+        print('downloading to', item.path())
+        self.statusBar().showMessage("Downloading to " + item.path())
+        item.accept()
 
     #
     # Slots
