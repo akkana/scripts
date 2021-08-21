@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Decode unicode characters, given as arguments;
+# or search for unicode characters matching given patterns.
+
 import unicodedata
 import sys
 import re
