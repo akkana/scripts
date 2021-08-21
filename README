@@ -511,6 +511,9 @@ tweet:
     Play birdsong from a specific bird. Requires ripped tracks from a
     bird song CD: for example, the Stokes, Cornell or Peterson collections.
 
+unidecode.py:
+    Print the codepoints and names for unicode characters.
+
 urldownloader.py:
     Maintain a queue of URLs to download asynchronously to local files.
 
