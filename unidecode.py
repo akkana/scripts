@@ -14,7 +14,15 @@ MAXUNI = 0x10FFFF
 
 
 def decode_char(c):
-    print("%2c  U+%-7X %s" % (c, ord(c), unicodedata.name(c)))
+    # c is a character. Try to get the UTF equivalent.
+    try:
+        utfbytes = c.encode("utf-8")
+        utfstr = ' '.join([ "%2x" % b for b in utfbytes ])
+    except:
+        utfstr = ""
+
+    print("%2c  U+%-7X %-30s UTF-8: %s" % (c, ord(c), unicodedata.name(c),
+                                           utfstr))
 
 
 def unisearch(patlist):
