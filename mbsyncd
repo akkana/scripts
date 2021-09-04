@@ -15,12 +15,15 @@ import time
 import subprocess
 import os, sys
 
+
 # Change this to whereever you want the log:
-logfile = "~/.mutt/mbsync.log"
+logfile = os.path.expanduser("~/.mutt/mbsync.log")
+
 
 def Usage():
     print("Usage: %s [seconds]" % os.path.basename(sys.argv[0]))
     sys.exit(1)
+
 
 if __name__ == '__main__':
     if len(sys.argv) > 2:
@@ -34,11 +37,37 @@ if __name__ == '__main__':
     else:
         secs = 120
 
+    # Is an mbsync or mbsyncd process already running?
+    # Running two at once would be bad.
+    PROCDIR = '/proc'
+    for proc in os.listdir(PROCDIR):
+        if not proc[0].isdigit():
+            continue
+
+        # Is it the current process? Obviously that doesn't count.
+        if int(proc) == os.getpid():
+            continue
+
+        # Race condition: processes can come and go, so we may not be
+        # able to open something just because it was there when we
+        # did the listdir.
+        try:
+            with open(os.path.join(PROCDIR, proc, 'cmdline')) as procfp:
+                procline = procfp.readline()
+                if "mbsync" in procline:
+                    print("There's already an mbsync running, pid %s: %s"
+                          % (proc, ' '.join(procline.split('\0'))))
+                    sys.exit(1)
+        except Exception as e:
+            print("Exception", e)
+            pass
+
+    # Fork and run in the background.
     rc = os.fork()
     if rc:
         sys.exit(0)
 
-    logfp = open(os.path.expanduser(logfile), 'w')
+    logfp = open(logfile, 'w')
     print("mbsync daemon, ouput to %s" % logfile)
 
     while True:
