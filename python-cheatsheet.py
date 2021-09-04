@@ -453,6 +453,17 @@ filename = 'file%(num)s.txt' % locals()  # Neat trick
 # Using string.Template:
 filename = string.Template('file${num}.txt').substitute(locals()))
 
+##### Unicode code points, names etc.
+
+# Print by name
+print(u'\N{snowman}'))
+
+import unicodedata
+print(unicodedata.name('\u03b1'))
+
+# See also unidecode.py, e.g. for how to search in names.
+
+
 ############################
 # Frustrations at exceptions when printing,
 # when Python (even Python 3) wants to convert to ascii rather than
@@ -1038,20 +1049,33 @@ while True:
 # Chain a multi-command pipeline:
 p1 = subprocess.Popen([args1],
                       shell=False, stdout=subprocess.PIPE)
-
 p2 = subprocess.Popen([args2],
                       shell=False, stdin=p1.stdout, stdout=subprocess.PIPE)
 p1.stdout.close()
-
 p3 = subprocess.Popen([args3],
                       shell=False, stdin=p2.stdout, stdout=subprocess.PIPE)
 p2.stdout.close()
-
 p4 = subprocess.Popen([args4].
                       shell=False, stdin=p3.stdout, stdout=subprocess.PIPE)
 p3.stdout.close()
-
 output = p4.communicate()[0]
+
+#
+# Exclusive mode: run only one instance of a process
+#
+# Method 1: loop over pids in /proc, looking for a matching name.
+#           see find_proc_by_name() in quickbrowse.py
+# Method 2: use file locking.
+#           The filelock module doesn't actually lock, so instead,
+#           use fcntl.lockf(f, fcntl.LOCK_EX|fcntl.LOCK_NB)
+#           see https://stackoverflow.com/a/46407326
+#           LOCK_NB means anyone else trying to open the file will raise
+#           BlockingIOError: [Errno 11] Resource temporarily unavailable;
+#           if it's omitted, anyone trying to open the file will block.
+#           This is a mess, though. You can't call fcntl.lockf until
+#           you've already opened the file, so if you're on a filesystem
+#           where file-locking doesn't work, opening it in write mode
+#           will zero it out.
 
 ########################################################
 # Threading and multiprocessing
