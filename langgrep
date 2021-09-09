@@ -7,16 +7,22 @@
 # Please share, modify and enjoy under the terms of the GPL v2
 # or, at your option, any later GPL version.
 #
-# Bugs: it isn't smart about parsing the grep flags.
+# Bugs/To Do:
+# 1. it isn't smart about parsing the grep flags.
 # Anything beginning with a - will be considered a flag
 # and passed on to grep; the first argument not starting with -
 # is taken to be the search pattern, and everything after that
 # is the file list.
 #
+# 2. If you have files in two directories in the search path,
+# e.g. ~/bin/word2html -> ~/src/scripts/word2html.py,
+# you'll see results twice. It should check for symlinks and
+# omit anything that links to another directory in the search path.
 
 import string, os, sys
 import subprocess
 import shlex
+from pathlib import Path
 
 
 # Use XDG for the config and cache directories if it's available:
@@ -185,6 +191,26 @@ def langgrep(lang, pattern, grepargs, fil, flags):
         print(s)
 
 
+def is_link_to_dirs(filepath, alldirs):
+    """Is filepath a symbolic link to anything inside any of the
+       directories in alldirs?
+    """
+    p = Path(filepath)
+
+    # Is it a symlink? There must be a better way to check this
+    # than statting twice.
+    if p.stat().st_ino == p.lstat().st_ino:
+        return False
+
+    # It is a symlink. Does it link to any of the given directories?
+    parentdir = str(p.parent)
+    for d in alldirs:
+        if d == parentdir:
+            # print("Skipping symlink", filepath)
+            return True
+    return False
+
+
 def parse_args():
     """Usage: langgrep lang [grepflags] pattern files
        Returns: (lang, pattern, grepargs, files)
@@ -229,13 +255,14 @@ if __name__ == '__main__':
         lang, pattern, grepargs, files, flags = parse_args()
 
         if not files:
-            for filepath in find_files_in_dir(lang,
-                                          os.path.join(os.getenv("HOME"),
-                                                       "bin")):
-                langgrep(lang, pattern, grepargs, filepath, flags)
+            alldirs = extra_dirs_by_lang(lang)
+            # ~/bin goes last, because it's most likely to contain symlinks
+            alldirs.append(os.path.join(os.getenv("HOME"), "bin"))
 
-            for d in extra_dirs_by_lang(lang):
+            for d in alldirs:
                 for filepath in find_files_in_dir(lang, d):
+                    if is_link_to_dirs(filepath, alldirs):
+                        continue
                     langgrep(lang, pattern, grepargs, filepath, flags)
 
         # print("files:", '\n'.join(files))
