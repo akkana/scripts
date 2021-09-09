@@ -1967,6 +1967,19 @@ https://realpython.com/documenting-python-code/#docstrings-background
 '''
 
 ################################################################
+# pdb, Python debugging
+################################################################
+# Debug on ctrl-C:
+
+def debug_signal_handler(signal, frame):
+    import pdb
+    pdb.set_trace()
+import signal
+signal.signal(signal.SIGINT, debug_signal_handler)
+
+
+
+################################################################
 # New stuff in specific Python versions
 ################################################################
 
