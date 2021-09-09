@@ -27,8 +27,6 @@ import html
 import datetime
 import time
 
-# import googlemaps   # need this for exceptions
-# from googlemaps import GoogleMaps
 import urllib.request, urllib.parse, urllib.error, json
 
 def write_gpx_file(entries, filename, omit_address=False, omit_time=False):
@@ -92,6 +90,10 @@ xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/
 #
 # Google Maps here used to offer a geocoding API, but it became
 # increasingly restrictive and then stopped working entirely.
+#
+# Two other options not yet included here:
+# Geocoder: https://geocoder.readthedocs.io/
+# GeoPy:    https://geopy.readthedocs.io/en/latest/#geocodeearth
 #
 
 def geocode(addr):
