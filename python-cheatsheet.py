@@ -1162,6 +1162,10 @@ del body["style"]
 # Join consecutive similar tags:
 # see join_consecutive_tags() in losalamosmeetings.py.
 
+# Change a title -- doesn't seem to be documented anywhere
+if not soup.title.string:
+    soup.title.string = "Document Title"
+
 
 ########################################################
 # Networking and Requests
