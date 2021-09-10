@@ -60,6 +60,19 @@ def fix_agenda(agenda_infile):
         print("Infile name should be a in a directory named 'orig'")
         sys.exit(1)
 
+    # The title comes out as /full/path/to/filename.html
+    # How to change a title is completely undocumented,
+    # but it turns out to be title.string.
+    title = soup.title.string
+    if '/' in title:
+        title = os.path.basename(title)
+        soup.title.string = title
+
+    # Convert any existing links to be target="_blank"
+    for link in soup.find_all("a"):
+        if link.attrs["href"] and not link.attrs["href"].startswith("#"):
+            link.attrs["target"] = "_blank"
+
     origfiles = os.listdir(origdir)
     origbases = [ os.path.splitext(f)[0] for f in origfiles ]
     if not os.path.exists(htmldir):
@@ -217,7 +230,7 @@ def fix_agenda(agenda_infile):
     # Add a link to the zip file in the agenda:
     tag = soup.new_tag("hr")
     soup.body.append(tag)
-    tag = soup.new_tag("a", href=zipfile, target="_blank")
+    tag = soup.new_tag("a", href=zipfile)
     tag.string = "Zip file of everything"
     soup.body.append(tag)
 
@@ -239,7 +252,7 @@ def fix_agenda(agenda_infile):
             print("    ", f)
 
     if cantconvert:
-        print("\nCan't convert:")
+        print("\nLeft untouched:")
         for f in cantconvert:
             print("    ", f)
 
