@@ -4,6 +4,9 @@
 # Vote411/lwv.thevoterguide.org, and format it appropriately
 # for a printed voter guide.
 
+# Requires the docx module: pip install python-docx, not pip install docx
+# which is a different module.
+
 import csv
 import docx
 import html2text
@@ -172,7 +175,7 @@ class DocxFormatter:
     FONT_NAME = "Times New Roman"
     BASE_SIZE = 12
     TITLE_SIZE = 16
-    NAME_SIZE = 14
+    NAME_SIZE = 16
     QUESTION_SIZE = 14
 
     def __init__(self):
@@ -182,8 +185,10 @@ class DocxFormatter:
         # Diane says she just uses normal text and changes the size
         # and boldness, but I can't help but think that using actual
         # headers would make it easier for the newspaper to convert
-        # it to HTML for their website. Make it optional:
-        self.use_headings = True
+        # it to HTML for their website.
+        # People liked the headings in 2020 but don't like them in 2021.
+        # Make it optional:
+        self.use_headings = False
 
         font = self.doc.styles['Normal'].font
         font.name = self.FONT_NAME
@@ -197,26 +202,29 @@ class DocxFormatter:
 
         else:
             self.para = self.doc.add_paragraph('')
-            run = self.para.add_run(office + '\n')
+            run = self.para.add_run(office + '\n\n')
             run.bold = True
             run.font.size = docx.shared.Pt(self.TITLE_SIZE)
             run = self.para.add_run(description)
+            self.para = None
 
     def add_name_and_party(self, name, party):
         if self.use_headings:
             heading = self.doc.add_heading(name, 2)
             self.set_heading_style(heading, self.NAME_SIZE)
-            self.doc.add_paragraph(party)
+            if party:
+                self.doc.add_paragraph(party)
 
         else:
-            if not self.para:
-                self.para = self.doc.add_paragraph('')
-            run = self.para.add_run('\n' + name + '\n')
+            self.para = self.doc.add_paragraph('')
+            # In 2020 people wanted extra lines; in 2021 they don't.
+            # run = self.para.add_run('\n' + name + '\n')
+            run = self.para.add_run(name)
+            run.font.size = docx.shared.Pt(self.NAME_SIZE)
             run.bold = True
             if party:
-                run.font.size = docx.shared.Pt(self.NAME_SIZE)
                 run = self.para.add_run(party)
-            run.font.size = docx.shared.Pt(self.BASE_SIZE)
+            # run.font.size = docx.shared.Pt(self.BASE_SIZE)
 
     def add_q_and_a(self, question, answer):
         self.para = self.doc.add_paragraph('')
@@ -457,12 +465,12 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
                     print(num_for_office, "running for", cur_office)
                     num_for_office = 0
                 cur_office = candidate.office
+                # Previously did a .replace('NM', 'N.M.') on next two ops
+                # but that breaks UNM
                 print_office = candidate.office \
-                                      .replace('NM', 'N.M.') \
-                                      .replace('DISTRICT', 'District')
+                                        .replace('DISTRICT', 'District')
                 desc = html_converter.handle(row[desc_i]) \
-                                     .strip() \
-                                     .replace('NM', 'N.M.')
+                                     .strip()
                 formatter.add_office(print_office,
                                      race_descriptions[candidate.office])
             num_for_office += 1
