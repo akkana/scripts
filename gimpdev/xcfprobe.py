@@ -8,6 +8,8 @@
 # https://gitlab.gnome.org/GNOME/gimp/-/blob/gimp-2-10/app/xcf/xcf-private.h
 # which you'll need if you want to expand this beyond just layer names
 # and visibility.
+# The XCF spec is at
+#   https://gitlab.gnome.org/GNOME/gimp/-/blob/gimp-2-10/devel-docs/xcf.txt
 #
 # This is a simple demo that only works with some XCF versions.
 
@@ -47,8 +49,11 @@ def probe_xcf(filename):
             saved_pos = f.tell()
             f.seek(next_layer_offset + 12, 0)
 
-            tmp = int.from_bytes(f.read(4), "big")
-            name = f.read(tmp).decode("utf-8")
+            namelen = int.from_bytes(f.read(4), "big")
+            # namelen may include a null terminating character,
+            # (see line L226 of the XCF spec)
+            # which Python doesn't use, so strip it off:
+            name = f.read(namelen).decode("utf-8").replace('\0', '')
             print('\nLayer "%s"' % name, end='')
 
             while True:
