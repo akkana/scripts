@@ -1279,6 +1279,42 @@ else:
     print("Run locally")
 
 
+###########################################################
+# "else" for loops
+###########################################################
+
+"""
+Why I'm always confused by "else" clauses and they never
+seem to do what I want:
+
+> else clauses have almost exactly opposite effects.
+>
+> while...else...
+>
+> executes the else if the body of the loop does NOT get executed.
+>
+> for...else...
+>
+> executes the else iff ALL iterations of the for loop DO complete.
+>
+>         -- Alan Gauld via Python-list
+
+MRAB disagrees:
+> In both cases, it executes the 'else' part if it didn't break out of the loop.
+> That's it.
+>
+> If all of the iterations completed, then there was no break, so the 'else'
+> part is executed.
+>
+> If there were no iterations, then there was no break, so the 'else' part is
+> executed.
+>
+> It's the same for both of them.
+
+
+"""
+
+
 ########################################################
 # unittest
 ########################################################
@@ -1834,13 +1870,32 @@ PySonar: a type inferencer and indexer
 '''
 
 ################################################################
-# pip hints
+# pip tios
 ################################################################
 
 '''
+List all packages installed with pip:
+    pip list -l
+
+Related but less helpful commands, which include system packages:
+    pip list
+includes the version of every package.
+    pip freeze
+doesn't include versions.
+pip list includes a few more packages than pip freeze
+
+    pip list --user
+does something else, creating a very short but not very useful list.
+
+pip show <packagename>
+shows info about a package.
+
 Pip reinstall:
     pip install -I
 --force-reinstall isn't enough, you need --upgrade which is -I
+
+There is no reliable way to upgrade all packages, a la apt upgrade.
+Here are various hacks and partial solutions people have come up with.
 
 List outdated packages:
 pip list --outdated
