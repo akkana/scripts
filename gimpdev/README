@@ -1,4 +1,5 @@
-Helpers for working on development versions of GIMP:
+Helpers for working on development versions of GIMP,
+or for working with GIMP files and formats.
 
 buildgimp:
     Shell script for GIMP's ridiculously complicated build.
@@ -9,4 +10,9 @@ gimprun:
 
 gimpapidocs:
     Generate HTML documentation from GIMP .gir files.
+
+xcfprobe.py:
+    Print the layers in an XCF image.
+    Mostly useful as a proof of concept of analyzing (some versions of)
+    XCF from a non-GIMP Python script.
 
