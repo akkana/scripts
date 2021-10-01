@@ -549,8 +549,13 @@ weborphans:
     Check a web site (perhaps localhost) against a local mirror,
     checking for broken links and orphaned files.
 
+wikifollow.py:
+    Starting with any Wikipedia page, follow the first real link
+    on each successive page until it arrives at a target endpoing.
+    The theory is that everything always ends in "Philosophy".
+
 wikitable.py:
-    Parse a data table from a wikipedia page, outputting CSV.
+    Parse a data table from a Wikipedia page, outputting CSV.
 
 word2html.py:
     Convert .docx or .doc to prettyprinted HTML.
