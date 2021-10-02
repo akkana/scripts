@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+# From a game described by Mark Galassi at an NMGLUG meeting:
+# Starting at any Wikipedia page, click on the first real link
+# (not disambiguation, See Also, sidebars, images etc.).
+# Then do the same to the next page. The theory is that no matter
+# where you start, you'll end up at Philosophy.
+# I haven't found any exceptions to this so far.
+#
+# Copyright 2021 by Akkana Peck: Share and enjoy under the GPLv2 or later.
+
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from collections import OrderedDict
