@@ -2,6 +2,7 @@
 
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from collections import OrderedDict
 import requests
 import sys, os
 
@@ -32,7 +33,7 @@ def firstlink(pageurl):
         if href.startswith("#"):
             continue
         # Don't count disambiguation links
-        if "disambiguation" in href:
+        if "disambiguation" in href.lower():
             continue
 
         # Not interested unless the link is to another wikipedia article
@@ -87,9 +88,9 @@ def follow_links(term, terminator, interactive=False):
        and then continue to follow the first link of each subsequent page
        until finally arriving at the expected terminator page.
        The theory is that the chain always gets to "Philosophy".
-       Return a list of triples: (term, absurl, link_text)
+       Return an OrderedDict { absurl: (term, link_text) }
     """
-    linklist = []
+    linkdic = OrderedDict()
     link = wikibase + 'wiki/' + term
     hops = 0
     text = term
@@ -99,17 +100,31 @@ def follow_links(term, terminator, interactive=False):
             sys.stdout.flush()
 
         if os.path.basename(link) == terminator:
-            return linklist
+            return linkdic
         hops += 1
         link, term, text = firstlink(link)
-        linklist.append((link, term, text))
+        if link in linkdic:
+            if interactive:
+                print("LOOP DETECTED!")
+            linkdic[link] = (term, text)
+            return
+        linkdic[link] = (term, text)
 
 
 if __name__ == '__main__':
     try:
         for term in sys.argv[1:]:
-            linklist = follow_links(term.replace(' ', '_'), "Philosophy",
-                                    interactive=True)
+            linkdic = follow_links(term.replace(' ', '_'), "Philosophy",
+                                   interactive=True)
+            # This would print out basically the same thing that
+            # follow_links(interactive=True) already printed;
+            # it's just here to show how to access the results.
+            # For interactive use, it's more useful to print the
+            # results as they come in, in case of problems like
+            # an undetected infinite loop.
+            # print("====", term)
+            # for hops, l in enumerate(linkdic):
+            #     print("%3d %-23s %s" % (hops, linkdic[l][1], l))
 
     except KeyboardInterrupt:
         print("Interrupt")
