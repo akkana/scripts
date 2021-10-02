@@ -32,8 +32,9 @@ def firstlink(pageurl):
         href = link.get("href")
         if href.startswith("#"):
             continue
-        # Don't count disambiguation links
-        if "disambiguation" in href.lower():
+        # Don't count disambiguation links or media
+        lhref = href.lower()
+        if "disambiguation" in lhref or "file:" in lhref:
             continue
 
         # Not interested unless the link is to another wikipedia article
