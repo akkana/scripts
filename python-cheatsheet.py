@@ -20,6 +20,10 @@
 import importlib
 importlib.reload(modulename)
 
+# importlib is also useful for importing a module named by a variable, e.g.
+modname = 'requests'
+importlib.import_module(modname)
+
 # Python 3.2 - 3.3:
 import imp
 imp.reload(modulename)
@@ -303,6 +307,21 @@ re.search('[0-9]+\..*[A-Z]+', teststr, flags=re.DOTALL)
 # re.MULTILINE controls whether ^ and $ match line beginnings
 # and ends in the pattern, but doesn't affect whether the
 # search can cross newlines.
+
+# Transliteration:
+# https://docs.python.org/3/library/stdtypes.html#str.maketrans
+abc = "abc"
+abc.translate(abc.maketrans("abc", "def"))
+#  If there is a third argument, it must be a string, whose characters
+# will be mapped to None in the result.
+# You can also pass it a dictionary, but the keys are int, not str.
+abc.translate({ord('a'): 'A', ord('b'): None})
+# But you can dispense with the ord()s if you call maketrans:
+abc.translate(abc.maketrans({'a': 'A', 'b': None}))
+# There doesn't seem to be any simple equivalent to perl y/A-Z/a-z/
+# -- you can set up ranges with lambdas or comprehensions
+# but it gets hairy quickly.
+
 
 ################################################################
 # Python3-specific stringy stuff
@@ -1059,6 +1078,8 @@ p4 = subprocess.Popen([args4].
                       shell=False, stdin=p3.stdout, stdout=subprocess.PIPE)
 p3.stdout.close()
 output = p4.communicate()[0]
+# communicate() runs the command, reads all output and waits for it to finish
+# (it can also take a timeout).
 
 #
 # Exclusive mode: run only one instance of a process
@@ -1131,10 +1152,6 @@ Difference between .string and .text:
 
 Useful recent additions: tag.replace_with_children()
 
-Use decompose() rather than extract():
-tag.extract() removes a tag from the tree and returns it.
-tag.decompose() removes it from the  tree and deletes it and its contents.
-
 Whitespace:
 tag.find_next_sibling() and find_previous_sibling() will skip over
 intervening NavigableString whitespace, whereas tag.next_sibling
@@ -1145,6 +1162,12 @@ and tag.previous_sibling will return the whitespace.
 for t in soup.findAll(style=True)
 # Harder way, using lambda:
 soup.findAll(lambda tag: 'style' in tag.attrs)
+
+# Remove a tag and its children.
+tag.decompose()
+# Use decompose() rather than extract():
+# tag.extract() removes a tag from the tree and returns it.
+# tag.decompose() removes it from the  tree and deletes it and its contents.
 
 # Remove a tag but keep what's inside it:
 for tag in invalid_tags:
@@ -1170,6 +1193,11 @@ if not soup.title.string:
 ########################################################
 # Networking and Requests
 ########################################################
+
+# Basic requests use
+r = requests.get(url)
+# Now you have r.status_code, r.text, r.content (bytes),
+# r.json(), json.loads(r.text)
 
 # To handle cookies with requests, ignore the Requests documentation
 # that says to use a RequestCookieJar: that's apparently only for
@@ -1837,7 +1865,7 @@ def bbb():
 
 
 ################################################################
-# Walrus operator
+# Walrus operator (3.8 and up)
 ################################################################
 
 if (n := len(a)) > 10:
