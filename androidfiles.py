@@ -59,7 +59,7 @@ def strip_schema(path):
     if path.startswith("androidsd:"):
         sdcards = find_sdcards()
         if not sdcards:
-            raise RuntimeError("Can't access Android device")
+            raise RuntimeError("Can't find an Android SD card")
         return '/storage/' + sdcards[0] + '/' + path[10:]
 
     return path
@@ -654,6 +654,44 @@ def sync(src, dst, dryrun=True):
     make_sync_changes(newdirs, moves, removes, updates, dryrun=False)
 
 
+def read_config_file():
+    configpath = os.path.expanduser("~/.config/androidfiles.conf")
+    pathdict = {}
+    if os.path.exists(configpath):
+        with open(configpath) as fp:
+            for line in fp:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    key, path = (val.strip()
+                                 for val in line.split(':', maxsplit=1))
+                    pathdict[key] = path
+                except:
+                    print("Can't parse line in config file:", line,
+                          file=sys.stderr)
+                    continue
+    return pathdict
+
+
+def to_singleslash(s):
+    """Change any instances of multiple slashes to single ones"""
+    return re.sub('//*', '/', s)
+
+
+def expandpath(path, pathdict):
+    """Expand a path by substituting any instances from the config file.
+       E.g. droid:osmand/whiterock/canyonrim.gpx ->
+              android:/.../net.osmand.plus/files/tracks/whiterock/
+    """
+    if ':' not in path:
+        return path
+    key, pathval = (val.strip() for val in path.split(':'))
+    if key.lower() == "android" or key.lower() == "androidsd":
+        return path
+    return to_singleslash(pathdict[key] + '/' + pathval)
+
+
 def Usage():
     progname = os.path.basename(sys.argv[0])
     return ("""%s: list or sync directories with Android over adb.
@@ -666,6 +704,7 @@ Usage:
 
     Paths may be local files, android:/path/to, or androidsd:/path/to."""
         % (progname, progname, progname))
+
 
 def parse_args():
     """Parse commandline arguments."""
@@ -693,15 +732,21 @@ def parse_args():
 
     return args
 
+
 def main():
     args = parse_args()
     # print(args)
 
+    pathdict = read_config_file()
+
     if args.sync:
-        sync(args.paths[0], args.paths[1], dryrun=args.dryrun)
+        sync(expandpath(args.paths[0], pathdict),
+             expandpath(args.paths[1], pathdict),
+             dryrun=args.dryrun)
         return
 
     for path in (args.paths):
+        path = expandpath(path, pathdict)
         print("\n%s :" % path)
         files, dirs = list_dir(path, sizes=(not args.nosize),
                                recursive=args.recursive)
