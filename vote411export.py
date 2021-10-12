@@ -98,15 +98,16 @@ class Measure:
     #         "Description"
     #         "Category": "Constitutional Amendments", "State Bond Questions"
     def __init__(self, measurename, description, category):
-        self.measurename = measurename
+        self.measurename = measurename.strip()
         self.desc = html_converter.handle(description) \
                                      .strip() \
                                      .replace('NM', 'N.M.')
-        self.category = category
+        self.category = category.strip()
 
     def output(self, formatter):
         formatter.add_name_and_party(
-            f'{self.measurename}: {self.desc} ({self.category})', None)
+            f'{self.measurename})', None)
+            # f'{self.measurename}: {self.desc} ({self.category})', None)
         formatter.add_q_and_a('', self.desc)
 
     def __repr__(self):
@@ -323,14 +324,30 @@ def sort_measures(measures, order):
     sorted_measures = []
     categories = set()
 
-    for measurecat in order:
-        measurecat_l = measurecat["fullname"].lower()
+    for measure_m in measures:
+        print("   |%s|" % measure_m.measurename.lower())
+    print("=============")
+
+    for orderline in order:
+        orderline_l = orderline["fullname"].lower().strip()
         for measure_m in measures:
-            if measure_m.category.lower() == measurecat_l:
+            if measure_m.category.lower().strip() == orderline_l \
+               or measure_m.measurename.lower() == orderline_l:
+                print("******* MATCHED! *******", measure_m)
                 sorted_measures.append(measure_m)
                 categories.add(measure_m.category)
+                break
+            elif orderline_l.startswith('pojo'):
+                print("'%s' != '%s'" % (measure_m.measurename.lower(),
+                                        orderline_l))
 
+    print("Sorted measures:")
+    pprint(sorted_measures)
+    print("Categories:")
+    pprint(categories)
     return sorted_measures, categories
+
+from pprint import pprint
 
 
 # Read tab-separated files
@@ -452,10 +469,18 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
         s_candidates, notfound = sort_candidates(candidates, order)
         measure_categories = [ c.lower().strip() for c in measure_categories ]
 
-        # First find the measures:
+        # First print the measures:
+        print("s_measures:")
+        pprint(s_measures)
         for measure in s_measures:
             print("...", measure)
+            if measure.measurename in notfound:
+                notfound.remove(measure.measurename)
+                print("measure.measurename isn't really notfound")
             measure.output(formatter)
+        # If any measures made it into notfound, remove them:
+        print("notfound:")
+        pprint(notfound)
 
         cur_office = None
         num_for_office = 0
