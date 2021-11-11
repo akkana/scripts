@@ -188,7 +188,11 @@ header_wanted = sys.argv[1]
 try:
     if len(sys.argv) > 2:
         for filename in sys.argv[2:]:
-            decode_file(filename, header_wanted, all)
+            try:
+                decode_file(filename, header_wanted, all)
+            except FileNotFoundError:
+                print("**** Error:", filename, "Not found")
+                continue
     else:
         fil = sys.stdin
         decode_file('-', header_wanted)
