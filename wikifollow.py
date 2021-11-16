@@ -26,7 +26,7 @@ ignore_parents = [ "ul", "table" ]
 # links with these classes, or inside anything with these classes,
 # will be ignored
 ignore_classes = [ "image", "thumb", "hatnote",  "flaggedrevs",
-                   "mw-indicator", "IPA" ]
+                   "mw-indicator", "IPA", "noexcerpt" ]
 
 
 def firstlink(pageurl):
@@ -34,13 +34,12 @@ def firstlink(pageurl):
     r = requests.get(pageurl)
     soup = BeautifulSoup(r.text, "lxml")
 
-    # XXX Enumerate only because knowing i (which link matched)
-    # is interesting during debugging.
-    for i, link in enumerate(soup.find_all("a", href=True)):
+    for link in soup.find_all("a", href=True):
         # Don't count internal page anchros like #ms-head
         href = link.get("href")
         if href.startswith("#"):
             continue
+
         # Don't count disambiguation links or media
         lhref = href.lower()
         if "disambiguation" in lhref or "file:" in lhref:
@@ -63,7 +62,8 @@ def firstlink(pageurl):
 def should_skip(tag, parenttags, classpats):
     """Is the given linktag (tag object) a child of any of the given tags,
        or a child of any tag with a class containing any of the given classpats?
-       parenttags is a list of str tag names.
+       parenttags is a list of str tag names; classpats is a list of
+       patterns that "class=" should not match.
     """
     while True:
         # Got to the top?
@@ -74,13 +74,12 @@ def should_skip(tag, parenttags, classpats):
             if tag.name == name:
                 return True
 
+        classes = tag.get("class")
         for classpat in classpats:
-            classes = tag.get("class")
             if classes:
                 for c in classes:
                     if classpat in c:
                         return True
-
         # This shouldn't happen if we stop at <body>,
         # but keep it in for a while, just in case.
         try:
@@ -89,15 +88,14 @@ def should_skip(tag, parenttags, classpats):
             print("eek, no parent for", tag.name)
             print(traceback.format_exc())
             sys.exit(0)
-            # return False
 
 
-
-def follow_links(term, terminator, interactive=False):
+def follow_links(term, terminator=None, interactive=False):
     """Follow the first link from the body of a term's wikipedia page
        and then continue to follow the first link of each subsequent page
-       until finally arriving at the expected terminator page.
+       until finally arriving at the expected terminator page, if any.
        The theory is that the chain always gets to "Philosophy".
+       If no terminator is given, continue until a loop is detected.
        Return an OrderedDict { absurl: (term, link_text) }
     """
     linkdic = OrderedDict()
@@ -109,8 +107,10 @@ def follow_links(term, terminator, interactive=False):
             print("%3d %-23s %s" % (hops, text, link))
             sys.stdout.flush()
 
-        if os.path.basename(link) == terminator:
+        # Reached the terminator?
+        if terminator and text == terminator:
             return linkdic
+
         hops += 1
         link, term, text = firstlink(link)
         if link in linkdic:
@@ -122,9 +122,25 @@ def follow_links(term, terminator, interactive=False):
 
 
 if __name__ == '__main__':
+    def Usage():
+        appname = os.path.basename(sys.argv[0])
+        print(f"{appname}: Follow chains of links in (English) Wikipedia")
+        print(f"Usage: {appname} [-t terminator] wikiterm [wikiterm ...]")
+        sys.exit(1)
+
+    terminator = None
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-h':
+            Usage()
+        if sys.argv[1] == '-t':
+            if len(sys.argv) < 3:
+                Usage()
+            terminator = sys.argv[2]
+            sys.argv = sys.argv[2:]
+
     try:
         for term in sys.argv[1:]:
-            linkdic = follow_links(term.replace(' ', '_'), "Philosophy",
+            linkdic = follow_links(term.replace(' ', '_'), terminator,
                                    interactive=True)
             # This would print out basically the same thing that
             # follow_links(interactive=True) already printed;
@@ -138,5 +154,4 @@ if __name__ == '__main__':
 
     except KeyboardInterrupt:
         print("Interrupt")
-
 
