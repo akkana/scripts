@@ -483,7 +483,8 @@ print(unicodedata.name('\u03b1'))
 # See also unidecode.py, e.g. for how to search in names.
 
 
-############################
+####### Exceptions #####################
+
 # Frustrations at exceptions when printing,
 # when Python (even Python 3) wants to convert to ascii rather than
 # the system encoding:
@@ -507,11 +508,26 @@ sys.setdefaultencoding('utf8')
 # convert to ascii for printing. And in python3, sys.getdefaultencoding()
 # is already utf-8 so that doesn't explain the ascii codec exceptions.
 
-#############################
+
 # Speaking of exception frustrations: here's how to print a traceback
 # from the current exception. Curiously, you don't need to pass in the
 # actual exception.
-traceback.format_exc()
+print(traceback.format_exc())
+
+
+# When raising
+# Avoid "During handling of the above exception, another exception occurred":
+
+try:
+    some_operation()
+except (SomeError, OtherError) as e:
+    raise MyCustomException(e, "My custom exception") from None
+# Or pass information about the inner exception:
+    raise MyCustomException(e, "My custom exception",
+                            traceback.format_exc()) from None
+    raise MyCustomException(e, "My custom exception",
+                            traceback.extract_stack()) from None
+
 
 ########################################################
 # Byte strings and byte arrays
