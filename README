@@ -77,6 +77,13 @@ birdcodes.py:
 bdump:
     Ascii/hex/decimal dumps of any file. Like od but much more readable.
 
+blogtouch.py:
+    In a pyblosxom hierarchy, find files matching a pattern and
+    set the time on them to be ten years in the past, so that the next
+    pyblosxom.cgi --static --incremental will update them without
+    needing to change the date of the source file (which would
+    move it to the top of the blog).
+
 bookfind.py:
     List books by author optionally year of publication,
     to find new books by particular authors.
