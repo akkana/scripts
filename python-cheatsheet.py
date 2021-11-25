@@ -561,6 +561,9 @@ mylist.pop(i)            # Removes and returns list[i]
 # Delete an item from a dictionary:
 del thedic[key]
 
+# Rename a dictionary key:
+thedic["new_key"] = thedic.pop("old_key")
+
 # Insert an item into a list BEFORE the given index:
 l = ['a', 'b', 'c', 'd', 'e']
 l.insert(3, 'xxx')
