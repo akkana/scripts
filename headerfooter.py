@@ -3,6 +3,8 @@
 # Copyright 2021 by Akkana; share and enjoy under the GPLv2 or later.
 
 long_description = """
+Usage: headerfooter.py file.html [file.html ...]
+
 Take standalone HTML files and add customized headers and footers
 to make them fit in with a website, replacing anything up to and
 including <body> and following and including </body>.
@@ -60,23 +62,43 @@ def do_file(filename, patname=None):
 
     outstr = head
 
+    def write_file():
+        os.rename(filename, os.path.join(filename + ".bak"))
+        with open(filename, "w") as ofp:
+            ofp.write(outstr)
+        print("Added headers and footers to", filename)
+
+
+    # Save anything before the <body> tag:
+    # if it turns out there is no <body> tag, this will be the whole file.
+    before_body = ""
+
     with open(filename) as fp:
         for line in fp:
             stripline = line.strip().lower()    # for string comparisons
             if not seen_body:
                 if stripline == "<body>":
                     seen_body = True
+                else:
+                    before_body += "\n" + line
                 continue
+
             # Saw the body already. Keep appending lines until </body>
             if stripline != "</body>":
                 outstr += line
                 continue
 
             outstr += foot
-            os.rename(filename, os.path.join(filename + ".bak"))
-            with open(filename, "w") as ofp:
-                ofp.write(outstr)
-            print("Did", filename)
+
+            write_file()
+
+    if seen_body:
+        return
+
+    # No body. outstr contains only the desired headers.
+    outstr += before_body
+    outstr += foot
+    write_file()
 
 
 def find_title(filename):
