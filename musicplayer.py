@@ -1,12 +1,14 @@
 #! /usr/bin/env python
 
 # A simple music player using pygame.
+
 # Requirements: python-pygame python-id3
 # Strongly recommended: python-mutagen
-# (uses mutagen for MP3 song length and frequency; without it,
-# some songs may play too fast or too slowly).
+# which is used for MP3 song length and frequency, as well as ID3 tags;
+# without mutagen, some songs may play too fast or too slowly.
 #
-# Copyright 2015.2019,2020 by Akkana Peck: share and enjoy under the GPLv2 or later.
+# Copyright 2015.2019,2020,2021 by Akkana Peck:
+# share and enjoy under the GPLv2 or later.
 
 from __future__ import print_function
 
@@ -34,6 +36,7 @@ import cgi
 try:
     from mutagen.id3 import ID3
 except:
+    print("No mutagen.id3, won't be able to read ID3 info")
     pass
 
 try:
@@ -55,7 +58,15 @@ class MusicWin(Gtk.Window):
 
     MAX_FILENAME_LEN = 90
 
-    def __init__(self, init_songs, random=None, backward=False):
+    def __init__(self, init_songs, shuffle=None, backward=False):
+        """
+        init_songs: a list of songs and/or m3u files to play.
+        shuffle: if True, will shuffle; if False, it won't.
+                If shuffle is unset (None), default to True
+                if init_songs has songs or playlists, else False.
+        backward: play in reverse order (assuming shuffle is False)
+        """
+
         super(MusicWin, self).__init__()
 
         self.songs = []
@@ -69,50 +80,83 @@ class MusicWin(Gtk.Window):
 
         self.configdir = os.path.expanduser('~/.config/musicplayer')
 
-        # If no songs or playlists specified, play from favorites.m3u.
-        if not init_songs:
-            self.playlist = os.path.join(self.configdir, "favorites.m3u")
-            print("Playing favorites")
-            init_songs = [ self.playlist ]
+        # Paths to try prepending to music or playlist filenames
+        self.musicpaths = [ os.path.expanduser("~/Music"), self.configdir ]
 
-        # Did the user specify one single playlist?
-        elif len(init_songs) == 1 \
-           and init_songs[-1].endswith('.m3u'):
-            self.playlist = os.path.join(self.configdir,
-                                         os.path.basename(init_songs[-1]))
-
-        else:
-            self.playlist = os.path.join(self.configdir, 'playlist.m3u')
-
-        # Right now, random is the only thing that can be specified
-        # in the config file.
-        if random is None:
+        # Figure out whether shuffle mode should be set.
+        # If shuffle mode wasn't passed in as an argument,
+        # figure out whether it should be on.
+        if shuffle is None:
+            # First check the config file:
             configfile = os.path.join(self.configdir, "config")
             if os.path.exists(configfile):
-                fp = open(configfile)
-                randomre = re.compile('random *= *([^ ]+)')
-                for line in fp:
-                    if line.startswith('#'):
-                        continue
-                    m = randomre.search(line)
-                    if m:
-                        val = m.group(1).strip().lower()
-                        if val == "true" or val == '1':
-                            self.random = True
-                        elif val == "false" or val == '0':
-                            self.random = False
-                        else:
-                            print("Config file error: '%s'" . line.strip())
-                    break
-                fp.close()
+                with open(configfile) as fp:
+                    randomre = re.compile('^\s*random *= *([^ ]+)')
+                    shufflere = re.compile('^\s*shuffle *= *([^ ]+)')
+                    for line in fp:
+                        if line.startswith('#'):
+                            continue
+                        m = shufflere.search(line)
+                        if m:
+                            val = m.group(1).strip().lower()
+                            if val == "true" or val == '1':
+                                shuffle = True
+                            elif val == "false" or val == '0':
+                                shuffle = False
+                            else:
+                                print("Config file error: '%s'" . line.strip())
+                        break
 
+        # Not set from the config file? Decide based on arguments.
+        if shuffle is None:
+            if init_songs:
+                shuffle = False
             else:
-                # If there's no config file, default to not random.
-                self.random = False
-        else:
-            self.random = random
+                shuffle = True
+
+        self.shuffle = shuffle
 
         self.backward = backward
+
+        # It's also possible to have a list of songs and directories to avoid
+        noplaylist = None
+        self.noplayfile = None
+
+        self.playlist = None
+
+        # If no songs or playlists specified, look for favorites.m3u.
+        if not init_songs:
+            default_playlist = os.path.join(self.configdir, "favorites.m3u")
+            if os.path.exists(default_playlist):
+                init_songs = [ default_playlist ]
+                noplaylist = True
+
+        # If that's not there, look for ~/Music
+        if not init_songs:
+            default_playlist = os.path.expanduser("~/Music")
+            if os.path.exists(default_playlist):
+                init_songs = [ default_playlist ]
+                noplaylist = True
+
+        # Still nothing?
+        if not init_songs:
+            print("No songs specified and no ~/.config/musicplayer or ~/Music")
+            sys.exit(1)
+
+        if noplaylist:    # it might have been set to True, above
+            self.noplayfile = os.path.join(self.configdir, "noplay.m3u")
+            if os.path.exists(self.noplayfile):
+                noplaylist = self.noplayfile
+            else:
+                noplaylist = None
+
+        # If playing only a single playlist, record that as self.playlistfile
+        # so d, - or DEL can remove songs from it.
+        if len(init_songs) == 1 and init_songs[0].lower().endswith(".m3u"):
+            self.playlistfile = init_songs[0]
+
+        # Build up the song list.
+        self.expand_songs_and_directories(init_songs, noplaylist=noplaylist)
 
         # Are we stopped, paused or playing?
         MusicWin.STOPPED = 0
@@ -181,7 +225,7 @@ class MusicWin(Gtk.Window):
         add_class(next_btn, "button")
         buttonbox.add(next_btn)
 
-        # Assorted info, like the random button and progress indicator:
+        # Assorted info, like the shuffle button and progress indicator:
         views = Gtk.HBox(spacing=4)
         # views.padding = 8 So frustrating that we can't set this in general!
         mainbox.pack_end(views, False, False, 0)
@@ -201,10 +245,10 @@ class MusicWin(Gtk.Window):
         views.pack_start(self.progress_hscale,
                          fill=True, expand=True, padding=8)
 
-        randomBtn = Gtk.ToggleButton(label="Shuffle")
-        randomBtn.set_active(self.random)
-        randomBtn.connect("toggled", self.toggle_random);
-        views.pack_end(randomBtn, fill=True, expand=False, padding=8)
+        shuffleBtn = Gtk.ToggleButton(label="Shuffle")
+        shuffleBtn.set_active(self.shuffle)
+        shuffleBtn.connect("toggled", self.toggle_shuffle);
+        views.pack_end(shuffleBtn, fill=True, expand=False, padding=8)
 
         # The content areas for the song filename, title and artist:
         # you might think HTML/CSS markup would let you put these all
@@ -269,57 +313,89 @@ button:hover { background: #dff; border-color: #8bb; }
         # In GTK3 this also sets initial size, and it's too big.
         # self.set_size_request(550, 225)
 
-        # Done with UI! Now we can build up the song list.
-        self.add_songs_and_directories(init_songs)
-
         mixer.init()
 
-    def add_songs_from_dir(self, d):
+    @staticmethod
+    def playok(songpath, noplaylist=None):
+        """Is it ok to play this song? It's not prohibited by the noplaylist?
+        """
+        if not noplaylist:
+            return True
+        for badsong in noplaylist:
+            if badsong in songpath:
+                return False
+        return True
+
+    def add_songs_from_dir(self, d, noplaylist=None):
         # XXX Recursively crawl the directory and add every song in it.
         for root, dirs, files in os.walk(d):
             for filename in files:
                 if '.' in filename:
-                    self.songs.append(os.path.join(root, filename))
+                    songpath = os.path.join(root, filename)
+                    if self.playok(songpath):
+                        self.songs.append(songpath)
 
-    def add_songs_and_directories(self, slist):
+    def expand_songs_and_directories(self, slist, noplaylist=None):
+        """slist is a list of song files and directories.
+           noplaylist (optional) is a list of songs and directories
+           NOT to include.
+        """
+        if type(slist) is str:
+            slist = [slist]
+
+        # First, if noplaylist is specified, expand that:
+        if noplaylist:
+            with open(noplaylist) as fp:
+                noplaylist = []
+                for line in fp:
+                    noplaylist.append(line.strip())
+
         for s in slist:
             if os.path.isdir(s):
-                self.add_songs_from_dir(s)
+                self.add_songs_from_dir(s, noplaylist=noplaylist)
 
-            elif s.endswith('.m3u'):
+            elif s.lower().endswith('.m3u'):
                 if os.path.exists(s):
-                    self.add_songs_in_playlist(s)
+                    self.add_songs_in_playlist(s, noplaylist)
                 elif os.path.exists(os.path.join(self.configdir, s)):
                     self.add_songs_in_playlist(os.path.join(self.configdir, s))
                 else:
                     print(s, ": No such playlist")
             else:
-                if os.path.exists(s):
+                if os.path.exists(s) and self.playok(s, noplaylist):
                     self.songs.append(s)
                 else:
                     print(s, ": No such file")
 
-        # Play music in random order:
+        # Play music in shuffle order:
         random.seed(os.getpid())
-        if self.random:
+        if self.shuffle:
             random.shuffle(self.songs)
         else:
             self.songs.sort(reverse=self.backward)
 
-    def add_songs_in_playlist(self, playlist):
-        path = os.path.split(playlist)[0]
+    def add_songs_in_playlist(self, playlist, noplaylist=None):
         with open(playlist) as m3ufile:
             for line in m3ufile:
                 line = line.strip()
-                linepath = os.path.join(path, line)
+                if not line:
+                    continue
                 if os.path.isdir(line):
-                    self.add_songs_from_dir(line)
-                elif os.path.isdir(linepath):
-                    self.add_songs_from_dir(linepath)
-                elif os.path.exists(path):
-                    self.songs.append(path)
-                elif os.path.exists(linepath):
-                    self.songs.append(linepath)
+                    self.add_songs_from_dir(line, noplaylist)
+                    continue
+                if os.path.exists(line) and self.playok(line, noplaylist):
+                    self.songs.append(line)
+                    continue
+
+                for path in self.musicpaths:
+                    linepath = os.path.join(path, line)
+                    if os.path.isdir(linepath):
+                        self.add_songs_from_dir(linepath, noplaylist)
+                        break
+                    if os.path.exists(linepath) and \
+                       self.playok(linepath, noplaylist):
+                        self.songs.append(linepath)
+                        break
 
     def run(self):
         if not self.songs:
@@ -385,10 +461,10 @@ button:hover { background: #dff; border-color: #8bb; }
             self.stop_btn.set_tooltip_text("Play")
             self.play_state = MusicWin.PLAYING
 
-    def toggle_random(self, w):
-        self.random = w.get_active()
+    def toggle_shuffle(self, w):
+        self.shuffle = w.get_active()
         cursong = self.songs[self.song_ptr]
-        if self.random:
+        if self.shuffle:
             random.shuffle(self.songs)
         else:
             self.songs.sort(reverse=self.backward)
@@ -446,48 +522,62 @@ button:hover { background: #dff; border-color: #8bb; }
         self.volume_change(-.1)
 
     def delete_song(self, from_disk):
+        # If using a noplayfile, just add it to that and skip
+        # to the next song, if not deleting from disk.
+        if self.noplayfile:
+            with open(self.noplayfile, "a") as fp:
+                print(self.songs[self.song_ptr], file=fp)
+                print("Adding", self.songs[self.song_ptr],
+                      "to no-play list")
+            if not from_disk:
+                # skip to the next song.
+                mixer.music.stop()
+                return
+
         if from_disk:
             delstr = "Delete song from disk PERMANENTLY?"
-        else:
+        elif self.playlist:
             delstr = "Delete song from playlist?"
-        dialog = Gtk.MessageDialog(self,
-                                   Gtk.DIALOG_DESTROY_WITH_PARENT,
-                                   Gtk.MESSAGE_QUESTION,
-                                   Gtk.BUTTONS_OK_CANCEL,
-                                   delstr)
-        dialog.set_default_response(Gtk.RESPONSE_OK)
+        else:
+            print("""Deleting a song from the playlist requires either
+using a no-play file or a single playlist""")
+            return
+
+        dialog = Gtk.MessageDialog(transient_for=self, flags=0,
+                                   message_type=Gtk.MessageType.QUESTION,
+                                   buttons=Gtk.ButtonsType.OK_CANCEL,
+                                   text=delstr)
+        dialog.set_default_response(Gtk.ResponseType.OK)
         response = dialog.run()
         dialog.destroy()
-        if response == Gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
+
             cur_song = self.songs[self.song_ptr]
             del self.songs[self.song_ptr]
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
-            self.save_playlist()
+
+            if self.playlistfile:
+                self.save_playlist()
+
             if from_disk:
                 os.remove(cur_song)
 
             # Either way, skip to the next song.
             mixer.music.stop()
 
-    def delete_song_from_playlist(self):
-        self.delete_song(False)
-
-    def delete_song_from_disk(self):
-        self.delete_song(True)
-
     def save_playlist(self):
         """Save the current playlist."""
-        if not self.playlist:
+        if not self.playlistfile:
             print("No playlist to save to!")
             return
 
         if not os.path.exists(self.configdir):
             os.makedirs(self.configdir)
 
-        if os.path.exists(self.playlist):
-            os.rename(self.playlist, self.playlist + '.bak')
+        if os.path.exists(self.playlistfile):
+            os.rename(self.playlistfile, self.playlistfile + '.bak')
 
-        fp = open(self.playlist, "w")
+        fp = open(self.playlistfile, "w")
         newlist = self.songs[:]
         newlist.sort(reverse=self.backward)
         for song in newlist:
@@ -558,17 +648,20 @@ button:hover { background: #dff; border-color: #8bb; }
         elif event.string == '0':
             self.restart()
 
-        # d means delete from the current playlist;
+        # d means add the song to CONFIGDIR/notfavorites.m3u
+        # so it won't be played by default.
         # ctrl-d actually deletes the song from disk.
         elif event.keyval == MusicWin.D_KEY:
             if event.state == Gdk.ModifierType.CONTROL_MASK:
-                self.delete_song_from_disk()
+                self.delete_song(True)
             else:
-                self.delete_song_from_playlist()
+                self.delete_song(False)
+        # Some other keys that add to notfavorites.m3u: - and DEL
+        elif event.keyval == Gdk.KEY_Delete or event.string == '-':
+            self.delete_song(False)
 
         elif event.keyval == MusicWin.S_KEY and \
            event.state == Gdk.ModifierType.CONTROL_MASK:
-            print("Saving playlist")
             self.save_playlist()
 
         return True
@@ -665,27 +758,30 @@ button:hover { background: #dff; border-color: #8bb; }
 
 if __name__ == '__main__':
     rc = os.fork()
-    if not rc:
-        args = sys.argv[1:]
-        rand = None
-        backward = False
-        if args:
-            if args[0] == '-h' or args[0] == '--help':
-                print("Usage: %s [-r|--random] [-s|--sequential] [-b|--backward]" % os.path.basename(sys.argv[0]))
-                sys.exit(0)
-            if args[0] == '-r' or args[0] == '--random':
-                rand = True
-                args = args[1:]
-            elif args[0] == '-s' or args[0] == '--sequential':
-                rand = False
-                args = args[1:]
-            elif args[0] == '-b' or args[0] == '--backward':
-                backward = True
-                rand = False
-                args = args[1:]
-
-        win = MusicWin(args, random=rand, backward=backward)
-        win.run()
-    else:
+    if rc:
         sys.exit(0)
+
+    args = sys.argv[1:]
+    shuffle = None
+    backward = False
+    if args:
+        if args[0] == '-h' or args[0] == '--help':
+            print("Usage: %s [-s|--shuffle] [-S|--sequential] [-b|--backward]" % os.path.basename(sys.argv[0]))
+            sys.exit(0)
+
+        if args[0] == '-r' or args[0] == 's' or args[0] == '--shuffle':
+            shuffle = True
+            args = args[1:]
+
+        elif args[0] == '-S' or args[0] == '--sequential':
+            shuffle = False
+            args = args[1:]
+
+        elif args[0] == '-b' or args[0] == '--backward':
+            backward = True
+            shuffle = False
+            args = args[1:]
+
+    win = MusicWin(args, shuffle=shuffle, backward=backward)
+    win.run()
 
