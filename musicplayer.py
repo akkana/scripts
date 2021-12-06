@@ -34,16 +34,11 @@ from pygame import mixer
 import cgi
 
 try:
+    import mutagen
     from mutagen.id3 import ID3
 except:
-    print("No mutagen.id3, won't be able to read ID3 info")
-    pass
-
-try:
-    from mutagen.mp3 import MP3
-except:
-    print("No mutagen, won't be able to check song length or adjust speeds")
-    pass
+    print("No mutagen, won't be able to check song length, adjust speeds")
+    print("or read ID3 tags")
 
 
 class MusicWin(Gtk.Window):
@@ -712,33 +707,26 @@ using a no-play file or a single playlist""")
 
         self.update_content()
 
-        # Get the length:
+        # Try to get the length and sample rate
+        songinfo = None
         try:
-            mp3info = MP3(self.songs[self.song_ptr])
-            self.cur_song_length = mp3info.info.length
+            songinfo = mutagen.File(self.songs[self.song_ptr]).info
+        except Exception as e:
+            print("Didn't recognize file type of", self.songs[self.song_ptr],
+                  ":", e)
+            songinfo = None
+
+        if songinfo:
+            self.cur_song_length = songinfo.length
             self.cur_song_length_str = self.sec_to_str(self.cur_song_length)
 
             # Show the length on the hscale slider
             self.progress_hscale.set_range(0, self.cur_song_length)
 
-        except:
-            self.cur_song_length = 0
-            self.cur_song_length_str = '?'
+            mixer.quit()
+            mixer.init(frequency=songinfo.sample_rate)
 
         try:
-            # First try to adjust the speed. This used to happen
-            # automatically, but now, some songs will play too fast
-            # or too slowly.
-            # This relies on mutagen, so it won't happen if it's not available.
-            try:
-                mp3 = MP3(self.songs[self.song_ptr])
-                # print("New frequency is", mp3.info.sample_rate)
-                mixer.quit()
-                mixer.init(frequency=mp3.info.sample_rate)
-            except NameError:
-                # print("Couldn't adjust speed, maybe mutagen isn't available?")
-                pass
-
             # Then load and play the song.
             mixer.music.load(self.songs[self.song_ptr])
             mixer.music.play()
