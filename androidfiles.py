@@ -31,6 +31,10 @@ import re
 import argparse
 
 
+# This works under Android 12, will probably have to be adjusted regularly.
+ANDROID_BASE = "/storage/emulated/0"
+
+
 # Android has changed the output of ls -lR.
 # Choose one or the other of these, or define your own.
 # If you leave it blank, androidfiles will try to figure it out.
@@ -40,29 +44,44 @@ marshmallow_indices = {
     "fname": 6,
     "size": 3,
 }
+
 # Android 11 indices for ls -lR:
 eleven_indices = {
     "fname": 7,    # Where the filename starts
     "size": 4,     # file size
 }
+
 indices = None
+
 
 def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
+
 
 def strip_schema(path):
     """Strip off any android: prefix in the path.
     """
     if path.startswith("android:"):
-        return path[8:]
+        path = path[8:]
+
+        # posixpath will ignore any arguments before an argument
+        # that starts with /. So make sure PATH doesn't:
+        while path.startswith("/"):
+            path = path[1:]
+
+        # Under Marshmallow this somehow worked:
+        # return path
+        # but under Android 12, this is needed:
+        return posixpath.join(ANDROID_BASE, path)
 
     if path.startswith("androidsd:"):
         sdcards = find_sdcards()
         if not sdcards:
             raise RuntimeError("Can't find an Android SD card")
-        return '/storage/' + sdcards[0] + '/' + path[10:]
+        return posixpath.join("/storage", sdcards[0], path[10:])
 
     return path
+
 
 def find_sdcards():
     sdcards = []
@@ -78,6 +97,7 @@ def find_sdcards():
         sdcards.append(line[m.start():m.end()])
     return sdcards
 
+
 def list_dir(path, **kwargs):
     """Recursively list either a local or remote directory.
        Return a list of paths relative to the original directory.
@@ -86,6 +106,7 @@ def list_dir(path, **kwargs):
         return list_android_dir(strip_schema(path), **kwargs)
     else:
         return list_local_dir(path, **kwargs)
+
 
 def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     """List the contents of the given directory on Android.
@@ -121,31 +142,33 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
             cur_subdir = line[:-1]
             continue
 
-        l = line.split()
-        if l[0] == 'total':
+        words = line.split()
+        if words[0] == 'total':
             continue
 
-        nwords = len(l)
+        nwords = len(words)
         if not nwords:
             continue
 
-        if line.startswith('drw'):
+        sizeoffset = 0
+        if indices == marshmallow_indices and line.startswith('drw'):
             sizeoffset = -1
-        elif line.startswith('-rw'):
-            sizeoffset = 0
-        else:
+        elif not line.startswith('-rw'):
             continue
 
         # Figure out which ls format this machine uses, if not already set:
         if not indices:
             try:
-                int(l[marshmallow_indices["size"] + sizeoffset])
+                int(words[marshmallow_indices["size"] + sizeoffset])
                 indices = marshmallow_indices
             except (ValueError, TypeError):
                 try:
-                    int(l[eleven_indices["size"] + sizeoffset])
+                    int(words[eleven_indices["size"] + sizeoffset])
                     indices = eleven_indices
                 except (ValueError, TypeError):
+                    print("Not eleven, words[", eleven_indices["size"],
+                          "+", sizeoffset,
+                          "] =", eleven_indices["size"] + sizeoffset)
                     pass
         if not indices:
             print("ls -lR output matches neither known format.",
@@ -159,7 +182,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         if line.startswith('drw'):
             # It's a directory. Directories on Android don't list size,
             # so the name index is one less than for files.
-            dir_list.append(l[indices["fname"] + sizeoffset])
+            dir_list.append(words[indices["fname"] + sizeoffset])
             continue
 
         if not line.startswith('-rw'):
@@ -174,7 +197,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
 
         # Account for filenames with spaces: anything from element 6
         # to the end is the filename.
-        fname = ' '.join(l[indices["fname"]:])
+        fname = ' '.join(words[indices["fname"]:])
 
         if recursive and cur_subdir:
             fname = posixpath.normpath(posixpath.join(cur_subdir,
@@ -187,7 +210,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
                 fname = fname[1:]
         if sizes:
             try:
-                file_list.append((fname, int(l[indices["size"]])))
+                file_list.append((fname, int(words[indices["size"]])))
             except Exception as e:
                 # This could happen for the initial "Total:" line
                 # print("exception:", e)
@@ -204,6 +227,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         dir_list.sort()
 
     return file_list, dir_list
+
 
 def list_local_dir(path, sorted=True, sizes=False, recursive=False):
     """List the contents of the given local directory,
@@ -274,6 +298,7 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
 
     return sizelist, dir_list
 
+
 # Helper routines to copy to/from/on android.
 # These assume the schemas have already been removed.
 def quote(s):
@@ -306,6 +331,7 @@ def rmdir_on_android(d, recursive=False):
         subprocess.call(["adb", "shell", "rm", "-rf", quote(d)])
     else:
         subprocess.call(["adb", "shell", "rmdir", quote(d)])
+
 
 ####################################################################
 # Here are the public routines that we expect callers to know about:
@@ -346,6 +372,7 @@ def copyfile(src, dst, move=False):
         print("Internal error: couldn't figure out how to %s %s to %s"
               % ('move' if move else 'copy', src, dst))
 
+
 def move(src, dst):
     copyfile(src, dst, move=True)
 
@@ -360,6 +387,7 @@ def remove(f):
         remove_from_android(strip_schema(f))
     else:
         os.unlink(f)
+
 
 def find_basename_size_match(pair, pairlist):
     """Given a pair (pathname, size) and a list of pairs, take the basename
@@ -383,6 +411,7 @@ def find_basename_size_match(pair, pairlist):
     elif num_matches > 1:
         print("Multiple matches for", base)
     return -1
+
 
 def make_sync_changes(newdirs, moves, removes, updates, dryrun):
     """Print the sync changes, and, if dryrun is false, actually make them.
@@ -430,6 +459,7 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
                 copyfile(*pair)
     else:
         print("No files need updating.")
+
 
 def sync(src, dst, dryrun=True):
     """Synchronize recursively (like rsync -av --checksum)
