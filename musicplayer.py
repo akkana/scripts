@@ -55,7 +55,7 @@ class MusicWin(Gtk.Window):
 
     def __init__(self, init_songs, shuffle=None, backward=False):
         """
-        init_songs: a list of songs and/or m3u files to play.
+        init_songs: a list of songs, playlists (.m3u) and directories to play.
         shuffle: if True, will shuffle; if False, it won't.
                 If shuffle is unset (None), default to True
                 if init_songs has songs or playlists, else False.
@@ -770,6 +770,7 @@ if __name__ == '__main__':
             shuffle = False
             args = args[1:]
 
+    print("args", args)
     win = MusicWin(args, shuffle=shuffle, backward=backward)
     win.run()
 
