@@ -303,7 +303,7 @@ def read_config_file():
                     continue
                 if 'subs' not in config:
                     config['subs'] = []
-                config['subs'].append(parts)
+                config['subs'].append((parts[1], parts[0]))
 
     except:
         pass
