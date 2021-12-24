@@ -62,7 +62,7 @@ print("Setting times to ten years earlier:")
 num_files_changed = 0
 
 pat = re.compile(sys.argv[1])
-for root, dirs, files in os.walk(os.path.expanduser("~/web/blog/linux")):
+for root, dirs, files in os.walk(os.path.expanduser("~/web/blog/")):
     for f in files:
         filepath = os.path.join(root, f)
 
