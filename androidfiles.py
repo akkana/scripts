@@ -31,8 +31,15 @@ import re
 import argparse
 
 
+# The user config file
+CONFIGPATH = "~/.config/androidfiles.conf"
+
 # This works under Android 12, will probably have to be adjusted regularly.
 ANDROID_BASE = "/storage/emulated/0"
+
+
+# Verbose mode, set with -v, will print every adb command.
+VERBOSE = False
 
 
 # Android has changed the output of ls -lR.
@@ -52,6 +59,18 @@ eleven_indices = {
 }
 
 indices = None
+
+
+# subprocess calls: if VERBOSE, print the arguments first.
+def sp_call(arglist):
+    if VERBOSE:
+        print("Call:", ' '.join(arglist))
+    return subprocess.call(arglist)
+
+def sp_popen(*args, **kwargs):
+    if VERBOSE:
+        print("Popen:", ' '.join(args[0]))
+    return subprocess.Popen(*args, **kwargs)
 
 
 def is_android(path):
@@ -85,9 +104,9 @@ def strip_schema(path):
 
 def find_sdcards():
     sdcards = []
-    proc = subprocess.Popen(["adb", "shell", "ls", "/storage"],
-                            shell=False,
-                            stdout=subprocess.PIPE)
+    proc = sp_popen(["adb", "shell", "ls", "/storage"],
+                    shell=False,
+                    stdout=subprocess.PIPE)
     stdout_lines = proc.communicate()[0].decode().split('\n')
     sdpat = re.compile('[0-9A-F]{4}-[0-9A-F]{4}')
     for line in stdout_lines:
@@ -127,7 +146,7 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
     else:
         args = ["adb", "shell", "ls", "-l", path]
 
-    proc = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE)
+    proc = sp_popen(args, shell=False, stdout=subprocess.PIPE)
     stdout_lines = proc.communicate()[0].decode().split('\n')
     file_list = []
     dir_list = []
@@ -150,46 +169,45 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         if not nwords:
             continue
 
-        sizeoffset = 0
-        if indices == marshmallow_indices and line.startswith('drw'):
-            sizeoffset = -1
-        elif not line.startswith('-rw'):
+        if len(words[0]) != 10 or words[0][1] != 'r':
+            if VERBOSE:
+                print("Skipping line:", line)
             continue
 
         # Figure out which ls format this machine uses, if not already set:
         if not indices:
             try:
-                int(words[marshmallow_indices["size"] + sizeoffset])
+                int(words[marshmallow_indices["size"]])
                 indices = marshmallow_indices
             except (ValueError, TypeError):
                 try:
-                    int(words[eleven_indices["size"] + sizeoffset])
+                    int(words[eleven_indices["size"]])
                     indices = eleven_indices
                 except (ValueError, TypeError):
-                    print("Not eleven, words[", eleven_indices["size"],
-                          "+", sizeoffset,
-                          "] =", eleven_indices["size"] + sizeoffset)
                     pass
         if not indices:
             print("ls -lR output matches neither known format.",
                   file=sys.stderr)
             print("Command was:", ' '.join(args))
-            print("sizeoffset:", sizeoffset)
             print(">>>", line, "<<<")
             print()
             continue
 
-        if line.startswith('drw'):
-            # It's a directory. Directories on Android don't list size,
+        if line.startswith('dr'):
+            # It's a directory. Directories on marshmallow don't list size,
             # so the name index is one less than for files.
-            dir_list.append(words[indices["fname"] + sizeoffset])
+            # But on 10-11-12 they do list size.
+            # XXX Ugh, I no longer have a marshmallow device to test on,
+            # and this is likely broken now in marshmallow for directories.
+            dir_list.append(words[indices["fname"]])
             continue
 
-        if not line.startswith('-rw'):
-            # print("Not a file or directory: %s" % l)
+        if not line.startswith('-r'):
+            if VERBOSE:
+                print("Not a file or directory: %s" % l)
             continue
 
-        # The line starts with "-rw" -- it's a file.
+        # The line starts with "-r" -- it's a file.
 
         if nwords < indices["fname"]+1:
             print("Not enough words for a file listing: %s"% l)
@@ -220,7 +238,8 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
 
     if not file_list:
         print("Didn't find any files")
-        print("Command was:", ' '.join(args))
+        if VERBOSE:
+            print("Command was:", ' '.join(args))
 
     if sorted:
         file_list.sort()
@@ -291,10 +310,14 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
             try:
                 sizelist.append((filename, os.stat(filepath).st_size))
             except OSError as e:
-                print("OSError on", filepath, "path was", path)
-                print(e)
+                # Broken symbolic links raise OSError,
+                # but the user doesn't need to see that.
+                if not os.path.islink(filepath):
+                    print("OSError on", filepath, "path was", path)
+                    print(e)
+                elif VERBOSE:
+                    print("Symlink:", path)
                 sizelist.append((filename, 0))
-                sys.exit(0)
 
     return sizelist, dir_list
 
@@ -308,29 +331,29 @@ def quote(s):
     return s
 
 def copy_to_android(src, dst):
-    subprocess.call(["adb", "push", quote(src), quote(dst)])
+    sp_call(["adb", "push", quote(src), quote(dst)])
 
 def copy_from_android(src, dst):
     # Copy from android to local
-    subprocess.call(["adb", "pull", quote(src), quote(dst)])
+    sp_call(["adb", "pull", quote(src), quote(dst)])
 
 def copy_on_android(src, dst):
-    subprocess.call(["adb", "shell", "cp", quote(src), quote(dst)])
+    sp_call(["adb", "shell", "cp", quote(src), quote(dst)])
 
 def move_on_android(src, dst):
-    subprocess.call(["adb", "shell", "mv", quote(src), quote(dst)])
+    sp_call(["adb", "shell", "mv", quote(src), quote(dst)])
 
 def remove_from_android(f):
-    subprocess.call(["adb", "shell", "rm", quote(f)])
+    sp_call(["adb", "shell", "rm", quote(f)])
 
 def mkdir_on_android(d):
-    subprocess.call(["adb", "shell", "mkdir", quote(d)])
+    sp_call(["adb", "shell", "mkdir", quote(d)])
 
 def rmdir_on_android(d, recursive=False):
     if recursive:
-        subprocess.call(["adb", "shell", "rm", "-rf", quote(d)])
+        sp_call(["adb", "shell", "rm", "-rf", quote(d)])
     else:
-        subprocess.call(["adb", "shell", "rmdir", quote(d)])
+        sp_call(["adb", "shell", "rmdir", quote(d)])
 
 
 ####################################################################
@@ -685,7 +708,7 @@ def sync(src, dst, dryrun=True):
 
 
 def read_config_file():
-    configpath = os.path.expanduser("~/.config/androidfiles.conf")
+    configpath = os.path.expanduser(CONFIGPATH)
     pathdict = {}
     if os.path.exists(configpath):
         with open(configpath) as fp:
@@ -704,11 +727,6 @@ def read_config_file():
     return pathdict
 
 
-def to_singleslash(s):
-    """Change any instances of multiple slashes to single ones"""
-    return re.sub('//*', '/', s)
-
-
 def expandpath(path, pathdict):
     """Expand a path by substituting any instances from the config file.
        E.g. droid:osmand/whiterock/canyonrim.gpx ->
@@ -717,27 +735,48 @@ def expandpath(path, pathdict):
     if ':' not in path:
         return path
     key, pathval = (val.strip() for val in path.split(':'))
+    if not pathval:
+        pathval = '/'
+
     if key.lower() == "android" or key.lower() == "androidsd":
         return path
-    return to_singleslash(pathdict[key] + '/' + pathval)
+
+    if key not in pathdict:
+        raise(RuntimeError("Don't know key %s:" % key))
+
+    # pathdict[key] is likely android:/path/to or androidsd:/path/to.
+    # Strip out the prefix so posixpath.normpath can normalize the rest.
+    if ':' in pathdict[key]:
+        key, pathval = pathdict[key].split(':')
+        return "%s:%s" % (key, posixpath.normpath(pathval))
+    else:
+        return posixpath.normpath(pathdict[key])
 
 
 def Usage():
     progname = os.path.basename(sys.argv[0])
-    return ("""%s: list or sync directories with Android over adb.
-
-Usage:
-    %s path [path ...]
-        List the given paths"
+    return ("""
+    %s path [-rnz] [path ...]
+        List the given paths
     %s -s [-n] srcpath dstpath
         Sync from srcpath to dstpath
 
-    Paths may be local files, android:/path/to, or androidsd:/path/to."""
-        % (progname, progname, progname))
+Paths may be local files, android:/path/to, or androidsd:/path/to.
+
+You can also make shortcuts to frequently used paths in %s, like this:
+
+books: android:/storage/emulated/0/Books
+osmand: android:/Android/data/net.osmand.plus/files/
+
+
+"""
+        % (progname, progname, CONFIGPATH))
 
 
 def parse_args():
     """Parse commandline arguments."""
+    global VERBOSE
+
     parser = argparse.ArgumentParser(
         usage=Usage(),
         description="List or sync files between Linux and Android")
@@ -750,9 +789,15 @@ def parse_args():
                         action="store_true")
     parser.add_argument('-z', "--no-size", dest="nosize", default=False,
                         action="store_true")
-    parser.add_argument("paths", nargs='+')
+    parser.add_argument('-l', "--list", dest="list_locations", default=False,
+                        action="store_true")
+    parser.add_argument('-v', "--verbose", dest="verbose", default=False,
+                        action="store_true")
+    parser.add_argument("paths", nargs='*')
 
     args = parser.parse_args()
+
+    VERBOSE = args.verbose
 
     # I can't find a way to get argparse to handle this.
     if args.sync and len(args.paths) != 2:
@@ -765,9 +810,17 @@ def parse_args():
 
 def main():
     args = parse_args()
-    # print(args)
 
     pathdict = read_config_file()
+
+    if args.list_locations:
+        print("Predefined paths from %s:" % CONFIGPATH)
+        if pathdict:
+            for key in pathdict:
+                print("%13s: %s" % (key, pathdict[key]))
+        else:
+            print("None")
+        sys.exit(0)
 
     if args.sync:
         sync(expandpath(args.paths[0], pathdict),
