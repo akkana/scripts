@@ -11,7 +11,7 @@ import unittest
 import os
 import shutil
 
-import epubtag
+from ebooks import epubtag
 
 class TestEpubTags(unittest.TestCase):
     # setUp() will be called for every test_*() function in the class.
