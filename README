@@ -173,6 +173,10 @@ fincompare.py:
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
 
+firefox-nozoom.py:
+    Show which sites have saved zoom settings in firefox,
+    or delete all saved zoom settings.
+
 fix_agenda.py:
     Are you in an organization where everyone lives and dies by MS
     Word, emailing dozens of Word documents around for every meeting,
