@@ -362,12 +362,26 @@ button:hover { background: #dff; border-color: #8bb; }
                 else:
                     print(s, ": No such file")
 
-        # Play music in shuffle order:
-        random.seed(os.getpid())
+        # random.shuffle() doesn't produce a very random list,
+        # and in any case it's deprecated and doesn't seem to have
+        # a replacement.
+        # XXX It would be nice to keep the original list,
+        # to allow toggling between shuffle and sequential mode
+        # at runtime.
         if self.shuffle:
-            random.shuffle(self.songs)
+            shuffled = []
+            while self.songs:
+                shuffled.append(
+                    self.songs.pop(random.randrange(len(self.songs))))
+
+            self.songs = shuffled
+
         else:
             self.songs.sort(reverse=self.backward)
+
+        # Even if self.shuffle isn't currently set,
+        # it might be toggled on later, so be prepared.
+        random.seed(os.getpid())
 
     def add_songs_in_playlist(self, playlist, noplaylist=None):
         with open(playlist) as m3ufile:
