@@ -13,7 +13,7 @@
 # If curious, the site names are in groups which has columns id, name.
 
 import sqlite3
-import sys
+import sys, os
 
 
 def get_zoom_id(cursor):
@@ -35,10 +35,38 @@ def get_zoom_id(cursor):
 
 
 def show_zoom_info(contentfile):
-    conn = sqlite3.connect(contentfile)
-    cursor = conn.cursor()
+    # The documentation says you can open in read-only mode
+    # using URI syntax, but it doesn't work, still raises
+    # sqlite3.OperationalError "database is locked"
+    # uri = "file://" + os.path.abspath(contentfile) + "?mode=ro"
+    # uri = "file:" + os.path.abspath(contentfile) + "?mode=ro"
+    # print("Trying URI", uri)
+    # conn = sqlite3.connect(uri, uri=True)
 
-    zoom_id = get_zoom_id(cursor)
+    # This is supposed to be an alternate way of opening in
+    # read-only mode, but it doesn't work either:
+    # fd = os.open(contentfile, os.O_RDONLY)
+    # conn = sqlite3.connect('/dev/fd/%d' % fd)
+    # (if you get this working, add os.close(fd) at function's end)
+
+    # Since neither of those work, copy the file if necessary (sigh):
+    tempcontent = None
+    cursor = None
+    try:
+        conn = sqlite3.connect(contentfile)
+        cursor = conn.cursor()
+        zoom_id = get_zoom_id(cursor)
+
+    except sqlite3.OperationalError:
+        print("Database is locked. Making a copy of", contentfile)
+        from tempfile import NamedTemporaryFile
+        tempcontent = NamedTemporaryFile(mode="wb")
+        with open(contentfile, "rb") as infp:
+            tempcontent.write(infp.read())
+
+        conn = sqlite3.connect(tempcontent.name)
+        cursor = conn.cursor()
+        zoom_id = get_zoom_id(cursor)
 
     cursor.execute("select id,groupID,value from prefs where settingID is ?;",
                    (zoom_id,))
@@ -55,6 +83,7 @@ def show_zoom_info(contentfile):
 
     conn.close()
 
+
 def clear_zoom_info(contentfile):
     conn = sqlite3.connect(contentfile)
     cursor = conn.cursor()
@@ -70,7 +99,6 @@ def clear_zoom_info(contentfile):
 
 
 def Usage():
-    import os
     progname = os.path.basename(sys.argv[0])
     print("""%s: Explore firefox zoom settings.
 
@@ -99,7 +127,8 @@ if __name__ == '__main__':
     except IndexError:
         Usage()
 
-    except sqlite3.OperationalError as e:
+    # except sqlite3.OperationalError as e:
+    except RuntimeError as e:
         print("OperationalError:", e)
         print("""
 Either ensure that firefox is not running, or (if you're just trying
