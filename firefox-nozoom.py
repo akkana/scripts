@@ -13,6 +13,7 @@
 # If curious, the site names are in groups which has columns id, name.
 
 import sqlite3
+import sys
 
 
 def get_zoom_id(cursor):
@@ -50,7 +51,7 @@ def show_zoom_info(contentfile):
     for zs in zoom_settings:
         cursor.execute(f"select name from groups where id is ?;", (zs[1],))
         domain = cursor.fetchall()[0][0]
-        print(f"{zs[2]:5} {domain}")
+        print(f"{zs[2]:5}  {domain}")
 
     conn.close()
 
@@ -68,10 +69,39 @@ def clear_zoom_info(contentfile):
     print("Deleted all zoom settings")
 
 
-if __name__ == '__main__':
-    import sys
-    if sys.argv[1] == '-d':
-        clear_zoom_info(sys.argv[2])
-    else:
-        show_zoom_info(sys.argv[1])
+def Usage():
+    import os
+    progname = os.path.basename(sys.argv[0])
+    print("""%s: Explore firefox zoom settings.
 
+Usage:
+    Show current zoom levels:
+        %s /path/to/content-prefs.sqlite
+    Delete all saved zoom levels:
+        %s -d /path/to/content-prefs.sqlite
+
+Make sure firefox is NOT running when changing content-prefs.sqlite."""
+                  % (progname, progname, progname))
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1] == '-h' or sys.argv[1] == "--help":
+            raise IndexError
+
+        if sys.argv[1] == '-d':
+            clear_zoom_info(sys.argv[2])
+
+        else:
+            show_zoom_info(sys.argv[1])
+
+    except IndexError:
+        Usage()
+
+    except sqlite3.OperationalError as e:
+        print("OperationalError:", e)
+        print("""
+Either ensure that firefox is not running, or (if you're just trying
+to view current zoom settings) use a copy of content-prefs.sqlite""")
+        sys.exit(1)
