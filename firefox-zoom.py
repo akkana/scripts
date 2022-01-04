@@ -38,35 +38,13 @@ def show_zoom_info(contentfile):
     # The documentation says you can open in read-only mode
     # using URI syntax, but it doesn't work, still raises
     # sqlite3.OperationalError "database is locked"
-    # uri = "file://" + os.path.abspath(contentfile) + "?mode=ro"
-    # uri = "file:" + os.path.abspath(contentfile) + "?mode=ro"
-    # print("Trying URI", uri)
-    # conn = sqlite3.connect(uri, uri=True)
+    # unless you also supply immutable=1.
+    uri = "file:" + os.path.abspath(contentfile) + "?immutable=1&mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
 
-    # This is supposed to be an alternate way of opening in
-    # read-only mode, but it doesn't work either:
-    # fd = os.open(contentfile, os.O_RDONLY)
-    # conn = sqlite3.connect('/dev/fd/%d' % fd)
-    # (if you get this working, add os.close(fd) at function's end)
+    cursor = conn.cursor()
 
-    # Since neither of those work, copy the file if necessary (sigh):
-    tempcontent = None
-    cursor = None
-    try:
-        conn = sqlite3.connect(contentfile)
-        cursor = conn.cursor()
-        zoom_id = get_zoom_id(cursor)
-
-    except sqlite3.OperationalError:
-        print("Database is locked. Making a copy of", contentfile)
-        from tempfile import NamedTemporaryFile
-        tempcontent = NamedTemporaryFile(mode="wb")
-        with open(contentfile, "rb") as infp:
-            tempcontent.write(infp.read())
-
-        conn = sqlite3.connect(tempcontent.name)
-        cursor = conn.cursor()
-        zoom_id = get_zoom_id(cursor)
+    zoom_id = get_zoom_id(cursor)
 
     cursor.execute("select id,groupID,value from prefs where settingID is ?;",
                    (zoom_id,))
