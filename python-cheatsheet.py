@@ -1983,6 +1983,13 @@ source ~/pythonenv/envname/bin/activate
 '''
 
 '''
+Find out what's installed in a virtualenv:
+pip list --local
+pip freeze --local
+The former is easier to read.
+'''
+
+'''
 Upgrade everything in a venv -- but DON'T DO THIS WITH --system-packages,
 it will try to pip upgrade all your system packages too!
 pip install -U $(pip freeze | awk '{split($0, a, "=="); print a[1]}')
@@ -2005,7 +2012,7 @@ Installing to a virtualenv (don't use setup.py install):
 Developing a package in a virtualenv:
   pip install -e .
 OR
-  setup.py develop
+  python3 setup.py develop
 
 This makes links to the live sourcedir, so it will see changes.
 
