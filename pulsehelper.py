@@ -12,6 +12,7 @@
 
 import sys, os
 import subprocess
+import re
 
 # The configuration, if any, is global.
 config = {}
@@ -291,22 +292,22 @@ def read_config_file():
        to make the output shorter and more readable.
     """
     global config
-    try:
-        with open(os.path.expanduser("~/.config/pulsehelper/config")) as fp:
-            for line in fp:
-                line = line.strip()
-                if not line:
-                    continue
-                parts = [ p.strip() for p in line.split('=') ]
-                if len(parts) != 2:
-                    print("Config file parse error, line:", line)
-                    continue
-                if 'subs' not in config:
-                    config['subs'] = []
-                config['subs'].append((parts[1], parts[0]))
 
-    except:
-        pass
+    with open(os.path.expanduser("~/.config/pulsehelper/config")) as fp:
+        for line in fp:
+            # Strip whitespace and comments
+            line = re.sub('\s*#.*$', '', line.strip())
+            if not line:
+                continue
+            if line.startswith('#'):
+                continue
+            parts = [ p.strip() for p in line.split('=') ]
+            if len(parts) != 2:
+                print("Config file parse error, line:", line)
+                continue
+            if 'subs' not in config:
+                config['subs'] = []
+            config['subs'].append((parts[1], parts[0]))
 
     return config
 
