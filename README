@@ -63,6 +63,9 @@ angle_properties.py:
 animate.js:
     Simple code for animating a series of images in javascript.
 
+aotsearch: Easier way of using aptitude search, which then calls
+    apt-file search if aptitude doesn't find any matches.
+
 aptver:
     Search for Debian packages, installed or uninstalled, matching
     a pattern, and print out versions and descriptions.

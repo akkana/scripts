@@ -1,0 +1,87 @@
+#!/bin/zsh
+
+# Debian apt search helper. Uses aptitude search first;
+# if no results, calls apt-file search instead.
+
+# Misc aptitude notes:
+#
+# aptitude search reference:
+# https://www.debian.org/doc/manuals/aptitude/ch02s04s05.en.html
+#
+# There doesn't seem to be any way to exclude all those i386 packages
+# when searching, so search results are twice as long as they need to be
+# if you have dual architectures installed (e.g. for wine).
+#
+# aptitude's notion of "description" is the long description, not the
+# short one that shows up in aptitude search. So if you search on ~d
+# (-D in this function) you'll get matches that don't include the search
+# term anywhere. -d in this function implies -D but then greps the output
+# to ensure the search term is there.
+
+aptsearch_usage() {
+    echo "Usage: aptsearch [-idD] pattern"
+    echo "-i: show only packages already installed"
+    echo "-d: search in package descriptions"
+    echo "-D: search in package long descriptions"
+    echo "    (which don't show up in aptitude search output"
+}
+
+local OPTIND o only_installed description
+while getopts ":idD" o; do
+    case "${o}" in
+        i)
+            only_installed=1
+            ;;
+        d)
+            shortdesc=1
+            description=1
+            ;;
+        D)
+            description=1
+            ;;
+        *)
+            aptsearch_usage
+            return
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+# Search for only installed packages:
+# packages whose name contains bash: aptitude search '~i bash'
+# also, aptitude search '?narrow(?installed, …)'
+# packages whose description contains bash: aptitude search '~i ~d bash'
+# packages that are not installed: aptitude search '!~i bash'
+if [[ $only_installed ]]; then
+    argstr='~i '
+else
+    argstr=''
+fi
+
+if [[ $description ]]; then
+    argstr="${argstr}~d "
+fi
+
+if [[ $argstr != "" ]]; then
+    argstr="${argstr} $*"
+else
+    argstr="$*"
+fi
+
+if [[ $shortdesc ]]; then
+    # restrict output to lines actually containing the search term
+    echo "aptitude search \"${argstr}\" | grep $1"
+    echo
+    aptitude search "${argstr}" | grep "$1" | egrep -v '( - $|:i386)'
+else
+    echo "aptitude search \"${argstr}\""
+    echo
+    aptitude search "${argstr}" | egrep -v '( - $|:i386)'
+fi
+
+# If aptitude search found nothing, try apt-file search
+if [ $? -ne 0 ]; then
+    echo "=== No packages found by that name. Looking for files:"
+    echo "apt-file search \"${argstr}\""
+    apt-file search "${argstr}"
+fi
