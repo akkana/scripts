@@ -2,8 +2,8 @@
 
 # Build GIMP.
 # First argument is the version (which is also the name of the
-# build directory), e.g. buildgimp master will use a SRCDIR of
-# $HOME/outsrc/gimp-master and a GIMP_PREFIX of$HOME/run/gimp-master
+# build directory), e.g. buildgimp master will use a
+# SRCDIR=$HOME/outsrc/gimp-master and a GIMP_PREFIX=$HOME/run/gimp-master
 #
 # With no args, will assume "master".
 #
