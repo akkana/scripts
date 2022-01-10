@@ -236,11 +236,6 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         else:
             file_list.append(fname)
 
-    if not file_list:
-        print("Didn't find any files")
-        if VERBOSE:
-            print("Command was:", ' '.join(args))
-
     if sorted:
         file_list.sort()
         dir_list.sort()
@@ -729,28 +724,29 @@ def read_config_file():
 
 def expandpath(path, pathdict):
     """Expand a path by substituting any instances from the config file.
-       E.g. droid:osmand/whiterock/canyonrim.gpx ->
+       E.g. osmand:whiterock/canyonrim.gpx ->
               android:/.../net.osmand.plus/files/tracks/whiterock/
     """
-    if ':' not in path:
-        return path
-    key, pathval = (val.strip() for val in path.split(':'))
-    if not pathval:
-        pathval = '/'
+    while ':' in path:
+        key, pathval = (val.strip() for val in path.split(':'))
+        if not pathval:
+            pathval = '/'
 
-    if key.lower() == "android" or key.lower() == "androidsd":
-        return path
+        if key.lower() == "android" or key.lower() == "androidsd":
+            return path
 
-    if key not in pathdict:
-        raise(RuntimeError("Don't know key %s:" % key))
+        if key not in pathdict:
+            raise(RuntimeError("Don't know key %s:" % key))
 
-    # pathdict[key] is likely android:/path/to or androidsd:/path/to.
-    # Strip out the prefix so posixpath.normpath can normalize the rest.
-    if ':' in pathdict[key]:
-        key, pathval = pathdict[key].split(':')
-        return "%s:%s" % (key, posixpath.normpath(pathval))
-    else:
-        return posixpath.normpath(pathdict[key])
+        # pathdict[key] is likely android:/path/to or androidsd:/path/to.
+        # Strip out the prefix so posixpath.normpath can normalize the rest.
+        if ':' in pathdict[key]:
+            key2, pathval2 = pathdict[key].split(':')
+            path = f"{key2}:{posixpath.join(pathval2, pathval)}"
+        else:
+            return posixpath.normpath(pathdict[key])
+
+    return path
 
 
 def Usage():
@@ -833,10 +829,6 @@ def main():
         print("\n%s :" % path)
         files, dirs = list_dir(path, sizes=(not args.nosize),
                                recursive=args.recursive)
-
-        if not files:
-            print("No files")
-            continue
 
         if dirs and not args.recursive:
             print("Directories:")
