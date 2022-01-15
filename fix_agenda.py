@@ -20,10 +20,10 @@
 # html using mammoth, with links to the right converted files.
 # It will also make a zip file of everything.
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 import os, sys
 
-from word2html import docx2html
+from word2html import docx2html, docx2htmlfile
 
 from difflib import SequenceMatcher
 
@@ -57,7 +57,7 @@ def fix_agenda(agenda_infile):
         origdirname = os.path.join(basedir, "orig")
         origdir = os.path.join(basedir, origdirname)
     else:
-        print("Infile name should be a in a directory named 'orig'")
+        print("Infile name should be a in a directory named 'orig' or 'html'")
         sys.exit(1)
 
     # The title comes out as /full/path/to/filename.html
@@ -80,10 +80,21 @@ def fix_agenda(agenda_infile):
     htmlfiles = os.listdir(htmldir)
     htmlbases = [ os.path.splitext(f)[0] for f in htmlfiles ]
 
-    # Read the list of html filenames, in subdir html,
-    # and original filenames, in subdir orig.
+    # Read the list of original filenames, in subdir orig.
+    # with bad filename characters removed.
+    origfiles = []
+    for fname in os.listdir("orig"):
+        newfname = ''.join([x for x in fname if x.isalpha() or x.isdigit() \
+                                                or x in '-_.'])
+        if newfname != fname:
+            print("** Renaming '%s' to '%s'" % (fname, newfname))
+            os.rename(os.path.join('orig', fname),
+                      os.path.join('orig', newfname))
+        origfiles.append(newfname)
+
+    # List of already existing html filenames, in subdir html.
+    # We'll add to this list as files are converted to html.
     htmlfiles = os.listdir("html")
-    origfiles = os.listdir("orig")
 
     nosuchfiles = []
     cantconvert = []
@@ -104,16 +115,7 @@ def fix_agenda(agenda_infile):
         # e.g. 10.1_CNM_Report_03.2021
         # em_text, fileext = os.path.splitext(em_text)
 
-        # First see if there's an html file by that name
-        if em_text in htmlbases:
-            a = soup.new_tag("a", href="html/" + em_text + ".html",
-                             target="_blank")
-            a.string = em_text
-            em.contents[0].replace_with(a)
-            em_text = None
-            continue
-
-        # Not already HTML. Find the original file and convert, if possible.
+        # Find the original file.
         # Can't just search for em_text in origbases, because
         # non-technical users seem incapable of understanding
         # "put the filename in the agenda", and will instead put
@@ -150,17 +152,33 @@ def fix_agenda(agenda_infile):
 
         origfile = origfiles[index]
         origbase, ext = os.path.splitext(origfile)
+
         if ext == ".docx" or ext == ".doc":
-            # Use unoconv because it preserves colors,
-            # which mammoth/word2html does not.
             infile = os.path.join(origdir, origfile)
-            # Replace any spaces in the HTML filename with underscores
-            # in case that hasn't already been done.
-            htmlfile = origbase.replace(' ', '_') + ".html"
+            htmlfile = origbase + ".html"
             outfile = os.path.join(htmldir, htmlfile)
 
+            # Is there already an html file?
+
             # Maybe it's already been converted in an earlier run
-            if not os.path.exists(outfile):
+            if os.path.exists(outfile):
+                already_converted.append(origfile)
+                # print(outfile, "was already converted")
+
+            elif origbase.startswith('1') and "Agenda" in origbase:
+                # When converting the agenda, use mammoth because
+                # there won't be colors (that we care about, anyway)
+                # and it's sometimes handy to be able to edit the
+                # agenda -- unoconv output is almost impossible to edit
+                # without making a mistake.
+                docx2htmlfile(infile, outfile)
+                converted.append(origfile)
+                # print("Converted the agenda %s separately" % outfile)
+
+            else:
+                # Use unoconv because it preserves colors,
+                # which mammoth/word2html does not.
+                #
                 # For some reaason, unoconv flakes out when you try to
                 # call it from inside a python script, even if it
                 # works just fine from the shell. The error message is:
@@ -177,17 +195,26 @@ def fix_agenda(agenda_infile):
                 else:
                     cantconvert.append(origfile)
                     # print("unoconv failed on", filename, "exit code", rv)
-            else:
-                already_converted.append(origfile)
-                # print(outfile, "was already converted")
 
             if os.path.exists(outfile):
                 htmlfile = "html/" + htmlfile
                 a = soup.new_tag("a", href=htmlfile, target="_blank")
                 a.string = em_text
                 em.contents[0].replace_with(a)
-                htmlfiles.append(htmlfile)
                 em_text = None
+                # Don't add to htmlfiles, should be already there
+
+                # Add a parenthesizedlink to the original document.
+                # This doesn't end up getting called for every .doc*
+                # file, though.
+                base, ext = os.path.splitext(origfile)
+                em.append(NavigableString(" (original "))
+                linkfile = "orig/" + origfile
+                a = soup.new_tag("a", href=linkfile, target="_blank")
+                a.string = ext
+                em.append(a)
+                em.append(NavigableString(")"))
+
         else:
             cantconvert.append(origfile)
             linkfile = "orig/" + origfile

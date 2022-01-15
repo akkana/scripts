@@ -46,7 +46,6 @@ def prettyprint_html(inhtml, filename=''):
     elif soup.h1:
         title = soup.h1.text
     else:
-        print("filename is", filename)
         title = os.path.splitext(filename)[0]
     if title:
         title = '<title>' + title + '</title>'
