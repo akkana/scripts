@@ -170,9 +170,69 @@ def mute_unmute(mute, dev, devtype):
             '1' if mute else '0']
     if DEBUG:
         print("muting" if mute else "unmuting",
-              sub_str(dev['device.description']))
+              sub_str(dev['device.description']),
+              "=", dev['device.description'])
         print("Calling:", args)
     subprocess.call(args)
+
+
+def mute_all(devtype):
+    if DEBUG:
+        print("Muting all")
+
+    for i, dev in enumerate(parse_sources_sinks(devtype)):
+        mute_unmute(True, dev, devtype)
+
+
+def match_dev_pattern(pattern, devtype, devs):
+    """Find the device matching pattern, which could be a nickname,
+       an integer, a full match for a dev name, or a partial match
+       for a dev name if there's only one such match.
+       return devindex or -1.
+    """
+    # Is pattern a sub?
+    for sub in config["subs"]:
+        # sub is a tuple: the first item is the real device name,
+        # the rest are nicknames.
+        # If any of the nickname matches pattern,
+        # replace pattern with the real device name.
+        if pattern in sub[1:]:
+            devname = sub[0]
+            for i, dev in enumerate(devs):
+                if devname == dev["device.description"]:
+                    return i
+            print(f"{pattern} matched nonexistent device {devname}")
+
+    # Pattern isn't a sub
+    # Is it an integer, to be used as an index?
+    try:
+        patternint = int(pattern)
+        if patternint < len(devs):
+            return patternint
+
+    except ValueError:
+        pass    # Not an index
+
+    # See if pattern is an exact match for a device
+    for i, dev in enumerate(devs):
+        if pattern == dev["device.description"]:
+            return i
+
+    # See if pattern is an partial match for any devices
+    partials = []
+    for i, dev in enumerate(devs):
+        if pattern in dev["device.description"]:
+            partials.append(i)
+        else:
+            print(f'{pattern} not in {dev["device.description"]}')
+    if len(partials) == 1:
+        return partials[0]
+    if len(partials) > 1:
+        print(f"{pattern} matched more than one device:")
+        for i in partials:
+            print("   ", devs[i]["device.description"])
+
+    return -1
 
 
 def unmute_one(pattern, devtype, mute_others=True):
@@ -183,47 +243,35 @@ def unmute_one(pattern, devtype, mute_others=True):
        devtype is "source" or "sink".
        If pattern is None or none, mute everything of that type.
     """
+
+    if pattern.lower() == "none":
+        mute_all(devtype)
+        return
+
     devs = parse_sources_sinks(devtype)
-    muteall = (pattern.lower() == "none")
-    devindex = -1
 
-    try:
-        patternint = int(pattern)
+    devindex = match_dev_pattern(pattern, devtype, devs)
+    if devindex < 0:
+        print("No match")
+        sys.exit(1)
 
-        for i, dev in enumerate(devs):
-            if dev["index"] == pattern:
-                devindex = i
-                break
+    if devindex < 0:
+        print(f"Didn't find a {devtype} matching '{pattern}'")
+        return
 
-    except ValueError:
-        if not muteall:
-            # Make sure there's a match before muting anything
-            devindex = -1
-            for i, dev in enumerate(devs):
-                if pattern in sub_str(dev['device.description']):
-                    devindex = i
-                    break
-                if pattern in dev['device.description']:
-                    devindex = i
-                    break
-
-            if devindex < 0:
-                print(f"Didn't find a {devtype} matching", pattern)
-                return
-
-    # Now either muteall or devindex should be set.
+    # Now devindex should be set.
     # Set the given device as the fallback
-    if not muteall and devindex >= 0:
-        if DEBUG:
-            print("Setting", sub_str(devs[devindex]['device.description']),
-                  "as fallback")
-            print("Calling", ["pactl", f"set-default-{devtype}",
-                              devs[devindex]['index']])
-        subprocess.call(["pactl", f"set-default-{devtype}",
-                         devs[devindex]['index']])
+    if DEBUG:
+        print("Setting", sub_str(devs[devindex]['device.description']),
+              "=", devs[devindex]['device.description'],
+              "as fallback")
+        print("Calling", ["pactl", f"set-default-{devtype}",
+                          devs[devindex]['index']])
+    subprocess.call(["pactl", f"set-default-{devtype}",
+                     devs[devindex]['index']])
 
     for i, dev in enumerate(devs):
-        if not muteall and i == devindex:
+        if i == devindex:
             mute_unmute(False, dev, devtype)
         elif mute_others:
             mute_unmute(True, dev, devtype)
@@ -239,7 +287,7 @@ def sub_str(s):
         return s
 
     for pair in config['subs']:
-        if pair[0] in s:
+        if pair[0] == s:
             s = s.replace(pair[0], pair[1])
 
     return s
@@ -248,7 +296,8 @@ def sub_str(s):
 def sink_or_source_str(devdict):
     """Pretty output for a sink or source.
     """
-    out = f"{devdict['index']}: {sub_str(devdict['device.description'])}"
+    substr = sub_str(devdict['device.description'])
+    out = f"{devdict['index']}: {substr}"
 
     if devdict['fallback']:
         out += ' (--FALLBACK--)'
@@ -267,6 +316,9 @@ def sink_or_source_str(devdict):
         out = mutedstring(out)
     if devdict['fallback']:
         out = fallbackstring(out)
+
+    if substr != devdict['device.description']:
+        out += f"\n   = {devdict['device.description']}"
 
     return out
 
@@ -337,6 +389,8 @@ def print_status():
     print('Currently running (sink inputs):')
     for si in sink_inputs:
         print(sink_input_str(si))
+    else:
+        print("None")
 
 
 def get_active_sink_volume():
