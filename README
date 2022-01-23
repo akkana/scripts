@@ -304,6 +304,10 @@ monmon.py
     and move them back to a monitor that's still connected.
     Replaces and extends check-monitors.
 
+motionphoto_split.py:
+    Separate the jpeg and video from a Google MotionPhoto file
+    from a Pixel phone.
+
 mouseevent.py:
     Read mouse events from /dev/input even if not running X,
     using the python evdev module. Linux only.
