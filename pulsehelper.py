@@ -128,6 +128,9 @@ def parse_sources_sinks(whichtype):
             name = after_equals(line)
             curdict[words[0].decode()] = name
 
+        elif line.startswith(b"active port:"):
+            curdict["active port"] = b' '.join(words[2:]).decode()
+
     if curdict:
         devs.append(curdict)
     return devs
@@ -179,7 +182,8 @@ def mute_unmute(mute, dev, devtype):
     if DEBUG:
         print("muting" if mute else "unmuting",
               sub_str(dev['device.description']),
-              "=", dev['device.description'])
+              "=", dev['device.description'],
+              "=", dev["name"])
         print("Calling:", args)
     subprocess.call(args)
 
@@ -339,6 +343,9 @@ def sink_or_source_str(devdict):
                                   for v in devdict['volume']]) + ')'
     else:
         out += ' (volume unknown)'
+
+    if "active port" in devdict:
+        out += f" (port: {devdict['active port']})"
 
     if devdict['muted']:
         out += ' (MUTED)'
