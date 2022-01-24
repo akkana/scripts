@@ -3,9 +3,10 @@
 # A quickie way to switch audio between internal speakers and a USB hub,
 # using pulseaudio commandline tools.
 
-# Adjust as needed for your specific audio devices.
+# Configure your specific audio devices in ~/.config/pulsehelper/config.
 # To see your available audio devices: pacmd list-cards
 # For each card, look under "profiles:"
+# See mics: pacmd list-sources; sinks: pacmd list_sinks
 
 # Uses the termcolor module if it's available to highlight fallbacks
 # and muted devices.
@@ -19,6 +20,9 @@ config = {}
 
 DEBUG = False
 
+# Hide monitor inputs?
+HIDE_MONITORS = True
+
 
 # If python-termcolor is installed, show muted items in red.
 try:
@@ -27,11 +31,15 @@ try:
         return colored(s, 'red')
     def fallbackstring(s):
         return colored(s, 'green', attrs=['bold'])
+    def monitorstring(s):
+        return colored(s, 'yellow')
 except:
     def mutedstring(s):
         return f'  ({s})'
     def fallbackstring(s):
         return '** ' + s
+    def monitorstring(s):
+        return s + ' ((fallback))'
 
 def parse_cards():
     """Get a list of cards"""
@@ -181,6 +189,7 @@ def mute_all(devtype):
         print("Muting all")
 
     for i, dev in enumerate(parse_sources_sinks(devtype)):
+        # Don't check for monitors, mute them too.
         mute_unmute(True, dev, devtype)
 
 
@@ -205,16 +214,24 @@ def match_dev_pattern(pattern, devtype, devs):
 
     # Pattern isn't a sub
     # Is it an integer, to be used as an index?
-    try:
-        patternint = int(pattern)
-        if patternint < len(devs):
-            return patternint
+    # try:
+    #     patternint = int(pattern)
+    #     if patternint < len(devs):
+    #         print("Returning patternint", patternint)
+    #         return patternint
 
-    except ValueError:
-        pass    # Not an index
+    # except ValueError:
+    #     pass    # Not an index
 
     # See if pattern is an exact match for a device
     for i, dev in enumerate(devs):
+        # Is it a monitor, and are monitors hidden?
+        if is_monitor(dev) and HIDE_MONITORS:
+            continue
+
+        if pattern == dev["index"]:
+            print("Returning", dev)
+            return i
         if pattern == dev["device.description"]:
             return i
 
@@ -293,9 +310,21 @@ def sub_str(s):
     return s
 
 
+def is_monitor(devdict):
+    if 'monitor' in devdict['name'].lower():
+        return True
+    if 'monitor' in devdict['device.description'].lower():
+        return True
+    return False
+
+
 def sink_or_source_str(devdict):
     """Pretty output for a sink or source.
     """
+    # from pprint import pprint
+    # pprint(devdict)
+    # print("----")
+
     substr = sub_str(devdict['device.description'])
     out = f"{devdict['index']}: {substr}"
 
@@ -313,7 +342,16 @@ def sink_or_source_str(devdict):
 
     if devdict['muted']:
         out += ' (MUTED)'
+
+    # Monitor and muted are both colorized, so they're mutually exclusive
+    if is_monitor(devdict):
+        if HIDE_MONITORS:
+            return ''
+        out = monitorstring(out)
+    elif devdict['muted']:
         out = mutedstring(out)
+
+    # fallbackstring is bold, so it can coexist with either color
     if devdict['fallback']:
         out = fallbackstring(out)
 
@@ -376,13 +414,15 @@ def print_status():
     sinks = parse_sources_sinks('sink')
     print('Sinks:')
     for sink in sinks:
-        print(sink_or_source_str(sink))
+        s = sink_or_source_str(sink)
+        if (s): print(s)
     print()
 
     sources = parse_sources_sinks('source')
     print('Sources:')
     for source in sources:
-        print(sink_or_source_str(source))
+        s = sink_or_source_str(source)
+        if (s): print(s)
     print()
 
     sink_inputs = parse_sink_inputs()
@@ -435,6 +475,9 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
                         help='Set current sink (speaker)')
     parser.add_argument('--getvol', action='store_true', dest='getvol',
                         help='Get the current volume level for the active sink')
+    parser.add_argument('--show-monitors', action='store_true',
+                        dest='show_monitors',
+                        help='Show monitor sources (hidden by default)')
     parser.add_argument('-d', '--debug', action='store_true', dest='debug',
                         help='Get the current volume level for the active sink')
     parser.add_argument('--setvol', action='store', type=str, dest='setvol',
@@ -450,6 +493,8 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
 
     if args.debug:
         DEBUG = True
+
+    HIDE_MONITORS = not(args.show_monitors)
 
     quiet = False
 
