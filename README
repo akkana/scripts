@@ -595,6 +595,12 @@ xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using
     the xlrd package to parse the spreadsheet.
 
+zoomrecordings.py:
+    List recordings available to download, with URLs and sizes.
+    Gives a way to download zoom recordings without needing a browser
+    (if you have the JWT token for the Zoom account in question).
+    Super-simple example of the Zoom API.
+
 
 --------
 Testing:
