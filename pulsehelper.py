@@ -443,24 +443,69 @@ def print_status():
         print("None")
 
 
-def get_active_sink_volume():
+def active_sink():
+    """Return the active sink, or None
+    """
     for sink in parse_sources_sinks('sink'):
-        if not sink['fallback']:
-            continue
-        if 'muted' in sink:
-            muted = sink['muted']
-            if muted:
-                return 0
-        else:
-            muted = False
+        if sink['fallback']:
+            return sink
+    return None
 
-        return sink['volume'], sink['volsteps']
 
-    return -1
+def get_sink_volume(sink=None):
+    """Get volume on a sink (if None, use the active sink).
+       Returns a list of channel volumes and the base volume
+       (the volume that's considered to be 100%, though sinks
+       can have volume set above this)
+       e.g. [56360, 56360], 65536
+    """
+    if not sink:
+        sink = active_sink()
+    if not sink:
+        return -1
 
-def set_active_sink_volume(newvol):
-    subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                     "%d%%" % newvol])
+    if 'muted' in sink:
+        muted = sink['muted']
+        if muted:
+            return 0
+    else:
+        muted = False
+
+    return sink['volume'], sink['base_volume']
+
+
+def volume_string(sink=None):
+    """Return a readable string showing volume settings and percentages.
+    """
+    vol, basevol = get_sink_volume(sink)
+    s = str( [ v for v in vol ] )
+    s += " / "
+    s += str(basevol)
+    s += "    "
+    s += str( [ int(round(v * 100 /basevol)) for v in vol ] )
+    return s
+
+
+def set_sink_volume(newvol, sink=None):
+    """Set volume on a sink.
+       newvol is an int percentage between 0 and 100.
+       sink is a dictionary; if None, use the active sink.
+       May not set to an exact value: pactl seems to take
+       set-sink-volume arguments as only approximate hints.
+    """
+    if not sink:
+        sink = active_sink()
+    if not sink:
+        print("No active sink")
+        return
+
+    if 'base_volume' in sink:
+        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                         str(int(newvol * sink['base_volume'] / 100))])
+    else:
+        print("No base_volume, using percent")
+        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                         "%d%%" % newvol])
 
 
 if __name__ == '__main__':
@@ -508,24 +553,22 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
 
     quiet = False
 
-    def get_vol_percents():
-        vol, volsteps = get_active_sink_volume()
-        return [ int(v * 100 /volsteps) for v in vol ]
-
     if args.getvol:
-        print(get_vol_percents())
+        print(volume_string())
         quiet = True
 
     if args.setvol:
-        if args.setvol[0] == '-' or args.setvol[0] == '+':
-            vol, volsteps = get_active_sink_volume()
-            vol = max(vol)
-            percent = int(vol * 100 / volsteps) + int(args.setvol)
-        else:
-            percent = int(args.setvol)
+        sink = active_sink()
+        if sink:
+            if args.setvol[0] == '-' or args.setvol[0] == '+':
+                vol, volsteps = get_sink_volume()
+                vol = max(vol)
+                percent = int(vol * 100 / volsteps) + int(args.setvol)
+            else:
+                percent = int(args.setvol)
 
-        set_active_sink_volume(percent)
-        print(get_vol_percents())
+        set_sink_volume(percent, sink)
+        print(volume_string(sink))
 
         quiet = True
 
