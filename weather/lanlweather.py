@@ -11,6 +11,9 @@ import requests
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+# LANL_URL = 'https://www.weather.lanl.gov/data_request_green_weather.asp'
+# LANL_URL = 'https://weathermachine.lanl.gov/data_request_green_weather.asp'
+LANL_URL = 'http://weathermachine.lanl.gov/data_request_green_weather.asp'
 
 # LANL has a bad TLS certificate.
 # Disable the endless warnings:
@@ -294,7 +297,7 @@ class LANLWeather(object):
 
         headers = {
             'User-Agent': 'LANL Weather Fetcher 0.9',
-            'Referer': 'https://www.weather.lanl.gov/data_request_green_weather.asp',
+            'Referer': LANL_URL,
             'Content-Type': 'application/x-www-form-urlencoded',
         }
 
@@ -303,7 +306,6 @@ class LANLWeather(object):
         # r = requests.post('http://www.weather.lanl.gov/'
         #                   'data_request_green_weather.asp',
         #                   data=request_data, headers=headers, verify=False)
-        LANL_URL = 'https://www.weather.lanl.gov/data_request_green_weather.asp'
         try:
             r = requests.post(LANL_URL,
                               headers=headers, # cookies=cookies,
@@ -326,6 +328,7 @@ class LANLWeather(object):
             pprint(request_data)
             raise RuntimeError("Empty response on %s" % LANL_URL)
 
+        print("Fetched", len(r.text), "bytes")
         return r.text
 
     def get_fields_and_units(self, lines):
