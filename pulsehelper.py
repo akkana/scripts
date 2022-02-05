@@ -115,6 +115,9 @@ def parse_sources_sinks(whichtype):
         elif words[0] == b'muted:':
             curdict['muted'] = (words[1] == b'yes')
 
+        elif words[0] == b'volume' and words[1] == b'steps:':
+            curdict['volsteps'] = int(words[2])
+
         elif words[0] == b'volume:':
             curdict['volume'] = parse_volume(words)
 
@@ -446,17 +449,18 @@ def get_active_sink_volume():
             continue
         if 'muted' in sink:
             muted = sink['muted']
+            if muted:
+                return 0
         else:
             muted = False
-        return int(sink['base_volume']), muted
+
+        return sink['volume'], sink['volsteps']
 
     return -1
 
 def set_active_sink_volume(newvol):
-    if '%' not in newvol:
-        newvol += '%'
-        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                         newvol])
+    subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                     "%d%%" % newvol])
 
 
 if __name__ == '__main__':
@@ -482,15 +486,14 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
                         help='Set current sink (speaker)')
     parser.add_argument('--getvol', action='store_true', dest='getvol',
                         help='Get the current volume level for the active sink')
+    parser.add_argument('--setvol', action='store', type=str, dest='setvol',
+                        help='Set the current volume level for the active sink.'
+                             ' A percentage, optionally preceded by + or -.')
     parser.add_argument('--show-monitors', action='store_true',
                         dest='show_monitors',
                         help='Show monitor sources (hidden by default)')
     parser.add_argument('-d', '--debug', action='store_true', dest='debug',
-                        help='Get the current volume level for the active sink')
-    parser.add_argument('--setvol', action='store', type=str, dest='setvol',
-                        default=-1,
-                        help='Set the current volume level for the active sink.'
-                             ' A percentage, optionally preceded by + or -.')
+                        help='Show debugging chatter')
     parser.add_argument('-q', '--quiet',
                         action="store_true", dest="force_quiet",
                         help="Don't print status at the end")
@@ -505,12 +508,25 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
 
     quiet = False
 
+    def get_vol_percents():
+        vol, volsteps = get_active_sink_volume()
+        return [ int(v * 100 /volsteps) for v in vol ]
+
     if args.getvol:
-        print(get_active_sink_volume())
+        print(get_vol_percents())
         quiet = True
 
-    if args.setvol >= 0:
-        print(set_active_sink_volume(args.setvol))
+    if args.setvol:
+        if args.setvol[0] == '-' or args.setvol[0] == '+':
+            vol, volsteps = get_active_sink_volume()
+            vol = max(vol)
+            percent = int(vol * 100 / volsteps) + int(args.setvol)
+        else:
+            percent = int(args.setvol)
+
+        set_active_sink_volume(percent)
+        print(get_vol_percents())
+
         quiet = True
 
     if args.source:
