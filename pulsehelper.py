@@ -41,7 +41,7 @@ except:
     def monitorstring(s):
         return s + ' ((fallback))'
 
-def parse_cards():
+def parse_cards() -> list:
     """Get a list of cards"""
     cards = []
     internal_card = None
@@ -58,7 +58,7 @@ def parse_cards():
     return cards
 
 
-def parse_volume(words):
+def parse_volume(words: list) -> int:
     if words[1] == b'front-left:':
         return [int(words[2]), int(words[9])]
     if words[1] == b'mono:':
@@ -67,7 +67,7 @@ def parse_volume(words):
     return None
 
 
-def after_equals(line):
+def after_equals(line: bytes) -> str:
     eq = line.index(b'=')
     if not eq:
         return None
@@ -80,7 +80,7 @@ def after_equals(line):
 by_index = { 'source': {}, 'sink': {} }
 
 
-def parse_sources_sinks(whichtype):
+def parse_sources_sinks(whichtype: str) -> list:
     """Get a list of sinks or sources. whichtype should be "source" or "sink".
     """
     devs = []
@@ -139,7 +139,7 @@ def parse_sources_sinks(whichtype):
     return devs
 
 
-def parse_sink_inputs():
+def parse_sink_inputs() -> list:
     """Parse sink inputs: running programs that are producing audio.
     """
     cmd = ['pactl', 'list', 'sink-inputs']
@@ -175,7 +175,7 @@ def parse_sink_inputs():
     return sink_inputs
 
 
-def mute_unmute(mute, dev, devtype):
+def mute_unmute(mute: bool, dev: dict, devtype: str):
     """Mute (mute=True) or unmute (False) a source (devtype="source")
        or sink ("sink") of a given name.
        pactl set-source-mute $source 1
@@ -191,7 +191,7 @@ def mute_unmute(mute, dev, devtype):
     subprocess.call(args)
 
 
-def mute_all(devtype):
+def mute_all(devtype: str):
     if DEBUG:
         print("Muting all")
 
@@ -200,7 +200,7 @@ def mute_all(devtype):
         mute_unmute(True, dev, devtype)
 
 
-def match_dev_pattern(pattern, devtype, devs):
+def match_dev_pattern(pattern: str, devtype: str, devs: list) -> int:
     """Find the device matching pattern, which could be a nickname,
        an integer, a full match for a dev name, or a partial match
        for a dev name if there's only one such match.
@@ -259,7 +259,7 @@ def match_dev_pattern(pattern, devtype, devs):
     return -1
 
 
-def unmute_one(pattern, devtype, mute_others=True):
+def unmute_one(pattern: str, devtype: str, mute_others: bool = True):
     """Make one source or sink the active fallback, unmuting it and
        (optionally) muting all others.
        pattern is a string (not regexp) to search for in the device description,
@@ -304,7 +304,7 @@ def unmute_one(pattern, devtype, mute_others=True):
         print()
 
 
-def sub_str(s):
+def sub_str(s: str) -> str:
     """Substitute any matches found in config['subs'].
     """
     if 'subs' not in config:
@@ -317,7 +317,7 @@ def sub_str(s):
     return s
 
 
-def is_monitor(devdict):
+def is_monitor(devdict: dict) -> bool:
     if 'monitor' in devdict['name'].lower():
         return True
     if 'monitor' in devdict['device.description'].lower():
@@ -325,7 +325,7 @@ def is_monitor(devdict):
     return False
 
 
-def sink_or_source_str(devdict):
+def sink_or_source_str(devdict: dict) -> str:
     """Pretty output for a sink or source.
     """
     # from pprint import pprint
@@ -371,7 +371,7 @@ def sink_or_source_str(devdict):
     return out
 
 
-def sink_input_str(sidict):
+def sink_input_str(sidict: dict) -> str:
     """Pretty output for a sink input.
     """
     # return str(sidict)
@@ -386,7 +386,7 @@ def sink_input_str(sidict):
     return out
 
 
-def read_config_file():
+def read_config_file() -> dict:
     """Read the config file.
        Currently, the only configuration is a list of substitutions
        to make the output shorter and more readable.
@@ -443,7 +443,7 @@ def print_status():
         print("None")
 
 
-def active_sink():
+def active_sink() -> dict:
     """Return the active sink, or None
     """
     for sink in parse_sources_sinks('sink'):
@@ -452,7 +452,7 @@ def active_sink():
     return None
 
 
-def get_sink_volume(sink=None):
+def get_sink_volume(sink: dict = None) -> tuple:
     """Get volume on a sink (if None, use the active sink).
        Returns a list of channel volumes and the base volume
        (the volume that's considered to be 100%, though sinks
@@ -474,7 +474,7 @@ def get_sink_volume(sink=None):
     return sink['volume'], sink['base_volume']
 
 
-def volume_string(sink=None):
+def volume_string(sink: dict = None) -> str:
     """Return a readable string showing volume settings and percentages.
     """
     vol, basevol = get_sink_volume(sink)
@@ -486,7 +486,7 @@ def volume_string(sink=None):
     return s
 
 
-def set_sink_volume(percent, sink=None, direction=0):
+def set_sink_volume(percent: int, sink: dict = None, direction: int = 0):
     """Set volume on a sink.
        newvol is an int percentage between 0 and 100.
        sink is a dictionary; if None, use the active sink.
