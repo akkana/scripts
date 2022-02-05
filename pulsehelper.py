@@ -486,10 +486,13 @@ def volume_string(sink=None):
     return s
 
 
-def set_sink_volume(newvol, sink=None):
+def set_sink_volume(percent, sink=None, direction=0):
     """Set volume on a sink.
        newvol is an int percentage between 0 and 100.
        sink is a dictionary; if None, use the active sink.
+       If direction is nonzero, adjust the current volume
+       in that direction by the given percent.
+
        May not set to an exact value: pactl seems to take
        set-sink-volume arguments as only approximate hints.
     """
@@ -499,13 +502,37 @@ def set_sink_volume(newvol, sink=None):
         print("No active sink")
         return
 
-    if 'base_volume' in sink:
-        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                         str(int(newvol * sink['base_volume'] / 100))])
+    # if 'base_volume' not in sink:
+    #     print("No base_volume, using percent")
+    #     subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+    #                      "%d%%" % newvol])
+    #     return
+
+    basevol = int(sink['base_volume'])
+    maxvol = max(get_sink_volume(sink)[0])
+
+    # Current volume in percent
+    curvol = int(round(maxvol * 100 / basevol))
+
+    if direction > 0:
+        newvol = curvol + percent
+
+    elif direction < 0:
+        newvol = curvol - percent
+
     else:
-        print("No base_volume, using percent")
-        subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
-                         "%d%%" % newvol])
+        newvol = percent
+
+    volnum = int(newvol * basevol / 100.)
+
+    if max(sink['volume']) >= basevol:
+        pass
+
+    if DEBUG:
+        print("Current volume %d = %d%%; new volume will be %d + %d%%"
+              % (maxvol, curvol, newvol, volnum))
+    subprocess.call(["pactl", "set-sink-volume", "@DEFAULT_SINK@",
+                     str(volnum)])
 
 
 if __name__ == '__main__':
@@ -560,15 +587,24 @@ Super Long Hard To Read PulseAudio Name = Nice Short Name
     if args.setvol:
         sink = active_sink()
         if sink:
-            if args.setvol[0] == '-' or args.setvol[0] == '+':
-                vol, volsteps = get_sink_volume()
-                vol = max(vol)
-                percent = int(vol * 100 / volsteps) + int(args.setvol)
+            if args.setvol[0] == '-':
+                direc = -1
+                setvol = int(args.setvol[1:])
+            elif args.setvol[0] == '+':
+                direc = 1
+                setvol = int(args.setvol[1:])
             else:
-                percent = int(args.setvol)
+                direc = 0
+                setvol = int(args.setvol)
 
-        set_sink_volume(percent, sink)
-        print(volume_string(sink))
+            set_sink_volume(setvol, sink, direction=direc)
+
+            # To get the new volume, need to re-fetch the device,
+            # so don't specify the sink here.
+            print("New volume:", volume_string())
+
+        else:
+            print("No active sink")
 
         quiet = True
 
