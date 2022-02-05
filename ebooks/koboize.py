@@ -34,7 +34,7 @@ def convert_file(filename, destdir):
         if name.endswith('.html') or name.endswith('.xhtml'):
             print("Converting %s" % name)
             fp = book.zip.open(name)
-            soup = BeautifulSoup(fp)
+            soup = BeautifulSoup(fp, "lxml")
             altertags(soup)
             fp.close()
             ozf.writestr(name, str(soup))
