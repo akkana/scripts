@@ -83,7 +83,7 @@ def build_upcoming_meetings_list(only_future=False):
     if now.day > 20:
         cookiedict = { 'Setting-69-Calendar Year': 'Next Month' }
         r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
-        parse_meeting_list(r.text, only_future)
+        parse_html_meeting_list(r.text, only_future)
 
     # Get the meetings on the default (this month) page.
     # These will be appended to the global list upcoming_meetings.
