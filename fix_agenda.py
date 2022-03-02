@@ -21,6 +21,7 @@
 # It will also make a zip file of everything.
 
 from bs4 import BeautifulSoup, NavigableString
+from datetime import datetime
 import os, sys
 
 from word2html import docx2html, docx2htmlfile
@@ -100,6 +101,7 @@ def fix_agenda(agenda_infile):
     cantconvert = []
     converted = []
     already_converted = []
+    guesses = []
 
     for em in soup.findAll('em'):
         # em_text = os.path.splitext(em.text.strip())[0]
@@ -138,7 +140,7 @@ def fix_agenda(agenda_infile):
                     best_match = i
                     best_ratio = r
             if best_ratio > .75:
-                print("Guessing", agendaname, "-->", filenames[best_match])
+                guesses.append((agendaname, filenames[best_match]))
                 return best_match
             return -1
 
@@ -254,9 +256,19 @@ def fix_agenda(agenda_infile):
     else:
         print("Couldn't save zip file")
 
-    # Add a link to the zip file in the agenda:
+    # Footer material
     tag = soup.new_tag("hr")
     soup.body.append(tag)
+
+    # Last-modified date
+    now = datetime.now()
+    nowtext = NavigableString("Updated: " + now.strftime("%a %m/%d/%Y %H:%M"))
+    soup.body.append(nowtext)
+
+    tag = soup.new_tag("br")
+    soup.body.append(tag)
+
+    # link to the zip file:
     tag = soup.new_tag("a", href=zipfile)
     tag.string = "Zip file of everything"
     soup.body.append(tag)
@@ -283,6 +295,11 @@ def fix_agenda(agenda_infile):
         for f in cantconvert:
             print("    ", f)
 
+    if guesses:
+        print("\nFuzzy matches:")
+        for a, b in guesses:
+            print(f"    {a} -> {b}")
+
     if nosuchfiles:
         print("\nCouldn't find files:")
         for f in nosuchfiles:
@@ -291,5 +308,4 @@ def fix_agenda(agenda_infile):
 
 if __name__ == '__main__':
     fix_agenda(sys.argv[1])
-
 
