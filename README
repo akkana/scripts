@@ -103,6 +103,13 @@ cairodrawwin.py:
     A base for building Python3 GTK3/Cairo apps using a drawing area.
     You can import and subclass it, or use it as a template.
 
+camset.py:
+    A wrapper for v4l2-ctl, to allow camera capability queries that
+    don't scroll for three pages, and settings based on profiles so
+    you don't have to fumble around with history or aliases for five
+    different commands when the camera resets in the middle of a
+    session.
+
 cellaut.py:
     Simple cellular automata simulation in Python.
     Slow, not something you'd want for real simulations.
