@@ -50,15 +50,20 @@ def run_it(args):
         print("Couldn't run", args)
 
 
-def find_camera(pat:str, allcams:dict) -> str:
-    """Return the video device (/dev/videoN) associated with the
-       first camera whose name contains the given pattern (case insensitive).
+def find_camera(pat:str, allcams:dict) -> tuple:
+    """Return the name () and the video device (/dev/videoN)
+       associated with the first camera whose name contains the
+       given pattern (case insensitive), or that has a device
+       matching the pattern.
     """
     pat = pat.lower()
     for cam in allcams:
         if pat in cam.lower():
-            return allcams[cam][0]
-    return None
+            return cam, allcams[cam][0]
+        for dev in allcams[cam]:
+            if pat in dev:
+                return cam, dev
+    return None, None
 
 
 def find_all_cameras() -> dict:
@@ -90,7 +95,23 @@ def find_all_cameras() -> dict:
 
         if line != cam:
             cam = line
-            # print("New cam", cam)
+
+            # Remove the terminating colon
+            while cam.endswith(':'):
+                cam = cam[:-1]
+
+            # This is something like
+            # "Integrated Camera: Integrated C (usb-0000:00:14.0-8)"
+            # Remove the USB codes.
+            try:
+                match = re.match(
+                    '(.*) \((usb-[0-9a-fA-F-\:\.]+)\)',
+                    cam)
+                cam = match.group(1)
+                usbdev = match.group(2)
+            except:
+                pass
+
             found_cameras[cam] = []
 
     return found_cameras
@@ -145,7 +166,6 @@ if __name__ == '__main__':
         print(f"e.g. {os.path.basename(sys.argv[0])} logitech night")
         sys.exit(0)
 
-
     if len(sys.argv) > 1:
         pat = sys.argv[1]
         if pat == '-h' or pat == '--help':
@@ -156,14 +176,18 @@ if __name__ == '__main__':
     all_cameras = find_all_cameras()
     keys = list(all_cameras.keys())
 
-    if len(all_cameras) == 1:
+    if pat:
+        camname, camdev = find_camera(pat, all_cameras)
+
+    elif len(all_cameras) == 1:
+        camname = keys[0]
         camdev = all_cameras[keys[0]][0]
-    elif pat:
-        camdev = find_camera(pat, all_cameras)
     else:
         camdev = None
 
     if not camdev:
+        if pat:
+            print(f"Couldn't find a camera matching '{pat}'.")
         print("Please specify which camera you want:")
 
         for cam in all_cameras:
@@ -171,7 +195,7 @@ if __name__ == '__main__':
             print("   ", ' '.join(all_cameras[cam]))
         sys.exit(0)
 
-    print("Camera dev:", camdev)
+    print(camname, ":", camdev)
 
     if len(sys.argv) == 3:
         set_settings(camdev, sys.argv[2])
