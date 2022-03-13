@@ -17,3 +17,8 @@ grebook.sh:
 grebook.py:
     A Python version of grebook, mainly useful to show how to implement
     a multi-stage command pipeline in Python.
+
+mirror2kobo.py:
+    From a directory structure of epub files, create a parallel structure
+    with all the same files, same create and modify dates, but with
+    files converted for Kobo's .kepub.epub format.

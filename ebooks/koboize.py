@@ -32,7 +32,7 @@ def convert_file(filename, destdir):
     for name in namelist:
         # print("name: %s" % name)
         if name.endswith('.html') or name.endswith('.xhtml'):
-            print("Converting %s" % name)
+            # print("Converting %s" % name)
             fp = book.zip.open(name)
             soup = BeautifulSoup(fp, "lxml")
             altertags(soup)
@@ -44,6 +44,8 @@ def convert_file(filename, destdir):
     book.close()
     ozf.close()
     print("Converted %s to %s" % (filename, outbookname))
+    return outbookname
+
 
 def altertags(soup):
     counter = 1
