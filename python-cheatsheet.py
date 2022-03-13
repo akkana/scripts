@@ -278,6 +278,9 @@ for b in string_list:
         best_match = b
         best_ratio = r
 
+# Compare two possibly similar strings:
+
+
 # raw string literals: r'' avoids any backslash escapes.
 # printf-style %x still works, e.g. r'abc %d' % 42
 r = r'abc\def'
@@ -403,6 +406,7 @@ filename = 'file%s.txt' % num
 # Formatted string literals or f-strings, Python 3.6+
 print(f'Fly to {name}: {lat}N {lon}E')
 print(f'The value of pi is approximately {math.pi:.3f}.')
+print(f"{setting:>27}: ")    # right-justify with >
 
 # decimals and field widths
 >>> f'{math.pi:.2f}'
@@ -544,7 +548,7 @@ buf.insert(2, 0xf7)
 # iterator, list and dictionary helpers
 ########################################################
 
-# Remove items from a list: I always forget how to do this.
+# Remove/delete items from a list: I always forget how to do this.
 mylist.remove("item")    # Removes the first instance of "item"
 mylist.pop(i)            # Removes and returns list[i]
 # There's no single call to remove ALL instances of an item,
@@ -636,7 +640,7 @@ def file2dict(filename):
         return dict(line.strip().split('=',1) for line in af)
 
 #
-# Walk a directory tree
+# Walk a directory tree with os.walk
 #
 def walkfiles(rootdir):
     for root, dirs, files in os.walk(rootdir):
@@ -797,6 +801,15 @@ parser.print_help()
 ########################################################
 # Dates and times
 ########################################################
+
+# Converting between various date/time formats,
+# from https://docs.python.org/3/library/time.html :
+From                       To                        Use
+----                       ----                      ------
+seconds since the epoch    struct_time in UTC        gmtime()
+seconds since the epoch    struct_time in localtime  localtime()
+struct_time in UTC         seconds since the epoch   calendar.timegm()
+struct_time in local time  seconds since the epoch   mktime()
 
 # Printing formats:
 >>> dt = datetime.datetime.now()
@@ -1031,6 +1044,9 @@ noon_mt - noon_et
 
 ################################################################
 # Pathlib, cross-platform replacement for os.path and much more.
+# https://docs.python.org/3/library/pathlib.html
+# https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/
+# https://treyhunner.com/2019/01/no-really-pathlib-is-great/
 ################################################################
 
 >>> from pathlib import Path, PosixPath
@@ -1061,6 +1077,18 @@ PosixPath('/home/username/pathlib')
 # .open(), .read_bytes(), .read_text(), .write_bytes(), .write_text()
   # reads and writes don't require open first
 
+Path('.editorconfig').write_text('# config goes here')
+
+path = Path('.editorconfig')
+with path.open(mode='wt') as config:
+    config.write('# config goes here')
+
+# 3.6 on:
+path = Path('.editorconfig')
+with open(path, mode='wt') as config:
+    config.write('# config goes here')
+
+
 # Use pathlib to search the filesystem:
 for filename in Path('/').rglob('*.py'):
     print(filename)
@@ -1079,7 +1107,8 @@ output = subprocess.run(arglist, stdout=subprocess.DEVNULL,
 # More complicated way:
 import subprocess
 
-proc = subprocess.Popen(["procname"], stdout=subprocess.PIPE)
+proc = subprocess.Popen(["procname"], check=True, stdout=subprocess.PIPE)
+# check raises  CalledProcessError if the subprocess exits != 0
 while True:
     line = proc.stdout.readline()
     print("line: %s" % line)
@@ -1358,6 +1387,7 @@ MRAB disagrees:
 >
 > It's the same for both of them.
 
+Some people on python-list suggest it should have been named nobreak.
 
 """
 
@@ -1906,6 +1936,8 @@ Several ways of hinting about types in Python 3:
 Type hinting with the typing module:
   https://docs.python.org/3/library/typing.html
 
+def percent(num: float) -> int:
+
 Function annotations, PEP 3107:
   https://www.python.org/dev/peps/pep-3107/
 
@@ -2011,8 +2043,12 @@ Installing to a virtualenv (don't use setup.py install):
 
 Developing a package in a virtualenv:
   pip install -e .
-OR
+(OR
   python3 setup.py develop
+but the pip option is preferred; calling setup.py won't properly tell
+pip that it's installed. Read more:
+https://stackoverflow.com/questions/30306099/pip-install-editable-vs-python-setup-py-develop
+)
 
 This makes links to the live sourcedir, so it will see changes.
 
