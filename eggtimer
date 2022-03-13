@@ -2,7 +2,14 @@
 
 from __future__ import print_function
 
-import sys, os, time
+import sys, os
+import time
+import signal
+
+
+wakeuptime = None
+message = "Wake up!"
+
 
 # Tkinter changed capitalization from Python 2 to Python 3.
 # Python 2: import Tkinter as tkinter
@@ -22,17 +29,21 @@ except ImportError:
         print("Sorry, ImportError, eggtimer needs Tkinter")
         sys.exit(1)
 
+
 # Callback for key events:
 def keyEvent(event):
     # print(event.char, event.keysym, event.keycode)
     if event.char == 'q' or event.keysym == 'Return':
         sys.exit(0)
 
+
 def Usage():
     print("Usage:", sys.argv[0], "minutes message")
-    sys.exit(1)
+    print("With no arguments, will show any eggtimers currently running")
+    sys.exit(0)
 
-def showAlert(message):
+
+def showAlert(message:str):
     # This is supposed to show a dialog, but tkMessageBox doesn't exist:
     # tkMessageBox.showwarning("hello", message)
 
@@ -57,8 +68,38 @@ def showAlert(message):
 
     root.mainloop()
 
+
 # main: read the runtime arguments.
 if __name__ == '__main__':
+
+    if len(sys.argv) == 1:
+        # Find all running eggtimer processes and send them a SIGUSR1
+        foundone = False
+        slashproc = "/proc"
+        for pid in os.listdir(slashproc):
+            try:
+                # Make sure the directory name is an integer PID
+                pidint = int(pid)
+                # Skip the PID of this process
+                if pidint == os.getpid():
+                    continue
+                # Look for other eggtimer processes
+                with open(os.path.join(slashproc, pid, "cmdline")) as fp:
+                    cmdline = fp.read().split('\0')
+                    if "python" not in cmdline[0]:
+                        continue
+                    if not (cmdline[1].endswith("eggtimer") or
+                            cmdline[1].endswith("eggtimer.py")):
+                        continue
+                    foundone = True
+                    os.kill(pidint, signal.SIGUSR1)
+            except:
+                pass
+
+        if not foundone:
+            Usage()
+
+        sys.exit(0)
 
     try:
       sleeptime = float(sys.argv[1]) * 60
@@ -67,8 +108,6 @@ if __name__ == '__main__':
 
     if len(sys.argv) > 2:
       message = ' '.join(sys.argv[2:])
-    else:
-      message = "Wake up!"
 
     print("Sleeping for", sleeptime, "seconds with message:", message)
 
@@ -77,6 +116,21 @@ if __name__ == '__main__':
     if rc:
         sys.exit(0)
 
+    # Set up a signal handler so users can query for time left
+    def signal_handler(signal, frame):
+        timeleft = int(wakeuptime - time.time())
+        print("In", timeleft, "seconds:", message, "(PID %d)" % os.getpid())
+
+        time.sleep(timeleft)
+
+        showAlert(message)
+
+    # Trap SIGUSR1
+    signal.signal(signal.SIGUSR1, signal_handler)
+
+    wakeuptime = time.time() + sleeptime
+
     time.sleep(sleeptime)
+    print("woke up")
 
     showAlert(message)
