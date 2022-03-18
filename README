@@ -271,6 +271,10 @@ langgrep:
     Search (grep) for patterns only within scripts written in a
     specified language (e.g. in all python scripts).
 
+legistarparse.py:
+    An experiment in using pdfminer to parse legistar PDFs,
+    for use with losalamosmtgs.py.
+
 losalamosmtgs.py:
     Scrape the Los Alamos legistar page to find out about upcoming
     county meetings and find out what's on their agendas.
