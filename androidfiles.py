@@ -97,7 +97,16 @@ def strip_schema(path):
         sdcards = find_sdcards()
         if not sdcards:
             raise RuntimeError("Can't find an Android SD card")
-        return posixpath.join("/storage", sdcards[0], path[10:])
+        # posixpath fails if any of its arguments start with "/":
+        # it ignores all other args and only returns "/"
+        path = path[10:]
+        while path and path[0] == '/':
+            if path == '/':
+                path = ""
+            else:
+                path = path[1:]
+
+        return posixpath.join("/storage", sdcards[0], path)
 
     return path
 
@@ -174,6 +183,15 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
                 print("Skipping line:", line)
             continue
 
+        if line.startswith('dr'):
+            # It's a directory. Directories on marshmallow don't list size,
+            # so the name index is one less than for files.
+            # But on 10-11-12 they do list size.
+            # XXX Ugh, I no longer have a marshmallow device to test on,
+            # and this is likely broken now in marshmallow for directories.
+            dir_list.append(words[-1])
+            continue
+
         # Figure out which ls format this machine uses, if not already set:
         if not indices:
             try:
@@ -188,19 +206,15 @@ def list_android_dir(path, sorted=True, sizes=False, recursive=False):
         if not indices:
             print("ls -lR output matches neither known format.",
                   file=sys.stderr)
+            print(f"Size isn't in either {marshmallow_indices['size']}",
+                  f"({words[marshmallow_indices['size']]}) or",
+                  f"{eleven_indices['size']}",
+                  f"({words[eleven_indices['size']]})")
             print("Command was:", ' '.join(args))
             print(">>>", line, "<<<")
+            print("output words:", words)
             print()
-            continue
-
-        if line.startswith('dr'):
-            # It's a directory. Directories on marshmallow don't list size,
-            # so the name index is one less than for files.
-            # But on 10-11-12 they do list size.
-            # XXX Ugh, I no longer have a marshmallow device to test on,
-            # and this is likely broken now in marshmallow for directories.
-            dir_list.append(words[indices["fname"]])
-            continue
+            break
 
         if not line.startswith('-r'):
             if VERBOSE:
