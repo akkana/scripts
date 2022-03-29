@@ -141,7 +141,7 @@ class FontApp(gtk.Window):
         main_vbox.add(main_hbox)
 
         #
-        # Left pane: the font list
+        # Left pane: the font list, a TreeView backed by a ListStore
         #
         self.sw = gtk.ScrolledWindow()
         self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
@@ -257,6 +257,9 @@ class FontApp(gtk.Window):
         # Not sure if this could be done earlier
         self.preview.get_style_context().add_class("preview")
 
+
+        self.update_font_list()
+
         #
         # Just before showing, update everything:
         #
@@ -268,8 +271,6 @@ class FontApp(gtk.Window):
         self.sw.set_size_request(self.list_width, -1)
         #self.sw.set_size_request(self.list_width, self.list_height)
         self.preview.set_size_request(-1, self.preview_height)
-
-        self.update_font_list()
 
         # Done with UI, finish showing window
         self.show_all()
@@ -457,6 +458,25 @@ class FontApp(gtk.Window):
         for btn in self.category_buttons:
             self.change_button_color(btn, False)
 
+    def select_font_by_name(self, fontname):
+        """Select the treeview row matching the given font name, if any.
+        """
+        # OMG, it's so incredibly difficult and undocumented
+        # to auto-select a row in a treeview!
+
+        # Iiterate through the treeview
+        for row, treemodelrow in enumerate(self.store):
+            # treemodelrow is a gi.overrides.Gtk.TreeModelRow
+            # treemodelrow[0] is the name of the font
+            if treemodelrow[0] == fontname:
+                # print("Matched line", row, treemodelrow[0])
+                col0 = self.tree_view.get_column(0)
+                self.tree_view.set_cursor(row, col0, True)
+                self.tree_view.scroll_to_cell(row)
+                return
+
+            treemodelrow = treemodelrow.get_next()
+
     #
     # Lines in the category file look like:
     # catname: font, font, font ...
@@ -488,15 +508,11 @@ class FontApp(gtk.Window):
                     if varval[0] == "string":
                         self.preview.set_text(varval[1].strip())
                         continue
-                    # I haven't yet found any way to set a treeview
-                    # programatically, so fontname is ignored for now.
-                    # if varval[0] == "fontname":
-                    #     # XXXXXX
-                    #     print("Trying to set a selection")
-                    #     selection = self.tree_view.get_selection()
-                    #     # selection.select_path(5)
-                    #     selection.select_all()
-                    #     continue
+
+                    if varval[0] == "fontname":
+                        self.select_font_by_name(varval[1])
+                        continue
+
                     if varval[0] == "fontsize":
                         self.fontsize = int(varval[1])
                         self.sizespin.set_value(self.fontsize)
