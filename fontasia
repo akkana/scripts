@@ -150,19 +150,19 @@ class FontApp(gtk.Window):
         self.all_families = context.list_families()
         self.store = gtk.ListStore(str)
 
-        self.tree_view = gtk.TreeView(model=self.store)
+        self.treeview = gtk.TreeView(model=self.store)
         # XXX deprecated
-        # self.tree_view.set_rules_hint(True)
+        # self.treeview.set_rules_hint(True)
         self.store.set_sort_column_id(0, gtk.SORT_ASCENDING)
 
-        selection = self.tree_view.get_selection()
+        selection = self.treeview.get_selection()
         selection.set_mode(gtk.SELECTION_MULTIPLE)
 
-        self.tree_view.connect("cursor-changed", self.render_font);
+        self.treeview.connect("cursor-changed", self.render_font);
 
-        self.sw.add(self.tree_view)
+        self.sw.add(self.treeview)
 
-        self.create_column(self.tree_view)
+        self.create_column(self.treeview)
 
         main_hbox.pack_start(self.sw, expand=False)
 
@@ -301,7 +301,7 @@ class FontApp(gtk.Window):
         #self.update_font_list()
 
     def toggle_fancy_list(self, yesno):
-        column = self.tree_view.get_column(0)
+        column = self.treeview.get_column(0)
         rendererText = column.get_cell_renderers()[0]
         if self.fancy_list:
             column.set_cell_data_func(rendererText, self.set_list_font)
@@ -356,7 +356,7 @@ class FontApp(gtk.Window):
     # It calls toggle_font_in_category.
     #
     def toggle_cur_font_in_cat(self, widget, catname):
-        selection = self.tree_view.get_selection()
+        selection = self.treeview.get_selection()
         model, item = selection.get_selected_rows()
 
         # Read all the selected fonts, not just the first one:
@@ -365,7 +365,7 @@ class FontApp(gtk.Window):
             #print("Adding", fontname, "to", catname)
             self.toggle_font_in_category(fontname, catname)
             self.update_category_buttons(fontname)
-        self.tree_view.grab_focus()
+        self.treeview.grab_focus()
 
     # Update the View Categories combobox:
     def update_cats_menu(self):
@@ -464,15 +464,15 @@ class FontApp(gtk.Window):
         # OMG, it's so incredibly difficult and undocumented
         # to auto-select a row in a treeview!
 
-        # Iiterate through the treeview
+        # Iterate through the treeview
         for row, treemodelrow in enumerate(self.store):
             # treemodelrow is a gi.overrides.Gtk.TreeModelRow
             # treemodelrow[0] is the name of the font
             if treemodelrow[0] == fontname:
                 # print("Matched line", row, treemodelrow[0])
-                col0 = self.tree_view.get_column(0)
-                self.tree_view.set_cursor(row, col0, True)
-                self.tree_view.scroll_to_cell(row)
+                col0 = self.treeview.get_column(0)
+                self.treeview.set_cursor(row, col0, True)
+                self.treeview.scroll_to_cell(row)
                 return
 
             treemodelrow = treemodelrow.get_next()
@@ -670,7 +670,7 @@ class FontApp(gtk.Window):
                 #self.category_buttons[i].set_active(False)
 
     def current_font(self):
-        selection = self.tree_view.get_selection()
+        selection = self.treeview.get_selection()
         model, item = selection.get_selected_rows()
         if not item:
             return None
