@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# fontasia 0.7:
+# fontasia 0.8:
 # List all fonts on the system and let the user group them into categories.
 #
 # Can be run as a standalone script, or as a GIMP plug-in font chooser
@@ -27,14 +27,13 @@
 
 from __future__ import print_function
 
-from gi import pygtkcompat
-pygtkcompat.enable()
-pygtkcompat.enable_gtk(version='3.0')
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk
+from gi.repository import Pango
 
-import gtk
-import pango
-import os
 import re
+import os
 
 # A buttonbox class, which can hold an arbitrary number of buttons.
 # This is expected to occupy a space which may expand or contract.
@@ -43,24 +42,24 @@ import re
 # The base buttonbox class is a simple vbox:
 class Buttonbox():
     def __init__(self):
-        self.widget = gtk.VBox(spacing=8)
+        self.widget = Gtk.VBox(spacing=8)
     def addButton(self, btn):
-        self.widget.pack_start(btn, expand=False)
+        self.widget.pack_start(btn, expand=False, fill=True, padding=0)
 
 # Attempt at different-sized buttons that wrap:
-# this doesn't work yet, gtk doesn't offer any straightforward way.
+# this doesn't work yet, Gtk doesn't offer any straightforward way.
 class ButtonboxWrap(Buttonbox):
     def __init__(self):
-        self.widget = gtk.HBox(spacing=8)
+        self.widget = Gtk.HBox(spacing=8)
 
     def addButton(self, btn):
-        self.widget.pack_start(btn, expand=False)
+        self.widget.pack_start(btn, expand=False, fill=True, padding=0)
 
 # A 2-dimensional table:
 class ButtonboxTable(Buttonbox):
     def __init__(self):
         self.rows = 8
-        self.widget = gtk.Table(homogeneous=False)
+        self.widget = Gtk.Table(homogeneous=False)
         self.cur_row = 0
         self.cur_col = 0
 
@@ -74,7 +73,7 @@ class ButtonboxTable(Buttonbox):
             self.cur_row = 0
             self.cur_col += 1
 
-class FontApp(gtk.Window):
+class FontApp(Gtk.Window):
 
     # CSS for the category buttons
     CSS = '''
@@ -111,52 +110,52 @@ class FontApp(gtk.Window):
         self.connect("destroy", self.save_and_quit)
         self.set_title("Fontasia: Categorize your fonts")
 
-        main_vbox = gtk.VBox(spacing = 10)
+        main_vbox = Gtk.VBox(spacing = 10)
         self.add(main_vbox)
 
-        hbox = gtk.HBox(spacing = 10)
-        main_vbox.pack_start(hbox, expand=False)
+        hbox = Gtk.HBox(spacing = 10)
+        main_vbox.pack_start(hbox, expand=False, fill=True, padding=0)
 
         #
         # The preview
         #
-        self.preview = gtk.Entry()
+        self.preview = Gtk.Entry()
         self.preview.set_width_chars(45)
         self.preview.set_text(self.preview_text)
 
         # Don't use fallbacks for characters not in the current font.
-        # This apparently didn't work in gtk2, and is deprecated in gtk3.
-        # al = pango.AttrList()
-        # al.insert(pango.AttrFallback(False, 0, -1))
+        # This apparently didn't work in Gtk2, and is deprecated in Gtk3.
+        # al = Pango.AttrList()
+        # al.insert(Pango.AttrFallback(False, 0, -1))
         # self.preview.get_layout().set_attributes(al)
 
-        hbox.pack_start(self.preview, expand=True)
+        hbox.pack_start(self.preview, expand=True, fill=True, padding=0)
 
         # Quit button
-        btn = gtk.Button(label="Quit")
-        hbox.pack_end(btn, expand=False)
+        btn = Gtk.Button(label="Quit")
+        hbox.pack_end(btn, expand=False, fill=True, padding=0)
         btn.connect("clicked", self.save_and_quit);
 
-        main_hbox = gtk.HBox(spacing = 10)
+        main_hbox = Gtk.HBox(spacing = 10)
         main_vbox.add(main_hbox)
 
         #
         # Left pane: the font list, a TreeView backed by a ListStore
         #
-        self.sw = gtk.ScrolledWindow()
-        self.sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        self.sw = Gtk.ScrolledWindow()
+        self.sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
 
         context = self.create_pango_context()
         self.all_families = context.list_families()
-        self.store = gtk.ListStore(str)
+        self.store = Gtk.ListStore(str)
 
-        self.treeview = gtk.TreeView(model=self.store)
+        self.treeview = Gtk.TreeView(model=self.store)
         # XXX deprecated
         # self.treeview.set_rules_hint(True)
-        self.store.set_sort_column_id(0, gtk.SORT_ASCENDING)
+        self.store.set_sort_column_id(0, Gtk.SortType.ASCENDING)
 
         selection = self.treeview.get_selection()
-        selection.set_mode(gtk.SELECTION_MULTIPLE)
+        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
         self.treeview.connect("cursor-changed", self.render_font);
 
@@ -164,94 +163,95 @@ class FontApp(gtk.Window):
 
         self.create_column(self.treeview)
 
-        main_hbox.pack_start(self.sw, expand=False)
+        main_hbox.pack_start(self.sw, expand=False, fill=True, padding=0)
 
         #
         # Right pane: the controls
         #
-        vbox = gtk.VBox(spacing=15)
-        main_hbox.pack_start(vbox, expand=True)
+        vbox = Gtk.VBox(spacing=15)
+        main_hbox.pack_start(vbox, expand=True, fill=True, padding=0)
 
         # Box to hold font size, view category etc.
-        hbox = gtk.HBox(spacing=10)
-        vbox.pack_start(hbox, expand=False)
+        hbox = Gtk.HBox(spacing=10)
+        vbox.pack_start(hbox, expand=False, fill=True, padding=0)
 
         # Checkbox for showing fonts in the font list
-        self.fancy_btn = gtk.ToggleButton(label="Fancy list")
+        self.fancy_btn = Gtk.ToggleButton(label="Fancy list")
         self.fancy_btn.set_active(self.fancy_list)
         self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb);
-        hbox.pack_start(self.fancy_btn, expand=False)
+        hbox.pack_start(self.fancy_btn, expand=False, fill=True, padding=0)
 
         # Button to copy current font name
-        # btn = gtk.Button(label="Copy Font Name")
+        # btn = Gtk.Button(label="Copy Font Name")
         # hbox.pack_end(btn, expand=False)
         # btn.connect("clicked", self.copy_font_name);
 
         # Font size
-        label = gtk.Label(label="Size:")
-        hbox.pack_start(label, expand=False)
+        label = Gtk.Label(label="Size:")
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
 
-        adj = gtk.Adjustment(value=self.fontsize, lower=1, upper=1000,
+        adj = Gtk.Adjustment(value=self.fontsize, lower=1, upper=1000,
                              step_increment=1)
-        self.sizespin = gtk.SpinButton(adjustment=adj)
+        self.sizespin = Gtk.SpinButton(adjustment=adj)
         self.sizespin.set_numeric(True)
         self.sizespin.connect("value-changed", self.render_font);
-        hbox.pack_start(self.sizespin, expand=False)
+        hbox.pack_start(self.sizespin, expand=False, fill=True, padding=0)
 
         # Bold and italic buttons
-        self.bold_btn = gtk.ToggleButton(label="Bold")
-        hbox.pack_start(self.bold_btn, expand=False)
+        self.bold_btn = Gtk.ToggleButton(label="Bold")
+        hbox.pack_start(self.bold_btn, expand=False, fill=True, padding=0)
         self.bold_btn.connect("toggled", self.render_font);
-        self.italic_btn = gtk.ToggleButton(label="Italic")
-        hbox.pack_start(self.italic_btn, expand=False)
+        self.italic_btn = Gtk.ToggleButton(label="Italic")
+        hbox.pack_start(self.italic_btn, expand=False, fill=True, padding=0)
         self.italic_btn.connect("toggled", self.render_font);
 
         #
         # View category menu
         #
-        label = gtk.Label(label="View:")
+        label = Gtk.Label(label="View:")
         # This is supposed to right-align the label, but alas it does nothing
-        # and is now deprecated in gtk3:
+        # and is now deprecated in Gtk3:
         #label.set_alignment(1.0, .5)
         # This also doesn't right-align, but the docs are clear on that:
-        # label.set_justify(gtk.JUSTIFY_RIGHT)
-        hbox.pack_start(label, expand=False)
+        # label.set_justify(Gtk.JUSTIFY_RIGHT)
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
 
-        self.view_cat_combo = gtk.ComboBoxText()
-        hbox.pack_start(self.view_cat_combo, expand=False)
+        self.view_cat_combo = Gtk.ComboBoxText()
+        hbox.pack_start(self.view_cat_combo, expand=False, fill=True, padding=0)
         self.combo_connect_id = self.view_cat_combo.connect("changed",
                                                             self.combochanged)
 
         # Categories header row
-        hbox = gtk.HBox(spacing=8)
-        vbox.pack_start(hbox, expand=False)
-        label = gtk.Label(label="Categories")
-        hbox.pack_start(label, expand=False)
+        hbox = Gtk.HBox(spacing=8)
+        vbox.pack_start(hbox, expand=False, fill=True, padding=0)
+        label = Gtk.Label(label="Categories")
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
 
-        entry = gtk.Entry()
+        entry = Gtk.Entry()
         entry.set_width_chars(20)
-        hbox.pack_start(entry, expand=False)
+        hbox.pack_start(entry, expand=False, fill=True, padding=0)
 
-        btn = gtk.Button(label="Add category")
-        hbox.pack_start(btn, expand=False)
+        btn = Gtk.Button(label="Add category")
+        hbox.pack_start(btn, expand=False, fill=True, padding=0)
         btn.set_sensitive(False)
         btn.connect("clicked", self.add_category, entry);
         # The entry and button are tied together:
         entry.connect("changed", self.new_cat_entry_changed, btn);
 
-        label = gtk.Label(label="Categories")
-        hbox.pack_start(label, expand=False)
+        label = Gtk.Label(label="Categories")
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
 
         #
         # The buttonbox: the list of category togglebuttons.
         #
         self.buttonbox = ButtonboxTable()
-        vbox.pack_start(self.buttonbox.widget, expand=False)
+        vbox.pack_start(self.buttonbox.widget,
+                        expand=False, fill=True, padding=0)
 
         #
         # Apply the CSS
         #
-        self.css_provider = gtk.CssProvider()
+        self.css_provider = Gtk.CssProvider()
         self.apply_CSS(FontApp.CSS)
 
         # Not sure if this could be done earlier
@@ -278,7 +278,7 @@ class FontApp(gtk.Window):
         # Setting size_requests earlier set the *minimum* size,
         # but we don't want to do that. So reset the size request
         # once the widgets have already been sized.
-        # Alas, gtk has no way to just set the size without
+        # Alas, Gtk has no way to just set the size without
         # specifying a minimum; size_allocate() is a no-op.
         #self.sw.set_size_request(self.list_width, 1)
         #self.preview.set_size_request(-1, -1)
@@ -286,14 +286,14 @@ class FontApp(gtk.Window):
     def save_and_quit(self, widget=None):
         self.write_category_file()
         self.quit = True
-        # gtk.main_quit()
+        # Gtk.main_quit()
 
     def apply_CSS(self, newCSS: str):
         self.css_provider.load_from_data(newCSS.encode('UTF-8'))
-        context = gtk.StyleContext()
-        context.add_provider_for_screen(gtk.gdk.Screen.get_default(),
+        context = Gtk.StyleContext()
+        context.add_provider_for_screen(Gdk.Screen.get_default(),
                                         self.css_provider,
-                                        gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+                                        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def toggle_fancy_list_cb(self, widget):
         self.fancy_list = widget.get_active()
@@ -313,7 +313,7 @@ class FontApp(gtk.Window):
         fontname = model.get_value(iter, 0)
 
         # If the font name ends with a number, we're in trouble --
-        # pango will try to interpret the number as a HUGE size.
+        # Pango will try to interpret the number as a HUGE size.
         # Sample fonts to test: Math2, Math3,
         # Plain Cred 1978 from ttf-larabie-uncommon.
         # A few fonts still give width problems, like
@@ -324,8 +324,8 @@ class FontApp(gtk.Window):
         cell.set_property('font', fontname)
 
     def create_column(self, treeView):
-        rendererText = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Font name", rendererText, text=0)
+        rendererText = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Font name", rendererText, text=0)
         column.set_sort_column_id(0)
         if self.fancy_list:
             column.set_cell_data_func(rendererText, self.set_list_font)
@@ -373,7 +373,7 @@ class FontApp(gtk.Window):
             self.view_cat_combo.handler_block(self.combo_connect_id)
 
         self.view_cat_combo.get_model().clear()
-        # A recent gtk3 change requires this or none of the combobox entries
+        # A recent Gtk3 change requires this or none of the combobox entries
         # will appear at all.
         self.view_cat_combo.set_entry_text_column(0)
         self.view_cat_combo.append_text("All fonts")
@@ -382,7 +382,7 @@ class FontApp(gtk.Window):
 
         for btn in self.category_buttons:
             catname = btn.get_name()
-            item = gtk.MenuItem(label=catname)
+            item = Gtk.MenuItem(label=catname)
             self.view_cat_combo.append_text(catname)
 
         self.view_cat_combo.set_active(0)
@@ -629,7 +629,7 @@ class FontApp(gtk.Window):
         if (self.category_exists(newcat)):
             return
 
-        btn = gtk.Button(label=newcat)
+        btn = Gtk.Button(label=newcat)
         btn.set_name(newcat)
         self.buttonbox.addButton(btn)
         btn.connect("clicked", self.toggle_cur_font_in_cat, newcat);
@@ -681,11 +681,11 @@ class FontApp(gtk.Window):
         """Copy current font face name to both PRIMARY and CLIPBOARD"""
         curfont = self.current_font()
 
-        atom = gtk.gdk.atom_intern('PRIMARY', True)
+        atom = Gdk.atom_intern('PRIMARY', True)
         clipboard = widget.get_clipboard(atom)
         clipboard.set_text(curfont, -1)
 
-        atom = gtk.gdk.atom_intern('CLIPBOARD', True)
+        atom = Gdk.atom_intern('CLIPBOARD', True)
         clipboard = widget.get_clipboard(atom)
         clipboard.set_text(curfont, -1)
 
@@ -710,11 +710,11 @@ class FontApp(gtk.Window):
         newCSS += " font-size: %dpt;" % size
 
         if self.bold_btn.get_active():
-            # fontdesc.set_weight(pango.WEIGHT_BOLD)
+            # fontdesc.set_weight(Pango.WEIGHT_BOLD)
             newCSS += " font-weight: bold;"
 
         if self.italic_btn.get_active():
-            # fontdesc.set_style(pango.STYLE_ITALIC)
+            # fontdesc.set_style(Pango.STYLE_ITALIC)
             newCSS += " font-style: italic;"
 
         # Close out the style string
@@ -738,11 +738,11 @@ class FontApp(gtk.Window):
 def python_fu_fontasia():
     fontwin = FontApp()
 
-    # fontwin.connect("destroy", gtk.main_quit)
-    # gtk.main()
+    # fontwin.connect("destroy", Gtk.main_quit)
+    # Gtk.main()
 
     while not fontwin.quit:
-        gtk.main_iteration()
+        Gtk.main_iteration()
 
     pdb.gimp_context_set_font(fontwin.current_font())
 
@@ -781,6 +781,6 @@ if __name__ == '__main__':
 
     fontwin = FontApp()
     while not fontwin.quit:
-        gtk.main_iteration()
+        Gtk.main_iteration()
     # Trust that the FontApp has already saved new categories, etc.
     sys.exit(0)
