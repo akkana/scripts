@@ -213,6 +213,10 @@ gpreso:
     A lightweight presentation program for displaying HTML slides.
     Python2/GTK/webkit version. (Previously called preso.)
 
+gtktreeview.py:
+    An example of how to change the selection programmatically in
+    a scrolled GTK3 TreeView. Because this isn't documented AT ALL.
+
 gquickbrowse:
     Minimal browser: an older version of quickbrowse written in
     python2-webkit-GTK, now orphaned and no longer available on newer
