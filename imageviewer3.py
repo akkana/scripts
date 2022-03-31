@@ -250,7 +250,7 @@ class ImageViewerWindow(Gtk.Window):
             self.viewer.load_image(self.file_list[0])
 
     def run(self):
-        self.show_all();
+        self.show_all()
         self.set_opacity(.5)
         # print("xid: ")
         # print(self.xid)
