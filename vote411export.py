@@ -4,16 +4,13 @@
 # Vote411/lwv.thevoterguide.org, and format it appropriately
 # for a printed voter guide.
 
-# Requires the docx module: pip install python-docx, not pip install docx
-# which is a different module.
+# Requires the docx module if Word format output is required:
+# pip install python-docx,
+# not pip install docx which is a different module.
 
 import csv
-import docx
-import html2text
+# import html2text
 import re
-
-html_converter = html2text.HTML2Text()
-html_converter.body_width = 0
 
 # Don't be picky about smartquotes: map them to ascii quotes
 # for matching purposes.
@@ -37,6 +34,7 @@ class Candidate:
         self.comparename = re.sub('\.', '',
                                   re.sub('\s+', ' ', name.lower())).strip()
 
+        # fullname
         self.name = name
 
         # OPTIONAL: Convert name to title case.
@@ -99,9 +97,7 @@ class Measure:
     #         "Category": "Constitutional Amendments", "State Bond Questions"
     def __init__(self, measurename, description, category):
         self.measurename = measurename.strip()
-        self.desc = html_converter.handle(description) \
-                                     .strip() \
-                                     .replace('NM', 'N.M.')
+        self.desc = description.strip().replace('NM', 'N.M.')
         self.category = category.strip()
 
     def output(self, formatter):
@@ -119,7 +115,7 @@ class TextFormatter:
         pass
 
     def add_office(self, office, description):
-        print("===", office)
+        print("***", office)
         print(description)
         print()
 
@@ -264,12 +260,14 @@ class DocxFormatter:
 
 def sort_candidates(candidates, order):
     """Sort candidates according to the order in which they appear
-       in the order list, if any; otherwise, alphabetically.
-       Candidates not in the order file will be excluded.
+       in the order list, if any.
+       Candidates not in the order list will be excluded.
+       If there's no order list, sort alphabetically
+       by race and then by name.
     """
     if not order:
         print("Sorting alphabetically")
-        return sorted(candidates)
+        return sorted(candidates, key = lambda c: c.office + c.name), []
 
     sorted_candidates = []
     notfound = []
@@ -317,12 +315,12 @@ def sort_measures(measures, order):
        in the order list, if any; otherwise, alphabetically.
        Measures not in the order file will be excluded.
     """
-    if not order:
-        print("Sorting alphabetically")
-        return sorted(measures)
-
     sorted_measures = []
     categories = set()
+
+    if not order:
+        print("Sorting alphabetically")
+        return sorted(measures), categories
 
     for measure_m in measures:
         print("   |%s|" % measure_m.measurename.lower())
@@ -350,8 +348,10 @@ def sort_measures(measures, order):
 from pprint import pprint
 
 
-# Read tab-separated files
-def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
+def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
+    """Read the input CSV file plus any order file,
+       and output the information in the requested format.
+    """
     # Read the orderfile, if any:
     order = []
     if orderfile:
@@ -384,90 +384,75 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
                                                  cand['fullname'])) \
                                                  .translate(SMARTQUOTE_CHARMAP)
 
-    # Read the tab-separated VOTE411 export file:
-    with open(tsvfilename) as csvfp:
-        reader = csv.reader(csvfp, delimiter='\t')
-
-        # Get the first line, and use it to figure out important fields
-        columnnames = next(reader)
-
-        # tab-separated files exported by VOTE411 have column names
-        # up to the second question, but after that, the columns
-        # are blank. That's why this can't use csv.DictReader.
-        # Instead, go through and figure out the indices for
-        # the columns that will be needed.
-        name_i = columnnames.index('Name')
-        lastname_i = columnnames.index('Last Name')
-        office_i = columnnames.index('Race/Referendum')
-        desc_i = columnnames.index('Description of Race/Referendum')
-        party_i = columnnames.index('Party Affiliation')
-        question1_i = columnnames.index('Question 1')
-
-        # "Contact Name" is only needed to tell ballot measures from candidates
-        # "Category" is only used for measures.
-        contactname_i = columnnames.index('Contact Name')
-        category_i = columnnames.index('Category of Race/Referendum')
-
-        if fmt == 'text':
-            formatter = TextFormatter()
-        elif fmt == 'html':
-            formatter = HtmlFormatter()
-        elif fmt == 'docx':
-            formatter = DocxFormatter()
-        else:
-            raise(RuntimeError(f"Unknown format {fmt}: not text, html, docx"))
+    # Read the VOTE411 export CSV file:
+    with open(csvfilename) as csvfp:
+        reader = csv.DictReader(csvfp)
 
         candidates = []
         measures = []
         race_descriptions = {}
 
+        # In 2022, each row is an OrderedDict with:
+        # ID,Full Name,Last Name,Candidate Email,Contact Name,
+        # Security Code,Party Affiliation,Race/Referendum,
+        # Description of Race/Referendum,Category of Race/Referendum,
+        # Campaign Mailing Address,Twitter Handle,Facebook,
+        # Campaign Email,Website,Campaign Phone,
+        # followed by questions. Each question is its own column.
+        # Since the CSV may include many races, not all questions
+        # apply to any one candidate, so only use the ones they answered.
+
+        # The column index of the first question:
+        FIRST_Q_COL = 16
+
         for row in reader:
-            # For /lwvnm20_tdv-all.txt, Each row is an OrderedDict with:
-            # ID	Name	Last Name	Private Email	Contact Name	Security Code	Party Affiliation	Race/Referendum	Description of Race/Referendum	Category of Race/Referendum	Occupation	Mailing Address	Campaign Phone	Website	Street address	Campaign Email	Facebook	Twitter	OCD	facebook	Question 1	Guide Answer 1	Print Answer 1	Question 2	Guide Answer 2	Print Answer 2	...
 
             # Is it a ballot measure -- Constitutional Amendment, Bond Q, etc?
-            if row[contactname_i].startswith("Yes -"):
-                measures.append(Measure(row[office_i], row[desc_i],
-                                        row[category_i]))
-                continue
+            # XXX I won't know what that will look like until the 2022 general
+            # election, so this is commented out for now.
+            # if row[contactname_i].startswith("Yes -"):
+            #     measures.append(Measure(row[office_i], row[desc_i],
+            #                             row[category_i]))
+            #     continue
 
-            # Loop over the questions. They start at index question1_i
-            # and there are three columns for each question:
-            # question, Guide Answer, Print Answer.
-            # Print Answers are always blank; apparently that column is for
-            # some leagues that have different answers for their printed VG.
-            questions = []
-            answers = []
-            questionnum = 1
-            while True:
-                q_i = question1_i + (questionnum-1) * 3
-                # print(row)
-                # print("q_i", q_i, "len", len(row))
-                if len(row) < q_i + 2:
-                    break
-                questions.append(row[q_i])
-                answers.append(row[q_i + 1])
+            # Loop over the questions
+            allquestions = list(row.keys())[FIRST_Q_COL:]
 
-                questionnum += 1
+            questions = []    # The questions this candidate answered
+            answers = []      # The corresponding answers
+            for question in allquestions:
+                if row[question]:
+                    questions.append(question)
+                    answers.append(row[question].strip())
 
-            candidates.append(Candidate(row[name_i], row[lastname_i],
-                                        row[office_i], row[party_i],
-                                        questions, answers))
+            candidate = Candidate(row["Full Name"],
+                                  row["Last Name"],
+                                  row["Race/Referendum"],
+                                  row["Party Affiliation"],
+                                  questions, answers)
+            candidates.append(candidate)
 
-            if candidates[-1].office not in race_descriptions:
-                race_descriptions[candidates[-1].office] = \
-                    html_converter.handle(row[desc_i]) \
-                                  .strip() \
-                                  .replace('NM', 'N.M.')
+            if candidate.office not in race_descriptions:
+                race_descriptions[candidate.office] = \
+                    row["Description of Race/Referendum"] \
+                        .strip().replace('NM', 'N.M.')
 
         # Done with loop over tab-separated lines. All candidates are read.
-        # print(len(candidates), "candidates")
+        print(len(candidates), "candidates")
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
         s_measures, measure_categories = sort_measures(measures, order)
         s_candidates, notfound = sort_candidates(candidates, order)
         measure_categories = [ c.lower().strip() for c in measure_categories ]
+
+        # Time to create a formatter.
+        if fmt.lower() == "docx":
+            formatter = DocxFormatter()
+        elif fmt.lower() == 'html':
+            formatter = HtmlFormatter()
+        else:
+            formatter = TextFormatter()
 
         # First print the measures:
         print("s_measures:")
@@ -482,6 +467,7 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
         print("notfound:")
         pprint(notfound)
 
+        # Now loop over offices printing the candidates
         cur_office = None
         num_for_office = 0
         for candidate in s_candidates:
@@ -492,10 +478,8 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
                 cur_office = candidate.office
                 # Previously did a .replace('NM', 'N.M.') on next two ops
                 # but that breaks UNM
-                print_office = candidate.office \
-                                        .replace('DISTRICT', 'District')
-                desc = html_converter.handle(row[desc_i]) \
-                                     .strip()
+                print_office = candidate.office.replace('DISTRICT', 'District')
+                print("formatter:", formatter)
                 formatter.add_office(print_office,
                                      race_descriptions[candidate.office])
             num_for_office += 1
@@ -520,9 +504,13 @@ def convert_vote411_file(tsvfilename, fmt='text', orderfile=None):
 
 if __name__ == '__main__':
     import argparse
-    import sys
+    import sys, os
 
-    parser = argparse.ArgumentParser(description="Convert Vote411 tab-separated files to text or docx")
+    parser = argparse.ArgumentParser(
+        description="%s: Convert Vote411 CSV files to text, html or docx."
+                     % os.path.basename(sys.argv[0]),
+        formatter_class=argparse.RawTextHelpFormatter)
+
     parser.add_argument('-F', "--format", dest="format", default='text',
                         action="store", help="Output format: text, html, docx")
     parser.add_argument('-o', "--orderfile", dest="orderfile", default=None,
@@ -530,6 +518,14 @@ if __name__ == '__main__':
     parser.add_argument('infiles', nargs='+',
                         help="Input files, in tab-separated format")
     args = parser.parse_args(sys.argv[1:])
+
+    if args.format == 'docx':
+        try:
+            import docx
+        except ImportError:
+            print("Can't do Word output without the docx module.")
+            print("Try: pip install python-docx")
+            sys.exit(1)
 
     for f in args.infiles:
         convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
