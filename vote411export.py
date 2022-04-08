@@ -78,8 +78,13 @@ class Candidate:
             if not self.answers[i]:
                 self.answers[i] = "No response was received."
 
-            # No paragraph break between question and answer
-            formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
+            # No paragraph break between question and answer.
+            # Number the questions unless the question
+            # starts with a number followd by a dot.
+            if re.match('\d+\.', q):
+                formatter.add_q_and_a(q, self.answers[i])
+            else:
+                formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
 
     # Sorting:
     # Adjust as needed to match ballot order.
@@ -392,11 +397,13 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         measures = []
         race_descriptions = {}
 
-        # In vote411, there's no way to tell whether an answer field
-        # is blank because the candidate didn't answer it, or because
-        # it's a question that belongs to another race.
-        # This is "race name": [low_index, high_index]
-        # where the indices are into allquestions
+        # In vote411's export format, there's no way to tell whether
+        # an answer field is blank because the candidate didn't answer it,
+        # or because it's a question that belongs to another race.
+        # So store a dictionary "race name": [low_index, high_index]
+        # storing the beginning and end index of questions that any
+        # candidate for that race answered.
+        # This is so horrible.
         race_questions = {}
         allquestions = None
 
@@ -419,7 +426,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         # Since the CSV may include many races, not all questions
         # apply to any one candidate, so only use the ones they answered.
 
-        # The column index of the first question:
+        # The column index of the first question (hope this doesn't change):
         FIRST_Q_COL = 16
 
         for row in reader:
@@ -431,16 +438,16 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             #                             row[category_i]))
             #     continue
 
-            # Loop over the questions
             if not allquestions:
                 allquestions = list(row.keys())[FIRST_Q_COL:]
 
+            # Loop over the questions
             questions = []    # The questions this candidate answered
             answers = []      # The corresponding answers
             for qnum, question in enumerate(allquestions):
-                if row[question]:
+                if row[question]:    # Did the candidate answer this q?
                     tally_race_question(row["Race/Referendum"], qnum)
-                    questions.append(question)
+                    questions.append(question.strip())
                     answers.append(row[question].strip())
 
             candidate = Candidate(row["Full Name"],
@@ -455,10 +462,15 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                     row["Description of Race/Referendum"] \
                         .strip().replace('NM', 'N.M.')
 
+        # Done with loop over tab-separated lines. All candidates are read.
+        print(len(candidates), "candidates")
+
         # Sanity check: are any questions unanswered?
-        # This is so horrible, but there's no clean way to do it
-        # given the Vote411 format's absence of info on which questions
-        # belongs to which race.
+        # Now that the low and high question indices for each race are known,
+        # see if any candidate skipped anything inside that range,
+        # and if so, insert it with a "no reponse" answer.
+        # If there are any questions ignored by ALL candidates,
+        # that question won't be printed.
         for candidate in candidates:
             if candidate.office not in race_questions:
                 print("No", candidate.office, "candidates answered anything!")
@@ -469,20 +481,17 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             elif len(candidate.questions) != \
                (race_questions[candidate.office][1]
                 - race_questions[candidate.office][0]):
-                print(candidate.name, "has unanswered questions,",
-                      len(candidate.questions), "vs",
-                      (race_questions[candidate.office][1]
-                       - race_questions[candidate.office][0]))
+                # print(candidate.name, "has unanswered questions,",
+                #       len(candidate.questions), "vs",
+                #       (race_questions[candidate.office][1]
+                #        - race_questions[candidate.office][0]))
                 numquestions = race_questions[candidate.office][1] \
                     - race_questions[candidate.office][0]
                 for i in range(numquestions):
                     q = allquestions[race_questions[candidate.office][0] + i]
                     if q not in candidate.questions:
-                        candidate.questions.insert(i+1, q)
-                        candidate.answers.insert(i+1, "No reponse")
-
-        # Done with loop over tab-separated lines. All candidates are read.
-        print(len(candidates), "candidates")
+                        candidate.questions.insert(i, q)
+                        candidate.answers.insert(i, "No response")
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
@@ -511,7 +520,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         print("notfound:")
         pprint(notfound)
 
-        # Now loop over offices printing the candidates
+        # Now loop over offices printing the candidates in each office
         cur_office = None
         num_for_office = 0
         for candidate in s_candidates:
@@ -520,10 +529,9 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                     print(num_for_office, "running for", cur_office)
                     num_for_office = 0
                 cur_office = candidate.office
-                # Previously did a .replace('NM', 'N.M.') on next two ops
-                # but that breaks UNM
+                # Previously did a .replace('NM', 'N.M.') on print_office
+                # but that breaks UNM board
                 print_office = candidate.office.replace('DISTRICT', 'District')
-                print("formatter:", formatter)
                 formatter.add_office(print_office,
                                      race_descriptions[candidate.office])
             num_for_office += 1
@@ -572,6 +580,9 @@ if __name__ == '__main__':
             sys.exit(1)
 
     for f in args.infiles:
-        convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
+        try:
+            convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
+        except FileNotFoundError:
+            print("No such file:", f)
 
 
