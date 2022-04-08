@@ -392,6 +392,23 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         measures = []
         race_descriptions = {}
 
+        # In vote411, there's no way to tell whether an answer field
+        # is blank because the candidate didn't answer it, or because
+        # it's a question that belongs to another race.
+        # This is "race name": [low_index, high_index]
+        # where the indices are into allquestions
+        race_questions = {}
+        allquestions = None
+
+        # Here's how it's determined
+        def tally_race_question(racename, qnum):
+            if racename in race_questions:
+                race_questions[racename] = \
+                    (min(race_questions[racename][0], qnum),
+                     max(race_questions[racename][1], qnum+1))
+            else:
+                race_questions[racename] = (qnum, qnum+1)
+
         # In 2022, each row is an OrderedDict with:
         # ID,Full Name,Last Name,Candidate Email,Contact Name,
         # Security Code,Party Affiliation,Race/Referendum,
@@ -406,7 +423,6 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         FIRST_Q_COL = 16
 
         for row in reader:
-
             # Is it a ballot measure -- Constitutional Amendment, Bond Q, etc?
             # XXX I won't know what that will look like until the 2022 general
             # election, so this is commented out for now.
@@ -416,12 +432,14 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             #     continue
 
             # Loop over the questions
-            allquestions = list(row.keys())[FIRST_Q_COL:]
+            if not allquestions:
+                allquestions = list(row.keys())[FIRST_Q_COL:]
 
             questions = []    # The questions this candidate answered
             answers = []      # The corresponding answers
-            for question in allquestions:
+            for qnum, question in enumerate(allquestions):
                 if row[question]:
+                    tally_race_question(row["Race/Referendum"], qnum)
                     questions.append(question)
                     answers.append(row[question].strip())
 
@@ -436,6 +454,32 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                 race_descriptions[candidate.office] = \
                     row["Description of Race/Referendum"] \
                         .strip().replace('NM', 'N.M.')
+
+        # Sanity check: are any questions unanswered?
+        # This is so horrible, but there's no clean way to do it
+        # given the Vote411 format's absence of info on which questions
+        # belongs to which race.
+        for candidate in candidates:
+            if candidate.office not in race_questions:
+                print("No", candidate.office, "candidates answered anything!")
+                candidate.questions = \
+                    ["No responses for any candidates for this office"]
+                candidate.answers = [""]
+
+            elif len(candidate.questions) != \
+               (race_questions[candidate.office][1]
+                - race_questions[candidate.office][0]):
+                print(candidate.name, "has unanswered questions,",
+                      len(candidate.questions), "vs",
+                      (race_questions[candidate.office][1]
+                       - race_questions[candidate.office][0]))
+                numquestions = race_questions[candidate.office][1] \
+                    - race_questions[candidate.office][0]
+                for i in range(numquestions):
+                    q = allquestions[race_questions[candidate.office][0] + i]
+                    if q not in candidate.questions:
+                        candidate.questions.insert(i+1, q)
+                        candidate.answers.insert(i+1, "No reponse")
 
         # Done with loop over tab-separated lines. All candidates are read.
         print(len(candidates), "candidates")
