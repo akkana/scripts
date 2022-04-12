@@ -424,10 +424,36 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         # Campaign Email,Website,Campaign Phone,
         # followed by questions. Each question is its own column.
         # Since the CSV may include many races, not all questions
-        # apply to any one candidate, so only use the ones they answered.
+        # apply to any one candidate.
 
         # The column index of the first question (hope this doesn't change):
         FIRST_Q_COL = 16
+
+        def skip_question(question):
+            """Questions are skipped if they're empty, if they're Spanish,
+               if they're meant to be translated into Spanish
+               ("(es)" at the end)
+            """
+            # Vote411 gives a duplicate question for some questions,
+            # with "(es)" at the end. The question's not in Spanish;
+            # I'm guessing it's some sort of placeholder.
+            # Ignore it.
+            # Also ignore actual Spanish questions: they're not
+            # going into the printed Voter Guide, at least not
+            # for the primary.
+            question = question.strip()
+            if not question:
+                return True
+            if question.endswith("(es)"):
+                return True
+            if "¿" in question:
+                return True
+            if "experiencia" in question:
+                return True
+            if "Describa" in question:
+                return True
+            print("Not skipping:", question)
+            return False
 
         for row in reader:
             # Is it a ballot measure -- Constitutional Amendment, Bond Q, etc?
@@ -445,6 +471,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             questions = []    # The questions this candidate answered
             answers = []      # The corresponding answers
             for qnum, question in enumerate(allquestions):
+                if skip_question(question):
+                    continue
                 if row[question]:    # Did the candidate answer this q?
                     tally_race_question(row["Race/Referendum"], qnum)
                     questions.append(question.strip())
@@ -455,6 +483,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                                   row["Race/Referendum"],
                                   row["Party Affiliation"],
                                   questions, answers)
+            print(candidate.name, "questions:", candidate.questions)
             candidates.append(candidate)
 
             if candidate.office not in race_descriptions:
@@ -489,6 +518,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                     - race_questions[candidate.office][0]
                 for i in range(numquestions):
                     q = allquestions[race_questions[candidate.office][0] + i]
+                    if skip_question(q):
+                        continue
                     if q not in candidate.questions:
                         candidate.questions.insert(i, q)
                         candidate.answers.insert(i, "No response")
@@ -508,17 +539,19 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             formatter = TextFormatter()
 
         # First print the measures:
-        print("s_measures:")
-        pprint(s_measures)
-        for measure in s_measures:
-            print("...", measure)
-            if measure.measurename in notfound:
-                notfound.remove(measure.measurename)
-                print("measure.measurename isn't really notfound")
-            measure.output(formatter)
-        # If any measures made it into notfound, remove them:
-        print("notfound:")
-        pprint(notfound)
+        if s_measures:
+            print("s_measures:")
+            pprint(s_measures)
+            for measure in s_measures:
+                print("...", measure)
+                if measure.measurename in notfound:
+                    notfound.remove(measure.measurename)
+                    print("measure.measurename isn't really notfound")
+                measure.output(formatter)
+            # If any measures made it into notfound, remove them:
+            if notfound:
+                print("notfound:")
+                pprint(notfound)
 
         # Now loop over offices printing the candidates in each office
         cur_office = None
