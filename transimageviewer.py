@@ -35,7 +35,7 @@ class TransImageViewerWindow(ImageViewerWindow):
     def key_press_event(self, widget, event):
         """Handle a key press event anywhere in the window"""
         if event.string == " ":
-            imagewin.next_image()
+            self.next_image()
             return
         if event.string == "q":
             gtk.main_quit()
