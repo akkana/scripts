@@ -203,8 +203,8 @@ class DocxFormatter:
             self.doc.add_paragraph(description)
 
         else:
-            self.para = self.doc.add_paragraph('')
-            run = self.para.add_run(office + '\n\n')
+            self.para = self.doc.add_paragraph('\n')
+            run = self.para.add_run(office + '\n')
             run.bold = True
             run.font.size = docx.shared.Pt(self.TITLE_SIZE)
             run = self.para.add_run(description)
@@ -220,12 +220,13 @@ class DocxFormatter:
         else:
             self.para = self.doc.add_paragraph('')
             # In 2020 people wanted extra lines; in 2021 they don't.
+            # In 2022 they want a line break between the name and party.
             # run = self.para.add_run('\n' + name + '\n')
             run = self.para.add_run(name)
             run.font.size = docx.shared.Pt(self.NAME_SIZE)
             run.bold = True
             if party:
-                run = self.para.add_run(party)
+                run = self.para.add_run('\n' + party)
             # run.font.size = docx.shared.Pt(self.BASE_SIZE)
 
     def add_q_and_a(self, question, answer):
@@ -466,6 +467,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
 
             if not allquestions:
                 allquestions = list(row.keys())[FIRST_Q_COL:]
+                for i, q in enumerate(allquestions):
+                    print(f"AQ {i}  '{q}'")
 
             # Loop over the questions
             questions = []    # The questions this candidate answered
@@ -523,6 +526,12 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                     if q not in candidate.questions:
                         candidate.questions.insert(i, q)
                         candidate.answers.insert(i, "No response")
+
+        # Strip all questions and answers. Can't be done earlier
+        # because then it won't match the questions in the CSV header.
+        for candidate in candidates:
+            candidate.questions = [ q.strip() for q in candidate.questions ]
+            candidate.answers   = [ a.strip() for a in candidate.answers ]
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
