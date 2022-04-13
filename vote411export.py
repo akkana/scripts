@@ -11,6 +11,7 @@
 import csv
 # import html2text
 import re
+from io import StringIO
 
 # Don't be picky about smartquotes: map them to ascii quotes
 # for matching purposes.
@@ -19,6 +20,10 @@ SMARTQUOTE_CHARMAP = { 0x201c : u'"',
                        0x2018 : u"'",
                        0x2019 : u"'" }
 
+# The column index of the first question (hope this doesn't change):
+FIRST_Q_COL = 16
+
+NO_RESPONSE = "No response was receved."
 
 class Candidate:
     def __init__(self, name, lastname, office, party, questions, answers):
@@ -76,12 +81,12 @@ class Candidate:
 
         for i, q in enumerate(self.questions):
             if not self.answers[i]:
-                self.answers[i] = "No response was received."
+                self.answers[i] = NO_RESPONSE
 
             # No paragraph break between question and answer.
             # Number the questions unless the question
             # starts with a number followd by a dot.
-            if re.match('\d+\.', q):
+            if re.match('\d+\.', q) or not q:
                 formatter.add_q_and_a(q, self.answers[i])
             else:
                 formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
@@ -328,28 +333,112 @@ def sort_measures(measures, order):
         print("Sorting alphabetically")
         return sorted(measures), categories
 
-    for measure_m in measures:
-        print("   |%s|" % measure_m.measurename.lower())
-    print("=============")
+    # for measure_m in measures:
+    #     print("   |%s|" % measure_m.measurename.lower())
+    # print("=============")
 
     for orderline in order:
         orderline_l = orderline["fullname"].lower().strip()
         for measure_m in measures:
             if measure_m.category.lower().strip() == orderline_l \
                or measure_m.measurename.lower() == orderline_l:
-                print("******* MATCHED! *******", measure_m)
+                # print("******* MATCHED! *******", measure_m)
                 sorted_measures.append(measure_m)
                 categories.add(measure_m.category)
                 break
-            elif orderline_l.startswith('pojo'):
-                print("'%s' != '%s'" % (measure_m.measurename.lower(),
-                                        orderline_l))
+            # elif orderline_l.startswith('pojo'):
+            #     print("'%s' != '%s'" % (measure_m.measurename.lower(),
+            #                             orderline_l))
 
-    print("Sorted measures:")
-    pprint(sorted_measures)
-    print("Categories:")
-    pprint(categories)
+    # print("Sorted measures:")
+    # pprint(sorted_measures)
+    # print("Categories:")
+    # pprint(categories)
     return sorted_measures, categories
+
+
+def skip_question(question):
+    """Questions are skipped if they're empty, if they're Spanish,
+       if they're meant to be translated into Spanish
+       ("(es)" at the end)
+    """
+    # Vote411 gives a duplicate question for some questions,
+    # with "(es)" at the end. The question's not in Spanish;
+    # I'm guessing it's some sort of placeholder.
+    # Ignore it.
+    # Also ignore actual Spanish questions: they're not
+    # going into the printed Voter Guide, at least not
+    # for the primary.
+    question = question.strip()
+    if not question:
+        return True
+    if question.endswith("(es)"):
+        return True
+    if "¿" in question:
+        return True
+    if "experiencia" in question:
+        return True
+    if "Describa" in question:
+        return True
+    # print("Not skipping:", question)
+    return False
+
+
+def clean_up_csv(csvfilename):
+    """Read the CSV export file from Vote411 and clean it up so it's usable:
+       strip fields (vote411 does things like add newlines to the end of
+       questions), and try to detect and remove non-English questions which
+       Vote411 adds but doesn't flag.
+       Returns a file-like (already open) handle to a good csv file
+       that can be parsed by csv.DictReader.
+    """
+    with open(csvfilename) as infp:
+        csvreader = csv.reader(infp)
+        infields = next(csvreader)
+        outfields = []
+        skipindices = []
+        # First copy non-question fields, stripped
+        for field in infields[:FIRST_Q_COL]:
+            outfields.append(field.strip())
+        # The harder part: copy questions, stripped,
+        # except fo Spanish ones
+        for i, field in enumerate(infields[FIRST_Q_COL:]):
+            field = field.strip()
+            if skip_question(field):
+                # skipindices should have reverse order, so that it's easy
+                # to iterate over it removing fields from each row
+                # print("skipping field", FIRST_Q_COL + i, field)
+                skipindices.insert(0, FIRST_Q_COL + i)
+            else:
+                outfields.append(field)
+
+        # print("skipindices:", skipindices)
+        # print("outfields:", outfields)
+
+        # Right now this is written to yield lines, but
+        # csv.reader and csv.writer can both only take file-like objects
+        # so this will probably need StringIo.
+        # For possible solutions, see
+        # https://stackoverflow.com/questions/12593576/adapt-an-iterator-to-behave-like-a-file-like-object-in-python
+        # https://stackoverflow.com/questions/6657820/how-to-convert-an-iterable-to-a-stream/20260030#20260030
+        # https://docs.python.org/3/library/io.html
+        outfp = StringIO()
+        # outfp = open("cleaned-" + csvfilename, "w")
+        csvwriter = csv.writer(outfp)
+        csvwriter.writerow(outfields)
+
+        for row in csvreader:
+            for i in skipindices:
+                row.pop(i)
+            csvwriter.writerow(row)
+
+        # outfp.close()
+        # print("Wrote to", "cleaned-" + csvfilename)
+        # sys.exit(0)
+
+        outfp.seek(0)
+        return outfp
+
 
 from pprint import pprint
 
@@ -391,7 +480,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                                                  .translate(SMARTQUOTE_CHARMAP)
 
     # Read the VOTE411 export CSV file:
-    with open(csvfilename) as csvfp:
+    # with open(csvfilename) as csvfp:
+    with clean_up_csv(csvfilename) as csvfp:
         reader = csv.DictReader(csvfp)
 
         candidates = []
@@ -427,35 +517,6 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         # Since the CSV may include many races, not all questions
         # apply to any one candidate.
 
-        # The column index of the first question (hope this doesn't change):
-        FIRST_Q_COL = 16
-
-        def skip_question(question):
-            """Questions are skipped if they're empty, if they're Spanish,
-               if they're meant to be translated into Spanish
-               ("(es)" at the end)
-            """
-            # Vote411 gives a duplicate question for some questions,
-            # with "(es)" at the end. The question's not in Spanish;
-            # I'm guessing it's some sort of placeholder.
-            # Ignore it.
-            # Also ignore actual Spanish questions: they're not
-            # going into the printed Voter Guide, at least not
-            # for the primary.
-            question = question.strip()
-            if not question:
-                return True
-            if question.endswith("(es)"):
-                return True
-            if "¿" in question:
-                return True
-            if "experiencia" in question:
-                return True
-            if "Describa" in question:
-                return True
-            print("Not skipping:", question)
-            return False
-
         for row in reader:
             # Is it a ballot measure -- Constitutional Amendment, Bond Q, etc?
             # XXX I won't know what that will look like until the 2022 general
@@ -467,8 +528,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
 
             if not allquestions:
                 allquestions = list(row.keys())[FIRST_Q_COL:]
-                for i, q in enumerate(allquestions):
-                    print(f"AQ {i}  '{q}'")
+                # for i, q in enumerate(allquestions):
+                #     print(f"AQ {i}  '{q}'")
 
             # Loop over the questions
             questions = []    # The questions this candidate answered
@@ -486,7 +547,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                                   row["Race/Referendum"],
                                   row["Party Affiliation"],
                                   questions, answers)
-            print(candidate.name, "questions:", candidate.questions)
+            # print(candidate.name, "questions:", candidate.questions)
             candidates.append(candidate)
 
             if candidate.office not in race_descriptions:
@@ -505,9 +566,9 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         # that question won't be printed.
         for candidate in candidates:
             if candidate.office not in race_questions:
-                print("No", candidate.office, "candidates answered anything!")
+                # print("No", candidate.office, "candidates answered anything!")
                 candidate.questions = \
-                    ["No responses for any candidates for this office"]
+                    [""]
                 candidate.answers = [""]
 
             elif len(candidate.questions) != \
@@ -525,7 +586,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                         continue
                     if q not in candidate.questions:
                         candidate.questions.insert(i, q)
-                        candidate.answers.insert(i, "No response")
+                        candidate.answers.insert(i, NO_RESPONSE)
 
         # Strip all questions and answers. Can't be done earlier
         # because then it won't match the questions in the CSV header.
