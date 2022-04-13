@@ -8,6 +8,7 @@
 # https://automatetheboringstuff.com/
 # (the oft-recommended "Learn Python the Hard Way" is not well favored).
 # I can't vouch for these books myself.
+# For intermediates, I've seen Fluent Python recommended on #python.
 
 ########################################################
 # Interactive Python interpreter
@@ -295,6 +296,10 @@ s = s.replace("\u00A0"," ")
 # Regular expressions/regexp:
 ################################################################
 
+# Difference between match and search:
+# match matches only from the beginning of the string,
+# search will look anywhere in the string.
+
 # Split with a regex:
 sep = re.compile('[,\s]+')
 sep.split('HB42,SJR1, HR67 SB3')
@@ -324,6 +329,18 @@ abc.translate(abc.maketrans({'a': 'A', 'b': None}))
 # There doesn't seem to be any simple equivalent to perl y/A-Z/a-z/
 # -- you can set up ranges with lambdas or comprehensions
 # but it gets hairy quickly.
+
+########################################################
+# Useful regular expressions
+########################################################
+
+# Find MAC address:
+match = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', instr, re.I)
+if match: return match.group()
+
+# Find IP address:
+match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr)
+if match: return match.group()
 
 
 ################################################################
@@ -390,6 +407,17 @@ except NameError: pass
 # OR:
 if hasattr(__builtins__, 'raw_input'):
     input = raw_input
+
+########################################################
+# Byte strings and byte arrays
+########################################################
+
+buf = bytearray(b'\x51\x02\x00\x00\x00')
+buf.append(0xa2)
+buf.insert(2, 0xf7)
+
+# struct: https://docs.python.org/2/library/struct.html
+# is perhaps a better way to handle byte strings like this.
 
 #############################
 # ways of formatting numbers.
@@ -534,17 +562,6 @@ except (SomeError, OtherError) as e:
 
 
 ########################################################
-# Byte strings and byte arrays
-########################################################
-
-buf = bytearray(b'\x51\x02\x00\x00\x00')
-buf.append(0xa2)
-buf.insert(2, 0xf7)
-
-# struct: https://docs.python.org/2/library/struct.html
-# is perhaps a better way to handle byte strings like this.
-
-########################################################
 # iterator, list and dictionary helpers
 ########################################################
 
@@ -645,7 +662,7 @@ def file2dict(filename):
 def walkfiles(rootdir):
     for root, dirs, files in os.walk(rootdir):
         for f in files:
-            print os.path.join(root, f)
+            print(os.path.join(root, f))
 
 # os.walk is handy, but it doesn't allow any type of sorting.
 # So here's a rewritten os.walk that sorts alphabetically.
@@ -695,22 +712,6 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
 
 # Simpler syntax with decorators:
 # https://github.com/PacktPublishing/Expert-Python-Programming_Second-Edition/blob/master/chapter3/properties_decorator.py
-
-########################################################
-# Useful regular expressions
-########################################################
-
-# Difference between match and search:
-# match matches only from the beginning of the string,
-# search will look anywhere in the string.
-
-# Find MAC address:
-match = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', instr, re.I)
-if match: return match.group()
-
-# Find IP address:
-match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr)
-if match: return match.group()
 
 ########################################################
 # Command-line Argument parsing
@@ -1179,6 +1180,21 @@ if __name__ == '__main__':
           time.sleep(2)
 
 ########################################################
+# StringIO
+########################################################
+
+from io import StringIO
+outfp = StringIO()
+csvwriter = csv.writer(outfp)
+csvwriter.writerow(outfields)
+for row in csvreader:
+    csvwriter.writerow(row)
+
+outfp.seek(0)
+reader = csv.DictReader(csvfp)
+...
+
+########################################################
 # CSV
 ########################################################
 
@@ -1186,7 +1202,6 @@ with open(filename) as csvfp:
     reader = csv.DictReader(csvfp)
     for row in reader:
         # Each row is an OrderedDict
-
 
 ########################################################
 # BeautifulSoup
@@ -1356,7 +1371,7 @@ else:
 
 
 ###########################################################
-# "else" for loops
+# "else" in loops
 ###########################################################
 
 """
