@@ -528,15 +528,11 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
 
             if not allquestions:
                 allquestions = list(row.keys())[FIRST_Q_COL:]
-                # for i, q in enumerate(allquestions):
-                #     print(f"AQ {i}  '{q}'")
 
             # Loop over the questions
             questions = []    # The questions this candidate answered
             answers = []      # The corresponding answers
             for qnum, question in enumerate(allquestions):
-                if skip_question(question):
-                    continue
                 if row[question]:    # Did the candidate answer this q?
                     tally_race_question(row["Race/Referendum"], qnum)
                     questions.append(question.strip())
@@ -547,7 +543,6 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                                   row["Race/Referendum"],
                                   row["Party Affiliation"],
                                   questions, answers)
-            # print(candidate.name, "questions:", candidate.questions)
             candidates.append(candidate)
 
             if candidate.office not in race_descriptions:
@@ -567,13 +562,15 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         for candidate in candidates:
             if candidate.office not in race_questions:
                 # print("No", candidate.office, "candidates answered anything!")
-                candidate.questions = \
-                    [""]
+                candidate.questions = [""]
                 candidate.answers = [""]
 
             elif len(candidate.questions) != \
                (race_questions[candidate.office][1]
                 - race_questions[candidate.office][0]):
+                # If this candidate has unanswered questions,
+                # insert a NO_RESPONSE in the right place in the
+                # candidate's answer list.
                 # print(candidate.name, "has unanswered questions,",
                 #       len(candidate.questions), "vs",
                 #       (race_questions[candidate.office][1]
@@ -582,17 +579,16 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                     - race_questions[candidate.office][0]
                 for i in range(numquestions):
                     q = allquestions[race_questions[candidate.office][0] + i]
-                    if skip_question(q):
-                        continue
                     if q not in candidate.questions:
                         candidate.questions.insert(i, q)
                         candidate.answers.insert(i, NO_RESPONSE)
 
         # Strip all questions and answers. Can't be done earlier
         # because then it won't match the questions in the CSV header.
-        for candidate in candidates:
-            candidate.questions = [ q.strip() for q in candidate.questions ]
-            candidate.answers   = [ a.strip() for a in candidate.answers ]
+        # But now it should happen in clean_up_csv.
+        # for candidate in candidates:
+        #     candidate.questions = [ q.strip() for q in candidate.questions ]
+        #     candidate.answers   = [ a.strip() for a in candidate.answers ]
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
