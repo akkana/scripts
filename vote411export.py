@@ -5,7 +5,7 @@
 # for a printed voter guide.
 
 # Requires the docx module if Word format output is required:
-# pip install python-docx,
+# pip install python-docx
 # not pip install docx which is a different module.
 
 import csv
@@ -23,12 +23,35 @@ SMARTQUOTE_CHARMAP = { 0x201c : u'"',
 # The column index of the first question (hope this doesn't change):
 FIRST_Q_COL = 16
 
-NO_RESPONSE = "No response was receved."
+# The global list of all questions from the header of the CSV file.
+allquestions = None
+
+# In vote411's export format, there's no way to tell whether
+# an answer field is blank because the candidate didn't answer it,
+# or because it's a question that belongs to another race.
+# So store a dictionary "race name": [low_index, high_index]
+# storing the beginning and end index (into the global allquestions)
+# of questions that any candidate for that race answered.
+# This is just so horrible.
+race_questions = {}
+
+# Here's how it's determined:
+def tally_race_question(racename, qnum):
+    if racename in race_questions:
+        race_questions[racename] = \
+            (min(race_questions[racename][0], qnum),
+             max(race_questions[racename][1], qnum))
+    else:
+        race_questions[racename] = (qnum, qnum)
+
+
+NO_RESPONSE = "No response was received."
 
 class Candidate:
-    def __init__(self, name, lastname, office, party, questions, answers):
-        '''name, lastname, party are strings
-           questions and answers are lists
+    def __init__(self, name, lastname, office, party, q_and_a):
+        '''name, lastname, party are strings.
+           q_and_a is a dictionary of { index: answer }
+           where the index is into the global allquestions list.
         '''
         # For comparing, use lowercase, collapse multiple spaces,
         # and remove any dots after middle initials.
@@ -43,7 +66,7 @@ class Candidate:
         self.name = name
 
         # OPTIONAL: Convert name to title case.
-        # THIS COULD INTRODUCE ERRORS, e.g. MacPhee would become Macphee.
+        # THIS COULD INTRODUCE ERRORS, e.g. McPhee would become Mcphee.
         # If using this option, be sure to proofread carefully!
         if self.name.isupper():
             self.name = self.name.title()
@@ -66,8 +89,7 @@ class Candidate:
         else:
             self.party = party
 
-        self.questions = questions
-        self.answers = answers
+        self.q_and_a = q_and_a
 
         self.sortkey = ''.join([ c.lower() for c in self.lastname
                                            if c.isalpha() ])
@@ -79,17 +101,28 @@ class Candidate:
             partystr = ''
         formatter.add_name_and_party(self.name, partystr)
 
-        for i, q in enumerate(self.questions):
-            if not self.answers[i]:
-                self.answers[i] = NO_RESPONSE
+        # Did no candidate answer any question yet in this race?
+        if self.office not in race_questions:
+            formatter.add_q_and_a('', "No responses yet for this office")
+            return
 
-            # No paragraph break between question and answer.
-            # Number the questions unless the question
-            # starts with a number followd by a dot.
-            if re.match('\d+\.', q) or not q:
-                formatter.add_q_and_a(q, self.answers[i])
+        # Loop over all questions for the candidate's office.
+        low, high = race_questions[self.office]
+
+        for qnum, qindex in enumerate(range(low, high+1)):
+            # qnum is the number to put before the question,
+            # like 1. Why should we vote for you?
+            # except it starts at 0, not 1.
+            # qindex is the index into allquestions.
+            if re.match('\d+\.', allquestions[qindex]):
+                q = allquestions[qindex]
             else:
-                formatter.add_q_and_a(f'{i+1}. {q}', self.answers[i])
+                q = f'{qnum+1}. {allquestions[qindex]}'
+            if qindex in self.q_and_a and self.q_and_a[qindex]:
+                a = self.q_and_a[qindex]
+            else:
+                a = NO_RESPONSE
+            formatter.add_q_and_a(q, a)
 
     # Sorting:
     # Adjust as needed to match ballot order.
@@ -237,11 +270,12 @@ class DocxFormatter:
     def add_q_and_a(self, question, answer):
         self.para = self.doc.add_paragraph('')
 
-        run = self.para.add_run(question)
-        run.bold = True
-        run.font.size = docx.shared.Pt(self.QUESTION_SIZE)
+        if question:
+            run = self.para.add_run(question)
+            run.bold = True
+            run.font.size = docx.shared.Pt(self.QUESTION_SIZE)
+            self.para.add_run('\n')
 
-        self.para.add_run('\n')
         run = self.para.add_run(answer)
         run.font.size = docx.shared.Pt(self.BASE_SIZE)
 
@@ -390,7 +424,7 @@ def clean_up_csv(csvfilename):
        questions), and try to detect and remove non-English questions which
        Vote411 adds but doesn't flag.
        Returns a file-like (already open) handle to a good csv file
-       that can be parsed by csv.DictReader.
+       that can be parsed by another csv reader..
     """
     with open(csvfilename) as infp:
         csvreader = csv.reader(infp)
@@ -412,16 +446,6 @@ def clean_up_csv(csvfilename):
             else:
                 outfields.append(field)
 
-        # print("skipindices:", skipindices)
-        # print("outfields:", outfields)
-
-        # Right now this is written to yield lines, but
-        # csv.reader and csv.writer can both only take file-like objects
-        # so this will probably need StringIo.
-        # For possible solutions, see
-        # https://stackoverflow.com/questions/12593576/adapt-an-iterator-to-behave-like-a-file-like-object-in-python
-        # https://stackoverflow.com/questions/6657820/how-to-convert-an-iterable-to-a-stream/20260030#20260030
-        # https://docs.python.org/3/library/io.html
         outfp = StringIO()
         # outfp = open("cleaned-" + csvfilename, "w")
         csvwriter = csv.writer(outfp)
@@ -434,7 +458,6 @@ def clean_up_csv(csvfilename):
 
         # outfp.close()
         # print("Wrote to", "cleaned-" + csvfilename)
-        # sys.exit(0)
 
         outfp.seek(0)
         return outfp
@@ -447,6 +470,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
     """Read the input CSV file plus any order file,
        and output the information in the requested format.
     """
+    global allquestions
+
     # Read the orderfile, if any:
     order = []
     if orderfile:
@@ -482,32 +507,17 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
     # Read the VOTE411 export CSV file:
     # with open(csvfilename) as csvfp:
     with clean_up_csv(csvfilename) as csvfp:
-        reader = csv.DictReader(csvfp)
+        reader = csv.reader(csvfp)
+        # Can't use a DictReader here, because fields aren't unique!
+        infields = next(reader)
+
+        allquestions = infields[FIRST_Q_COL:]
 
         candidates = []
         measures = []
         race_descriptions = {}
 
-        # In vote411's export format, there's no way to tell whether
-        # an answer field is blank because the candidate didn't answer it,
-        # or because it's a question that belongs to another race.
-        # So store a dictionary "race name": [low_index, high_index]
-        # storing the beginning and end index of questions that any
-        # candidate for that race answered.
-        # This is so horrible.
-        race_questions = {}
-        allquestions = None
-
-        # Here's how it's determined
-        def tally_race_question(racename, qnum):
-            if racename in race_questions:
-                race_questions[racename] = \
-                    (min(race_questions[racename][0], qnum),
-                     max(race_questions[racename][1], qnum+1))
-            else:
-                race_questions[racename] = (qnum, qnum+1)
-
-        # In 2022, each row is an OrderedDict with:
+        # In 2022, each row contains:
         # ID,Full Name,Last Name,Candidate Email,Contact Name,
         # Security Code,Party Affiliation,Race/Referendum,
         # Description of Race/Referendum,Category of Race/Referendum,
@@ -526,69 +536,32 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             #                             row[category_i]))
             #     continue
 
-            if not allquestions:
-                allquestions = list(row.keys())[FIRST_Q_COL:]
+            # Up to where the questions start, a dict is useful.
+            rowdict = dict(zip(infields[:FIRST_Q_COL], row[:FIRST_Q_COL]))
 
-            # Loop over the questions
-            questions = []    # The questions this candidate answered
-            answers = []      # The corresponding answers
-            for qnum, question in enumerate(allquestions):
-                if row[question]:    # Did the candidate answer this q?
-                    tally_race_question(row["Race/Referendum"], qnum)
-                    questions.append(question.strip())
-                    answers.append(row[question].strip())
+            # Which questions did this candidate answer?
+            q_and_a = {}
+            for qindex, col in enumerate(row[FIRST_Q_COL:]):
+                if col:
+                    # The candidate answered this question,
+                    # which has index qindex in allquestions
+                    q_and_a[qindex] = col
+                    tally_race_question(rowdict["Race/Referendum"], qindex)
 
-            candidate = Candidate(row["Full Name"],
-                                  row["Last Name"],
-                                  row["Race/Referendum"],
-                                  row["Party Affiliation"],
-                                  questions, answers)
+            candidate = Candidate(rowdict["Full Name"],
+                                  rowdict["Last Name"],
+                                  rowdict["Race/Referendum"],
+                                  rowdict["Party Affiliation"],
+                                  q_and_a)
             candidates.append(candidate)
 
             if candidate.office not in race_descriptions:
                 race_descriptions[candidate.office] = \
-                    row["Description of Race/Referendum"] \
+                    rowdict["Description of Race/Referendum"] \
                         .strip().replace('NM', 'N.M.')
 
         # Done with loop over tab-separated lines. All candidates are read.
         print(len(candidates), "candidates")
-
-        # Sanity check: are any questions unanswered?
-        # Now that the low and high question indices for each race are known,
-        # see if any candidate skipped anything inside that range,
-        # and if so, insert it with a "no reponse" answer.
-        # If there are any questions ignored by ALL candidates,
-        # that question won't be printed.
-        for candidate in candidates:
-            if candidate.office not in race_questions:
-                # print("No", candidate.office, "candidates answered anything!")
-                candidate.questions = [""]
-                candidate.answers = [""]
-
-            elif len(candidate.questions) != \
-               (race_questions[candidate.office][1]
-                - race_questions[candidate.office][0]):
-                # If this candidate has unanswered questions,
-                # insert a NO_RESPONSE in the right place in the
-                # candidate's answer list.
-                # print(candidate.name, "has unanswered questions,",
-                #       len(candidate.questions), "vs",
-                #       (race_questions[candidate.office][1]
-                #        - race_questions[candidate.office][0]))
-                numquestions = race_questions[candidate.office][1] \
-                    - race_questions[candidate.office][0]
-                for i in range(numquestions):
-                    q = allquestions[race_questions[candidate.office][0] + i]
-                    if q not in candidate.questions:
-                        candidate.questions.insert(i, q)
-                        candidate.answers.insert(i, NO_RESPONSE)
-
-        # Strip all questions and answers. Can't be done earlier
-        # because then it won't match the questions in the CSV header.
-        # But now it should happen in clean_up_csv.
-        # for candidate in candidates:
-        #     candidate.questions = [ q.strip() for q in candidate.questions ]
-        #     candidate.answers   = [ a.strip() for a in candidate.answers ]
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
