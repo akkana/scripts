@@ -571,6 +571,15 @@ mylist.pop(i)            # Removes and returns list[i]
 # There's no single call to remove ALL instances of an item,
 # so you have to use a list comprehension to do that.
 
+# iterator unpacking (aka tuple unpacking) doesn't have to use all vals:
+>>> a, b, *rest = range(5)
+>>> a
+0
+>>> b
+1
+>>> rest
+[2, 3, 4]
+
 # () turns a list comprehension into a generator:
 >>> ( i*2 for i in range(5) )
 <generator object <genexpr> at 0x7f8fc17db050>
@@ -643,8 +652,7 @@ for name, height in zip(names, heights):
 for i, (name, height) in enumerate(zip(names, heights)):
     print("%d: %s: %s meters" % (i, name, height))
 
-
-# Or make a dictionary from a zip():
+# Or make a dictionary from a zip of two lists:
 tall_buildings = dict(zip(names, heights))
 print max(tall_buildings.values())
 
@@ -1180,7 +1188,7 @@ if __name__ == '__main__':
           time.sleep(2)
 
 ########################################################
-# StringIO
+# Use the same StringIO for both input and output
 ########################################################
 
 from io import StringIO
