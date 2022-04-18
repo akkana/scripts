@@ -69,35 +69,46 @@ def showAlert(message:str):
     root.mainloop()
 
 
+def get_timer_procs():
+    """Find all running eggtimer processes. Return list of int pids."""
+
+    slashproc = "/proc"
+    pidlist = []
+    for pid in os.listdir(slashproc):
+        try:
+            # Make sure the directory name is an integer PID
+            pidint = int(pid)
+            # Skip the PID of this process
+            if pidint == os.getpid():
+                continue
+            # Look for other eggtimer processes
+            with open(os.path.join(slashproc, pid, "cmdline")) as fp:
+                cmdline = fp.read().split('\0')
+                if "python" not in cmdline[0]:
+                    continue
+                if not (cmdline[1].endswith("eggtimer") or
+                        cmdline[1].endswith("eggtimer.py")):
+                    continue
+                pidlist.append(pidint)
+        except:
+            # Likely a non/integer directory or file in /proc
+            pass
+
+    return pidlist
+
+
 # main: read the runtime arguments.
 if __name__ == '__main__':
 
     if len(sys.argv) == 1:
         # Find all running eggtimer processes and send them a SIGUSR1
-        foundone = False
-        slashproc = "/proc"
-        for pid in os.listdir(slashproc):
-            try:
-                # Make sure the directory name is an integer PID
-                pidint = int(pid)
-                # Skip the PID of this process
-                if pidint == os.getpid():
-                    continue
-                # Look for other eggtimer processes
-                with open(os.path.join(slashproc, pid, "cmdline")) as fp:
-                    cmdline = fp.read().split('\0')
-                    if "python" not in cmdline[0]:
-                        continue
-                    if not (cmdline[1].endswith("eggtimer") or
-                            cmdline[1].endswith("eggtimer.py")):
-                        continue
-                    foundone = True
-                    os.kill(pidint, signal.SIGUSR1)
-            except:
-                pass
+        timer_pids = get_timer_procs()
 
-        if not foundone:
+        if not timer_pids:
             Usage()
+
+        for pidint in timer_pids:
+            os.kill(pidint, signal.SIGUSR1)
 
         sys.exit(0)
 
