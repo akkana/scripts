@@ -97,6 +97,20 @@ def get_timer_procs():
     return pidlist
 
 
+def user_timestr(secs):
+    if secs > 3600:
+        return time.strftime("%-d days %-H hours %-M minutes %-S seconds",
+                             time.gmtime(secs))
+    if secs > 3600:
+        return time.strftime("%-H hours %-M minutes %-S seconds",
+                             time.gmtime(secs))
+    if secs > 60:
+        return time.strftime("%-M minutes %-S seconds",
+                             time.gmtime(secs))
+    return time.strftime("%-S seconds",
+                         time.gmtime(secs))
+
+
 # main: read the runtime arguments.
 if __name__ == '__main__':
 
@@ -130,7 +144,7 @@ if __name__ == '__main__':
     # Set up a signal handler so users can query for time left
     def signal_handler(signal, frame):
         timeleft = int(wakeuptime - time.time())
-        print("In", timeleft, "seconds:", message, "(PID %d)" % os.getpid())
+        print(f"In {user_timestr(timeleft)}: {message} (PID {os.getpid()})")
 
         time.sleep(timeleft)
 
