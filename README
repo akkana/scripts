@@ -144,6 +144,9 @@ covid-timeseries.py:
     Plot COVID data from the Corona Data Scraper.
     Because I'm as obsessed by COVID-19 as everybody else.
 
+crawler.py:
+    Crawl a website (typically localhost) looking for bad links.
+
 decodemail.py:
     Decode email lines encoded in RFC 2047 format, printing only lines
     that match a specific header (Subject:, From:, etc.).
