@@ -737,7 +737,7 @@ def parse_args():
     parser.add_argument('-c', "--check", dest="check", default=False,
                         action="store_true", help="Help string")
 
-    # int or string flag.
+    # int or string argument.
     # Without type=, will store a string.
     # For a mandatory argument, add required=True.
     parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
@@ -764,6 +764,8 @@ def parse_args():
 
     # single positional argument
     parser.add_argument('url', help='The URL to open')
+
+    # Multiple arguments
     parser.add_argument('urls', nargs='?', default='http://localhost/',
                         help="URLs to open")
 
@@ -890,6 +892,13 @@ calendar.monthrange(year, month)[1]
 
 # Or do it using only datetime:
 (datetime.datetime(year, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
+
+## Human-readable string for a time interval.
+# Cute trick: use time.gmtime directly on the interval.
+# Also, I can't find this in the documentation, but adding a - after the %
+# omits the zero prefix.
+time.strftime("%-d days %-H hours %-M minutes %-S seconds",
+                             time.gmtime(timesecs))
 
 ###############
 # Date Parsing
@@ -1281,6 +1290,17 @@ r = session.get(url)
 # r.encoding comes from the server,
 # r.apparent_encoding is guessed from the text
 # (either one may be None).
+
+# The default timeout is None. Give it a timeout in seconds:
+requests.get(url, timeout=5)
+'''Note:
+
+timeout is not a time limit on the entire response download; rather, an exception is raised if the server has not issued a response for timeout seconds (more precisely, if no bytes have been received on the underlying socket for timeout seconds).'''
+# https://linuxpip.org/python-requests-timeout/
+# You can specify a 2-tuple timeout=(3.05, 27)
+# to set the connect and read timeouts separately.
+# If you specify a single int, it will apply to both connect and read.
+
 
 ########################################################
 # Enumerators and similar

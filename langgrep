@@ -184,6 +184,7 @@ def langgrep(lang, pattern, grepargs, fil, flags):
             path = '/'.join(pathparts[-2:])
 
         if 'fullpath' in flags and flags['fullpath']:
+            # XXX This isn't really the full path, needs work
             s = "%s%s" % (path, line[colon:])
         else:
             s = "%s%s" % (os.path.basename(path), line[colon:])

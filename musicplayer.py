@@ -696,7 +696,9 @@ using a no-play file or a single playlist""")
                                   + " / " + self.cur_song_length_str)
 
     def timer_func(self):
-        """The timer func is what does the actual playing of songs."""
+        """The timer func is what does the actual playing of songs,
+           as well as skipping to the next or previous song.
+        """
         # If we're stopped, don't change anything.
         if self.play_state == MusicWin.STOPPED:
             return True

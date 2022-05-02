@@ -3,6 +3,8 @@
 # Cycle between connected monitors using xrandr.
 # For instance, bind this to XF86Display in your window manager.
 
+# Dependencies: python3-xlib python3-ewmh
+
 # XXX Need to change desktop/screen resolution too.
 # When cycling to a new monitor, also need -s newwxnewh
 
