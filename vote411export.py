@@ -94,6 +94,9 @@ class Candidate:
         self.sortkey = ''.join([ c.lower() for c in self.lastname
                                            if c.isalpha() ])
 
+    def has_answers(self):
+        return bool(self.q_and_a.values())
+
     def output(self, formatter):
         if self.party:
             partystr = f'({self.party})'
@@ -589,13 +592,16 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                 measure.output(formatter)
             # If any measures made it into notfound, remove them:
             if notfound:
-                print("notfound:")
+                print("Not found:")
                 pprint(notfound)
 
         # Now loop over offices printing the candidates in each office
         cur_office = None
         num_for_office = 0
+        no_response_candidates = []
         for candidate in s_candidates:
+            if not candidate.has_answers():
+                no_response_candidates.append(candidate)
             if candidate.office != cur_office:
                 if cur_office:
                     print(num_for_office, "running for", cur_office)
@@ -611,6 +617,12 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
 
         formatter.save()
 
+        # Print the candidates who didn't respond
+        if no_response_candidates:
+            print("\nNo response from:")
+            for c in no_response_candidates:
+                print("   ", c.name)
+
         # Did we find everybody?
         if notfound:
             num_notfound = 0
@@ -619,7 +631,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                 o = orphan.lower().strip()
                 if o in measure_categories:
                     continue
-                notfound_s += "\n    " + o
+                notfound_s += "\n    " + o.upper()
                 num_notfound += 1
             if notfound_s:
                 print("\nNot found:", notfound_s)
