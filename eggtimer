@@ -98,10 +98,10 @@ def get_timer_procs():
 
 
 def user_timestr(secs):
-    if secs > 3600:
+    if secs > 60*60*24:
         return time.strftime("%-d days %-H hours %-M minutes %-S seconds",
                              time.gmtime(secs))
-    if secs > 3600:
+    if secs > 60*60:
         return time.strftime("%-H hours %-M minutes %-S seconds",
                              time.gmtime(secs))
     if secs > 60:
