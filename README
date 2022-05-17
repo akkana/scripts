@@ -216,6 +216,11 @@ gitbranchsync.py:
     A solution to the problem of git making it idiotically difficult
     to keep several machines in sync with the branches in a git repository.
 
+gmail-oauth-tokens.py:
+    A script to manage GMail OAuth2 tokens,
+    derived from getmail6's getmail-gmail-xoauth-tokens
+    which itself is derived from Google's orphaned oauth2.py.
+
 gpreso:
     A lightweight presentation program for displaying HTML slides.
     Python2/GTK/webkit version. (Previously called preso.)
