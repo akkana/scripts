@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 
 #
 # Copyright 2012 Google Inc.
@@ -28,36 +28,17 @@ import sys
 import json
 import argparse
 import time
+from pprint import pprint
 try:
     import urllib.request as urllibrequest
     import urllib.parse as urllibparse
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    urlparse = urllibparse
-    def codebytes(b): return b.encode("utf8")
+    raw_input = input
 except: #py2
-    import urlparse
     import urllib as urllibparse
-    from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
     urllibrequest = urllibparse
-    def codebytes(b): return b
 
-# Local webserver nonsense required to receive code from redirect
-class OAuthRedirectHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        response = urlparse.urlparse(self.path)
-        query_string = urlparse.parse_qs(response.query)
-        code = query_string["code"][0]
-        self.server.oauth_code = code
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
-        self.wfile.write(b"<html><head></head><body><h2>Your json file is updated.</h2></body></html>")
+DEBUG = False
 
-class OAuthRedirectServer(HTTPServer):
-    def __init__(self, port):
-        self.oauth_code = None
-        HTTPServer.__init__(self, ("localhost", int(port)), OAuthRedirectHandler)
-        self.timeout = None
 
 class OAuth2(object):
 
@@ -80,33 +61,41 @@ class OAuth2(object):
             lst.append('%s=%s' % (param[0], escaped))
         return '&'.join(lst)
 
-    def code_url(self, port):
-        params = self.copy('scope', 'client_id')
-        params['redirect_uri'] = 'http://localhost:' + str(port) + '/'
+    def code_url(self):
+        params = self.copy('scope', 'client_id', 'redirect_uri')
         params['response_type'] = 'code'
-        params['access_type'] = 'offline'
-        params['prompt'] = 'consent'
         return '%s?%s' % (self.data['auth_uri'], self.query(params))
 
     def get_response(self, url, params):
         encoded = urllibparse.urlencode(params).encode('ascii')
-        response = urllibrequest.urlopen(url, encoded).read()
-        return json.loads(response)
+        try:
+            response = urllibrequest.urlopen(url, encoded).read()
+            return json.loads(response)
+        except urllib.error.HTTPError:
+            if DEBUG:
+                print("The tokens have expired and Google gave an "
+                      "Error 400: Bad Request", file=sys.stderr)
+            self.authenticate()
 
     def update_config(self, d):
         self.data['access_token'] = d['access_token']
         self.data['expires_at'] = time.time() + d['expires_in'] - 100
+        if DEBUG:
+            print("New expiration:", time.localtime(self.data['expires_at']),
+                  file=sys.stderr)
 
         refresh_token = d.get('refresh_token')
         if refresh_token is not None:
             self.data['refresh_token'] = refresh_token
+        elif DEBUG:
+            print("No refresh token", file=sys.stderr)
 
         with open(self.token_data_path, "w") as f:
             json.dump(self.data, f)
 
-    def init_tokens(self, code, port):
-        params = self.copy('user', 'client_id', 'client_secret')
-        params['redirect_uri'] = 'http://localhost:' + str(port) + '/'
+    def init_tokens(self, code):
+        params = self.copy('user', 'client_id', 'client_secret',
+                           'redirect_uri')
         params['code'] = code
         params['grant_type'] = 'authorization_code'
 
@@ -114,42 +103,63 @@ class OAuth2(object):
         self.update_config(d)
 
     def refresh_tokens(self):
+        if DEBUG:
+            print("Refreshing token", file=sys.stderr)
         params = self.copy('client_id', 'client_secret', 'refresh_token')
         params['grant_type'] = 'refresh_token'
 
         d = self.get_response(self.data['token_uri'], params)
+        if DEBUG:
+            print("Refresh response:", file=sys.stderr)
+            pprint(d, stream=sys.stderr)
         self.update_config(d)
 
     def token(self):
-        if time.time() >= self.data.get('expires_at'):
+        if DEBUG:
+            print("JSON data:", file=sys.stderr)
+            pprint(self.data, stream=sys.stderr)
+        expired = self.data.get('expires_at')
+        if time.time() >= expired:
+            if DEBUG:
+                print("Need to refresh tokens: expired at",
+                      time.strftime('%Y-%m-%d %H:%M', time.gmtime(expired)),
+                      file=sys.stderr)
             self.refresh_tokens()
 
         return self.data['access_token']
+
+    def authenticate(self):
+        """Called from --init, or (maybe) if refresh_tokens fails with a 400"""
+        print("Visit this url to obtain a verification code:",
+              file=sys.stderr)
+        print("    %s\n" % auth.code_url(), file=sys.stderr)
+
+        # Write the prompt to stderr so it won't interfere with
+        # the eventual code printed. raw_input only knows how
+        # to prompt to stdout.
+        sys.stderr.write("Enter verification code: ")
+        code = raw_input()
+        response = auth.init_tokens(code)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--init", action="store_true", default=False,
                         help="initialize access and refresh tokens")
+    parser.add_argument("-d", "--debug", action="store_true", default=False,
+                        help="print debugging output, for testing")
     parser.add_argument('tokenfile', metavar='<token data file path>',
                         help="location of the token data file")
-    parser.add_argument("-p", "--port", default="8083",
-                        help="local port to use for receiving oauth2 redirect")
 
     args = parser.parse_args()
+    if args.debug:
+        DEBUG = True
+
     auth = OAuth2(args.tokenfile)
 
     if args.init:
-        print("Visit this url to obtain a verification code:")
-        print("    %s\n" % auth.code_url(args.port))
-        oauthd = OAuthRedirectServer(args.port)
-        try:
-            oauthd.handle_request()
-            auth.init_tokens(oauthd.oauth_code,args.port)
-        finally:
-            oauthd.server_close()
-        print("\naccess token\n")
-
-    print("%s" % auth.token())
+        auth.authenticate()
+    else:
+        sys.stdout.write("%s" % auth.token())
 
     sys.exit(0)
