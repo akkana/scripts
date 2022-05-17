@@ -52,6 +52,9 @@ getattr(os, 'get_terminal_size', "Doesn't exist")
 if 'myVar' in locals():
 if 'myVar' in globals():
 
+# ChainMap looks something up in a series of dict-like variables:
+pylookup = ChainMap(locals(), globals(), vars(builtins))
+
 # Or, more generally,
 try:
     myVar
@@ -617,17 +620,39 @@ isodd = ['t' if n%2 else 'f' for n in nums]
 >>> { key: value for key, value in zip( [1, 2, 3], [11, 22, 33] ) }
 {1: 11, 2: 22, 3: 33}
 
+#########################################
 # dictionary default values, several ways:
 
-# With regular dicts
+# With regular dicts, you can use get() with a default value
 total['newvalue']] = total.get(key, 0) + 42
 
-# With collections:
+# With collections, you can use defaultdict
 from collections import defaultdict
 total = defaultdict(int)
 total['newvalue'] += 42
 
 names = defaultdict(list)
+
+# Or if writing a class that inherits from dict, you can define __missing__.
+# dict knows about __missing__ and will use it if it's defined,
+# though it's not defined by defaults.
+class MyDict(dict):
+    def __missing__(self, key):
+        print("missing key", key)
+        return 0
+>>> md = MyDict({'one': 1, "three": 3})
+>>> md
+{'one': 1, 'three': 3}
+>>> md['one']
+1
+>>> md['two']
+missing key two
+0
+
+# Fluent Python says it's easier to subclass collections.UserDict than dict,
+# but apparently that's no longer true and now there's really no need for
+# UserDict and UserList. Nobody seems very clear on why it was needed,
+# but apparently it hasn't been needed since Python 2.2.
 
 # While we're looking at collections, another useful collection is:
 from collections import namedtuple
@@ -2133,6 +2158,13 @@ twine upload dist/*
 Specifying required versions:
 install_requires = [ 'numpy>=1.17', ... ]
 
+See also ZipApp, for distributing several files zipped together
+into one runnable file:
+https://docs.python.org/3/library/zipapp.html
+See youtube-dl as an example.
+You can unzip it with unzip, which will skip the shebang line
+(but emacs gets confused by it).
+
 Good way to generate requirements.txt if there's already a setup.py:
 pip-compile
 (Uses specific versions, so you may want to edit it afterward.)
@@ -2168,7 +2200,6 @@ def debug_signal_handler(signal, frame):
     pdb.set_trace()
 import signal
 signal.signal(signal.SIGINT, debug_signal_handler)
-
 
 
 ################################################################
