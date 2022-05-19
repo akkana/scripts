@@ -2,7 +2,9 @@ A collection of useful scripts and snippets by Akkana,
 in various languges (but mostly Python).
 
 All licensed under the GNU Public License v.2 or, at your option,
-any later GPL version.
+any later GPL version -- unless otherwise specified in comments
+at the beginning of the script (there are a few scripts forked from
+projects that use a different license.)
 
 ----------------
 Subdirectories:
