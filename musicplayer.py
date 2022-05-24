@@ -376,8 +376,8 @@ button:hover { background: #dff; border-color: #8bb; }
 
             self.songs = shuffled
 
-        else:
-            self.songs.sort(reverse=self.backward)
+        elif self.backward:
+            self.songs.reverse()
 
         # Even if self.shuffle isn't currently set,
         # it might be toggled on later, so be prepared.
