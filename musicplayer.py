@@ -452,7 +452,7 @@ button:hover { background: #dff; border-color: #8bb; }
             self.pause_btn.set_label('||')
             self.pause_btn.set_tooltip_text("Pause")
             self.play_state = MusicWin.PLAYING
-        # else must be MusicWin.STOPPED. Nothing to do.
+        # else must be MusicWin.STOPPED. Do nothing, keep it there.
 
     def stop(self, w=None):
         if self.play_state == MusicWin.PLAYING \
@@ -700,7 +700,8 @@ using a no-play file or a single playlist""")
            as well as skipping to the next or previous song.
         """
         # If we're stopped, don't change anything.
-        if self.play_state == MusicWin.STOPPED:
+        if self.play_state == MusicWin.STOPPED or \
+           self.play_state == MusicWin.PAUSED:
             return True
 
         # Are we still playing the same song?
@@ -786,7 +787,6 @@ if __name__ == '__main__':
             shuffle = False
             args = args[1:]
 
-    print("args", args)
     win = MusicWin(args, shuffle=shuffle, backward=backward)
     win.run()
 
