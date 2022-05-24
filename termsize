@@ -17,6 +17,12 @@ import tty
 import termios
 import select
 
+try:
+    import curses
+except:
+    pass
+
+
 # python3 has get_terminal size, but it doesn't actually query
 # the terminal, just trusts current stty settings, which isn't
 # useful here. But 3 has different open() characteristics so we
@@ -28,43 +34,65 @@ else:
     fd = os.open('/dev/tty', os.O_RDWR|os.O_NOCTTY)
     ttyfd = open(fd, 'wb+', buffering=0)
 
-# Save the terminal state
-fileno = sys.stdin.fileno()
-stty_sav = termios.tcgetattr(sys.stdin)
-fc_sav = fcntl.fcntl(fileno, fcntl.F_GETFL)
 
-# Turn off echo.
-stty_new = termios.tcgetattr(sys.stdin)
-stty_new[3] = stty_new[3] & ~termios.ECHO
-termios.tcsetattr(sys.stdin, termios.TCSADRAIN, stty_new)
+def get_terminal_size_curses():
+    stdscr = curses.initscr()
+    rows, cols = stdscr.getmaxyx()
+    curses.endwin()
+    return rows, cols
 
-ttyfd.write(b'\033[7\033[r\033[999;999H\033[6n')
-ttyfd.flush()
 
-# Put stdin into cbreak mode.
-# Python2 can use fd here, but in Python3 we have to get sys.stdin.fileno.
-tty.setcbreak(sys.stdin)
+def get_terminal_size_noncurses():
+    # The non-curses version works well under xterm, but in urxvt,
+    # the terminal echoes back the rows and columns, but in a way
+    # that makes it see those characters as input. I haven't
+    # found a way around that.
 
-# Nonblocking mode.
-fcntl.fcntl(fileno, fcntl.F_SETFL, fc_sav | os.O_NONBLOCK)
+    # Save the terminal state
+    fileno = sys.stdin.fileno()
+    stty_sav = termios.tcgetattr(sys.stdin)
+    fc_sav = fcntl.fcntl(fileno, fcntl.F_GETFL)
 
-try:
-    while True:
-        r, w, e = select.select([ttyfd], [], [])
-        if r:
-            output = sys.stdin.read()
-            break
-finally:
-    # Reset the terminal back to normal cooked mode
-    termios.tcsetattr(fileno, termios.TCSAFLUSH, stty_sav)
-    fcntl.fcntl(fileno, fcntl.F_SETFL, fc_sav)
+    # Turn off echo.
+    stty_new = termios.tcgetattr(sys.stdin)
+    stty_new[3] = stty_new[3] & ~termios.ECHO
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, stty_new)
 
-rows, cols = list(map(int, re.findall(r'\d+', output)))
+    ttyfd.write(b'\033[7\033[r\033[999;999H\033[6n')
+    ttyfd.flush()
 
-fcntl.ioctl(ttyfd, termios.TIOCSWINSZ,
-            struct.pack("HHHH", rows, cols, 0, 0))
+    # Put stdin into cbreak mode.
+    # Python2 can use fd here, but in Python3 we have to get sys.stdin.fileno.
+    tty.setcbreak(sys.stdin)
 
-print("\nReset the terminal to %d rows, %d cols" % (rows, cols))
+    # Nonblocking mode.
+    fcntl.fcntl(fileno, fcntl.F_SETFL, fc_sav | os.O_NONBLOCK)
+
+    try:
+        while True:
+            r, w, e = select.select([ttyfd], [], [])
+            if r:
+                output = sys.stdin.read()
+                break
+    finally:
+        # Reset the terminal back to normal cooked mode
+        termios.tcsetattr(fileno, termios.TCSAFLUSH, stty_sav)
+        fcntl.fcntl(fileno, fcntl.F_SETFL, fc_sav)
+
+    rows, cols = list(map(int, re.findall(r'\d+', output)))
+
+    return rows, cols
+
+
+if __name__ == '__main__':
+    try:
+        rows, cols = get_terminal_size_curses()
+    except:
+        rows, cols = get_terminal_size_noncurses()
+
+    fcntl.ioctl(ttyfd, termios.TIOCSWINSZ,
+                struct.pack("HHHH", rows, cols, 0, 0))
+    print("Reset the terminal to %d rows, %d cols" % (rows, cols))
 
 
 
