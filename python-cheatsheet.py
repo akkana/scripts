@@ -1792,6 +1792,18 @@ output = summit(100000)
 print("output = '%s'" % str(output))
 
 ################################################################
+# Closures
+################################################################
+
+'''
+From Fluent Python: a closure is function that retains the bindings
+of the free variables that exist when the function is defined.
+
+So it can remember variables from the enclosing function without
+needing to rely on globals or object members.
+'''
+
+################################################################
 # Performance profiling
 ################################################################
 
