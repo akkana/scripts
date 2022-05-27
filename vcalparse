@@ -26,10 +26,10 @@ def parse_vcal_file(f):
     # There are attendees, but there doesn't seem to be any way
     # to loop over them; you can get one of them with
     # parsedCal.vevent.attendee but how do you get the rest?
-    print("Attending:")
-    for att in parsedCal.vevent.contents["attendee"]:
-        print("  ", att.value)
-    print(parsedCal.vevent.dtstart)
+    if "attendee" in parsedCal.vevent.contents:
+        print("Attending:")
+        for att in parsedCal.vevent.contents["attendee"]:
+            print("  ", att.value)
     print()
 
 if __name__ == "__main__":
