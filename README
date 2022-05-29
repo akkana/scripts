@@ -176,7 +176,7 @@ dirsneeded.py:
 
 docx2html, doc2html have been replaced by word2html.
 
-eggtimer:
+eggtimer.py:
     Pop up a reminder window in a specified number of minutes.
 
 falls_between.py:
