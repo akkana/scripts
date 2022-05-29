@@ -5,10 +5,13 @@ from __future__ import print_function
 import sys, os
 import time
 import signal
-
+import socket
 
 wakeuptime = None
 message = "Wake up!"
+
+
+SLASHPROC = "/proc"
 
 
 # Tkinter changed capitalization from Python 2 to Python 3.
@@ -37,19 +40,9 @@ def keyEvent(event):
         sys.exit(0)
 
 
-def Usage():
-    print("Usage:", sys.argv[0], "minutes message")
-    print("With no arguments, will show any eggtimers currently running")
-    sys.exit(0)
-
-
 def showAlert(message:str):
-    # This is supposed to show a dialog, but tkMessageBox doesn't exist:
-    # tkMessageBox.showwarning("hello", message)
-
     # Try to beep a bit, even though that doesn't work on some distros:
     print("")
-    # print message
 
     root = tkinter.Tk()
 
@@ -69,30 +62,37 @@ def showAlert(message:str):
     root.mainloop()
 
 
-def get_timer_procs():
+def is_eggtimer_proc(pid):
+    try:
+        # Look for other eggtimer processes
+        with open(os.path.join(SLASHPROC, str(pid), "cmdline")) as fp:
+            cmdline = fp.read().split('\0')
+            if "python" not in cmdline[0]:
+                return False
+            if not (cmdline[1].endswith("eggtimer") or
+                    cmdline[1].endswith("eggtimer.py")):
+                return False
+            return True
+    except:
+        # Likely a non/integer directory or file in /proc
+        return False
+
+
+def get_eggtimer_procs():
     """Find all running eggtimer processes. Return list of int pids."""
 
-    slashproc = "/proc"
     pidlist = []
-    for pid in os.listdir(slashproc):
+    for pid in os.listdir(SLASHPROC):
+        # Skip the current process' PID
         try:
-            # Make sure the directory name is an integer PID
             pidint = int(pid)
-            # Skip the PID of this process
-            if pidint == os.getpid():
-                continue
-            # Look for other eggtimer processes
-            with open(os.path.join(slashproc, pid, "cmdline")) as fp:
-                cmdline = fp.read().split('\0')
-                if "python" not in cmdline[0]:
-                    continue
-                if not (cmdline[1].endswith("eggtimer") or
-                        cmdline[1].endswith("eggtimer.py")):
-                    continue
-                pidlist.append(pidint)
         except:
-            # Likely a non/integer directory or file in /proc
-            pass
+            continue
+        if pidint == os.getpid():
+            continue
+
+        if is_eggtimer_proc(pid):
+            pidlist.append(pidint)
 
     return pidlist
 
@@ -111,28 +111,124 @@ def user_timestr(secs):
                          time.gmtime(secs))
 
 
-# main: read the runtime arguments.
-if __name__ == '__main__':
+# Set up a signal handler so users can query for time left
+def handle_wakeup(signal, frame):
+    global wakeuptime
 
-    if len(sys.argv) == 1:
-        # Find all running eggtimer processes and send them a SIGUSR1
-        timer_pids = get_timer_procs()
+    timeleft = int(wakeuptime - time.time())
+    # print(f"In {user_timestr(timeleft)}: {message}")
 
+    # Set up a socket for full-duplex communication:
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sockname = f"/tmp/eggtimer.{os.getpid()}"
+    if not os.path.exists(sockname):
+        sock.bind(sockname)
+        sock.listen(1)
+        conn, addr = sock.accept()
+
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            if data == b"STATUS":
+                conn.sendall(f"In {user_timestr(timeleft)}: "
+                             f"{message} (PID {os.getpid()})".encode())
+
+            elif data.startswith(b"ADD "):
+                try:
+                    addsecs = float(data[4:]) * 60
+                    timeleft += addsecs
+                    wakeuptime += addsecs
+
+                    conn.sendall(f"Adding {addsecs} seconds, "
+                                 f"now {user_timestr(timeleft)}".encode())
+                except ValueError:
+                    conn.sendall(f"Can't add {data[4:]} seconds".encode())
+
+            else:
+                conn.sendall(b"Unknown command: " + data)
+
+        conn.close()
+        os.unlink(sockname)
+
+    else:
+        print("Socket already existed")
+
+    # Go back to sleep, perhaps with an updated sleep time
+    time.sleep(timeleft)
+
+    showAlert(message)
+
+
+def ping_running_eggtimers(cmd_tuples):
+    """Ping running eggtimer processes, send commands to them if any are
+       supplied, then report status for each of them.
+
+       cmd_tuples (optional) is a list of [ (pid, command [, arg] ) ]
+       e.g. [ (7563, ADD, 60) ]
+
+       If cmd_tuples are supplied, ping all the referenced PIDs,
+       else ping all running eggtimers asking for status.
+    """
+    if not cmd_tuples:
+        timer_pids = get_eggtimer_procs()
         if not timer_pids:
-            Usage()
+            print("Couldn't find any eggtimers still running", file=sys.stderr)
+            sys.exit(1)
+        cmd_tuples = [ (pid,) for pid in timer_pids ]
+    else:
+        # Don't send signals to non-eggtimer processes,
+        # even if the user specified the PID.
+        cmd_tuples = [ ct for ct in cmd_tuples if is_eggtimer_proc(ct[0]) ]
 
-        for pidint in timer_pids:
-            os.kill(pidint, signal.SIGUSR1)
+    for ctup in cmd_tuples:
+        pidint = int(ctup[0])
 
-        sys.exit(0)
+        # Make sure it's actually an eggtimer process -- don't
+        # be sending signals to other processes.
+        if not is_eggtimer_proc(pidint):
+            continue
 
-    try:
-      sleeptime = float(sys.argv[1]) * 60
-    except ValueError:
-      Usage()
+        # Wake up the process and tell it to create a socket
+        os.kill(pidint, signal.SIGUSR1)
 
-    if len(sys.argv) > 2:
-      message = ' '.join(sys.argv[2:])
+        # Look for Unix-domain socket named /tmp/eggtimer.[pid]
+        # May have to wait a little while for it to be created,
+        # but don't wait forever.
+        sockname = f"/tmp/eggtimer.{pidint}"
+        for i in range(10):
+            if os.path.exists(sockname):
+                break
+            time.sleep(.15)
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(sockname)
+
+        for cmd in ctup[1:]:
+            # A number, like +2 or -3, means adding minutes
+            # (which can be negative).
+            if cmd[0] in '-+':
+                try:
+                    add_time = float(cmd)
+                except ValueError:
+                    print("Can't add", cmd, ": not a time", file=sys.stderr)
+                    continue
+                sock.sendall(f"ADD {add_time}".encode())
+                response = sock.recv(512)
+                print(f"eggtimer {pidint}:", response.decode())
+            else:
+                print("Don't know command:", cmd)
+
+        # Done with commands, end with a status
+        sock.sendall(b"STATUS")
+        response = sock.recv(512)
+        print(f"eggtimer {pidint} status:", response.decode())
+
+        sock.close()
+
+
+def fork_timer(sleeptime, message):
+    global wakeuptime
 
     print("Sleeping for", sleeptime, "seconds with message:", message)
 
@@ -141,21 +237,56 @@ if __name__ == '__main__':
     if rc:
         sys.exit(0)
 
-    # Set up a signal handler so users can query for time left
-    def signal_handler(signal, frame):
-        timeleft = int(wakeuptime - time.time())
-        print(f"In {user_timestr(timeleft)}: {message} (PID {os.getpid()})")
-
-        time.sleep(timeleft)
-
-        showAlert(message)
-
     # Trap SIGUSR1
-    signal.signal(signal.SIGUSR1, signal_handler)
+    signal.signal(signal.SIGUSR1, handle_wakeup)
 
     wakeuptime = time.time() + sleeptime
 
     time.sleep(sleeptime)
-    print("woke up")
 
     showAlert(message)
+
+
+# main: read the runtime arguments.
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Set/manage time reminders")
+    parser.add_argument('-c', '--command',  action='append', nargs='+',
+                        metavar=('command', 'cmdval'))
+    args, rest = parser.parse_known_args(sys.argv[1:])
+
+    # Three ways of running:
+    # 1. eggtimer (no arguments): args.command=None, rest=[]
+    # 2. eggtimer 15 blah blah blah
+    #    command=None
+    #    rest=['15', 'blah', 'blah', 'blah']
+    # 3. eggtimer -c 9876 +10 -c 123 +60
+    #    args.command=[['9876', '+10'], ['123', '+60']]
+    #    rest=[]
+
+    if not args.command and not rest:
+        ping_running_eggtimers(None)
+        sys.exit(0)
+
+    if not args.command:
+        try:
+            sleeptime = float(rest[0]) * 60
+        except ValueError:
+            parser.print_help()
+            sys.exit(1)
+        message = ' '.join(rest[1:])
+
+        fork_timer(sleeptime, message)
+        sys.exit(0)
+
+    # We have commands. rest should be empty
+    if rest:
+        print("Confused -- is this a timer, or a query of running timers?",
+              file=sys.stderr)
+        parser.print_help()
+        sys.exit(1)
+
+    # args.command is a list of tuples, like [['9876', '+10'], ['123', '+60']]
+    ping_running_eggtimers(args.command)
+
