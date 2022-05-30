@@ -1190,6 +1190,17 @@ output = p4.communicate()[0]
 #           will zero it out.
 
 ########################################################
+# inter-process communication
+########################################################
+
+#### Named pipes are easy when you only need to talk in one direction.
+# See namedpipe.py for a working example.
+
+#### If you need it bidirectional, Unix domain sockets are the answer,
+#### but are a little harder to use. See eggtimer.py for a working example.
+#### quickbrowse also has an example, but that one's unidirectional.
+
+########################################################
 # Threading and multiprocessing
 ########################################################
 

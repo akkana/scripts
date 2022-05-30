@@ -178,6 +178,8 @@ docx2html, doc2html have been replaced by word2html.
 
 eggtimer.py:
     Pop up a reminder window in a specified number of minutes.
+    Also has an example of how to do full-duplex interprocess
+    communication with Unix domain sockets.
 
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
@@ -359,6 +361,9 @@ mpcdemo.py:
 musicplayer.py:
     A little toy music player in Python, illustrating how to play audio.
     Actually more than a toy now -- I use it as my main music player.
+
+namedpipe.py:
+    Illustrates how to use named pipes. Just a demo, nothing useful.
 
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
