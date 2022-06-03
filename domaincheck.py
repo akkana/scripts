@@ -63,7 +63,7 @@ def get_domain_apt_python3whois(domainname):
             return whois.query(domainname)
         except:
             # Yuck, this whois module just raises a generic Exception.
-            print("Problem on", domainname, -- "retrying ...",
+            print("Problem on", domainname, "retrying ...",
                   file=sys.stderr)
     print("Giving up on %s after %d timeouts" % (domainname, RETRIES),
           file=sys.stderr)
