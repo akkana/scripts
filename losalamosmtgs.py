@@ -166,7 +166,8 @@ def meeting_datetime(mtg):
     """Parse the meeting date and time and return an aware localtime.
     """
     # The parsed time is in the local time and is unaware,
-    # because strptime can't create a timezone aware object (see above).
+    # because strptime can't create a timezone aware object
+    # even if the string it's parsing includes a timezone (see above).
     unaware = datetime.datetime.strptime(mtg["Meeting Date"] + " "
                                          + mtg["Meeting Time"],
                                          '%m/%d/%Y %I:%M %p')
@@ -218,16 +219,16 @@ del { background: #fbb; }
     return diff.encode()
 
 
-def agenda_to_html(agendaloc, save_pdf_filename=None):
+def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
     if 'fitz' in sys.modules:
         print("Using fitz")
-        return html_agenda_mupdf(agendaloc, save_pdf_filename)
+        return html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename)
 
     print("No fitz, using pdftohtml")
-    return html_agenda_pdftohtml(agendaloc, save_pdf_filename)
+    return html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename)
 
 
-def html_agenda_mupdf(agendaloc, save_pdf_filename=None):
+def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
     doc = fitz.open(agendaloc)
 
     def find_indent_levels(pdfdoc):
@@ -279,7 +280,8 @@ def html_agenda_mupdf(agendaloc, save_pdf_filename=None):
 
     html = """<html>
 <body>
-"""
+<h3>%s</h3>
+""" % (meetingtime.strftime("%a %y-%m-%d"))
     for page in doc.pages():
         # blocks are like paragraphs in a normal PDF. Here, ??
         # block is supposedly a tuple,
@@ -322,7 +324,7 @@ def html_agenda_mupdf(agendaloc, save_pdf_filename=None):
     return html
 
 
-def html_agenda_pdftohtml(agendaloc, save_pdf_filename):
+def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        then returned cleaned_up bytes (not str).
        save_pdf_filename is for debugging: if set, save the PDF there
@@ -343,10 +345,10 @@ def html_agenda_pdftohtml(agendaloc, save_pdf_filename):
     print("Calling", ' '.join(args))
     subprocess.call(args)
 
-    return clean_up_htmlfile(htmlfile)
+    return clean_up_htmlfile(htmlfile, meetingtime)
 
 
-def clean_up_htmlfile(htmlfile):
+def clean_up_htmlfile(htmlfile, meetingtime):
     """Clean up the scary HTML written by pdftohtml,
        removing the idiotic dark grey background pdftohtml has hardcoded in,
        the assortment of absolute-positioned styles,
@@ -366,6 +368,12 @@ def clean_up_htmlfile(htmlfile):
     soup = BeautifulSoup(html_bytes, "lxml")
 
     body = soup.body
+
+    # Insert the meeting date at the beginning of the body
+    h_tag = soup.new_tag("h3")
+    soup.body.insert(0, h_tag)
+    datetext = NavigableString(meetingtime.strftime("%a %b %d"))
+    h_tag.append(datetext)
 
     # Sometimes pdftohtml mysteriously doesn't work, and gives
     # a basically empty HTML file: everything is using position:absolute
@@ -596,6 +604,7 @@ As of: {gendate}
                 pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
                 try:
                     agenda_html = agenda_to_html(mtg["Agenda"],
+                                                 meetingtime,
                                                  save_pdf_filename=pdfout)
                 except ReadTimeoutError:
                     print("Timed out on " + agendaloc)
@@ -738,7 +747,7 @@ As of: {gendate}
             with open(jsonfile, 'w') as jsonfp:
                 jsonfp.write(json.dumps(mtg, indent=4))
 
-            mtgtitle = f"""{mtg['Name']} on {mtg["Meeting Date"]}"""
+            mtgtitle = f"""{mtg['Name']} on {meetingtime.strftime("%a %b %d")}"""
 
             desc = f"""{mtg['Name']}: {mtg['Meeting Date']} at {mtg['Meeting Time']}<br />
 """
@@ -849,19 +858,6 @@ def mtgdic_to_cleanname(mtgdic):
 
 
 if __name__ == '__main__':
-    """
-    html = agenda_to_html('/home/akkana/src/scripts/test/files/Agenda-2021-07-13.pdf')
-    outfname = '/tmp/agendatest.html'
-    with open(outfname, 'w') as outfp:
-        outfp.write(html)
-        print("Wrote", outfname)
-    sys.exit(0)
-    """
-
-
-
-
-
     if len(sys.argv) > 1:
         RSS_URL = sys.argv[1]
         # RSS_URL is a directory and must end with a slash
