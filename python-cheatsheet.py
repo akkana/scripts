@@ -1054,6 +1054,11 @@ utctime = observer.date.datetime.replace(tzinfo=timezone.utc))
 # Note that despite what "replace" might imply, this does not
 # replace anything in the original object, merely creates a new copy.
 
+# Check if a datetime is timezone aware:
+t = datetime.strptime("2022-06-09 11:23 MDT", "%Y-%m-%d %H:%M %Z")
+t.tzinfo                # -> None if unaware
+datetime.utcoffset(t)   # -> None if unaware
+
 # All pytz code should be migrated over to zoneinfo or dateutil
 # and get on the PEP495 bandwagon.
 # PEP 495: Local time disambiguation: https://www.python.org/dev/peps/pep-0495/
@@ -1304,6 +1309,13 @@ del body["style"]
 # Change a title -- doesn't seem to be documented anywhere
 if not soup.title.string:
     soup.title.string = "Document Title"
+
+# Insert a tag at the beginning or end inside another tag:
+from bs4 import NavigableString
+b_tag = soup.new_tag("b")
+soup.body.insert(0, b_tag)
+btext = NavigableString("this is bold")
+b_tag.append(btext)
 
 
 ########################################################
