@@ -29,13 +29,15 @@ import json
 import argparse
 import time
 from pprint import pprint
-try:
+try:    # python 3
     import urllib.request as urllibrequest
     import urllib.parse as urllibparse
+    from urllib.error import HTTPError
     raw_input = input
-except: #py2
+except: # python 2
     import urllib as urllibparse
     urllibrequest = urllibparse
+    from urllib2 import HTTPError
 
 DEBUG = False
 
@@ -71,11 +73,11 @@ class OAuth2(object):
         try:
             response = urllibrequest.urlopen(url, encoded).read()
             return json.loads(response)
-        except urllib.error.HTTPError:
-            if DEBUG:
-                print("The tokens have expired and Google gave an "
-                      "Error 400: Bad Request", file=sys.stderr)
-            self.authenticate()
+        except HTTPError:
+            print("The tokens have expired and Google gave an "
+                  "Error 400: Bad Request", file=sys.stderr)
+            # self.authenticate()
+            exit(1)
 
     def update_config(self, d):
         self.data['access_token'] = d['access_token']
@@ -119,7 +121,7 @@ class OAuth2(object):
             print("JSON data:", file=sys.stderr)
             pprint(self.data, stream=sys.stderr)
         expired = self.data.get('expires_at')
-        if time.time() >= expired:
+        if time.time() >= float(expired):
             if DEBUG:
                 print("Need to refresh tokens: expired at",
                       time.strftime('%Y-%m-%d %H:%M', time.gmtime(expired)),
@@ -138,8 +140,13 @@ class OAuth2(object):
         # the eventual code printed. raw_input only knows how
         # to prompt to stdout.
         sys.stderr.write("Enter verification code: ")
-        code = raw_input()
-        response = auth.init_tokens(code)
+        try:
+            code = raw_input()
+            response = auth.init_tokens(code)
+        except EOFError:
+            print("Looks like you need to authenticate again.")
+            print("Try running", self.token_data_path,
+                  "in a terminal")
 
 
 if __name__ == '__main__':
