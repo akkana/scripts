@@ -76,6 +76,9 @@ class OAuth2(object):
         except HTTPError:
             print("The tokens have expired and Google gave an "
                   "Error 400: Bad Request", file=sys.stderr)
+            print("Please run %s -i %s" % (os.path.basename(sys.argv[0]),
+                                           self.token_data_path),
+                  file=sys.stderr)
             # self.authenticate()
             exit(1)
 
