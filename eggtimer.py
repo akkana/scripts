@@ -165,7 +165,9 @@ def ping_running_eggtimers(cmd_tuples):
        supplied, then report status for each of them.
 
        cmd_tuples (optional) is a list of [ (pid, command [, arg] ) ]
-       e.g. [ (7563, ADD, 60) ]
+       e.g. [ (7563, ADD, 60), (8725, SUBTRACT, 45), (9203, -3 ]
+       If there's no explicit command, ADD is assumed (but the
+       value can be negative).
 
        If cmd_tuples are supplied, ping all the referenced PIDs,
        else ping all running eggtimers asking for status.
@@ -176,10 +178,6 @@ def ping_running_eggtimers(cmd_tuples):
             print("Couldn't find any eggtimers still running", file=sys.stderr)
             sys.exit(1)
         cmd_tuples = [ (pid,) for pid in timer_pids ]
-    else:
-        # Don't send signals to non-eggtimer processes,
-        # even if the user specified the PID.
-        cmd_tuples = [ ct for ct in cmd_tuples if is_eggtimer_proc(ct[0]) ]
 
     for ctup in cmd_tuples:
         pidint = int(ctup[0])
@@ -187,6 +185,7 @@ def ping_running_eggtimers(cmd_tuples):
         # Make sure it's actually an eggtimer process -- don't
         # be sending signals to other processes.
         if not is_eggtimer_proc(pidint):
+            print(pidint, "isn't an eggtimer process!", file=sys.stderr)
             continue
 
         # Wake up the process and tell it to create a socket
@@ -204,18 +203,28 @@ def ping_running_eggtimers(cmd_tuples):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(sockname)
 
+        multiplier = 0
         for cmd in ctup[1:]:
             # A number, like +2 or -3, means adding minutes
             # (which can be negative).
-            if cmd[0] in '-+':
+            if cmd == 'ADD':
+                multiplier = 1
+                continue    # ADD is implied
+
+            if cmd == 'SUBTRACT' or cmd == 'SUB':
+                multiplier = -1
+                continue
+
+            if cmd[0] in '-+' or multiplier:
                 try:
                     add_time = float(cmd)
                 except ValueError:
                     print("Can't add", cmd, ": not a time", file=sys.stderr)
                     continue
+                if multiplier:
+                    add_time *= multiplier
                 sock.sendall(f"ADD {add_time}".encode())
                 response = sock.recv(512)
-                print(f"eggtimer {pidint}:", response.decode())
             else:
                 print("Don't know command:", cmd)
 
@@ -251,9 +260,17 @@ def fork_timer(sleeptime, message):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description="Set/manage time reminders")
+    parser = argparse.ArgumentParser(description="Set/manage time reminders",
+                             formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', '--command',  action='append', nargs='+',
-                        metavar=('command', 'cmdval'))
+                        metavar=('command', 'cmdval'),
+                        help="""Commands to query running eggtimers must start
+with the PID of the process to be modified.
+Examples:
+  eggtimer -c 1234 ADD 2
+  eggtimer -c 1234 SUBTRACT 60
+  eggtimer -c 1234 +10
+  eggtimer -c 1234 -40""")
     args, rest = parser.parse_known_args(sys.argv[1:])
 
     # Three ways of running:
