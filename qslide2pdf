@@ -7,7 +7,12 @@
 # To convert all the output files into a single multi-page PDF, use this:
 # gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=multipage.pdf -dBATCH file*.pdf
 
+# To use this on one of my slide presentations, where the successive
+# URLs are listed in slides.js, one per line:
+# qslide2pdf $(fgrep .html slides.js | sed -e 's_//.*__' -e 's/^ *\"//' -e 's/\".*$//' -e 's_^_http://localhost/DEcaucus/_' | egrep .html)
+
 import sys
+import time
 
 import urllib.request
 
@@ -26,6 +31,7 @@ class HeadlessPagePrinter():
     def __init__(self, app, pdf_ready, x_res=1024):
         self.profile = QWebEngineProfile()
         self.webpage = QWebEnginePage(self.profile, app)
+
         self.webpage.loadFinished.connect(self.load_finished)
         self.x_res = x_res
 
@@ -60,15 +66,15 @@ class HeadlessPagePrinter():
 }
 </style>
 </head>''' % self.x_res)
-        print(html)
 
-        self.webpage.setHtml(html, QUrl('file:///home/akkana/Docs/Preso/moon-peec/'))
-
-    def set_html(self, html):
-        self.webpage.setHtml(html)
+        self.webpage.setHtml(html, QUrl(url))
 
     def load_finished(self, ok):
-        print("Load finished ... trying to print")
+        # This gets called before the load is actually finished. Sigh.
+        # The html is loaded, but images might not be.
+        # So wait a bit:
+        time.sleep(.4)
+
         # contentsSize is always 0x0. Not clear if it's supposed to be useful.
         # print("Contents size is %f x %f" %
         #       (self.webpage.contentsSize().width(),
@@ -86,7 +92,7 @@ class HeadlessPagePrinter():
         else:
             xmm = 271
         ymm = 203.3
-        print("Page size of", xmm, ymm)
+        # print("Page size of", xmm, ymm)
         layout = QPageLayout(QPageSize(QSizeF(xmm, ymm),
                                        QPageSize.Millimeter),
                              QPageLayout.Portrait, margins,
@@ -114,12 +120,12 @@ class SlidePrinter:
         if self.urlindex >= len(self.urllist):
             print("All done")
             sys.exit(0)
-        print("\n=== Rendering url", self.urlindex, ":",
+        print("=== Rendering url", self.urlindex, ":",
               self.urllist[self.urlindex])
         self.renderer.load_url(self.urllist[self.urlindex])
 
     def pdf_ready(self, pdf_bytes):
-        print("finished rendering to", len(pdf_bytes), "bytes")
+        # print("finished rendering to", len(pdf_bytes), "bytes")
         if pdf_bytes:
             filename = "/tmp/page%d.pdf" % self.urlindex
             with open(filename, "wb") as fp:
@@ -132,7 +138,7 @@ class SlidePrinter:
 
         self.urlindex += 1
         if self.urlindex >= len(self.urllist):
-            print("\nTrying to save the merged file")
+            # print("\nTrying to save the merged file")
             with open(self.outfile, "wb") as fp:
                 self.merger.write(fp)
             print("Wrote", self.outfile)
