@@ -289,7 +289,11 @@ class FontApp(Gtk.Window):
         # Gtk.main_quit()
 
     def apply_CSS(self, newCSS: str):
-        self.css_provider.load_from_data(newCSS.encode('UTF-8'))
+        try:
+            self.css_provider.load_from_data(newCSS.encode('UTF-8'))
+        except gi.repository.GLib.GError as e:
+            print("GTK Error applying CSS:", e, file=sys.stderr)
+            print("CSS was:", newCSS, file=sys.stderr)
         context = Gtk.StyleContext()
         context.add_provider_for_screen(Gdk.Screen.get_default(),
                                         self.css_provider,
