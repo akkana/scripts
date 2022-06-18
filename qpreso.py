@@ -13,6 +13,7 @@
 import sys
 import os
 import argparse
+from shutil import rmtree
 
 from PyQt5.QtCore import QUrl
 from PyQt5.QtWidgets import QApplication, QShortcut, QDesktopWidget, QMainWindow
@@ -199,6 +200,18 @@ if __name__ == '__main__':
         # logging.critical('{0}: {1}'.format(excType, excValue))
         traceback.print_exception(excType, excValue, tracebackobj)
     sys.excepthook = excepthook
+
+    # QtWebEngine creates a cache whether you want it or not,
+    # which then sometimes, unpredictably, persists to future runs
+    # so updates you make to the preso may not be seen.
+    # (This seems to be new behavior in June 2022.) S
+    # So remove any cache before starting up.
+    try:
+        rmtree(os.path.expanduser("~/.cache/qpreso/QtWebEngine/"))
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Couldn't clear cache on startup:", e)
 
     args = parse_args()
 
