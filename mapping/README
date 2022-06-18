@@ -2,6 +2,10 @@
 Mapping and GIS Related Scripts:
 --------------------------------
 
+airlineroutes.py:
+    Plot US airline routes on a background map.
+    Mainly useful as an illustration of plotting from geopandas.
+
 demraytrace.py:
     Raytrace a Digital Elevation Model file using povray,
     creating a 360-degree panorama.
