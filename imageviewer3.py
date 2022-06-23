@@ -31,25 +31,17 @@ class ImageViewer(Gtk.DrawingArea):
         self.cr = None
 
     def draw(self, widget, cr):
-        # if not self.xgc_bg:
-        #     self.xgc_bg = widget.window.new_gc()
-        #     self.xgc_bg.set_rgb_fg_color(Gdk.Color(0, 0, 0))
-
-        #     self.xgc_fg = widget.window.new_gc()
-        #     self.xgc_fg.set_rgb_fg_color(Gdk.color_parse("yellow"))
-
-        if True:
-            rect = self.get_allocation()
-            w = rect.width
-            h = rect.height
-            if w != self.width or h != self.height:
-                # get_allocation() gives a number that's too large,
-                # and if we later try to draw_rectangle() with these
-                # dimensions, we'll only get half the rectangle horizontally.
-                # I have no idea why this is happening, but subtracting a
-                # few pixels from allocation width is a temporary workaround.
-                self.width = w    # -5
-                self.height = h
+        rect = self.get_allocation()
+        w = rect.width
+        h = rect.height
+        if w != self.width or h != self.height:
+            # get_allocation() gives a number that's too large,
+            # and if we later try to draw_rectangle() with these
+            # dimensions, we'll only get half the rectangle horizontally.
+            # I have no idea why this is happening, but subtracting a
+            # few pixels from allocation width is a temporary workaround.
+            self.width = w    # -5
+            self.height = h
 
             # Have we had load_image called, but we weren't ready for it?
             # Now, theoretically, we are ... so call it again.
@@ -219,7 +211,7 @@ class ImageViewerWindow(Gtk.Window):
     """Bring up a window that can view images.
     """
 
-    def __init__(self, file_list=None, width=1024, height=768):
+    def __init__(self, file_list=None, width=1024, height=768, opacity=1):
         super().__init__()
         self.file_list = file_list
         self.imgno = 0
@@ -227,6 +219,8 @@ class ImageViewerWindow(Gtk.Window):
         # The size of the image viewing area:
         self.width = width
         self.height = height
+
+        self.opacity = opacity
 
         self.isearch = False
 
@@ -251,9 +245,11 @@ class ImageViewerWindow(Gtk.Window):
 
     def run(self):
         self.show_all()
-        self.set_opacity(.5)
-        # print("xid: ")
-        # print(self.xid)
+
+        # set_opacity is deprecated, but they don't say what replaces it.
+        if self.opacity != 1:
+            self.set_opacity(self.opacity)
+
         Gtk.main()
 
     def set_key_handler(self, fcn):
@@ -285,6 +281,6 @@ def key_press_event(widget, event, imagewin):
 
 if __name__ == "__main__":
     import sys
-    win = ImageViewerWindow(sys.argv[1:])
+    win = ImageViewerWindow(sys.argv[1:], opacity=.5)
     win.set_key_handler(key_press_event)
     win.run()
