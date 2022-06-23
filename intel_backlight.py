@@ -34,9 +34,9 @@ def set_brightness(newval):
 
 def change_brightness(incr):
     bright = get_brightness()
-    if bright < 10:
-        incr /= 10
-    print("change_brightness from", bright, "by", incr)
+    # if bright < 10:
+    #     incr /= 10
+    # print("change_brightness from", bright, "by", incr)
     bright += incr
     if bright > 100:
         bright = 100
