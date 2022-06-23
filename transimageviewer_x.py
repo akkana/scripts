@@ -24,9 +24,6 @@ class XImageWindow():
         x0 = 100
         y0 = 100
 
-        gc = self.screen.root.create_gc(foreground=self.screen.white_pixel,
-                                        background=self.screen.black_pixel)
-
         self.win = self.screen.root.create_window(
             x0, y0, self.width, self.height, 0,
             self.screen.root_depth,
@@ -52,17 +49,44 @@ class XImageWindow():
         self.win.change_property(self.dpy.get_atom('_NET_WM_WINDOW_OPACITY'),
                                  Xatom.CARDINAL, 32, [fourbytes])
 
-        self.gc = self.win.create_gc(foreground=self.screen.white_pixel,
-                                     background=self.screen.black_pixel)
+        # self.add_xlib_clickthrough()
 
         self.win.map()
+
+    def add_xlib_clickthrough(self):
+        """Attempt to add clickthrough to the window,
+           using Xlib's SHAPE extension.
+        """
+        if not self.dpy.has_extension('SHAPE'):
+            sys.stderr.write('%s: server does not have SHAPE extension\n'
+                             % os.path.basename(sys.argv[0]))
+            return
+
+        # create a pixmap for the input shape
+        geom = self.win.get_geometry()
+
+        input_pm = self.screen.root.create_pixmap(geom.width, geom.height, 1)
+        gc = input_pm.create_gc(foreground=1, background=0)
+        input_pm.fill_rectangle(gc, 0, 0, geom.width, 20)
+        gc.change(foreground=0)
+        input_pm.fill_rectangle(gc, 0, 20, geom.width, geom.height-20)
+        self.win.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, input_pm)
+        gc.free()
 
     def mainloop(self):
         while True:
             e = self.dpy.next_event()
             # print(e)
             if e.type == X.ConfigureNotify:
-                self.win.put_pil_image(self.gc, 0, 0, self.img)
+                gc = self.screen.root.create_gc(
+                    foreground=self.screen.white_pixel,
+                    background=self.screen.black_pixel)
+                self.win.put_pil_image(gc, 0, 0, self.img)
+                gc.free()
+
+                if self.opacity < 1:
+                    self.add_xlib_clickthrough()
+
                 self.dpy.flush()
                 continue
 
@@ -87,4 +111,8 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
 
     imgwin = XImageWindow(args.imgfile, opacity=args.opacity)
-    imgwin.mainloop()
+    try:
+        imgwin.mainloop()
+    except KeyboardInterrupt:
+        print("Bye")
+        sys.exit(0)
