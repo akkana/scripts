@@ -549,7 +549,7 @@ tklabelimage.py:
     in TkInter, and of how to conditionally import Tk in python2 or 3.
     Doesn't do anything useful.
 
-transimageviewer-gtk2.py:
+transimageviewer_gtk2.py:
     A translucent image viewer (inheriting from imageviewer.py)
     that passes clicks and other events through to the window below.
     Useful for things like saving GPS waypoints from a map image.
@@ -557,14 +557,19 @@ transimageviewer-gtk2.py:
     from pygtk, including input shapes. Now obsolete since it only
     works in GTK2; I haven't found a GTK3 equivalent.
 
-transimageviewer-tk.py:
+transimageviewer_tk.py:
     An attempt at a translucent clickthrough image viewer in tk,
     which DOES NOT allow clickthrough (yet?)
     It tries to use an xlib technique for that, but it doesn't work
     and I'm not sure why not.
 
-transimageviewer-qt5.py:
+transimageviewer_qt5.py:
     A translucent image viewer with clickthrough, implemented in qt5.
+
+transimageviewer_x.py:
+    A translucent image viewer with clickthrough, implemented in Xlib.
+    This one is the best of the bunch because you can move it around
+    by the titlebar, unlike the qt5 version.
 
 turtlefrac.py:
     Draw fractals (specifically a Sierpinski triangle)
@@ -635,8 +640,6 @@ wpnet.py:
 
 xbright:
     Adjust brightness of an X11 display up or down using xrandr.
-
-ximageviewer.py: An image viewer using only xlib. No opacity yet.
 
 xlsrd:
     Display an .xls spreadsheet as a formatted ASCII table, using

@@ -97,7 +97,6 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--opacity', type=int, default=50,
                         help='opacity (percent: default 50)')
     args = parser.parse_args(sys.argv[1:])
-    print(args)
 
     app = QApplication(sys.argv)
     window = TransWin(args.imgfile,
