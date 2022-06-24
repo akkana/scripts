@@ -10,9 +10,14 @@ from Xlib.ext import shape
 
 
 class XImageWindow():
-    def __init__(self, imgname, opacity=1):
+    def __init__(self, imgname, opacity=1, magnification=100):
         self.imgname = sys.argv[1]
         self.img = Image.open(self.imgname)
+
+        if magnification != 100:
+            newwidth = self.img.width * magnification / 100
+            newheight = self.img.height * magnification / 100
+            self.img = self.img.resize(newwidth, newheight)
 
         self.opacity = opacity/100.
 
@@ -30,7 +35,7 @@ class XImageWindow():
             X.InputOutput,
             X.CopyFromParent,
             colormap=X.CopyFromParent,
-            event_mask = X.StructureNotifyMask
+            event_mask = X.StructureNotifyMask | X.ExposureMask
         )
 
         self.win.set_wm_name(self.imgname)
@@ -49,7 +54,8 @@ class XImageWindow():
         self.win.change_property(self.dpy.get_atom('_NET_WM_WINDOW_OPACITY'),
                                  Xatom.CARDINAL, 32, [fourbytes])
 
-        # self.add_xlib_clickthrough()
+        # Would be nice to add the clickthrough input shapemask here,
+        # but it doesn't work if added this early.
 
         self.win.map()
 
@@ -70,6 +76,10 @@ class XImageWindow():
         input_pm.fill_rectangle(gc, 0, 0, geom.width, 20)
         gc.change(foreground=0)
         input_pm.fill_rectangle(gc, 0, 20, geom.width, geom.height-20)
+
+        # SO options are Intersect, Invert, Set, Subtract, Union
+        # SK options are Bounding, Clip, Input
+        # See https://www.x.org/releases/X11R7.7/doc/libXext/shapelib.html
         self.win.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, input_pm)
         gc.free()
 
@@ -77,11 +87,13 @@ class XImageWindow():
         while True:
             e = self.dpy.next_event()
             # print(e)
-            if e.type == X.ConfigureNotify:
+            if e.type == X.ConfigureNotify or e.type == X.Expose:
                 gc = self.screen.root.create_gc(
                     foreground=self.screen.white_pixel,
                     background=self.screen.black_pixel)
+
                 self.win.put_pil_image(gc, 0, 0, self.img)
+
                 gc.free()
 
                 if self.opacity < 1:
@@ -107,10 +119,13 @@ if __name__ == '__main__':
         description="Show an image transparently, with click-through")
     parser.add_argument('imgfile', help='Image to show')
     parser.add_argument('-o', '--opacity', type=int, default=100,
-                        help='opacity (percent: default 50)')
+                        help='opacity (percent: default 100)')
+    parser.add_argument('-m', '--magnify', type=int, default=100,
+                        help='magnification factor (percent: default 100)')
     args = parser.parse_args(sys.argv[1:])
 
-    imgwin = XImageWindow(args.imgfile, opacity=args.opacity)
+    imgwin = XImageWindow(args.imgfile, opacity=args.opacity,
+                          magnification=args.magnify)
     try:
         imgwin.mainloop()
     except KeyboardInterrupt:
