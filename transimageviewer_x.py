@@ -15,9 +15,9 @@ class XImageWindow():
         self.img = Image.open(self.imgname)
 
         if magnification != 100:
-            newwidth = self.img.width * magnification / 100
-            newheight = self.img.height * magnification / 100
-            self.img = self.img.resize(newwidth, newheight)
+            newwidth = int(self.img.width * magnification / 100.)
+            newheight = int(self.img.height * magnification / 100.)
+            self.img = self.img.resize((newwidth, newheight))
 
         self.opacity = opacity/100.
 
