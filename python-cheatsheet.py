@@ -859,6 +859,8 @@ struct_time in local time  seconds since the epoch   mktime()
 # Convert datetime to date:
 now = datetime.now()
 today = now.date()
+# date to datetime:
+d = datetime.combine(d, datetime.min.time())
 
 ##################
 # Date Arithmetic
@@ -1499,6 +1501,25 @@ Some people on python-list suggest it should have been named nobreak.
 # Run one test in one class in one file:
 # python -m unittest test.test_epubtags.TestEpubTags.test_epubtags
 
+# approximate tests
+def assertCloseEnough(a, b, tolerance=1e-5):
+    """Assert if two values aren't close enough within a tolerance.
+       Can accept two scalars or two iterables.
+    """
+    if hasattr(a, "__getitem__") and hasattr(b, "__getitem__"):
+        if len(a) != len(b):
+            raise AssertionError('Different lengths, %d vs %d'
+                                 % (len(a), len(b)))
+        for i, (aval, bval) in enumerate(zip(a, b)):
+            if not math.isclose(aval, bval, rel_tol=tolerance):
+                raise AssertionError("%dth elements differ: %f != %f"
+                                     % (i, aval, bval))
+        return
+
+    if not math.isclose(a, b, rel_tol=tolerance):
+        raise AssertionError('%f not close enough to %f' % (a, b))
+
+
 
 ########################################################
 # OS-specific stuff
@@ -1638,6 +1659,15 @@ for s in ("NONE", "REJECT", "ACCEPT", "DELETE_EVENT", "OK", "CANCEL", "CLOSE", "
 # NO -9
 # APPLY -10
 # HELP -11
+
+
+# This overrides Qt's silly trapping of Ctrl-C,
+# so you don't have to Ctrl-\ and get a core dump every time.
+# Just trapping KeyboardInterrupt doesn't do it.
+from PyQt5 import QtCore, QtGui, QtWidgets
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 
 ################################################################
 # Nonlocal variables, class statics, and closures
