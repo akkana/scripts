@@ -249,7 +249,7 @@ if __name__ == "__main__":
         except FileNotFoundError:
             print("Can't arp", file=sys.stderr)
             g_can_arp = False
-            # sys.exit(1)
+            sys.exit(1)
     elif g_debugging:
         print("Using arpreq library")
 
