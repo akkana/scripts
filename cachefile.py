@@ -70,8 +70,8 @@ class Cachefile(object):
         # Make sure the data doesn't span more than one day.
         if day_data[0][self.TIME].day != day_data[-1][self.TIME].day:
             print("Can't cache data for multiple days: %s - %s" % (
-                day_data[0][self.TIME].strftime('%Y-%M-%d'),
-                day_data[-1][self.TIME].strftime('%Y-%M-%d')))
+                day_data[0][self.TIME].strftime('%Y-%m-%d'),
+                day_data[-1][self.TIME].strftime('%Y-%m-%d')))
             return
 
         if not os.path.exists(self.cachedir):
