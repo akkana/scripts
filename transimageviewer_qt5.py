@@ -42,27 +42,15 @@ class TransWin(QMainWindow):
 
         # Translucent background
         self.setWindowOpacity(self.opacity)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        # self.setAttribute(Qt.WA_TranslucentBackground)
 
-        # Try to make mouse events click through, but it doesn't work:
-        # Apparently WA_TransparentForMouseEvents only works for
-        # other windoes from the same app.
-        # self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-
-        self.setWindowFlags(Qt.Popup|Qt.WindowDoesNotAcceptFocus
-                            | Qt.WindowTransparentForInput)
-        # self.setAttribute(Qt.WA_AlwaysStackOnTop, True)
-        # self.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint
-        #                     | Qt.FramelessWindowHint
-        #                     | Qt.WindowStaysOnTopHint)
-
+        # Make mouse events click through:
         # https://stackoverflow.com/a/70438754
-        self.setAttribute(Qt.WA_NoSystemBackground)
-        self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowFlags(self.windowFlags()
-                            # These make no difference
-                            # | Qt.WindowTransparentForInput
-                            # | Qt.FramelessWindowHint
+                            # This is necessary but not sufficient:
+                            # apparently it's mainly for passing events
+                            # through to lower windows *from the same app*:
+                            | Qt.WindowTransparentForInput
 
                             # This is the key: with X11BypassWindowManagerHint
                             # I can click through the window -- but
@@ -72,10 +60,7 @@ class TransWin(QMainWindow):
                             # key events either, the only way to exit
                             # is to SIGQUIT and take the core dump.
                             | Qt.X11BypassWindowManagerHint
-
-                            | Qt.WindowStaysOnTopHint
-                            | Qt.WA_MouseNoMask
-                            | Qt.WA_TranslucentBackground)
+                            )
 
     def paintEvent(self, event):
         painter = QPainter(self)

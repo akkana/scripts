@@ -72,28 +72,20 @@ def add_xlib_clickthrough():
         sys.exit(0)
     # print("xwin:", xwin)
 
-    #
     # create a pixmap for the input shape
-    #
-    screen = dpy.screen()
     geom = xwin.get_geometry()
-    print(geom.width, geom.height)
-    shape_pm = screen.root.create_pixmap(geom.width, geom.height, 1)
+    screen = dpy.screen()
     input_pm = screen.root.create_pixmap(geom.width, geom.height, 1)
-    gc = screen.root.create_gc(foreground=screen.white_pixel,
-                               background=screen.black_pixel)
-    shape_pm.fill_rectangle(gc, 0, 0, geom.width, geom.height)
-    input_pm.fill_rectangle(gc, 0, 0, geom.width, geom.height)
-    gc.change(foreground=screen.black_pixel)
-    shape_pm.fill_rectangle(gc, 100, 100, 800, 600)
-    gc.free()
+    gc = input_pm.create_gc(foreground=1, background=0)
+    input_pm.fill_rectangle(gc, 0, 0, geom.width, 20)
+    gc.change(foreground=0)
+    input_pm.fill_rectangle(gc, 0, 20, geom.width, geom.height-20)
 
     # SO options are Intersect, Invert, Set, Subtract, Union
     # SK options are Bounding, Clip, Input
     # See https://www.x.org/releases/X11R7.7/doc/libXext/shapelib.html
-    # Bounding is what moonroot uses.
-    xwin.shape_mask(shape.SO.Set, shape.SK.Clip, 0, 0, shape_pm)
-    # xwin.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, shape_pm)
+    xwin.shape_mask(shape.SO.Set, shape.SK.Input, 0, 0, input_pm)
+    gc.free()
 
 
 if __name__ == '__main__':
