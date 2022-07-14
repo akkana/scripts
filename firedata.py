@@ -14,7 +14,11 @@ master_bbox = ( -107, 35.15, -104.55, 36.6 )
 
 datadir = os.path.expanduser("~/Data/cerropelado")
 
-# The two satellite datasets to pull, MODIS and VIIRS
+# The two satellite datasets to pull, MODIS and VIIRS.
+# NASA says in https://www.earthdata.nasa.gov/resource-spotlight/wildfires :
+# "Active fire/hotspot data acquired by instruments aboard geostationary
+# satellites will be added to FIRMS later in 2022."
+# so keep an eye on FIRMS; it may be worth adding other FIRMS URLs.
 sat_urls = ( 'https://firms.modaps.eosdis.nasa.gov/data/active_fire/modis-c6.1/csv/MODIS_C6_1_USA_contiguous_and_Hawaii_24h.csv',
              'https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2/csv/J1_VIIRS_C2_USA_contiguous_and_Hawaii_24h.csv'
             )
