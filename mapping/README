@@ -12,6 +12,10 @@ demraytrace.py:
     demproj.py is similar but pointless, making lots of smaller
     povray projections that you can stitch together.
 
+firedata.py:
+    Track progress of a wildfire. Download MODIS and VIIRS hotspot data
+    plus perimeter data, and massage it into something pytopo can show.
+
 geoipcompare.py:
     Check several different geoip services and log the varying
     answers they give.

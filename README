@@ -190,10 +190,6 @@ fincompare.py:
     different funds on the same scale.
     Can also take data from a local spreadsheet or other source.
 
-firedata.py:
-    Track progress of a wildfire. Download MODIS and VIIRS hotspot data
-    plus perimeter data, and massage it into something pytopo can show.
-
 firefox-zoom.py:
     Show which sites have saved zoom settings in firefox,
     or delete all saved zoom settings.
