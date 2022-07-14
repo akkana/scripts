@@ -147,6 +147,7 @@ def fix_agenda(agenda_infile):
         index = fuzzy_search(em_text, origbases)
         if index < 0:    # No fuzzy match
             print("Couldn't find a match for", em_text)
+            nosuchfiles.append(em_text)
             continue
 
         # Found a match by searching origbases, returning index.
