@@ -550,26 +550,28 @@ tklabelimage.py:
     Doesn't do anything useful.
 
 transimageviewer_gtk2.py:
+    OBSOLETE because GTK2 is.
     A translucent image viewer (inheriting from imageviewer.py)
     that passes clicks and other events through to the window below.
     Useful for things like saving GPS waypoints from a map image.
     Also offers a rare example of how to use the X11 SHAPE extension
-    from pygtk, including input shapes. Now obsolete since it only
-    works in GTK2; I haven't found a GTK3 equivalent.
+    from pygtk2, including input shapes.
+    Alas, I haven't found a way to do this in GTK3.
 
 transimageviewer_tk.py:
     An attempt at a translucent clickthrough image viewer in tk,
     which DOES NOT allow clickthrough (yet?)
     It tries to use an xlib technique for that, but it doesn't work
-    and I'm not sure why not.
+    and I'm not sure why not (the same code works in transimageviewer_x.py).
 
 transimageviewer_qt5.py:
     A translucent image viewer with clickthrough, implemented in qt5.
+    Can't be moved once it's mapped, but otherwise works.
 
 transimageviewer_x.py:
     A translucent image viewer with clickthrough, implemented in Xlib.
     This one is the best of the bunch because you can move it around
-    by the titlebar, unlike the qt5 version.
+    if you grab it near the top center of the window.
 
 turtlefrac.py:
     Draw fractals (specifically a Sierpinski triangle)
