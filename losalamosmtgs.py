@@ -49,6 +49,11 @@ if not os.path.exists(RSS_DIR):
 ######## END CONFIGURATION ############
 
 
+# Needed to deal with meetings that don't list a time:
+NO_TIME = "NO TIME"
+localtz = datetime.datetime.now().astimezone().tzinfo
+
+
 Verbose = True
 
 # Make a timezone-aware datetime for now:
@@ -156,7 +161,7 @@ def parse_html_meeting_list(page_html, only_future=False):
 
         if "Meeting Date" in dic and "Meeting Time" in dic:
             mtg_datetime = meeting_datetime(dic)
-            if only_future and mtg_datetime < utcnow:
+            if mtg_datetime and only_future and mtg_datetime < utcnow:
                 continue
 
         upcoming_meetings.append(dic)
@@ -168,12 +173,25 @@ def meeting_datetime(mtg):
     # The parsed time is in the local time and is unaware,
     # because strptime can't create a timezone aware object
     # even if the string it's parsing includes a timezone (see above).
-    unaware = datetime.datetime.strptime(mtg["Meeting Date"] + " "
-                                         + mtg["Meeting Time"],
-                                         '%m/%d/%Y %I:%M %p')
-    # Make it aware in localtime
-    localtime = unaware.astimezone(localtz)
-    return localtime
+    if not mtg["Meeting Time"]:
+        mtg["Meeting Time"] = NO_TIME
+    try:
+        if mtg["Meeting Time"] != NO_TIME:
+            unaware = datetime.datetime.strptime(mtg["Meeting Date"] + " "
+                                                 + mtg["Meeting Time"],
+                                                 '%m/%d/%Y %I:%M %p')
+            # Make it aware in localtime
+            localtime = unaware.astimezone(localtz)
+        else:
+            unaware = datetime.datetime.strptime(mtg["Meeting Date"],
+                                                 '%m/%d/%Y')
+            localtime = datetime.datetime(now.year, now.month, now.day,
+                                          23, 59, 0, tzinfo=localtz)
+        return localtime
+
+    except ValueError:
+        print("ERROR: Can't parse date on meeting:", mtg)
+        return None
 
 
 def diffhtml(before_html, after_html, title=None):
@@ -586,6 +604,11 @@ As of: {gendate}
 
             # Is the meeting in the future? Don't list past meetings.
             meetingtime = meeting_datetime(mtg)
+            if not meetingtime:
+                print("Skipping", mtg["Name"], mtg["Meeting Date"],
+                      "because of bad meeting datetime",
+                      mtg["Meeting Date"], mtg["Meeting Date"])
+                continue
             if meetingtime < now:
                 print("Skipping", mtg["Name"], mtg["Meeting Date"],
                       "because", meetingtime, "<", now)
@@ -853,8 +876,11 @@ def mtgdic_to_cleanname(mtgdic):
        that can be used for filenames or URLs.
        Will be used both for the agenda file and for RSS entries.
     """
-    return meeting_datetime(mtgdic).strftime("%Y-%m-%d") + '-' \
-        + clean_filename(mtgdic["Name"])
+    mtg_dt = meeting_datetime(mtgdic)
+    if mtg_dt:
+        return mtg_dt.strftime("%Y-%m-%d") + '-' \
+            + clean_filename(mtgdic["Name"])
+    return "notime-" + clean_filename(mtgdic["Name"])
 
 
 if __name__ == '__main__':
