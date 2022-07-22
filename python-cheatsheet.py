@@ -846,6 +846,9 @@ seconds since the epoch    struct_time in UTC        gmtime()
 seconds since the epoch    struct_time in localtime  localtime()
 struct_time in UTC         seconds since the epoch   calendar.timegm()
 struct_time in local time  seconds since the epoch   mktime()
+datetime                   date                      d.date()
+date                       datetime                  \
+    datetime.datetime.combine(d, datetime.datetime.min.time())
 
 # Printing formats:
 >>> dt = datetime.datetime.now()
@@ -855,12 +858,6 @@ struct_time in local time  seconds since the epoch   mktime()
 '2019-07-22T19:46:20.164427'
 >>> f"{dt:%Y-%m-%d %H:%M}"        # Only in Python >= 3.6
 '2019-07-22 19:46'
-
-# Convert datetime to date:
-now = datetime.now()
-today = now.date()
-# date to datetime:
-d = datetime.combine(d, datetime.min.time())
 
 ##################
 # Date Arithmetic
