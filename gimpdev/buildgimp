@@ -54,7 +54,13 @@ export ACLOCAL_FLAGS="-I $GIMP_PREFIX/share/aclocal $ACLOCAL_FLAGS"
 if [[ "${@: -1}" == "clean" ]]; then
     clean=true
     echo "Cleaning all directories"
-    mkdir -p $GIMP_PREFIX/share/
+    echo ""
+    sleep 3
+    rm -rf $GIMP_PREFIX/*
+
+    # The build will fail if the share/aclocal dir isn't already created.
+    # The share dir needs to be there in any case, for config.site.
+    mkdir -p $GIMP_PREFIX/share/aclocal
 
     # Overwrite config.site:
     cat >$GIMP_PREFIX/share/config.site <<EOF
@@ -245,8 +251,14 @@ echo '========== gimp'
 cd $SRCDIR
 pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 echo "pullstatus:" $pullstatus
-if [[ $pullstatus == 1 ]]; then
-    ./autogen.sh --prefix=$GIMP_PREFIX && make -j4 && make install
+# Don't actually care about pullstatus: if running buildgimp,
+# the assumption is that we want to rebuild.
+#  --disable-vector-icons is temporary to try to get around a startup crash
+if [[ 1 || $pullstatus == 1 ]]; then
+    # You can build GIMP with either autotools or meson.
+    # Comment out one of these lines.
+    ./autogen.sh --prefix=$GIMP_PREFIX --disable-vector-icons && make -j4 && make install
+    # meson-build
 fi
 
 unset clean
