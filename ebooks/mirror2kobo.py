@@ -11,7 +11,11 @@ import koboize
 import sys, os
 import shutil
 
-srcdir, dstdir = sys.argv[1], sys.argv[2]
+try:
+    srcdir, dstdir = sys.argv[1], sys.argv[2]
+except:
+    print("Usage: %s srcdir dstdir" % os.path.basename(sys.argv[0]))
+    sys.exit(1)
 
 for root, dirs, files in os.walk(srcdir):
 
@@ -25,10 +29,11 @@ for root, dirs, files in os.walk(srcdir):
         relroot = relroot[1:]
 
     dstroot = os.path.join(dstdir, relroot)
-    print("mkdir:", dstroot)
     try:
         os.makedirs(dstroot)
+        print("mkdir:", dstroot)
     except FileExistsError:
+        print(dstroot, "already exists")
         pass
 
     for f in files:
