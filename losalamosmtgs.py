@@ -159,7 +159,7 @@ def parse_html_meeting_list(page_html, only_future=False):
             else:
                 dic[fieldnames[i]] = field.text.replace('\u00a0', ' ').strip()
 
-        if "Meeting Date" in dic and "Meeting Time" in dic:
+        if "Meeting Date" in dic:
             mtg_datetime = meeting_datetime(dic)
             if mtg_datetime and only_future and mtg_datetime < utcnow:
                 continue
@@ -168,25 +168,26 @@ def parse_html_meeting_list(page_html, only_future=False):
 
 
 def meeting_datetime(mtg):
-    """Parse the meeting date and time and return an aware localtime.
+    """Parse the meeting date and time and return an aware local datetime.
+       If there's only a date and no time, return a date object.
     """
     # The parsed time is in the local time and is unaware,
     # because strptime can't create a timezone aware object
     # even if the string it's parsing includes a timezone (see above).
-    if not mtg["Meeting Time"]:
+    if "Meeting Time" not in mtg or not mtg["Meeting Time"]:
         mtg["Meeting Time"] = NO_TIME
     try:
         if mtg["Meeting Time"] != NO_TIME:
             unaware = datetime.datetime.strptime(mtg["Meeting Date"] + " "
                                                  + mtg["Meeting Time"],
                                                  '%m/%d/%Y %I:%M %p')
-            # Make it aware in localtime
-            localtime = unaware.astimezone(localtz)
-        else:
+        else:    # No time, so list it at 23:59
             unaware = datetime.datetime.strptime(mtg["Meeting Date"],
                                                  '%m/%d/%Y')
-            localtime = datetime.datetime(now.year, now.month, now.day,
-                                          23, 59, 0, tzinfo=localtz)
+            unaware.replace(hour=23, minute=59, second=0)
+
+        # Make it aware in localtime
+        localtime = unaware.astimezone(localtz)
         return localtime
 
     except ValueError:
