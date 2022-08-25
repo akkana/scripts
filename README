@@ -484,6 +484,11 @@ readkey.py:
     Read a key press from the keyboard without waiting for a newline.
     For CLI programs: doesn't need X, tkintr, pygame or similar libs.
 
+remindcgi.py:
+    CGI: Run remind from a "remind.txt" source file in the same directory,
+    showing either upcoming reminders or all events for the next
+    week/month/ever.
+
 repo-pullpush:
     Modify a git repository, taking the existing URL, making that
     the pushurl and adding a passwordless pull URL alongside it.
