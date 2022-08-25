@@ -13,22 +13,25 @@ import datetime
 import argparse
 
 
+# Get the local timezone
+localtz = datetime.datetime.now().astimezone().tzinfo
+
+
 def read_ics_file(infile):
     """Parse an ics file into a dictionary.
     """
     cal = Calendar.from_ical(open(infile, 'rb').read())
 
-    # Get the local timezone
-    localtz = datetime.datetime.now().astimezone().tzinfo
-
-    event = {}
+    events = []
 
     for component in cal.walk():
+        # The first component is the whole vcalendar, name 'VCALENDAR'
         if component.name != 'VEVENT':
             continue
 
-        if 'SUMMARY' in event:
-            print("Yikes, more than one event!")
+        # if 'SUMMARY' in event:
+        #     print("Yikes, more than one event!")
+        event = {}
 
         event['SUMMARY'] = component.get('summary')
         event['DESCRIPTION'] = component.get('description')
@@ -42,30 +45,72 @@ def read_ics_file(infile):
         # exdate = component.get('exdate')
 
         # Rewrite into current timezone
-        event['LOCALSTART'] = event['DTSTART'].astimezone(localtz)
-        event['LOCALEND'] = event['DTEND'].astimezone(localtz)
+        event['LOCALSTART'] = event['DTSTART']
+        # If it's a datetime.date, it can't do astimezone
+        if hasattr(event['LOCALSTART'], 'astimezone'):
+            event['LOCALSTART'] = event['LOCALSTART'].astimezone(localtz)
+        event['LOCALEND'] = event['DTEND']
+        if hasattr(event['LOCALEND'], 'astimezone'):
+            event['LOCALEND'] = event['LOCALEND'].astimezone(localtz)
         # dtstamp.dt = dtstamp.dt.astimezone(localtz)
 
-    return event
+        events.append(event)
+
+    return events
 
 
 def print_event(event):
     """Print in an informal but readable way."""
 
-    print(f"START: {event['LOCALSTART'].strftime('%a, %d %b %Y %I:%M %Z')}")
-    if event['DTSTART'].tzinfo != event['LOCALSTART'].tzinfo:
-        print(f"      ({event['DTSTART'].strftime('%a, %d %b %Y %I:%M %Z')})")
-    print(f"  END: {event['LOCALEND'].strftime('%a, %d %b %Y %I:%M %Z')}")
-    if event['DTEND'].tzinfo != event['LOCALEND'].tzinfo:
-        print(f"      ({event['DTEND'].strftime('%a, %d %b %Y %I:%M %Z')})")
-    print("SUMMARY", event['SUMMARY'])
-    print("LOCATION", event['LOCATION'])
+    def print_if(key):
+        if key in event and event[key]:
+            # Description for some events is really long.
+            print(key, "::", type(event[key]), event[key])
+            if len(event[key]) > 200:
+                # prevent TypeError: unhashable type: 'slice'
+                print(f"{key}: {event[key][:200]} ...")
+            else:
+                print(f"{key}: {event[key]}")
 
-    # Description for some events is really long.
-    if len(event['DESCRIPTION']) > 300:
-        print("DESCRIPTION", event['DESCRIPTION'][:300], "...")
-    else:
-        print("DESCRIPTION", event['DESCRIPTION'])
+    def difftimes(startend):
+        """startend is either "START" or "END".
+           Return the non-local time if it's different from localtime
+           or is aware and in a different timezone,
+           else None.
+        """
+        localkey = "LOCAL" + startend
+        dtkey = "DT" + startend
+        if dtkey not in event:
+            return None
+        if not hasattr(event[dtkey], 'hour'):
+            # Just a date, not a datetime
+            return None
+        if hasattr(event[dtkey], 'tzinfo') and event[dtkey].tzinfo:
+            # it's aware
+            if event[dtkey].tzinfo != localtz:
+                return event[dtkey]
+            return None
+        # Not aware
+        if event[dtkey].hour != event[localkey].hour or \
+           event[dtkey].minute != event[localkey].minute:
+            return event[dtkey]
+        return None
+
+    print_if("SUMMARY")
+
+    print(f"START: {event['LOCALSTART'].strftime('%a, %d %b %Y %I:%M %Z')}")
+    dt = difftimes('START')
+    if dt:
+        print(f"      ({dt.strftime('%a, %d %b %Y %I:%M %Z')})")
+
+    if event['LOCALEND'] != event['LOCALSTART']:
+        print(f"  END: {event['LOCALEND'].strftime('%a, %d %b %Y %I:%M %Z')}")
+        dt = difftimes('END')
+        if dt:
+            print(f"      ({dt.strftime('%a, %d %b %Y %I:%M %Z')})")
+
+    print_if("LOCATION")
+    print_if("DESCRIPTION")
 
 
 def remind_for_event(ev):
@@ -83,9 +128,14 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
     # print("args", args)
 
-    events = [ read_ics_file(f) for f in args.files ]
+    all_events = []
 
-    for ev in events:
+    for f in args.files:
+        all_events += read_ics_file(f)
+
+    for ev in all_events:
+        print()
+
         if args.format == "remind":
             remind_for_event(ev)
 
