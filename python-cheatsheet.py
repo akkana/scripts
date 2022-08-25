@@ -1154,11 +1154,17 @@ output = subprocess.run(arglist, stdout=subprocess.DEVNULL,
 # More complicated way:
 import subprocess
 
-proc = subprocess.Popen(["procname"], check=True, stdout=subprocess.PIPE)
+proc = subprocess.Popen(["cmd", "arg"], check=True, stdout=subprocess.PIPE)
 # check raises  CalledProcessError if the subprocess exits != 0
 while True:
     line = proc.stdout.readline()
+    if not line:
+        break
     print("line: %s" % line)
+
+proc = subprocess.run(["cmd", "arg"], capture_output=True)
+# CompletedProcess(args=['ls', '-l', '/dev/null'], returncode=0,
+# stdout=b'crw-rw-rw- 1 root root 1, 3 Jan 23 16:23 /dev/null\n', stderr=b'')
 
 # Chain a multi-command pipeline:
 p1 = subprocess.Popen([args1],
@@ -1443,6 +1449,12 @@ if 'REQUEST_METHOD' in os.environ:
     form = cgi.FieldStorage()
 else:
     print("Run locally")
+
+# The CGI script is in os.getcwd()
+os.getcwd()
+
+# Current URL
+url = os.environ["REQUEST_URI"] 
 
 
 ###########################################################
