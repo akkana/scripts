@@ -5,16 +5,18 @@
 import cgi
 import subprocess
 import os, sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, MAXYEAR
 
 
 # There doesn't seem to be any way to get the current URL in a
 # Python CGI. os.environ["REQUEST_URI"] is the closest, but it doesn't
 # have the schema or server name.
 # So build it up from the components in the environment:
+# print("SERVER_NAME:", os.environ["SERVER_NAME"], file=sys.stderr)
+# print("REQUEST_URI:", os.environ["REQUEST_URI"], file=sys.stderr)
+
 fullurl = f'{os.environ["REQUEST_SCHEME"]}://{os.environ["SERVER_NAME"]}' \
-    f'/{os.environ["REQUEST_URI"]}'
-# print("fullurl:", fullurl, file=sys.stderr)
+    f'{os.environ["REQUEST_URI"]}'
 
 # Strip off the query string. urlparse or urlsplit from urllib.parse
 # seem like they ought to be the way to do that, except that they
@@ -49,28 +51,31 @@ def print_head(title):
 <h1>{title}</h1>
 <p>
 <a href="{baseurl}">Reminders</a> &bull;
-<a href="{baseurl}?interval=week">Week</a> &bull;
-<a href="{baseurl}?interval=month">Month</a>
+<a href="{baseurl}?when=week">Week</a> &bull;
+<a href="{baseurl}?when=month">Month</a> &bull;
+<a href="{baseurl}?when=all">All Events</a>
 <p>
 ''')
 
 
 form = cgi.FieldStorage()
-if 'interval' in form:
-    interval = form['interval'].value
+if 'when' in form:
+    when = form['when'].value
 
     today = date.today()
-    if interval.lower() == "week":
+    if when.lower() == "week":
         print_head("This Week")
         enddate = today + timedelta(days=7)
-    elif interval.lower() == "month":
+    elif when.lower() == "month":
         print_head("This Month")
         enddate = today + timedelta(days=31)
     else:
-        import sys
-        print(f"Unknown interval '{interval}'", file=sys.stderr)
-        print_head("This Month")
-        enddate = today + timedelta(days=31)
+        # Show everything
+        if when.lower() != "all":
+            print(f"<p>\nDon't understand when '{when}';",
+                  "showing all events")
+        print_head("All Events")
+        enddate = date(MAXYEAR, 12, 31)
 
     remindout = subprocess.check_output(["/usr/bin/remind", "-n",
                                          os.path.join(os.getcwd(),
