@@ -64,10 +64,10 @@ if 'when' in form:
 
     today = date.today()
     if when.lower() == "week":
-        print_head("This Week")
+        print_head("Upcoming Week")
         enddate = today + timedelta(days=7)
     elif when.lower() == "month":
-        print_head("This Month")
+        print_head("Upcoming Month")
         enddate = today + timedelta(days=31)
     else:
         # Show everything
@@ -85,6 +85,7 @@ if 'when' in form:
     # so a simple alphanumeric sort will work
     lines.sort()
 
+    monthname = None
     for line in lines:
         if not line:
             continue
@@ -96,8 +97,16 @@ if 'when' in form:
             continue
         if d > enddate:
             break
-        sublines = line.replace("||", "\n").split('\n')
-        print(f"<b>{sublines[0]}</b><br>")
+        newmonth = d.strftime("%b")
+        if newmonth != monthname:
+            monthname = newmonth
+            print(f"<h2>{monthname}</h2>")
+        sublines = line.replace('||', '\n').split('\n')
+        firstline = sublines[0][11:]
+        if firstline.startswith("on "):
+            firstline = firstline[3:]
+        # print(f"<b>{d.strftime('%a %b %d')} {sublines[0][11:]}</b><br>")
+        print(f"<b>{firstline}</b><br>")
         for subline in sublines[1:]:
             print(linkify(subline), "<br>")
         print("<p>")
