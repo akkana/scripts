@@ -4,6 +4,7 @@
 
 import cgi
 import subprocess
+import re
 import os, sys
 from datetime import date, datetime, timedelta, MAXYEAR
 
@@ -179,7 +180,11 @@ def is_link(line):
 today = date.today()
 
 
-def print_calendar(enddate, formatter):
+def print_remind_for_interval(enddate, formatter):
+    """Print everything output by remind -n between now and the end date.
+       That means everything except that for repeating events, only the
+       first instance will be printed.
+    """
     remindout = subprocess.check_output(["/usr/bin/remind", "-n",
                                          os.path.join(formatter.REMINDDIR,
                                                       "remind.txt")])
@@ -206,8 +211,14 @@ def print_calendar(enddate, formatter):
             print(formatter.header(monthname))
         sublines = line.replace('||', '\n').split('\n')
         firstline = sublines[0][11:]
-        if firstline.startswith("on "):
-            firstline = firstline[3:]
+
+        # If remind has added an "on longday, longmonth Nth, remove it
+        # and add the date back at the beginning in an easier to read format.
+        firstline = '%s: %s' % (
+            d.strftime('%a, %-d %b'),
+            re.sub('on [A-Z][a-z]+day, [A-Z][a-z]+ [0-9]{1,2}[a-z]{2}',
+                   '', firstline))
+
         print(formatter.highlight(firstline))
         for subline in sublines[1:]:
             print(formatter.linkify(subline), formatter.linebreak())
@@ -217,6 +228,10 @@ def print_calendar(enddate, formatter):
 
 
 def print_reminders(formatter):
+    """Print an only slightly spruced-up version of
+       remind -g output, which only reminds about things today
+       and things that have a +N reminder window set up.
+    """
     remindout = subprocess.check_output(["/usr/bin/remind", "-g",
                                          os.path.join(formatter.REMINDDIR,
                                                       "remind.txt")])
@@ -258,7 +273,9 @@ if __name__ == '__main__':
 
         formatter = TextFormatter()
 
-    if when == None:
+    if not when:
+        when = "week"
+    if when == "all":
         # Show everything
         formatter.print_head("Reminders")
         enddate = date(MAXYEAR, 12, 31)
@@ -268,19 +285,19 @@ if __name__ == '__main__':
     elif when == "month":
         formatter.print_head("Upcoming Month")
         enddate = today + timedelta(days=31)
-    else:
+    elif when != "remind":
         # Show everything
-        if when != "all":
-            print(f"<p>\nDon't understand when '{when}';",
-                  "showing all events", file=sys.stderr)
-        formatter.print_head("All Events")
-        enddate = date(MAXYEAR, 12, 31)
+        print(f"<p>\nDon't understand when '{when}';",
+              "showing all events", file=sys.stderr)
+        print("Usage: %s [week|month|remind]"
+              % os.path.basename(sys.argv[0]))
+        sys.exit(0)
 
-    print("Today is", today.strftime("%a, %b %d"))
-    print(formatter.linebreak())
+    # print("Today is", today.strftime("%a, %b %d"))
+    # print(formatter.linebreak())
 
-    if when:
-        print_calendar(enddate, formatter)
-    else:
+    if when == "remind":
         print_reminders(formatter)
+    else:
+        print_remind_for_interval(enddate, formatter)
 
