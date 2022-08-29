@@ -859,6 +859,12 @@ date                       datetime                  \
 >>> f"{dt:%Y-%m-%d %H:%M}"        # Only in Python >= 3.6
 '2019-07-22 19:46'
 
+# for no zero padding, add a dash:
+>>> d.strftime("%H:%M")
+'09:30'
+>>> d.strftime("%-H:%M")
+'9:30'
+
 ##################
 # Date Arithmetic
 ##################
@@ -922,7 +928,7 @@ calendar.monthrange(year, month)[1]
 # Also, I can't find this in the documentation, but adding a - after the %
 # omits the zero prefix.
 time.strftime("%-d days %-H hours %-M minutes %-S seconds",
-                             time.gmtime(timesecs))
+              time.gmtime(timesecs))
 
 ###############
 # Date Parsing
