@@ -127,7 +127,7 @@ pull-clone() {
     # Find the directory by stripping the extension from the URL basename
     d=$(basename $repo:r)
     cd $SRCDIR
-    echo pull_clone: SRCDIR $SRCDIR, repo $repo, ./$d, clean $clean, branch $branch
+    # echo pull_clone: SRCDIR $SRCDIR, repo $repo, ./$d, clean $clean, branch $branch
 
     # Have we checked out in this directory before?
     # There's a thing on https://stackoverflow.com/questions/13736385/how-to-write-a-shell-script-that-checks-if-git-repository-is-up-to-date
@@ -138,9 +138,11 @@ pull-clone() {
     # but it only works for master, not for branches.
     # This may be more useful:
     if [[ -d $d ]]; then
+
         cd $d
         echo_and_do git checkout $branch
         pullres=$(git pull)
+
         echo "Git pulled:" $pullres
         if [[ x$pullres != 'xAlready up to date.' ]]; then
             pullstatus=1
@@ -226,11 +228,11 @@ fi
 
 echo '========== babl'
 echo "clean:" $clean
+unset branch
 # cd $SRCDIR/babl
 # meson-build
 # echo "Exiting in
 # exit 0
-# unset branch
 
 cd $SRCDIR
 pull-clone https://gitlab.gnome.org/GNOME/babl.git $clean
@@ -249,15 +251,31 @@ fi
 
 echo '========== gimp'
 cd $SRCDIR
-pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
+# pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
+cd gimp
+
+# If on master, git pull. If on another branch,
+# pull, but don't merge, all branches
+curbranch=$(git status | grep "On branch" | awk '{print $3}')
+
+if [[ x"$curbranch" != 'master' ]]; then
+    echo "Rebasing master to $curbranch"
+    pullstatus=$(git fetch)
+    git rebase origin/master
+else
+    pullstatus=$(git pull)
+fi
+
 echo "pullstatus:" $pullstatus
+
 # Don't actually care about pullstatus: if running buildgimp,
 # the assumption is that we want to rebuild.
 #  --disable-vector-icons is temporary to try to get around a startup crash
 if [[ 1 || $pullstatus == 1 ]]; then
     # You can build GIMP with either autotools or meson.
     # Comment out one of these lines.
-    ./autogen.sh --prefix=$GIMP_PREFIX --disable-vector-icons && make -j4 && make install
+    # ./autogen.sh --prefix=$GIMP_PREFIX --disable-vector-icons && make -j4 && make install
+    ./autogen.sh --prefix=$GIMP_PREFIX && make -j4 && make install
     # meson-build
 fi
 
