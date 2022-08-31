@@ -9,6 +9,20 @@ import os, sys
 from datetime import date, datetime, timedelta, MAXYEAR
 
 
+today = date.today()
+
+css = '''@media (prefers-color-scheme: dark) {
+  * { background: black; color: white; }
+  a:link { color: #ffff00; }
+  a:visited { color: #aaffaa; }
+  a:hover, a:active { color: #ffffaa; }
+}
+@media (prefers-color-scheme: light) {
+  * { background: #eff;}
+}
+'''
+
+
 # termcolor.colored wasn't working, and termcolor.cprint doesn't help
 # when trying to combine several formatting items.
 # So instead, see https://stackoverflow.com/a/51708889
@@ -153,12 +167,16 @@ class HTMLFormatter:
  <!-- Google insists on this for "mobile friendly" sites: -->
  <meta name="viewport" content="width=device-width, initial-scale=1">
 
+ <style>
+{css}
+ </style>
+
 </head>
 
 <body>
 <h1>{title}</h1>
 <p>
-<a href="{baseurl}">Reminders</a> &bull;
+<a href="{baseurl}?when=remind">Reminders</a> &bull;
 <a href="{baseurl}?when=week">Week</a> &bull;
 <a href="{baseurl}?when=month">Month</a> &bull;
 <a href="{baseurl}?when=all">All Events</a>
@@ -175,9 +193,6 @@ class HTMLFormatter:
 
 def is_link(line):
     return line.startswith('http')
-
-
-today = date.today()
 
 
 def print_remind_for_interval(enddate, formatter):
@@ -277,7 +292,7 @@ if __name__ == '__main__':
         when = "week"
     if when == "all":
         # Show everything
-        formatter.print_head("Reminders")
+        formatter.print_head("All Events")
         enddate = date(MAXYEAR, 12, 31)
     elif when == "week":
         formatter.print_head("Upcoming Week")
@@ -285,7 +300,9 @@ if __name__ == '__main__':
     elif when == "month":
         formatter.print_head("Upcoming Month")
         enddate = today + timedelta(days=31)
-    elif when != "remind":
+    elif when == "remind":
+        formatter.print_head("Reminders")
+    else:
         # Show everything
         print(f"<p>\nDon't understand when '{when}';",
               "showing all events", file=sys.stderr)
@@ -293,8 +310,8 @@ if __name__ == '__main__':
               % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
-    # print("Today is", today.strftime("%a, %b %d"))
-    # print(formatter.linebreak())
+    print("Today is", today.strftime("%a, %b %d"))
+    print(formatter.linebreak())
 
     if when == "remind":
         print_reminders(formatter)
