@@ -137,6 +137,10 @@ cleanhtml.py
 colormatch.php:
     Find the nearest matching color name. http://shallowsky.com/colormatch/
 
+confusables.py:
+    Detect similar-looking letters, e.g. 𝒂pple.com where the first
+    character is actually unicode "MATHEMATICAL BOLD ITALIC SMALL A".
+
 countsyl:
     Experiments in counting likely syllables in words, giving best guess
     and likely max. Not particularly reliable, but I haven't found a
