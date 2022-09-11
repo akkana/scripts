@@ -69,27 +69,27 @@ class TextFormatter:
     REMINDDIR = os.path.expanduser("~/web/cal/")
 
     @staticmethod
-    def linkify(line):
-        if is_link(line):
-            return "%s%s%s%s%s" % ( ColorFormat.F_Blue, ColorFormat.Italic,
-                                    line,
-                                    ColorFormat.Reset_Italic,
-                                    ColorFormat.F_Default )
-        return line
+    def linkify(word):
+        if is_link(word):
+            return "%s%s%s%s%s" % (ColorFormat.F_Blue, ColorFormat.Italic,
+                                   word,
+                                   ColorFormat.Reset_Italic,
+                                   ColorFormat.F_Default)
+        return word
 
     @staticmethod
     def highlight(line):
-        return "%s%s%s" % ( ColorFormat.Bold,
-                            line,
-                            ColorFormat.Reset_Bold )
+        return "%s%s%s" % (ColorFormat.Bold,
+                           line,
+                           ColorFormat.Reset_Bold)
         return line
 
     @staticmethod
     def header(line):
-        return "%s%s%s%s%s%s\n" % ( ColorFormat.F_Magenta, ColorFormat.Bold,
+        return "%s%s%s%s%s%s\n" % (ColorFormat.F_Magenta, ColorFormat.Bold,
                                   "**** ", line,
                                   ColorFormat.Reset_Bold,
-                                  ColorFormat.F_Default )
+                                  ColorFormat.F_Default)
         return line
 
     @staticmethod
@@ -191,8 +191,16 @@ class HTMLFormatter:
 ''')
 
 
-def is_link(line):
-    return line.startswith('http')
+def is_link(word):
+    """Ultra-simple and dumb link detector.
+       Could improve, but in this context links are likely to be simple.
+    """
+    return word.startswith('http')
+
+
+def linkify_line(line, formatter):
+    return ' '.join([formatter.linkify(w) if is_link(w) else w
+                     for w in line.split()])
 
 
 def print_remind_for_interval(enddate, formatter):
@@ -204,8 +212,9 @@ def print_remind_for_interval(enddate, formatter):
                                          os.path.join(formatter.REMINDDIR,
                                                       "remind.txt")])
     lines = remindout.decode().split('\n')
-    # lines look like '2022/08/27 on Saturday, August 27th: dark-sky night'
-    # so a simple alphanumeric sort will work
+    # lines look like
+    # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
+    # so a simple alphanumeric sort will work to sort by date
     lines.sort()
 
     monthname = None
@@ -236,7 +245,7 @@ def print_remind_for_interval(enddate, formatter):
 
         print(formatter.highlight(firstline))
         for subline in sublines[1:]:
-            print(formatter.linkify(subline), formatter.linebreak())
+            print(formatter.linebreak(), linkify_line(subline, formatter))
         print(formatter.eventbreak())
 
     formatter.print_foot()
@@ -254,7 +263,6 @@ def print_reminders(formatter):
 
     new_event = True
     for line in remindout.split('\n'):
-        # ultra-simple linkify: assume the whole line is the link
         line = line.strip()
         if not line:
             new_event = True
@@ -274,7 +282,6 @@ if __name__ == '__main__':
         formatter = HTMLFormatter()
 
         form = cgi.FieldStorage()
-        print("form:", form, file=sys.stderr)
 
         if 'when' in form:
             when = form['when'].value.lower()
@@ -310,7 +317,7 @@ if __name__ == '__main__':
               % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
-    print("Today is", today.strftime("%a, %b %d"))
+    print("Today is", today.strftime("%A, %B %-d"))
     print(formatter.linebreak())
 
     if when == "remind":
