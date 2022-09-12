@@ -25,6 +25,8 @@ css = '''@media (prefers-color-scheme: dark) {
 
 # termcolor.colored wasn't working, and termcolor.cprint doesn't help
 # when trying to combine several formatting items.
+# colorama is primarily aimed at Windows, and doesn't have styles
+# Windows lacks, like italic (termcolor doesn't have italic either).
 # So instead, see https://stackoverflow.com/a/51708889
 class ColorFormat:
     # Foreground
