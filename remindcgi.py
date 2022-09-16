@@ -103,6 +103,10 @@ class TextFormatter:
         return ""
 
     @staticmethod
+    def separator():
+        return "--------------"
+
+    @staticmethod
     def print_head(title):
         print(TextFormatter.header(title))
 
@@ -136,6 +140,10 @@ class HTMLFormatter:
     @staticmethod
     def eventbreak():
         return "<p>"
+
+    @staticmethod
+    def separator():
+        return "<hr>"
 
     @staticmethod
     def print_head(title):
@@ -220,6 +228,7 @@ def print_remind_for_interval(enddate, formatter):
     lines.sort()
 
     monthname = None
+    weeknum = None   # Actually a string of the week number
     for line in lines:
         if not line:
             continue
@@ -231,10 +240,16 @@ def print_remind_for_interval(enddate, formatter):
             continue
         if d > enddate:
             break
+
         newmonth = d.strftime("%b")
         if newmonth != monthname:
             monthname = newmonth
             print(formatter.header(monthname))
+        newweeknum = d.strftime("%U")
+        if newweeknum != weeknum:
+            weeknum = newweeknum
+            print(formatter.separator())
+
         sublines = line.replace('||', '\n').split('\n')
         firstline = sublines[0][11:]
 
