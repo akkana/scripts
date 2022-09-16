@@ -241,7 +241,7 @@ def print_remind_for_interval(enddate, formatter):
         if d > enddate:
             break
 
-        newmonth = d.strftime("%b")
+        newmonth = d.strftime("%B")
         if newmonth != monthname:
             monthname = newmonth
             print(formatter.header(monthname))
