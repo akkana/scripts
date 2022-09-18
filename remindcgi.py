@@ -22,6 +22,10 @@ css = '''@media (prefers-color-scheme: dark) {
 }
 '''
 
+# Patterns used for restricting datetimes before parsing
+datetimepat = re.compile('[\d:apm ]+')
+datetimerangepat = re.compile('[\d:apm -]+')
+
 
 # termcolor.colored wasn't working, and termcolor.cprint doesn't help
 # when trying to combine several formatting items.
@@ -224,8 +228,53 @@ def print_remind_for_interval(enddate, formatter):
     lines = remindout.decode().split('\n')
     # lines look like
     # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
-    # so a simple alphanumeric sort will work to sort by date
-    lines.sort()
+    # so a simple alphanumeric sort almost works to sort by date,
+    # but AM/PM issues throw it off. 
+    def datetimekey(s):
+        """ Take a date string of form yyyy/mm/dd maybetime more stuff
+            where maybetime can have lots of forms.
+            dateutil.parser.parse() is good at parsing different formats,
+            but it can't handle extra stuff in the line, or ranges.
+        """
+        savedate = s[:10]
+        m = re.match(datetimerangepat, s[11:])
+        if not m:
+            return s
+        timerange = m.group(0).strip().replace(' ', '')
+        if timerange.endswith(':'):
+            timerange = timerange[:-1]
+
+        # Now timerange might be something like '5:30-7pm'
+        timeparts = timerange.split('-')
+
+        # We only care about the first timepart, but need to know
+        # if it ends with an 'am' or 'pm' (1-4pm) unless the first
+        # part already has one (11am-1pm)
+        lowertime = timeparts[0].lower()
+
+        if lowertime.endswith('am'):
+            return f'{savedate} {timeparts[0][:-2]}'
+
+        # The initial time (lowertime) could end with pm;
+        # or the pm could be after the range end, 1-3pm
+        if lowertime.endswith('pm') or timerange.lower().endswith('pm'):
+            hours = re.match('\d+', lowertime).group(0)
+            houri = int(hours)
+            # Special rule for 12 pm
+            if houri == 12:
+                houri = 0
+            # This only includes the hour:
+            hours = f'{savedate} {houri+12:02}'
+            # Add back in the minutes, if any
+            colon = lowertime.find(':')
+            if colon > 0:
+                hours += lowertime[colon:]
+            return hours
+
+        # No am or pm specified
+        return s
+
+    lines.sort(key=datetimekey)
 
     monthname = None
     weeknum = None   # Actually a string of the week number
