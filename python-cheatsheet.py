@@ -1957,7 +1957,35 @@ sys.float_info.max
 
 ax1 = fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
 
+#
+# Multiple plots spaced out properly so titles don't draw over xlabels:
+#
+fig, axes = plt.subplots(nrows=numplots, ncols=1,
+                         figsize=(8, 3.5 * numplots))
+                         # figsize is  width, height in inches
+
+axes[0].plot(distances, elevations, label="GPS elevation data", color="blue")
+axes[0].set_xlabel("miles")
+axes[0].set_ylabel("feet")
+axes[0].grid(True)
+axes[0].legend()
+axes[0].title.set_text("Elevation Profile")
+
+axes[1].plot(time, temperature, label="Temperature", color="red")
+axes[1].set_xlabel("time")
+axes[1].set_ylabel("temperature")
+axes[1].grid(True)
+axes[1].legend()
+axes[1].title.set_text("Temperature Data")
+
+plt.gcf().canvas.set_window_title("Elevation and temperature plots")
+fig.tight_layout()        # "plt.tight_layout()" is equivalent
+plt.show()
+
+
+#
 # Trimming all the spurious whitespace:
+#
 
 # Trim whitespace within each plot:
 ax.set_xlim([0, enddate])
