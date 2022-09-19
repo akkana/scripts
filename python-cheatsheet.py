@@ -953,7 +953,7 @@ datetime.datetime.utcfromtimestamp(1553010256)
 # You have to strip it off in this way, which seems horrifying
 # but you'll see it recommended all over, and you'd better hope
 # the decimal point is where you expect it and not some other place
-# inside the string, and not something else like a comma:
+# inside the string (for a comma you'd need an extra clause):
 timestr = '2016-01-01.234'
 if '.' in timestr:
     d = datetime.datetime.strptime(timestr, '%Y-%m-%d.%f')
