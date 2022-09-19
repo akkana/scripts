@@ -13,6 +13,9 @@ import csv
 import re
 from io import StringIO
 
+from pprint import pprint
+
+
 # Don't be picky about smartquotes: map them to ascii quotes
 # for matching purposes.
 SMARTQUOTE_CHARMAP = { 0x201c : u'"',
@@ -351,6 +354,7 @@ def sort_candidates(candidates, order):
             # else:
             #     print("    '%s' didn't match '%s'" % (fullname,
             #                                           cand_c.comparename))
+
         if not foundit:
             # print(f"Not a candidate: {saved_fullname}")
             notfound.append(saved_fullname)
@@ -438,7 +442,7 @@ def clean_up_csv(csvfilename):
         for field in infields[:FIRST_Q_COL]:
             outfields.append(field.strip())
         # The harder part: copy questions, stripped,
-        # except fo Spanish ones
+        # except for Spanish ones
         for i, field in enumerate(infields[FIRST_Q_COL:]):
             field = field.strip()
             if skip_question(field):
@@ -464,9 +468,6 @@ def clean_up_csv(csvfilename):
 
         outfp.seek(0)
         return outfp
-
-
-from pprint import pprint
 
 
 def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
