@@ -6,7 +6,7 @@
 # Configure your specific audio devices in ~/.config/pulsehelper/config.
 # To see your available audio devices: pacmd list-cards
 # For each card, look under "profiles:"
-# See mics: pacmd list-sources; sinks: pacmd list_sinks
+# See mics: pacmd list-sources; sinks: pacmd list-sinks
 
 # Uses the termcolor module if it's available to highlight fallbacks
 # and muted devices.
