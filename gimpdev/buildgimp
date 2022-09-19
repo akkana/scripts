@@ -102,9 +102,17 @@ meson-build() {
     # From Jehan, for Meson/Ninja builds:
     MESONSRC=$(pwd)
     BUILD_DIR=$MESONSRC/obj-$(arch)
-    mkdir -p $BUILD_DIR && \
-    cd $BUILD_DIR && \
-    meson -Dprefix=$GIMP_PREFIX --libdir=lib $MESONSRC && \
+    mkdir -p $BUILD_DIR
+    cd $BUILD_DIR
+
+    # Sometimes the meson command fails, but meson reconfigure works.
+    # I'm not sure what the difference is.
+    if [ -e build.ninja ]; then
+        meson reconfigure
+    else
+        meson -Dprefix=$GIMP_PREFIX --libdir=lib $MESONSRC
+    fi
+
     ninja && \
     ninja install && \
     cd ..
