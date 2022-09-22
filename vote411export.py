@@ -624,7 +624,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             for c in no_response_candidates:
                 print("   ", c.name)
 
-        # Did we find everybody?
+        # Was there anyone in the order list not found in the export CSV?
         if notfound:
             num_notfound = 0
             notfound_s = ''
@@ -635,8 +635,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                 notfound_s += "\n    " + o.upper()
                 num_notfound += 1
             if notfound_s:
-                print("\nNot found:", notfound_s)
-                print(num_notfound, "lines didn't match")
+                print("\nNot found (%d):" % num_notfound, notfound_s)
 
 
 if __name__ == '__main__':
