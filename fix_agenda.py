@@ -139,7 +139,7 @@ def fix_agenda(agenda_infile):
                 if r > best_ratio:
                     best_match = i
                     best_ratio = r
-            if best_ratio > .75:
+            if best_ratio > .88:
                 guesses.append((agendaname, filenames[best_match]))
                 return best_match
             return -1
@@ -300,6 +300,7 @@ def fix_agenda(agenda_infile):
         print("\nFuzzy matches:")
         for a, b in guesses:
             print(f"    {a} -> {b}")
+        print("BE SURE TO LOOK OVER THIS LIST!")
 
     if nosuchfiles:
         print("\nCouldn't find files:")
