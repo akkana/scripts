@@ -333,6 +333,13 @@ abc.translate(abc.maketrans({'a': 'A', 'b': None}))
 # -- you can set up ranges with lambdas or comprehensions
 # but it gets hairy quickly.
 
+# Use implicit string literal concatenation to make regexps easier to read:
+PERCENTPAT = re.compile(
+    r"(^|\s)"    # beginning of string or whitespace
+    r"%[a-z\d]"  # remind time directive, e.g. %k
+    r"($|:|\s)"  # end of string, colon, or whitespace
+)
+
 ########################################################
 # Useful regular expressions
 ########################################################
@@ -1171,6 +1178,11 @@ while True:
 proc = subprocess.run(["cmd", "arg"], capture_output=True)
 # CompletedProcess(args=['ls', '-l', '/dev/null'], returncode=0,
 # stdout=b'crw-rw-rw- 1 root root 1, 3 Jan 23 16:23 /dev/null\n', stderr=b'')
+
+# Pass input from a bytes object, then read output as another bytes object.
+proc = subprocess.Popen(["/usr/bin/remind", "-n", "-" ],
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+outputbytes = proc.communicate(input=inputbytes)[0]
 
 # Chain a multi-command pipeline:
 p1 = subprocess.Popen([args1],

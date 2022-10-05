@@ -217,14 +217,35 @@ def linkify_line(line, formatter):
                      for w in line.split()])
 
 
+# The remind program has % codes to show when events are happening.
+# That means that strings like URLs that contain % will be interpreted
+# as remind codes. So remove those remind codes, since this program
+# prints its own dates, and then escape any remaining %.
+# Pattern to match % followed by a single alphanumeric char:
+PERCENTPAT = re.compile(
+    rb"(^|\s)"    # beginning of string or whitespace
+    rb"%[a-z\d]"  # remind time directive, e.g. %k
+    rb"($|:|\s)"  # end of string, colon, or whitespace
+)
+# Remove the percent-escape, but keep the whitespace around it.
+PERCENTREPL = rb"\1\2"
+
 def print_remind_for_interval(enddate, formatter):
     """Print everything output by remind -n between now and the end date.
        That means everything except that for repeating events, only the
        first instance will be printed.
     """
-    remindout = subprocess.check_output(["/usr/bin/remind", "-n",
-                                         os.path.join(formatter.REMINDDIR,
-                                                      "remind.txt")])
+    with open(os.path.join(formatter.REMINDDIR, "remind.txt"), 'rb') as infp:
+        remindin = infp.read()
+
+    # Replace any %x directives that are by themselves as words
+    remindin = re.sub(PERCENTPAT, PERCENTREPL, remindin)
+    # Escape any remaining % characters. For instance, in webex links.
+    remindin = remindin.replace(b'%', b'%%')
+
+    proc = subprocess.Popen(["/usr/bin/remind", "-n", "-" ],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    remindout = proc.communicate(input=remindin)[0]
     lines = remindout.decode().split('\n')
     # lines look like
     # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
