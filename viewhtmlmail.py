@@ -183,8 +183,8 @@ def view_html_message(f, tmpdir):
             # non-dotfile inside the first non-dot directory.
             msg = None
             for maildir in os.listdir(f):
-                with open(find_first_maildir_file(f)) as fp:
-                    msg = email.message_from_string(fp.read())
+                with open(find_first_maildir_file(f), 'rb') as fp:
+                    msg = BytesParser(policy=default_policy).parse(fp)
                     break
         else:
             # Mbox format: we assume there's only one message in the mbox.
@@ -192,7 +192,7 @@ def view_html_message(f, tmpdir):
                 # msg = email.message_from_string(fp.read())
                 msg = BytesParser(policy=default_policy).parse(fp)
     else:
-        msg = email.message_from_string(sys.stdin.read())
+        msg = BytesParser(policy=default_policy).parsebytes(sys.stdin.buffer.read())
 
     counter = 1
     filename = None
@@ -320,7 +320,6 @@ def view_html_message(f, tmpdir):
         htmlfile = os.path.join(tmpdir, "viewhtml%02d.html" % i)
         fp = open(htmlfile, 'wb')
 
-        # htmlsrc should be a string.
         # html_parts[i].get_payload() returns string, but it's apparently
         # in straight unicode and doesn't reflect the message's charset.
         # html_part.get_payload(decode=True) returns bytes,
@@ -330,11 +329,7 @@ def view_html_message(f, tmpdir):
         # (None of this is documented in the python3 email module;
         # there's no mention of get_payload() at all. Sigh.)
 
-        # This works, but assumes UTF-8:
-        # htmlsrc = html_part.get_payload(decode=True).decode('utf-8', "replace")
-
-        # but it's probably better to use the system encoding:
-        htmlsrc = html_part.get_payload(decode=True).decode(errors="replace")
+        htmlsrc = html_part.get_payload(decode=True)
 
         # Substitute all the filenames for content_ids:
         for sf_cid in subfiles:
@@ -344,14 +339,14 @@ def view_html_message(f, tmpdir):
             # (which uses BeautifulSoup) and that problem will go away.
             if DEBUG:
                 print("Replacing cid", sf_cid, "with", subfiles[sf_cid][0])
-            newhtmlsrc = re.sub('cid: ?' + sf_cid,
-                             'file://' + subfiles[sf_cid][0],
-                             htmlsrc, flags=re.IGNORECASE)
+            newhtmlsrc = re.sub(b'cid: ?' + sf_cid.encode(),
+                                b'file://' + subfiles[sf_cid][0].encode(),
+                                htmlsrc, flags=re.IGNORECASE)
             if sf_cid not in embedded_parts and newhtmlsrc != htmlsrc:
                 embedded_parts.append(sf_cid)
             htmlsrc = newhtmlsrc
 
-        fp.write(htmlsrc.encode())
+        fp.write(htmlsrc)
         fp.close()
         if DEBUG:
             print("Wrote", htmlfile)
@@ -501,7 +496,4 @@ if __name__ == '__main__':
         for f in sys.argv[1:]:
             view_html_message(f, tmpdir)
     else:
-        stdin = '%s/.stdin' % tmpdir
-        with open(stdin, 'w') as f:
-            f.write(sys.stdin.read())
-        view_html_message(stdin, tmpdir)
+        view_html_message(None, tmpdir)
