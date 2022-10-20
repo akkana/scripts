@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2018 by Akkana Peck.
+# Copyright (C) 2018,2022 by Akkana Peck.
 # Share and enjoy under the GPL v2 or later.
 
 """A simple private browser."""
@@ -15,12 +15,58 @@ import argparse
 import tempfile
 import shutil
 
-from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier, pyqtSlot
-from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
-     QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
-     QWebEngineProfile, QWebEngineSettings
-from PyQt5.QtCore import QAbstractNativeEventFilter
+
+try:
+    # While working on the QT6 conversion, uncomment this to force QT5
+    # even on systems that have QT6 installed:
+    # import DONT_USE_QT6
+    from PyQt6.QtCore import QUrl, Qt, QEvent, QSocketNotifier
+    from PyQt6.QtCore import pyqtSlot as Slot
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QToolBar, \
+         QLineEdit, QStatusBar, QProgressBar, QTabWidget, QWidget
+    from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, \
+         QWebEngineSettings
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
+    from PyQt6.QtGui import QAction, QShortcut
+    from PyQt6.QtCore import QAbstractNativeEventFilter
+
+    # qt6 uses QEvent.Type.typename, qt5 didn't use the .Type
+    # so make globals
+    ChildAdded = QEvent.Type.ChildAdded
+    MouseButtonPress = QEvent.Type.MouseButtonPress
+    MouseButtonRelease = QEvent.Type.MouseButtonRelease
+
+    # I can't find any documentation on Qt6 key events.
+    # So monkeypatch some definitions to be consistent with Qt5.
+    CONTROL_MODIFIER = Qt.KeyboardModifier.ControlModifier
+    Qt.Key_Control = 16777249
+    Qt.Key_A = 65
+    Qt.Key_B = 66
+    Qt.Key_D = 68
+    Qt.Key_E = 69
+    Qt.Key_F = 70
+    Qt.Key_H = 72
+    Qt.Key_W = 87
+    Qt.Key_U = 85
+
+except ImportError:
+    from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
+    from PyQt5.QtCore import pyqtSlot as Slot
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
+         QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
+    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, \
+         QWebEngineProfile, QWebEngineSettings
+    from PyQt5.QtCore import QAbstractNativeEventFilter
+
+    CONTROL_MODIFIER = Qt.ControlModifier
+
+    ChildAdded = QEvent.ChildAdded
+    MouseButtonPress = QEvent.MouseButtonPress
+    MouseButtonRelease = QEvent.MouseButtonRelease
+
+if 'PyQt6' in sys.modules:
+    print("Using QyQt6")
+
 
 # Use qpdf for PDFs if it's available:
 try:
@@ -40,13 +86,15 @@ CMD_PIPE = "/tmp/quickbrowse-%d"
 # How long can a tab name be?
 MAX_TAB_NAME = 22
 
+
 class ReadlineEdit(QLineEdit):
+    """A QLineEdit that obeys standard readline editing bindings.
+    """
     def __init__(self):
         super ().__init__()
 
     def keyPressEvent(self, event):
-        # http://pyqt.sourceforge.net/Docs/PyQt4/qt.html#Key-enum
-        if (event.modifiers() & Qt.ControlModifier):
+        if (event.modifiers() & CONTROL_MODIFIER):
             k = event.key()
             if k == Qt.Key_Control:
                 return
@@ -72,6 +120,7 @@ class ReadlineEdit(QLineEdit):
         # For anything else, call the base class.
         super().keyPressEvent(event)
 
+
 # Only define the PDFBrowserView if we have the modules it requires.
 if handle_pdf:
     class PDFBrowserView(qpdf.PDFScrolledWidget):
@@ -88,6 +137,7 @@ if handle_pdf:
 
         def toDisplayString(self):
             return self.url
+
 
 # Need to subclass QWebEngineView, in order to have an object that
 # can own each load_finished() callback and have a pointer to
@@ -112,9 +162,19 @@ class BrowserView(QWebEngineView):
         else:
             super().__init__()
 
-        self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
-
-        QWebEngineSettings.globalSettings().setAttribute(QWebEngineSettings.FullScreenSupportEnabled, True)
+        if 'PyQt6' in sys.modules:
+            # PyQt6.QtWebEngineCore.QWebEngineSettings no longer has
+            # defaultSettings() or globalSettings(),
+            # and I can't find any documentation on PyQt6 QWebEngineSettings,
+            # so take a guess at alternate ways.
+            pass
+            # self.settings().setDefaultTextEncoding("utf-8")
+            # QWebEngineSettings.setAttribute(
+            #     QWebEngineSettings.FullScreenSupportEnabled, True)
+        else:
+            self.settings().defaultSettings().setDefaultTextEncoding("utf-8")
+            QWebEngineSettings.globalSettings().setAttribute(
+                QWebEngineSettings.FullScreenSupportEnabled, True)
 
         self.browser_win = browserwin
 
@@ -132,7 +192,7 @@ class BrowserView(QWebEngineView):
         self.try_url = None
 
     def eventFilter(self, source, event):
-        if (event.type() == QEvent.ChildAdded and source is self
+        if (event.type() == ChildAdded and source is self
             and event.child().isWidgetType()):
             self._glwidget = event.child()
             self._glwidget.installEventFilter(self)
@@ -141,7 +201,7 @@ class BrowserView(QWebEngineView):
 
         # Middle click, not over a link: load the selection.
         # XXX This prevents pasting into text fields too. Must fix.
-        elif event.type() == QEvent.MouseButtonPress and \
+        if event.type() == MouseButtonPress and \
              event.button() == Qt.MidButton and not self.last_hovered:
                 # if self.last_hovered:
                 #     self.browser_win.new_tab(self.last_hovered)
@@ -187,10 +247,6 @@ class BrowserView(QWebEngineView):
             qc = QApplication.clipboard()
             qc.setText(qc.text(qc.Clipboard), qc.Selection)
 
-    #
-    # Slots
-    #
-
     def url_changed(self, url):
         # I can't find any way to find out about load errors.
         # But an attempted load that fails gives a url_changed(about:blank)
@@ -206,8 +262,7 @@ class BrowserView(QWebEngineView):
         if self.browser_win.browserviews[self.browser_win.active_tab] != self:
             return
 
-        urlbar = self.browser_win.urlbar
-        urlbar.setText(url.toDisplayString())
+        self.browser_win.urlbar.setText(url.toDisplayString())
 
     def link_hover(self, url):
         self.browser_win.statusBar().showMessage(url)
@@ -220,6 +275,8 @@ class BrowserView(QWebEngineView):
         # but setting it here seems to work.
         # self.settings().setDefaultTextEncoding("utf-8")
 
+        if 'PyQt6' in sys.modules:
+            print("load_started")
         self.browser_win.progress.show()
 
         # If the link is PDF, the WebEngineView won't do anything with it,
@@ -233,6 +290,8 @@ class BrowserView(QWebEngineView):
         # OK is useless: if we try to load a bad URL, we won't get a
         # loadFinished on that; instead it will switch to about:blank,
         # load that successfully and call loadFinished with ok=True.
+        if 'PyQt6' in sys.modules:
+            print("load_finished")
         self.browser_win.progress.hide()
         url = self.browser_win.browserviews[self.browser_win.active_tab].url().toString()
         self.browser_win.progress.hide()
@@ -254,7 +313,11 @@ class BrowserView(QWebEngineView):
 
         self.browser_win.focus_content()
 
+    # Done with slots
+
     def load_progress(self, progress):
+        if 'PyQt6' in sys.modules:
+            print("load_progress", progress)
         self.browser_win.progress.setValue(progress)
 
     def zoom(self, factor=1.25):
@@ -273,7 +336,7 @@ class BrowserPage(QWebEnginePage):
         self.fullScreenRequested.connect(self.fullscreen_requested)
 
     # Override all the chatty JS warnings:
-    def javaScriptConsoleMessage(level, message, lineNumber, sourceID):
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
         pass
 
     def acceptNavigationRequest(self, url, navtype, isMainFrame):
@@ -369,7 +432,7 @@ class BrowserWindow(QMainWindow):
         self.cmdsock.listen(1)
 
         self.notifier = QSocketNotifier(self.cmdsock.fileno(),
-                                        QSocketNotifier.Read)
+                                        QSocketNotifier.Type.Read)
 
         self.notifier.activated.connect(self.pipe_ready)
 
@@ -511,8 +574,8 @@ class BrowserWindow(QMainWindow):
             return super().eventFilter(object, event)
             # return False
 
-        if event.type() not in [QEvent.MouseButtonPress,
-                                QEvent.MouseButtonRelease]:
+        if event.type() not in [MouseButtonPress,
+                                MouseButtonRelease]:
             # print("Not a button press or release", event)
             return super().eventFilter(object, event)
             # return False
@@ -520,14 +583,15 @@ class BrowserWindow(QMainWindow):
         tabindex = object.tabAt(event.pos())
 
         if event.button() == Qt.LeftButton:
-            if event.type() == QEvent.MouseButtonPress:
+            if event.type() == MouseButtonPress:
                 self.active_tab = tabindex
-                self.urlbar.setText(self.browserviews[tabindex].url().toDisplayString())
+                self.urlbar.setText(self.browserviews[tabindex].url()
+                                    .toDisplayString())
             return super().eventFilter(object, event)
             # return False    # So we'll still switch to that tab
 
         if event.button() == Qt.MidButton:
-            if event.type() == QEvent.MouseButtonPress:
+            if event.type() == MouseButtonPress:
                     self.prev_middle = tabindex
             else:
                 if tabindex != -1 and tabindex == self.prev_middle:
@@ -561,9 +625,9 @@ class BrowserWindow(QMainWindow):
             # print("New Webpage off the record?",
             #       webpage.profile().isOffTheRecord())
             webview.setPage(webpage)
+            # print("In new tab, view is", webview, "and page is", webpage)
             # print("New view's page off the record?",
             #       webview.page().profile().isOffTheRecord())
-            # print("In new tab, view is", webview, "and page is", webpage)
 
             self.browserviews.append(webview)
             self.tabwidget.addTab(webview, init_name)
@@ -590,7 +654,7 @@ class BrowserWindow(QMainWindow):
             os.unlink(self.cmdsockname)
         if os.environ["HOME"].startswith('/tmp/') and \
            os.getenv('USER') not in os.environ["HOME"]:
-            print("Cleaning up: removing %s" % os.environ["HOME"])
+            # print("Cleaning up: removing %s" % os.environ["HOME"])
             # XXX This doesn't actually succeed: the directory is still there.
             # Why?
             shutil.rmtree(os.environ["HOME"])
@@ -629,6 +693,8 @@ class BrowserWindow(QMainWindow):
                                                                url)))
             else:
                 qurl.setScheme('http')
+        if 'PyQt6' in sys.modules:
+            print("qurl:", qurl)
 
         if len(self.browserviews) == 0:
             self.new_tab()
@@ -641,7 +707,21 @@ class BrowserWindow(QMainWindow):
         if tab == self.active_tab:
             self.urlbar.setText(url)
 
+        ## XXXXXX
+        # Calls load on the BrowserView(QWebEngineView),
+        # but the BV's load_started() is never called.
+        # See experiments/simplebrowser-qt6.py for a non-tabbed
+        # example that works with qt6.
+        # It uses @Slot() heavily, maybe that would help;
+        # But adding @Slot mostly gives errors like
+        # BrowserView.link_hover() missing 1 required positional argument: 'url'
+        # Also 
+        # https://doc.qt.io/qtforpython/examples/example_webenginewidgets__tabbedbrowser.html
+        if 'PyQt6' in sys.modules:
+            print("Calling load for", qurl, "on", self.browserviews[tab])
         self.browserviews[tab].load(qurl)
+        if 'PyQt6' in sys.modules:
+            print("Returned from load")
 
     def load_html(self, html, base=None):
         """Load a string containing HTML.
@@ -709,10 +789,6 @@ class BrowserWindow(QMainWindow):
         self.statusBar().showMessage("Downloading to " + item.path())
         item.accept()
 
-    #
-    # Slots
-    #
-
     def urlbar_load(self):
         url = self.urlbar.text()
         self.load_url(url)
@@ -726,6 +802,7 @@ class BrowserWindow(QMainWindow):
     def reload(self):
         self.browserviews[self.active_tab].reload()
 
+
 def run_browser():
 
     #
@@ -736,10 +813,16 @@ def run_browser():
     #
     def excepthook(excType=None, excValue=None, tracebackobj=None, *,
                    message=None, version_tag=None, parent=None):
-        # print("exception! excValue='%s'" % excValue)
+        print("exception!", excType, excValue)
         # logging.critical(''.join(traceback.format_tb(tracebackobj)))
         # logging.critical('{0}: {1}'.format(excType, excValue))
-        traceback.print_exception(excType, excValue, tracebackobj)
+
+        # Qt apparently somehow overrides all the useful functions
+        # of the traceback module.
+        # This does nothing:
+        # traceback.print_exception(excType, excValue, tracebackobj)
+        # and this prevents the program from even showing its UI:
+        # traceback.print_stack()
 
     sys.excepthook = excepthook
 
@@ -804,9 +887,10 @@ def run_browser():
             print("No existing %s process: starting a new one." % progname)
 
     # Return control to the shell before creating the window:
-    rc = os.fork()
-    if rc:
-        sys.exit(0)
+    if 'PyQt6' not in sys.modules:
+        rc = os.fork()
+        if rc:
+            sys.exit(0)
 
     app = QApplication(sys.argv)
 
@@ -815,7 +899,8 @@ def run_browser():
         win.new_tab(url)
     win.show()
 
-    app.exec_()
+    app.exec()
+
 
 def run_main_quietly():
     # Suppress stderr, because QtWebEngine, DBus etc.print so much
