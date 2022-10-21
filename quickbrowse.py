@@ -20,7 +20,8 @@ try:
     # While working on the QT6 conversion, uncomment this to force QT5
     # even on systems that have QT6 installed:
     # import DONT_USE_QT6
-    from PyQt6.QtCore import QUrl, Qt, QEvent, QSocketNotifier
+    from PyQt6.QtCore import Qt, QUrl, QEvent, QObject, \
+        QAbstractNativeEventFilter, QSocketNotifier
     from PyQt6.QtCore import pyqtSlot as Slot
     from PyQt6.QtWidgets import QApplication, QMainWindow, QToolBar, \
          QLineEdit, QStatusBar, QProgressBar, QTabWidget, QWidget
@@ -28,7 +29,6 @@ try:
          QWebEngineSettings
     from PyQt6.QtWebEngineWidgets import QWebEngineView
     from PyQt6.QtGui import QAction, QShortcut
-    from PyQt6.QtCore import QAbstractNativeEventFilter
 
     # qt6 uses QEvent.Type.typename, qt5 didn't use the .Type
     # so make globals
@@ -50,7 +50,7 @@ try:
     Qt.Key_U = 85
 
 except ImportError:
-    from PyQt5.QtCore import QUrl, Qt, QEvent, QSocketNotifier
+    from PyQt5.QtCore import Qt, QUrl, QObject, QEvent, QSocketNotifier
     from PyQt5.QtCore import pyqtSlot as Slot
     from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
          QLineEdit, QStatusBar, QProgressBar, QTabWidget, QShortcut, QWidget
@@ -376,6 +376,12 @@ class BrowserWindow(QMainWindow):
             # Short enough to fit in XGA, 768 height:
             self.height = 735
 
+        if 'urls' in kwargs:
+            self.init_urls = kwargs['urls']
+            del kwargs['urls']
+        else:
+            self.init_urls = []
+
         # Then run the default constructor.
         super().__init__(*args, **kwargs)
 
@@ -542,7 +548,12 @@ class BrowserWindow(QMainWindow):
 
         self.setCentralWidget(self.tabwidget)
 
-        self.tabwidget.tabBar().installEventFilter(self)
+        # Install a listener for QShowEvent that will load the initial url
+        self.installEventFilter(self)
+
+        # Install a listener for clicks on the tab bar
+        tabhandler = TabBarEventHandler(self)
+        self.tabwidget.tabBar().installEventFilter(tabhandler)
         self.prev_middle = -1
         self.active_tab = 0
 
@@ -567,39 +578,22 @@ class BrowserWindow(QMainWindow):
         QShortcut("Esc", self, activated=self.unfullscreen)
 
     def eventFilter(self, object, event):
-        """Handle button presses in the tab bar"""
+        """Handle QShowEvent for the BrowserWindow to show initial URLs"""
 
-        if object != self.tabwidget.tabBar():
-            print("eventFilter Not in tab bar")
-            return super().eventFilter(object, event)
-            # return False
+        if event.type() == QEvent.Type.Show:
+            if 'PyQt6' in sys.modules:
+                print("********* BrowserWindow QShowEvent")
+                print("urls:", self.init_urls)
+            if object is not self:
+                print("Show, but not on window object", object)
 
-        if event.type() not in [MouseButtonPress,
-                                MouseButtonRelease]:
-            # print("Not a button press or release", event)
-            return super().eventFilter(object, event)
-            # return False
+            if self.init_urls:
+                self.load_url(self.init_urls[0])
+                for url in self.init_urls[1:]:
+                    self.new_tab(url)
 
-        tabindex = object.tabAt(event.pos())
-
-        if event.button() == Qt.LeftButton:
-            if event.type() == MouseButtonPress:
-                self.active_tab = tabindex
-                self.urlbar.setText(self.browserviews[tabindex].url()
-                                    .toDisplayString())
-            return super().eventFilter(object, event)
-            # return False    # So we'll still switch to that tab
-
-        if event.button() == Qt.MidButton:
-            if event.type() == MouseButtonPress:
-                    self.prev_middle = tabindex
-            else:
-                if tabindex != -1 and tabindex == self.prev_middle:
-                    self.close_tab(tabindex)
-                self.prev_middle = -1
             return True
 
-        print("Unknown button", event)
         return super().eventFilter(object, event)
 
     def new_tab(self, url=None):
@@ -612,36 +606,41 @@ class BrowserWindow(QMainWindow):
             webview = PDFBrowserView(self, url)
             self.browserviews.append(webview)
             self.tabwidget.addTab(webview, init_name)
+            return webview
 
-        else:    # The normal case, an HTML page
-            webview = BrowserView(self)
+        # The normal case, an HTML page
+        webview = BrowserView(self)
 
-            # We need a QWebEnginePage in order to get linkHovered events,
-            # and to set an anonymous profile.
-            # print("New tab, profile still off the record?",
-            #       self.profile.isOffTheRecord())
-            webpage = BrowserPage(self.profile, webview, self)
+        # We need a QWebEnginePage in order to get linkHovered events,
+        # and to set an anonymous profile.
+        # print("New tab, profile still off the record?",
+        #       self.profile.isOffTheRecord())
+        webpage = BrowserPage(self.profile, webview, self)
 
-            # print("New Webpage off the record?",
-            #       webpage.profile().isOffTheRecord())
-            webview.setPage(webpage)
-            # print("In new tab, view is", webview, "and page is", webpage)
-            # print("New view's page off the record?",
-            #       webview.page().profile().isOffTheRecord())
+        # print("New Webpage off the record?",
+        #       webpage.profile().isOffTheRecord())
+        webview.setPage(webpage)
+        # print("In new tab, view is", webview, "and page is", webpage)
+        # print("New view's page off the record?",
+        #       webview.page().profile().isOffTheRecord())
 
-            self.browserviews.append(webview)
-            self.tabwidget.addTab(webview, init_name)
+        self.browserviews.append(webview)
+        self.tabwidget.addTab(webview, init_name)
 
-            if url:
-                self.load_url(url, len(self.browserviews)-1)
+        if url:
+            if 'PyQt6' in sys.modules:
+                print("Calling load_url from new_tab")
+            self.load_url(url, len(self.browserviews)-1)
+            if 'PyQt6' in sys.modules:
+                print("Back from load_url")
 
-            # Set up the signals:
-            webview.urlChanged.connect(webview.url_changed)
-            webview.loadStarted.connect(webview.load_started)
-            webview.loadFinished.connect(webview.load_finished)
-            webview.loadProgress.connect(webview.load_progress)
-            webpage.linkHovered.connect(webview.link_hover)
-            webpage.profile().downloadRequested.connect(self.downloadRequested)
+        # Set up the signals:
+        webview.urlChanged.connect(webview.url_changed)
+        webview.loadStarted.connect(webview.load_started)
+        webview.loadFinished.connect(webview.load_finished)
+        webview.loadProgress.connect(webview.load_progress)
+        webpage.linkHovered.connect(webview.link_hover)
+        webpage.profile().downloadRequested.connect(self.downloadRequested)
 
         return webview
 
@@ -715,7 +714,7 @@ class BrowserWindow(QMainWindow):
         # It uses @Slot() heavily, maybe that would help;
         # But adding @Slot mostly gives errors like
         # BrowserView.link_hover() missing 1 required positional argument: 'url'
-        # Also 
+        # Also experiments/chinesebrowser-qt6.py
         # https://doc.qt.io/qtforpython/examples/example_webenginewidgets__tabbedbrowser.html
         if 'PyQt6' in sys.modules:
             print("Calling load for", qurl, "on", self.browserviews[tab])
@@ -803,6 +802,44 @@ class BrowserWindow(QMainWindow):
         self.browserviews[self.active_tab].reload()
 
 
+class TabBarEventHandler(QObject):
+
+    def __init__(self, browserwin):
+        self.browserwin = browserwin
+        super().__init__()
+
+    def eventFilter(self, object, event):
+        """Handle button presses in the tab bar"""
+
+        if event.type() not in [MouseButtonPress,
+                                MouseButtonRelease]:
+            # print("Not a button press or release", event)
+            return super().eventFilter(object, event)
+            # return False
+
+        tabindex = object.tabAt(event.pos())
+
+        if event.button() == Qt.LeftButton:
+            if event.type() == MouseButtonPress:
+                browserwin.active_tab = tabindex
+                browserwin.urlbar.setText(
+                    browserwin.browserviews[tabindex].url().toDisplayString())
+            return super().eventFilter(object, event)
+            # return False    # So we'll still switch to that tab
+
+        if event.button() == Qt.MidButton:
+            if event.type() == MouseButtonPress:
+                    browserwin.prev_middle = tabindex
+            else:
+                if tabindex != -1 and tabindex == browserwin.prev_middle:
+                    browserwin.close_tab(tabindex)
+                browserwin.prev_middle = -1
+            return True
+
+        print("Tab bar: Unknown button", event)
+        return super().eventFilter(object, event)
+
+
 def run_browser():
 
     #
@@ -876,17 +913,17 @@ def run_browser():
     if args.new_tab:
         # Try to use an existing instance of quickbrowse
         # instead of creating a new window.
-        # XXX This should be in a try, and then fall through if no answer.
         try:
             for url in args.url:
                 if args.new_tab:
                     BrowserWindow.send_command("new-tab", url)
-
             sys.exit(0)
+
         except Exception as e:
             print("No existing %s process: starting a new one." % progname)
 
     # Return control to the shell before creating the window:
+    # (But not in qt6 until the port is fully functional)
     if 'PyQt6' not in sys.modules:
         rc = os.fork()
         if rc:
@@ -894,9 +931,8 @@ def run_browser():
 
     app = QApplication(sys.argv)
 
-    win = BrowserWindow()
-    for url in args.url:
-        win.new_tab(url)
+    print("Creating a BrowserWindow with urls=", args.url)
+    win = BrowserWindow(urls=args.url)
     win.show()
 
     app.exec()
