@@ -17,9 +17,15 @@ import shutil
 
 
 try:
-    # While working on the QT6 conversion, uncomment this to force QT5
-    # even on systems that have QT6 installed:
-    # import DONT_USE_QT6
+    # XXX IMPORTANT NOTE: the QT6 conversion is NOT FINISHED
+    # (and may never be). The current problem is that load()
+    # called on a BrowserView doesn't do anything for views in
+    # background tabs; the QWebEngineView just ignores the load(),
+    # and I haven't found any way to get load() to work.
+    # QT5 still works fine, so it's used by default
+    # unless you uncomment the next line:
+    import DONT_USE_QT6
+
     from PyQt6.QtCore import Qt, QUrl, QEvent, QObject, \
         QAbstractNativeEventFilter, QSocketNotifier
     from PyQt6.QtCore import pyqtSlot as Slot
@@ -588,9 +594,15 @@ class BrowserWindow(QMainWindow):
                 print("Show, but not on window object", object)
 
             if self.init_urls:
+                # XXX From here, self.load_url() works for the first url
+                # but self.new_tab() doesn't work, doesn't load the url.
                 self.load_url(self.init_urls[0])
-                for url in self.init_urls[1:]:
-                    self.new_tab(url)
+                # self.new_tab(self.init_urls[0])
+                for i, url in enumerate(self.init_urls[1:]):
+                    # self.new_tab(url)
+                    # self.active_tab = i
+                    print("\nBrowserWindow: trying to load", url, "in new tab")
+                    self.load_url(url)
 
             return True
 
@@ -603,10 +615,10 @@ class BrowserWindow(QMainWindow):
             init_name = "New tab"
 
         if is_pdf(url):
-            webview = PDFBrowserView(self, url)
-            self.browserviews.append(webview)
-            self.tabwidget.addTab(webview, init_name)
-            return webview
+            view = PDFBrowserView(self, url)
+            self.browserviews.append(view)
+            self.tabwidget.addTab(view, init_name)
+            return view
 
         # The normal case, an HTML page
         webview = BrowserView(self)
@@ -626,6 +638,7 @@ class BrowserWindow(QMainWindow):
 
         self.browserviews.append(webview)
         self.tabwidget.addTab(webview, init_name)
+        self.active_tab = len(self.browserviews) - 1
 
         if url:
             if 'PyQt6' in sys.modules:
@@ -677,8 +690,7 @@ class BrowserWindow(QMainWindow):
         # When testing whether tab is set, be sure to test for None.
 
         if is_pdf(url):
-            self.new_tab(url)
-            return
+            return self.new_tab(url)
 
         qurl = QUrl(url)
 
@@ -931,7 +943,8 @@ def run_browser():
 
     app = QApplication(sys.argv)
 
-    print("Creating a BrowserWindow with urls=", args.url)
+    if 'PyQt6' in sys.modules:
+        print("Creating a BrowserWindow with urls=", args.url)
     win = BrowserWindow(urls=args.url)
     win.show()
 
