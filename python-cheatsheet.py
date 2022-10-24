@@ -604,6 +604,23 @@ del thedic[key]
 # Rename a dictionary key:
 thedic["new_key"] = thedic.pop("old_key")
 
+# flatten a list using a double comprehension:
+x = [[1,2,3],[4,5,6,7],[8,9]]
+[i for j in x for i in j]
+[1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+# Another flatten:
+# l1 = [[1,2,3],[4,5,6,7],[8,9]]
+# l2 = []
+# for lz in l1:
+#      l2.extend(lz)
+# l2 -is now [1,2,3,4,5,6,7,8,9]
+
+# flatten using itertools.chain:
+# >>> lst = [[1,2,3],[4,5,6,7],[8,9]]
+# >>> list(itertools.chain.from_iterable(lst))
+# [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
 # Insert an item into a list BEFORE the given index:
 l = ['a', 'b', 'c', 'd', 'e']
 l.insert(3, 'xxx')
@@ -1476,7 +1493,7 @@ url = os.environ["REQUEST_URI"]
 
 
 ###########################################################
-# "else" in loops
+# "for..else" in loops
 ###########################################################
 
 """
@@ -1508,6 +1525,19 @@ MRAB disagrees:
 > It's the same for both of them.
 
 Some people on python-list suggest it should have been named nobreak.
+
+In a later discussion, Chris Angelico says:
+> a for-else without a break is quite useless.
+>
+> The else is associated with the break to the exact extent that one is
+>essential to the other's value.
+
+In a later post, he adds that this is the typical use:
+while True:     # or terating over things to search for
+    if search(something): break
+else:
+    complain()
+
 
 """
 
@@ -1586,6 +1616,13 @@ with open("access-log") as wwwlog:
     bytes_sent = (int(x) for x in bytecolumn if x != '-')
     print("Total", sum(bytes_sent))
 
+# "yield from":
+#     yield from iterable
+# is equivalent to:
+#     for item in iterable:
+#         yield item
+# but is more efficient.
+
 ########################################################
 # Lambda foo
 ########################################################
@@ -1656,6 +1693,10 @@ if __name__ == "__main__":
     import os
     print "This is file:   ", __file__
     print "which is really:", os.path.realpath(__file__)
+
+# See also this nifty use of map/reduce to redefine | to act
+# like a shell data pipeline:
+# https://code.activestate.com/recipes/580625-collection-pipeline-in-python/
 
 #
 # Enum values in PyGTK. I'm forever running up against dialogs that
