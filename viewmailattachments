@@ -37,7 +37,6 @@ IMAGE_VIEWER = "pho"
 # IMAGE_VIEWER = None
 
 USE_WVHTML_FOR_DOC = False
-BROWSER_ARGS = []
 
 # How many seconds do we need to wait for unoconv?
 # It defaults to 6, but on a 64-bit machine that's not nearly enough.
@@ -46,41 +45,80 @@ UNOCONV_STARTUP_TIME = "14"
 
 # Does the browser need a one-time argument for bringing up an initial window,
 # like Firefox's -private-window -new-instance ?
-BROWSER_FIRST_ARG = []
+BROWSER_FIRST_ARGS = []
 
-# What browser to use. Quickbrowse is a little python-qtwebengine script
-# that comes up a lot faster than firefox and may be more anonymous.
-USE_QUICKBROWSE = True
+# Arguments to use on subsequent calls
+BROWSER_ARGS = []
 
-if USE_QUICKBROWSE:
-    BROWSER = "quickbrowse"
+# What browser to use.
+# Quickbrowse is my script, a little python-qt5webengine script
+# that comes up a lot faster than firefox and tries to be more anonymous.
+# But it's Qt5 only; I haven't managed to get it working in Qt6.
+USE_QUICKBROWSE = False
+
+# Qutebrowser is a well respected fast and lightweight browser,
+# which hopefully with the given arguments is as private as quickbrowse.
+USE_QUTEBROWSER = True
+
+if USE_QUTEBROWSER:
+    BROWSER = "qutebrowser"
 
     # Arguments for calling the browser on the index page:
-    BROWSER_FIRST_ARGS = []
-    # Browser argument to precede new tabs:
-    BROWSER_ARGS = [ "--new-tab" ]
+    # Args recommended by FAQ #1 https://www.qutebrowser.org/doc/faq.html
+    # but don't use --temp-basedir, as that gives a separate basedir
+    # for each run and so makes it impossible to use tabs in a single window.
+    # To specify initial window size, add args
+    # "--qt-arg", "geometry", "1024x768" (or whatever)
+    # or make a rule for your window manager.
+    BROWSER_FIRST_ARGS = [ "--target", "private-window",
+                           "--basedir", "/tmp/mailattachments",
+                           "-s", "content.dns_prefetch", "false",
+                           "-s", "content.javascript.enabled", "false"
+                          ]
+    BROWSER_ARGS = [ "--target", "tab-bg",
+                     "--basedir", "/tmp/mailattachments",
+                     # Don't need to specify privacy, prefetch or JS
+                     # because it's being opened in a window that
+                     # already has those settings, using the same configdir.
+                   ]
 
-    # Quickbrowse normally backgrounds itself, so we don't have to.
-    BROWSER_BACKGROUND = False
-
-    # If you have qpdfhtml installed, no need to convert PDF.
-    # Otherwise, set this to True.
-    CONVERT_PDF_TO_HTML = False
-
-else:    # Firefox in private browsing mode
-    BROWSER = "firefox"
-
-    # For the index page, bring up a new, private window:
-    BROWSER_FIRST_ARGS = [ "-P", "Default", "-private-window", "-new-instance" ]
-    # Subsequent tabs should be tabs in the private window
-    BROWSER_ARGS = [ "-P", "Default", "-private-window" ]
-    # Firefox doesn't run in the background.
+    # qutebrowser runs in foreground
     BROWSER_BACKGROUND = True
 
-    # Not clear what to do here: Firefox has a built-in PDF viewer,
-    # but for some mime types it can't figure out that it should use it,
-    # and there's no way to find out from outside the process.
-    CONVERT_PDF_TO_HTML = False
+    CONVERT_PDF_TO_HTML = True
+
+else:
+    if USE_QUICKBROWSE:
+        BROWSER = "quickbrowse"
+
+        # Arguments for calling the browser on the index page:
+        BROWSER_FIRST_ARGS = []
+        # Browser argument to precede new tabs:
+        BROWSER_ARGS = [ "--new-tab" ]
+
+        # Quickbrowse normally backgrounds itself, so we don't have to.
+        BROWSER_BACKGROUND = False
+
+        # If you have qpdfhtml installed, no need to convert PDF.
+        # Otherwise, set this to True.
+        CONVERT_PDF_TO_HTML = False
+
+    else:    # fall back to Firefox in private browsing mode
+        BROWSER = "firefox"
+
+        # For the index page, bring up a new, private window:
+        BROWSER_FIRST_ARGS = [ "-P", "Default", "-private-window",
+                               "-new-instance" ]
+        # Subsequent tabs should be tabs in the private window
+        BROWSER_ARGS = [ "-P", "Default", "-private-window" ]
+        # Firefox doesn't run in the background.
+        BROWSER_BACKGROUND = True
+
+        # Not clear what to do here: Firefox has a built-in PDF viewer,
+        # but for some mime types it can't figure out that it should use it,
+        # and there's no way to find out from outside the process.
+        CONVERT_PDF_TO_HTML = False
+
 
 # End global prefs
 ################################################
