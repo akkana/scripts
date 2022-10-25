@@ -10,14 +10,15 @@
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
 #
-# Copyright 2013-2018 by Akkana Peck. Share and enjoy under the GPL v2 or later.
-# Changes:
+# Copyright 2013-2022 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Contributions:
 #   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
 #   Antonio Terceiro 2018: Allow piping directly from mutt.
 
-# To use it from mutt, put the following lines in your .muttrc:
-# macro  index  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
-# macro  pager  <F10>  "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
+# To use it from mutt, install it somewhere in your path as viewhtmlmail,
+# then put the following lines in your .muttrc:
+# macro index <F9> "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
+# macro pager <F9> "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
 
 # TESTING: Use the email file in test/files/htmlmail.eml.
 
@@ -34,6 +35,7 @@ import subprocess
 ################################################
 # Some prefs:
 
+# Print lots of debugging info?
 DEBUG = False
 
 # If IMAGE_VIEWER is set, a message that has no multipart/related
@@ -270,7 +272,6 @@ def view_html_message(f, tmpdir):
         # Some mailers, like gmail, will attach multiple images to
         # the same email all with the same filename, like "image.png".
         # So check whether we have to uniquify the names.
-
         if filename in filenames:
             orig_basename, orig_ext = os.path.splitext(filename)
             counter = 0
@@ -280,11 +281,14 @@ def view_html_message(f, tmpdir):
 
         filenames.add(filename)
 
+        # If there's no content_id, use the uniquified filename, sans path.
+        if not content_id:
+            content_id = filename
+
         filename = os.path.join(tmpdir, filename)
 
-        # Now save content to the filename, and remember it in subfiles
-        if content_id:
-            subfiles[content_id] = [ filename, part ]
+        # Now save content to the filename, and remember it in subfiles.
+        subfiles[content_id] = [ filename, part ]
         with open(filename, 'wb') as fp:
             fp.write(part.get_payload(decode=True))
             if DEBUG:
@@ -363,6 +367,8 @@ def view_html_message(f, tmpdir):
         print("subfiles:", subfiles)
         print("Parts already embedded:", embedded_parts)
         print("\n************************************\n")
+
+    image_files = []
     for sfid in subfiles:
         if DEBUG:
             print("\nPart:", subfiles[sfid][0])
@@ -372,7 +378,11 @@ def view_html_message(f, tmpdir):
 
         if sfid in embedded_parts:
             if DEBUG:
-                print(partfile, "was embedded in html")
+                print(partfile, "was already embedded in html")
+            continue
+
+        if part.get_content_maintype() == "image":
+            image_files.append(partfile)
             continue
 
         if part.get_content_maintype() == "application":
@@ -414,6 +424,14 @@ def view_html_message(f, tmpdir):
                     delayed_browser(fileparts[0] + "-html.html")
                 else:
                     delayed_browser(partfile)
+
+    if image_files:
+        if IMAGE_VIEWER:
+            if DEBUG:
+                print("Calling", IMAGE_VIEWER, "on", image_files)
+            cmd = [ IMAGE_VIEWER ] + image_files
+            mysubprocess.call(cmd)
+
 
 def delayed_browser(htmlfile):
     # Call up the browser window right away,
