@@ -81,7 +81,7 @@ if USE_QUTEBROWSER:
     BROWSER_FIRST_ARGS = [ "--target", "private-window",
                            "--basedir", "/tmp/mailattachments",
                            "-s", "content.dns_prefetch", "false",
-                           "-s", "content.javascript.enabled", "false"
+                           "-s", "content.javascript.enabled", "false",
                           ]
     BROWSER_ARGS = [ "--target", "tab-bg",
                      "--basedir", "/tmp/mailattachments",
@@ -90,10 +90,22 @@ if USE_QUTEBROWSER:
                      # already has those settings, using the same configdir.
                    ]
 
-    # qutebrowser runs in foreground
+    # qutebrowser doesn't background itself
     BROWSER_BACKGROUND = True
 
+    # qutebrowser can display PDF natively if you use pdf.js.
+    # On debian, apt install libjs-pdf.
+    # But that also gives hundreds of lines of errors like
+    # ERROR: NotFoundError while handling qute://* URL: Can't find pdfjs resource 'web/images/toolbarButton-viewAttachments.svg'
+    # Also, it creates two tabs for each PDF file, reproducible with:
+    #   qutebrowser --target private-window --basedir /tmp/mailattachments -s content.dns_prefetch false -s content.pdfjs true somefile.html
+    #   qutebrowser --target tab-bg --basedir /tmp/mailattachments -s content.pdfjs true somefile.pdf
+    # so for now, disable it and convert to html instead:
     CONVERT_PDF_TO_HTML = True
+
+    if not CONVERT_PDF_TO_HTML:
+        BROWSER_FIRST_ARGS += [ "-s", "content.pdfjs", "true" ]
+        BROWSER_ARGS += [ "-s", "content.pdfjs", "true" ]
 
 else:
     if USE_QUICKBROWSE:
@@ -461,8 +473,6 @@ def delayed_browser(htmlfile):
     cmd += BROWSER_ARGS
     # cmd.append("file://" + pleasewait_file)
     cmd.append("file://" + htmlfile)
-    if DEBUG:
-        print("Calling:", cmd)
     mysubprocess.call_bg(cmd)
 
 
@@ -471,13 +481,13 @@ class mysubprocess:
     @staticmethod
     def call(arr):
         if DEBUG:
-            print("\n\n================\n=== Calling: %s" % str(arr))
+            print("\n========= Calling: %s" % str(arr))
         subprocess.call(arr)
 
     @staticmethod
     def call_bg(arr):
         if DEBUG:
-            print("\n\n================\n=== Calling in background: %s"
+            print("\n========= Calling in background: %s"
                   % str(arr))
         subprocess.Popen(arr, shell=False,
                          stdin=None, stdout=None, stderr=None)
