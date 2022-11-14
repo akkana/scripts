@@ -30,6 +30,7 @@ import email, mimetypes
 from email.parser import BytesParser
 from email.policy import default as default_policy
 import subprocess
+from collections import OrderedDict   # for python < 3.7
 
 
 ################################################
@@ -43,6 +44,7 @@ DEBUG = False
 # for images. To use a browser, set IMAGE_VIEWER = None.
 IMAGE_VIEWER = "pho"
 # IMAGE_VIEWER = None
+IMAGE_VIEWER_ARGS = ["-P"]   # For pho, don't use presentation mode
 
 USE_WVHTML_FOR_DOC = False
 
@@ -51,93 +53,93 @@ USE_WVHTML_FOR_DOC = False
 # Even 10 often isn't enough.
 UNOCONV_STARTUP_TIME = "14"
 
-# Does the browser need a one-time argument for bringing up an initial window,
-# like Firefox's -private-window -new-instance ?
-BROWSER_FIRST_ARGS = []
+# A list of supported browsers, in order of preference.
+BROWSERS = OrderedDict([
+    ('qutebrowser', {
+        'ARGS_FIRST': [ "--target", "private-window",
+                        "--basedir", "/tmp/mailattachments",
+                        "-s", "content.dns_prefetch", "false",
+                        "-s", "content.javascript.enabled", "false" ],
+        # If using PDFJS, add: "-s", "content.javascript.enabled", "false" 
+        'ARGS': [ "--target", "tab-bg",
+                  "--basedir", "/tmp/mailattachments",
+                  # Don't need to specify privacy, prefetch or JS
+                  # because it's being opened in a window that
+                  # already has those settings, using the same configdir.
+                 ],
+        'BACKGROUND': True,
+        # qutebrowser can display PDF natively if you use pdf.js.
+        # On debian, apt install libjs-pdf.
+        # But that also gives hundreds of lines of errors like
+        # ERROR: NotFoundError while handling qute://* URL: Can't find pdfjs resource 'web/images/toolbarButton-viewAttachments.svg'
+        # Also, it creates two tabs for each PDF file, reproducible with:
+        #   qutebrowser --target private-window --basedir /tmp/mailattachments -s content.dns_prefetch false -s content.pdfjs true somefile.html
+        #   qutebrowser --target tab-bg --basedir /tmp/mailattachments -s content.pdfjs true somefile.pdf
+        # so for now, disable it and convert to html instead:
+        'CONVERT_PDF_TO_HTML': True
+    } ),
 
-# Arguments to use on subsequent calls
-BROWSER_ARGS = []
+    ('quickbrowse', {
+        'ARGS_FIRST': [],
+        'ARGS':[ "--new-tab"],
+        'BACKGROUND': False,
+        'CONVERT_PDF_TO_HTML': True
+    }),
+    ('firefox', {
+        'ARGS_FIRST': [ "-P", "Default", "-private-window",
+                        "-new-instance" ],
+        'ARGS': [  "-P", "Default", "-private-window" ],
+        'BACKGROUND': True,
+        'CONVERT_PDF_TO_HTML': False,
+    })
+])
 
-# What browser to use.
-# Quickbrowse is my script, a little python-qt5webengine script
-# that comes up a lot faster than firefox and tries to be more anonymous.
-# But it's Qt5 only; I haven't managed to get it working in Qt6.
-USE_QUICKBROWSE = False
+WORKING_BROWSER = None
 
-# Qutebrowser is a well respected fast and lightweight browser,
-# which hopefully with the given arguments is as private as quickbrowse.
-USE_QUTEBROWSER = True
+# First call to a browser?
+first_browser = True
 
-if USE_QUTEBROWSER:
-    BROWSER = "qutebrowser"
 
-    # Arguments for calling the browser on the index page:
-    # Args recommended by FAQ #1 https://www.qutebrowser.org/doc/faq.html
-    # but don't use --temp-basedir, as that gives a separate basedir
-    # for each run and so makes it impossible to use tabs in a single window.
-    # To specify initial window size, add args
-    # "--qt-arg", "geometry", "1024x768" (or whatever)
-    # or make a rule for your window manager.
-    BROWSER_FIRST_ARGS = [ "--target", "private-window",
-                           "--basedir", "/tmp/mailattachments",
-                           "-s", "content.dns_prefetch", "false",
-                           "-s", "content.javascript.enabled", "false",
-                          ]
-    BROWSER_ARGS = [ "--target", "tab-bg",
-                     "--basedir", "/tmp/mailattachments",
-                     # Don't need to specify privacy, prefetch or JS
-                     # because it's being opened in a window that
-                     # already has those settings, using the same configdir.
-                   ]
+def run_browser(browser, htmlfile):
+    """Call a specific browser with the appropriate arguments.
+       May raise various errors.
+    """
+    global first_browser
+    cmd = [ browser ]
 
-    # qutebrowser doesn't background itself
-    BROWSER_BACKGROUND = True
+    if first_browser:
+        cmd += BROWSERS[browser]['ARGS_FIRST']
+        first_browser = False
+    else:
+        cmd += BROWSERS[browser]['ARGS']
 
-    # qutebrowser can display PDF natively if you use pdf.js.
-    # On debian, apt install libjs-pdf.
-    # But that also gives hundreds of lines of errors like
-    # ERROR: NotFoundError while handling qute://* URL: Can't find pdfjs resource 'web/images/toolbarButton-viewAttachments.svg'
-    # Also, it creates two tabs for each PDF file, reproducible with:
-    #   qutebrowser --target private-window --basedir /tmp/mailattachments -s content.dns_prefetch false -s content.pdfjs true somefile.html
-    #   qutebrowser --target tab-bg --basedir /tmp/mailattachments -s content.pdfjs true somefile.pdf
-    # so for now, disable it and convert to html instead:
-    CONVERT_PDF_TO_HTML = True
+    cmd.append("file://" + htmlfile)
+    if DEBUG:
+        print("Calling in background: %s" % ' '.join(cmd))
+    mysubprocess.call_bg(cmd)
 
-    if not CONVERT_PDF_TO_HTML:
-        BROWSER_FIRST_ARGS += [ "-s", "content.pdfjs", "true" ]
-        BROWSER_ARGS += [ "-s", "content.pdfjs", "true" ]
 
-else:
-    if USE_QUICKBROWSE:
-        BROWSER = "quickbrowse"
+def call_some_browser(htmlfile):
+    """Try the list of browsers to find which one works."""
+    global WORKING_BROWSER
 
-        # Arguments for calling the browser on the index page:
-        BROWSER_FIRST_ARGS = []
-        # Browser argument to precede new tabs:
-        BROWSER_ARGS = [ "--new-tab" ]
+    if DEBUG:
+        print("Calling browser for file://%s" % htmlfile)
 
-        # Quickbrowse normally backgrounds itself, so we don't have to.
-        BROWSER_BACKGROUND = False
+    if WORKING_BROWSER:
+        run_browser(WORKING_BROWSER, htmlfile)
+    else:
+        for b in BROWSERS:
+            try:
+                run_browser(b, htmlfile)
+                # If it worked, break out of the loop
+                WORKING_BROWSER = b
+                break
+            except Exception as e:
+                print("**** Couldn't run", b, "!", e)
+                # traceback.print_exc()
+                continue
 
-        # If you have qpdfhtml installed, no need to convert PDF.
-        # Otherwise, set this to True.
-        CONVERT_PDF_TO_HTML = False
-
-    else:    # fall back to Firefox in private browsing mode
-        BROWSER = "firefox"
-
-        # For the index page, bring up a new, private window:
-        BROWSER_FIRST_ARGS = [ "-P", "Default", "-private-window",
-                               "-new-instance" ]
-        # Subsequent tabs should be tabs in the private window
-        BROWSER_ARGS = [ "-P", "Default", "-private-window" ]
-        # Firefox doesn't run in the background.
-        BROWSER_BACKGROUND = True
-
-        # Not clear what to do here: Firefox has a built-in PDF viewer,
-        # but for some mime types it can't figure out that it should use it,
-        # and there's no way to find out from outside the process.
-        CONVERT_PDF_TO_HTML = False
 
 # Seconds to wait between refreshes when waiting for translated content
 REDIRECT_TIMEOUT = 2
@@ -356,20 +358,8 @@ def view_html_message(f, tmpdir):
         if DEBUG:
             print("Wrote", htmlfile)
 
-    # Now we have the file. Call a browser on it.
-        if DEBUG:
-            print("Calling browser for file://%s" % htmlfile)
-        cmd = [ BROWSER ]
-        if first_browser:
-            cmd += BROWSER_FIRST_ARGS
-            first_browser = False
-        else:
-            cmd += BROWSER_ARGS
-
-        cmd.append("file://" + htmlfile)
-        if DEBUG:
-            print("Calling in background: %s" % ' '.join(cmd))
-        mysubprocess.call_bg(cmd)
+        # Now we have the file. Call a browser on it.
+        call_some_browser(htmlfile)
 
     # Done with htmlparts.
     # Now handle any parts that aren't embedded inside HTML parts.
@@ -404,7 +394,7 @@ def view_html_message(f, tmpdir):
                 print("Application subtype:", part.get_content_subtype())
             if part.get_content_subtype() == "msword" and USE_WVHTML_FOR_DOC:
                 mysubprocess.call(["wvHtml", partfile, htmlfilename])
-                delayed_browser(htmlfilename)
+                call_some_browser(htmlfilename)
                 continue
 
             if part.get_content_subtype() == \
@@ -414,7 +404,7 @@ def view_html_message(f, tmpdir):
                 mysubprocess.call(["unoconv", "-f", "html",
                                       "-T", UNOCONV_STARTUP_TIME,
                                       "-o", htmlfilename, partfile])
-                delayed_browser(htmlfilename)
+                call_some_browser(htmlfilename)
                 continue
 
             # unoconv conversions from powerpoint to HTML drop all images.
@@ -428,52 +418,26 @@ def view_html_message(f, tmpdir):
                 partfile = pdffile
 
             if part.get_content_subtype() == "pdf" or partfile.endswith(pdf):
-                if CONVERT_PDF_TO_HTML:
+                if WORKING_BROWSER and \
+                   BROWSERS[WORKING_BROWSER]['CONVERT_PDF_TO_HTML']:
+                    print("Calling pdftohtml and delaying browser")
                     mysubprocess.call(["pdftohtml", "-s", partfile])
+                    print("pdftohtml exited. Did it work?")
+                    fff = fileparts[0] + "-html.html"
+                    os.system("ls -l " + fff)
 
                     # But pdftohtml is idiotic about output filename
                     # and won't let you override it:
-                    delayed_browser(fileparts[0] + "-html.html")
+                    call_some_browser(fileparts[0] + "-html.html")
                 else:
-                    delayed_browser(partfile)
+                    call_some_browser(partfile)
 
     if image_files:
         if IMAGE_VIEWER:
             if DEBUG:
                 print("Calling", IMAGE_VIEWER, "on", image_files)
-            cmd = [ IMAGE_VIEWER ] + image_files
-            mysubprocess.call(cmd)
-
-
-def delayed_browser(htmlfile):
-    # Call up the browser window right away,
-    # so the user can see something is happening.
-    # Firefox, alas, has no way from the commandline of calling up
-    # a new private window with content, then replacing that content.
-    # So we'll create a file that refreshes, so that when content is ready,
-    # it can redirect to the first content page.
-#     global delayed_tabs
-#     def write_to_index(outfile, msg, timeout_secs, redirect_url):
-#         if not redirect_url:
-#             redirect_url = "file://%s" % outfile
-#         ofp = open(outfile, "w")
-#         ofp.write('''<html><head>
-# <meta content="utf-8" http-equiv="encoding">
-# <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-# <meta http-equiv="refresh" content="%d;URL=%s">
-# </head><body>
-# <br><br><br><br><br><br><big><big>%s</big></big>
-# </body></html>
-# ''' % (timeout_secs, redirect_url, msg))
-#         ofp.close()
-
-#     write_to_index(pleasewait_file, "Please wait ...", REDIRECT_TIMEOUT, None)
-
-    cmd = [ BROWSER ]
-    cmd += BROWSER_ARGS
-    # cmd.append("file://" + pleasewait_file)
-    cmd.append("file://" + htmlfile)
-    mysubprocess.call_bg(cmd)
+            cmd = [ IMAGE_VIEWER ] + IMAGE_VIEWER_ARGS + image_files
+            mysubprocess.call_bg(cmd)
 
 
 # For debugging:
