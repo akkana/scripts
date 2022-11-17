@@ -17,9 +17,14 @@ def get_search_history(filename):
         shutil.copy(filename, newfilename)
     con = sqlite3.connect(newfilename)
     cur = con.cursor()
-    cur.execute("SELECT url FROM moz_places WHERE url like '%https://www.google.com/search?q=%'")
+    cur.execute("SELECT url, last_visit_date FROM moz_places WHERE url like '%https://www.google.com/search?q=%'")
 
-    return [ item[0] for item in cur.fetchall() ]
+    # fetchedlist = [ cur.fetchall() ]   # list of (url, last_visit_date)
+    fetchedlist = list(cur.fetchall())
+
+    # Sort by date (second item), which is is unix time in microseconds.
+    fetchedlist.sort(key=lambda x: x[1] if x[1] else 0)
+    return [ pair[0] for pair in fetchedlist ]
 
 
 def find_search_terms(url, query_string=None):
