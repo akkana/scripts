@@ -503,8 +503,12 @@ rise_set_az.py:
 
 scrubjay:
     Demo of how to use a few different Twitter API.
-    No UI as yet.
+    No UI.
     Two variants: scrubjay-tweepy (tweepy) and scrubjay-p-t (python-twitter).
+
+searchhistory.py:
+    Given places.sqlite3 from a Firefox profile,
+    display all the search terms that have been passed to Google.
 
 serio:
     A proof-of-concept serial terminal app in Python.
