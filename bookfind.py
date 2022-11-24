@@ -23,7 +23,7 @@
 # https://isbndb.com/apidocs looks interesting, but isn't free.
 #
 # Or maybe scrape the Library of Congress search pages;
-# the LOC has APIs for seemingly everything *except* books,
+# the LOC has APIs for seemingly everything *except* books, weirdly.
 # Typical LOC search page URL by author:
 # https://catalog.loc.gov/vwebv/search?searchArg=connie+willis&searchCode=GKEY%5E*&searchType=1&limitTo=none&fromYear=&toYear=&limitTo=LOCA%3Dall&limitTo=PLAC%3Dall&limitTo=TYPE%3Dam&limitTo=LANG%3DENG&recCount=100&filter=Y
 # They also have DMARC requests but they're only free up to 2013,
@@ -98,6 +98,88 @@ class Book:
             retstr += ' (Goodreads %d)' % self.goodreads_id
 
         return retstr
+
+
+# The new OpenLibrary API is much harder to use, and many entries
+# lack important data like publication language, which makes it
+# not really usable.
+
+from pprint import pprint
+
+class NewOpenLibraryAPI:
+    # https://openlibrary.org/developers/api
+    # replacing older API (which, sigh, was easier to use)
+    def __init__(self):
+        self.debug = True
+
+    def book_by_ISBN(self, isbn):
+        return self.books_by_query("isbn=" + isbn)
+
+    def book_by_id(self, bookid):
+        # No special OpenLibrary key, use the isbn
+        return books_by_ISBN(bookid)
+
+    def books_by_author(self, authorname):
+        '''Find books by all authors matching the given name.
+           authorname is a string like "Connie Willis")
+           Order of names probably doesn't matter.
+           Returns two lists: booklists, anthologies
+           each of which consists of triples [year, month, title]
+        '''
+        r = requests.get("https://openlibrary.org/search/authors.json?q="
+                         + authorname.replace(' ', '+'))
+        results = r.json()
+        authorkey = results['docs'][0]['key']
+
+        r = requests.get("https://openlibrary.org/authors/%s/works.json"
+                         % authorkey)
+        works = r.json()["entries"]
+        # print('works:')
+        # pprint(works)
+        booklist = []
+        for work in works:
+            # But the "work" entry doesn't include publication date!
+            # So each book has to fetch the list of all editions
+            # to get that.
+            # print("work:")
+            # pprint(work)
+            r = requests.get("https://openlibrary.org/%s/editions.json"
+                             % work["key"])
+            editions = r.json()
+            first_ed = None
+            first_pubdate = 10000
+            for edition in editions['entries']:
+                eng = False
+                if "languages" not in edition:
+                    print("No languages! edition:")
+                    pprint(edition)
+                    sys.exit(0)
+                for lang in edition["languages"]:
+                    if lang["key"] == "/languages/eng":
+                        eng = True
+                        break
+                if not eng:
+                    continue
+                # It's in English.
+                pubdate = int(edition["publish_date"])
+                if pubdate < first_pubdate:
+                    first_ed = edition
+                    first_pubdate = pubdate
+
+            # Hopefully by now first_ed is populated.
+            # If not, skip to the next work.
+            if not first_ed:
+                print("Couldn't parse any editions:", editions)
+                continue
+
+            book = Book(first_ed["isbn_13"],
+                        first_ed["title"],
+                        authorname,
+                        None,    # No description
+                        first_pubdate,
+                        0, # openlibrary doesn't have publish month
+                        0)
+            booklist.append(book)
 
 
 class OpenLibraryAPI:
