@@ -33,8 +33,9 @@ greatcircle.py:
 plotrivers.py:
     Follow the tutorial at
     https://towardsdatascience.com/creating-beautiful-river-maps-with-python-37c9b5f5b74c
-    updated to work with current data files, and showing North America,
-    and try to fix some matplotlib problems that show up.
+    updated to work with current data files, and showing North America.
+    Try to fix some matplotlib problems that show up.
+    *Very slow.*
 
 polidistmap.py:
     Show political districts -- or any other geojson data -- on a map

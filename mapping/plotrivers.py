@@ -22,6 +22,7 @@ https://www.naturalearthdata.com/downloads/
         countries (ne_10m_admin_0_countries.zip)
 """
 
+
 import os
 
 # Debian bug #1013186: pyproj can't find its own proj dir
@@ -41,8 +42,78 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
 
+from datetime import datetime
+
 
 DATADIR = os.path.expanduser('~/Data/Rivers')
+
+START_TIME = datetime.now()
+SECTION_START_TIME = START_TIME
+
+
+# The tutorial runs through lots of preliminary plots.
+# That slows things down if you just want to generate the final plot.
+SHOW_EVERYTHING = False
+
+colours_i_like = ['#875692', '#008856',  '#0067A5', '#BE0032',
+                  '#222222', '#F38400', 'blue', '#604E97',
+                  '#E68FAC', '#F3C300', '#B3446C', '#C2B280',
+                  '#F6A600', '#882D17', '#E25822', '#8DB600',
+                  '#F99379',  '#DCD300', '#F3C300', '#E68FAC', '#C2B280',
+                  # colors I don't actually like:
+                   '#848482', '#F3C300'
+                  ]
+
+# Show the color swatches first, before reading any data
+if SHOW_EVERYTHING:
+    cell_width = 212
+    cell_height = 22
+    swatch_width = 48
+    margin = 12
+    topmargin = 40
+
+    n = len(colours_i_like)
+    ncols = 1
+    nrows = len(colours_i_like)
+    width = cell_width * 4 + 2 * margin
+    height = cell_height * nrows + margin + topmargin
+    dpi = 72
+
+    fig, ax = plt.subplots(figsize=(width / dpi, height / dpi), dpi=dpi)
+    fig.subplots_adjust(margin/width, margin/height,
+                        (width-margin)/width, (height-topmargin)/height)
+    ax.set_xlim(0, cell_width * 4)
+    ax.set_ylim(cell_height * (nrows-0.5), -cell_height/2.)
+    ax.yaxis.set_visible(False)
+    ax.xaxis.set_visible(False)
+    ax.set_axis_off()
+    ax.set_title("Basin Colors", fontsize=24, loc="left", pad=10)
+
+    # Again, the tutorial used MAJ_NAME but it's not a field in the data.
+    # The tutorial used basin names when showing the swatches,
+    # but the actual data no longer has names for the basins, alas.
+    for i, color in enumerate(colours_i_like):
+        row = i % nrows
+        col = i // nrows
+        y = row * cell_height
+
+        swatch_start_x = cell_width * col
+        text_pos_x = cell_width * col + swatch_width + 7
+
+        ax.text(text_pos_x, y, (color), fontsize=14,
+                horizontalalignment='left',
+                verticalalignment='center')
+
+        ax.add_patch(
+            Rectangle(xy=(swatch_start_x, y-9), width=swatch_width,
+                      height=18, facecolor=color, edgecolor='0.7')
+        )
+    plt.show()
+
+
+now = datetime.now()
+print(f"Calculated color swatches ({now - SECTION_START_TIME})")
+SECTION_START_TIME = now
 
 
 # Read country and continent shapes
@@ -80,6 +151,11 @@ na_rivers = pd.concat([na_rivers, ca_rivers])
 
 # done with ca_rivers, free up memory
 ca_rivers = None
+
+now = datetime.now()
+print(f"Merged North and Central American Rivers ({now - SECTION_START_TIME})")
+SECTION_START_TIME = now
+
 
 # Read in the lakes. Weirdly, ne_10m_lakes.shp and ne_10m_lakes_north_america
 # show a completely different list of lakes; the latter has bigger lakes,
@@ -121,27 +197,32 @@ na_lakes = na_lakes.loc[na_lakes.index.isin(na_lakes.index.tolist())]
 
 excluded_rivers = gpd.sjoin(na_rivers, na_lakes, predicate='within')
 na_rivers = na_rivers.loc[~na_rivers.index.isin(excluded_rivers.index.tolist())]
-# print("After limiting to NA, na_rivers:", na_rivers)
 
-# Take a look at what we have so far.
-fig, ax = plt.subplots(facecolor='#FCF6F5FF')
-fig.set_size_inches(7, 5)
-# ax.set_xlim([0, enddate])
-# ax.set_ylim([0, data[-1]])
+now = datetime.now()
+print(f"Added lakes ({now - SECTION_START_TIME})")
 
-# XXX This plots quite small in a big window.
-# Try to make it come closer to filling the window:
-plt.margins(x=0)
-fig.tight_layout(pad=0, w_pad=0, h_pad=0)
+if SHOW_EVERYTHING:
+    # Take a look at what we have so far.
+    fig, ax = plt.subplots(facecolor='#FCF6F5FF')
+    fig.set_size_inches(7, 5)
+    # ax.set_xlim([0, enddate])
+    # ax.set_ylim([0, data[-1]])
 
-na_rivers.plot(ax=ax, color='blue', lw=0.1)
-# na_lakes.plot(ax=ax, color='purple', alpha=1)
-na_lakes.plot(ax=ax, color="none", facecolor="none",
-              edgecolor='purple', alpha=1)
+    # XXX This plots quite small in a big window.
+    # Try to make it come closer to filling the window:
+    plt.margins(x=0)
+    fig.tight_layout(pad=0, w_pad=0, h_pad=0)
 
-ax.axis('off')
+    na_rivers.plot(ax=ax, color='blue', lw=0.1)
+    # na_lakes.plot(ax=ax, color='purple', alpha=1)
+    na_lakes.plot(ax=ax, color="none", facecolor="none",
+                  edgecolor='purple', alpha=1)
 
-plt.show()
+    ax.axis('off')
+
+    plt.show()
+
+SECTION_START_TIME = now
 
 '''
 #
@@ -179,60 +260,12 @@ plt.show()
 basins = gpd.read_file(os.path.join(DATADIR,
                                     "hydrobasins/hybas_na_lev02_v1c.shp"))
 
-colours_i_like = ['#A1CAF1',  '#875692', '#008856',  '#0067A5', '#BE0032',
-                  '#222222', '#848482', '#F3C300',
-                  # 'blue', '#F38400',
-                  # '#E68FAC', '#604E97', '#F3C300', '#B3446C', '#C2B280',
-                  # '#F6A600', '#882D17', '#E25822', '#8DB600',
-                  # '#F99379',  '#DCD300', '#F3C300', '#E68FAC', '#C2B280',
-                  # '#222222'
-                  ]
-
+# Assign colors from the colour list to basins
 colors_df = pd.DataFrame({'basin': basins.HYBAS_ID.unique().tolist(),
-                          'colors': colours_i_like})
+                          'colors': colours_i_like[:8]})
 
-cell_width = 212
-cell_height = 22
-swatch_width = 48
-margin = 12
-topmargin = 40
-
-n = len(colours_i_like)
-ncols = 1
-nrows = len(colours_i_like)
-width = cell_width * 4 + 2 * margin
-height = cell_height * nrows + margin + topmargin
-dpi = 72
-
-# fig, ax = plt.subplots(figsize=(width / dpi, height / dpi), dpi=dpi)
-# fig.subplots_adjust(margin/width, margin/height,
-#                     (width-margin)/width, (height-topmargin)/height)
-# ax.set_xlim(0, cell_width * 4)
-# ax.set_ylim(cell_height * (nrows-0.5), -cell_height/2.)
-# ax.yaxis.set_visible(False)
-# ax.xaxis.set_visible(False)
-# ax.set_axis_off()
-# ax.set_title("Basin Colors", fontsize=24, loc="left", pad=10)
-
-# Again, the tutorial used MAJ_NAME but it's not a field in the data.
-for i, (name, basin) in enumerate(zip(colours_i_like,
-                                      basins.HYBAS_ID.unique().tolist())):
-    row = i % nrows
-    col = i // nrows
-    y = row * cell_height
-
-    swatch_start_x = cell_width * col
-    text_pos_x = cell_width * col + swatch_width + 7
-
-    ax.text(text_pos_x, y, (name + " " + str(basin)), fontsize=14,
-            horizontalalignment='left',
-            verticalalignment='center')
-
-    ax.add_patch(
-        Rectangle(xy=(swatch_start_x, y-9), width=swatch_width,
-                  height=18, facecolor=name, edgecolor='0.7')
-    )
-plt.show()
+now = datetime.now()
+print(f"Read in the basins ({now - SECTION_START_TIME})")
 
 #
 # Merge the basins GeoDataFrame with the colours df,
@@ -241,13 +274,17 @@ plt.show()
 basins = pd.merge(basins, colors_df, left_on='HYBAS_ID',
                   right_on='basin', how='left')
 
-fig, ax = plt.subplots(facecolor='#FCF6F5FF')
-# XXX geopandas/plotting.py:656: UserWarning: Only specify one of 'column' or 'color'. Using 'color'.
-# basins.plot(ax=ax, column='HYBAS_ID', edgecolor='face', color=basins['colors'])
-# basins.plot(ax=ax, column='HYBAS_ID', color=basins['colors'])
-basins.plot(ax=ax, color=basins['colors'])
-ax.axis('off')
-plt.show()
+if SHOW_EVERYTHING:
+    fig, ax = plt.subplots(facecolor='#FCF6F5FF')
+    # XXX geopandas/plotting.py:656: UserWarning: Only specify one of 'column' or 'color'. Using 'color'.
+    # basins.plot(ax=ax, column='HYBAS_ID', edgecolor='face', color=basins['colors'])
+    # basins.plot(ax=ax, column='HYBAS_ID', color=basins['colors'])
+    basins.plot(ax=ax, color=basins['colors'])
+    ax.axis('off')
+    plt.show()
+
+SECTION_START_TIME = now
+
 
 #
 # Now match the rivers with the basins.
@@ -255,31 +292,40 @@ plt.show()
 #
 rivers_basins = gpd.sjoin(na_rivers, basins, predicate='intersects')
 
-fig, ax = plt.subplots(facecolor='#FCF6F5FF')
-fig.set_size_inches(7, 5)
+now = datetime.now()
+print("Calculated intersection of rivers and basins "
+      f"({now - SECTION_START_TIME})")
 
-# Try again to make the size reasonable
-plt.margins(x=0)
-fig.tight_layout(pad=0, w_pad=0, h_pad=0)
 
-# The plot comes out faded, washed out compared to the tutorial,
-# and you really can't see any river detail.
-rivers_basins.plot(ax=ax, edgecolor='face',
-                   color=rivers_basins['colors'], lw=0.1)
-na_lakes.plot(ax=ax, color='#FCF6F5FF')
+if SHOW_EVERYTHING:
+    fig, ax = plt.subplots(facecolor='#FCF6F5FF')
+    fig.set_size_inches(7, 5)
 
-# logo = plt.imread('../../Branding/globe.png')
-# newax = fig.add_axes([0.83, 0.62, 0.1, 0.1], anchor='NE', zorder=-1)
-# newax.imshow(logo)
-# newax.axis('off')
-txt = ax.text(0.02, 0.03, "North American Rivers",
-              size=6,
-              color='grey',
-              transform = ax.transAxes,
-              fontfamily='fantasy')
+    # Try again to make the size reasonable
+    plt.margins(x=0)
+    fig.tight_layout(pad=0, w_pad=0, h_pad=0)
 
-ax.axis('off')
-plt.show()
+    # The plot comes out faded, washed out compared to the tutorial,
+    # and you really can't see any river detail.
+    rivers_basins.plot(ax=ax, edgecolor='face',
+                       color=rivers_basins['colors'], lw=0.1)
+    na_lakes.plot(ax=ax, color='#FCF6F5FF')
+
+    # logo = plt.imread('../../Branding/globe.png')
+    # newax = fig.add_axes([0.83, 0.62, 0.1, 0.1], anchor='NE', zorder=-1)
+    # newax.imshow(logo)
+    # newax.axis('off')
+    txt = ax.text(0.02, 0.03, "North American Rivers",
+                  size=6,
+                  color='black',
+                  transform = ax.transAxes,
+                  fontfamily='fantasy')
+
+    ax.axis('off')
+    plt.show()
+
+SECTION_START_TIME = now
+
 
 #
 # Make a plot with the river linewidths scaled according to
@@ -294,77 +340,93 @@ def scale_lw(df: gpd.GeoDataFrame, column_name: str,
     df[f'LW_{column_name}'] = 0.005 + (valueScaled * rightSpan)
     return df
 
-# CA river data doesn't have DISCHARGE
-# rivers_basins = scale_lw(rivers_basins, 'DISCHARGE',
-#                          min_value=0.005, max_value=0.6)
-rivers_basins = scale_lw(rivers_basins, 'WIDTH',
-                         min_value=0.005, max_value=0.6)
+# We'll use depth for the line width scaling:
+# it gives the best result.
 rivers_basins = scale_lw(rivers_basins, 'DEPTH',
                          min_value=0.005, max_value=0.6)
 
-fig = plt.figure(facecolor='#FCF6F5FF')
-fig.set_size_inches(15, 7)
 
-# ax1 = plt.subplot(1,3,1)
-# rivers_basins.plot(ax=ax1, color='blue', lw=rivers_basins['LW_DISCHARGE'])
-# na_lakes.plot(ax=ax1, color='#FCF6F5FF')
-# ax1.set_title("Discharge", fontfamily='fantasy')
-# ax1.axis('off')
+now = datetime.now()
+print(f"Scaled line widths ({now - SECTION_START_TIME})")
 
-ax2 = plt.subplot(1, 2, 1)
-rivers_basins.plot(ax=ax2, color='blue', lw=rivers_basins['LW_WIDTH'])
-na_lakes.plot(ax=ax2, color='#FCF6F5FF')
-ax2.set_title("Width", fontfamily='fantasy')
-ax2.axis('off')
+if SHOW_EVERYTHING:
+    rivers_basins = scale_lw(rivers_basins, 'WIDTH',
+                             min_value=0.005, max_value=0.6)
+    # CA river data doesn't have DISCHARGE
+    # rivers_basins = scale_lw(rivers_basins, 'DISCHARGE',
+    #                          min_value=0.005, max_value=0.6)
 
-ax3 = plt.subplot(1, 2, 2)
-rivers_basins.plot(ax=ax3, color='blue', lw=rivers_basins['LW_DEPTH'])
-na_lakes.plot(ax=ax3, color='#FCF6F5FF')
-ax3.set_title("Depth", fontfamily='fantasy')
-ax3.axis('off')
+    fig = plt.figure(facecolor='#FCF6F5FF')
+    fig.set_size_inches(15, 7)
 
-# Try again to make the size reasonable
-plt.margins(x=0)
-fig.tight_layout(pad=0, w_pad=0, h_pad=0)
+    # ax1 = plt.subplot(1,3,1)
+    # rivers_basins.plot(ax=ax1, color='blue', lw=rivers_basins['LW_DISCHARGE'])
+    # na_lakes.plot(ax=ax1, color='#FCF6F5FF')
+    # ax1.set_title("Discharge", fontfamily='fantasy')
+    # ax1.axis('off')
 
-plt.show()
+    ax2 = plt.subplot(1, 2, 1)
+    rivers_basins.plot(ax=ax2, color='blue', lw=rivers_basins['LW_WIDTH'])
+    na_lakes.plot(ax=ax2, color='#FCF6F5FF')
+    ax2.set_title("Width", fontfamily='fantasy')
+    ax2.axis('off')
+
+    ax3 = plt.subplot(1, 2, 2)
+    rivers_basins.plot(ax=ax3, color='blue', lw=rivers_basins['LW_DEPTH'])
+    na_lakes.plot(ax=ax3, color='#FCF6F5FF')
+    ax3.set_title("Depth", fontfamily='fantasy')
+    ax3.axis('off')
+
+    # Try again to make the size reasonable
+    plt.margins(x=0)
+    fig.tight_layout(pad=0, w_pad=0, h_pad=0)
+
+    plt.show()
+
 
 # Answer: Depth is better, shows more detail, darker.
 # So use that on the large plot.
 
-'''
 #
 # Larger plot, rivers all the same color
 #
 
-fig, ax = plt.subplots(facecolor='#FCF6F5FF')
-fig.set_size_inches(7, 5)
+if SHOW_EVERYTHING:
+    fig, ax = plt.subplots(facecolor='#FCF6F5FF')
+    fig.set_size_inches(7, 5)
 
-# Try again to make the size reasonable
-plt.margins(x=0)
-fig.tight_layout(pad=0, w_pad=0, h_pad=0)
+    # Try again to make the size reasonable
+    plt.margins(x=0)
+    fig.tight_layout(pad=0, w_pad=0, h_pad=0)
 
-rivers_basins.plot(ax=ax, edgecolor='face', color='blue',
-                   lw=rivers_basins['LW_DEPTH'])
-na_lakes.plot(ax=ax, color='#FCF6F5FF')
+    rivers_basins.plot(ax=ax, edgecolor='face', color='blue',
+                       lw=rivers_basins['LW_DEPTH'])
+    na_lakes.plot(ax=ax, color='#FCF6F5FF')
 
-# newax = fig.add_axes([0.83, 0.62, 0.1, 0.1], anchor='NE', zorder=-1)
-# newax.imshow(logo)
-# newax.axis('off')
-txt = ax.text(0.02, 0.03, "North American Rivers",
-              size=6,
-              color='grey',
-              transform = ax.transAxes,
-              fontfamily='fantasy')
+    # newax = fig.add_axes([0.83, 0.62, 0.1, 0.1], anchor='NE', zorder=-1)
+    # newax.imshow(logo)
+    # newax.axis('off')
+    txt = ax.text(0.02, 0.03, "North American Rivers",
+                  size=6,
+                  color='grey',
+                  transform = ax.transAxes,
+                  fontfamily='fantasy')
 
-ax.axis('off')
-plt.show()
-'''
+    ax.axis('off')
+    plt.show()
+
+SECTION_START_TIME = now
+
 
 #
-# Larger plot, colored by basin
+# The final plot, colored by basin
 #
-fig, ax = plt.subplots(facecolor='#FCF6F5FF')
+
+now = datetime.now()
+print(f"Ready to make final plot ({now - SECTION_START_TIME})")
+SECTION_START_TIME = now
+
+fig, ax = plt.subplots(facecolor='white')
 fig.set_size_inches(7, 5)
 
 # Try again to make the size reasonable. It doesn't succeed,
@@ -386,4 +448,33 @@ txt = ax.text(0.02, 0.03, "North American Rivers",
               fontfamily='fantasy')
 
 ax.axis('off')
+
+now = datetime.now()
+print(f"Final plot is ready ({now - SECTION_START_TIME})")
+SECTION_START_TIME = now
+print(f"Total time was {now - START_TIME}")
+
 plt.show()
+
+# Running the above takes several hours, which makes it hard
+# to fiddle with plotting and try to get matplotlib to do
+# something sensible. So save what we've calculated so far.
+print("fields in rivers_basins:", rivers_basins.columns)
+'''
+Calculated color swatches (0:00:00.000005)
+Merged North and Central American Rivers (0:00:27.564679)
+Added lakes (0:00:31.760115)
+Read in the basins (0:00:00.358680)
+Calculated intersection of rivers and basins (0:38:01.949588)
+Scaled line widths (0:00:00.008554)
+Ready to make final plot (0:00:00.000040)
+Final plot is ready (0:00:44.952849)
+Total time was 0:39:46.594510
+fields in rivers_basins: Index(['geometry', 'DEPTH', 'WIDTH', 'index_right', 'HYBAS_ID', 'NEXT_DOWN',
+       'NEXT_SINK', 'MAIN_BAS', 'DIST_SINK', 'DIST_MAIN', 'SUB_AREA',
+       'UP_AREA', 'PFAF_ID', 'ENDO', 'COAST', 'ORDER', 'SORT', 'basin',
+       'colors', 'LW_DEPTH'],
+      dtype='object')
+'''
+# rivers_basins = rivers_basins[[
+# na_rivers = na_rivers[['geometry', 'DEPTH', 'WIDTH']]
