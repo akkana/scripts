@@ -223,16 +223,17 @@ if [[ $pullstatus == 1 ]]; then
 fi
 echo "after building, clean:" $clean
 
-echo '========== libmypaint'
-echo "clean:" $clean
-cd $SRCDIR
-# pull-clone https://github.com/Jehan/mypaint-brushes.git $clean
-branch=libmypaint-v1
-pull-clone https://github.com/mypaint/libmypaint.git
-echo "pullstatus:" $pullstatus
-if [[ $pullstatus == 1 ]]; then
-    ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
-fi
+# On Debian sid, the provided libmypaint is good enough.
+# echo '========== libmypaint'
+# echo "clean:" $clean
+# cd $SRCDIR
+# # pull-clone https://github.com/Jehan/mypaint-brushes.git $clean
+# branch=libmypaint-v1
+# pull-clone https://github.com/mypaint/libmypaint.git
+# echo "pullstatus:" $pullstatus
+# if [[ $pullstatus == 1 ]]; then
+#     ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
+# fi
 
 echo '========== babl'
 echo "clean:" $clean
