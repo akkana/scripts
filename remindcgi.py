@@ -76,12 +76,10 @@ class TextFormatter:
 
     @staticmethod
     def linkify(word):
-        if is_link(word):
-            return "%s%s%s%s%s" % (ColorFormat.F_Blue, ColorFormat.Italic,
-                                   word,
-                                   ColorFormat.Reset_Italic,
-                                   ColorFormat.F_Default)
-        return word
+        return "%s%s%s%s%s" % (ColorFormat.F_Blue, ColorFormat.Italic,
+                               word,
+                               ColorFormat.Reset_Italic,
+                               ColorFormat.F_Default)
 
     @staticmethod
     def highlight(line):
@@ -125,9 +123,7 @@ class HTMLFormatter:
     @staticmethod
     def linkify(line):
         line = line.strip()
-        if is_link(line):
-            return '<a href="%s">%s</a>' % (line, line)
-        return line
+        return '<a href="%s">%s</a>' % (line, line)
 
     @staticmethod
     def header(line):
@@ -205,16 +201,44 @@ class HTMLFormatter:
 ''')
 
 
-def is_link(word):
-    """Ultra-simple and dumb link detector.
-       Could improve, but in this context links are likely to be simple.
-    """
-    return word.startswith('http')
-
+#
+# Regular expression to detect links. Start with just a simple one:
+#
+link_re = re.compile(r'((https?|ftp|file)://[\S]+)', flags=re.IGNORECASE)
 
 def linkify_line(line, formatter):
-    return ' '.join([formatter.linkify(w) if is_link(w) else w
-                     for w in line.split()])
+    links = re.findall(link_re, line)
+    # print("\n======== line:", line)
+    # print("links:", links)
+    if not links:
+        # print("  No links in line")
+        return line
+    linkified_string = ''
+    for link in links:
+        # print("link:", link)
+
+        # If there are any capture groups in the RE, findall returns
+        # a tuple containing each of the matched groups.
+        # But specifying multiple schemas, like allowing for file://,
+        # unfortunately gets treated as a capture group. So there has
+        # to be another capture group around the whole expression,
+        # and that group will show up as the first item in the tuple.
+        link = link[0]
+        pos = line.find(link)
+        # print("  pos:", pos)
+        # Add text leading up to the link
+        linkified_string += line[:pos]
+        # print("  Adding non-link text", line[:pos])
+        # Add the linkified link
+        # print("  Adding linkified", link)
+        linkified_string += formatter.linkify(link)
+        # print("  linkified_string now:", linkified_string)
+        # Move to after the link
+        line = line[pos + len(link):]
+        # print("  Rest of string is now:", line)
+
+    linkified_string += line
+    return linkified_string
 
 
 # The remind program has % codes to show when events are happening.
@@ -287,6 +311,7 @@ def print_remind_for_interval(enddate, formatter):
             re.sub('on [A-Z][a-z]+day, [A-Z][a-z]+ [0-9]{1,2}[a-z]{2} *',
                    '', firstline))
 
+        firstline = linkify_line(firstline, formatter)
         print(formatter.highlight(firstline))
         for subline in sublines[1:]:
             print(formatter.linebreak(), linkify_line(subline, formatter))
