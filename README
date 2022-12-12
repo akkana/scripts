@@ -607,14 +607,13 @@ pip_upgrade.py:
     Upgrade all Python packages in the current virtualenv.
     Don't try to upgrade anything in the system Python directories.
 
-viewhtmlmail:
-     Take an mbox HTML message (e.g. from mutt), split it using munpack,
-     and rewrite it so it can be viewed in an external browser.
+viewhtmlmail.py: OBSOLETE: see viewmailattachments.py
 
-viewmailattachments:
-     Show all attachments to an HTML message in a Firefox window,
-     first running them through unoconv or other conversion programs
-     as needed to convert MS Office formats to HTML or PDF.
+viewmailattachments.py:
+     (Replaces the older scripts viewhtmlmail.py and viewmailattachments)
+     Show HTML messages in an external browser, including embedded images.
+     Also show attachments in MS Office formats or PDF after
+     converting them to HTML.
 
 vol:
     A simple python-gtk volume slider. Much simpler and smaller than
