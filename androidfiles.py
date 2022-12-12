@@ -77,6 +77,46 @@ def is_android(path):
     return path.startswith("android:") or path.startswith("androidsd:")
 
 
+def expandpath(path, pathdict):
+    """Re any schema: prefix in the path, down to the point where
+       only android: (or nothing) remains.
+       Schemas can be self-referential, e.g. books:/ can map to
+       androidsd:/Books which maps to android:/storage/emulated/ABCD-EFG0/Books
+    """
+    while True:
+        if ':' not in path:
+            return path
+        if path.startswith("android:"):
+            return path
+
+        if path.startswith("androidsd:"):
+            sdcards = find_sdcards()
+            if not sdcards:
+                raise RuntimeError("Can't find an Android SD card")
+            # posixpath fails if any of its arguments start with "/":
+            # it ignores all other args and only returns "/"
+            path = path[10:]
+            while path and path[0] == '/':
+                if path == '/':
+                    path = ""
+                else:
+                    path = path[1:]
+
+            return "android:" + posixpath.join("/storage", sdcards[0], path)
+
+        # Must be a user-defined path
+        colonloc = path.find(':')
+        schema = path[:colonloc]
+        if schema not in pathdict:
+            print(f"'{schema}' is not defined", file=sys.stderr)
+            return None
+
+        # posixpath won't join these if one starts with android:
+        # but '/'.join() doesn't trim multiple slashes, so:
+        path = re.sub('/+', '/',
+                      '/'.join([pathdict[schema], path[colonloc+1:]]))
+
+
 def strip_schema(path):
     """Strip off any android: prefix in the path.
     """
@@ -471,8 +511,7 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
         print("No files need moving.")
 
     if removes:
-        if dryrun:
-            print("\n\nRemoving files that are no longer needed on the dst")
+        print("\n\nRemoving files that are no longer needed on the dst")
         for rm in removes:
             if dryrun:
                 print(rm)
@@ -482,8 +521,7 @@ def make_sync_changes(newdirs, moves, removes, updates, dryrun):
         print("No files need removing.")
 
     if updates:
-        if dryrun:
-            print("\n\nCopying files that are new or changed")
+        print("\n\nCopying files that are new or changed")
         for pair in updates:
             if dryrun:
                 print(" %s ->\n   %s" % pair)
@@ -734,33 +772,6 @@ def read_config_file():
                           file=sys.stderr)
                     continue
     return pathdict
-
-
-def expandpath(path, pathdict):
-    """Expand a path by substituting any instances from the config file.
-       E.g. osmand:whiterock/canyonrim.gpx ->
-              android:/.../net.osmand.plus/files/tracks/whiterock/
-    """
-    while ':' in path:
-        key, pathval = (val.strip() for val in path.split(':'))
-        if not pathval:
-            pathval = '/'
-
-        if key.lower() == "android" or key.lower() == "androidsd":
-            return path
-
-        if key not in pathdict:
-            raise(RuntimeError("Don't know key %s:" % key))
-
-        # pathdict[key] is likely android:/path/to or androidsd:/path/to.
-        # Strip out the prefix so posixpath.normpath can normalize the rest.
-        if ':' in pathdict[key]:
-            key2, pathval2 = pathdict[key].split(':')
-            path = f"{key2}:{posixpath.join(pathval2, pathval)}"
-        else:
-            return posixpath.normpath(pathdict[key])
-
-    return path
 
 
 def Usage():
