@@ -85,16 +85,16 @@ BROWSERS = OrderedDict([
         'BACKGROUND': False,
         'CONVERT_PDF_TO_HTML': True
     }),
+
     ('firefox', {
-        'ARGS_FIRST': [ "-P", "Default", "-private-window",
-                        "-new-instance" ],
-        'ARGS': [  "-P", "Default", "-private-window" ],
+        'ARGS_FIRST': [ "-new-tab" ],
+        'ARGS': [  "-private-window" ],
         'BACKGROUND': True,
         'CONVERT_PDF_TO_HTML': False,
     })
 ])
 
-WORKING_BROWSER = None
+WORKING_BROWSER = "firefox"
 
 # First call to a browser?
 first_browser = True
