@@ -94,7 +94,7 @@ BROWSERS = OrderedDict([
     })
 ])
 
-WORKING_BROWSER = "firefox"
+WORKING_BROWSER = None
 
 # First call to a browser?
 first_browser = True
