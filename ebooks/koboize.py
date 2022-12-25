@@ -11,7 +11,7 @@ import re
 
 import epubtag
 
-def convert_file(filename, destdir):
+def kobo_convert_file(filename, destdir):
     if not filename.lower().endswith(".epub"):
         print("%s Doesn't end with .epub" % filename)
         return
@@ -56,6 +56,7 @@ def altertags(soup):
          tag.unwrap()
          new_tag.wrap(tag)
 
+
 if __name__ == '__main__':
     if len(sys.argv) <= 1:
         print("Usage: %s a.epub [b.epub c.epub ...] [destdir]" % \
@@ -72,5 +73,5 @@ if __name__ == '__main__':
         print("Koboizing to directory %s" % destdir)
 
     for arg in files:
-        convert_file(arg, destdir)
+        kobo_convert_file(arg, destdir)
 
