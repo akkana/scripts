@@ -150,7 +150,7 @@ class Spider:
             # external URLs, this next condition is the one to change.
             if parsed.netloc != self.host:
                 if self.debug:
-                    print("Ignoring external link", url)
+                    print("  Ignoring external link", url, file=sys.stderr)
                 return None
             return url
 
@@ -172,7 +172,8 @@ class Spider:
         return urllib.parse.urlunparse(lurl)
 
     def check_url(self, url):
-        """Check a URL. This should be an absolute URL on the server."""
+        """Check a URL. This should be an absolute URL on the server.
+        """
         # If we got this far, we'll be comparing links.
         # So we'll need to know the parsed parts of this url.
         urlparsed = urllib.parse.urlparse(url)
@@ -188,7 +189,8 @@ class Spider:
             return
 
         if self.debug:
-            print("=============================== Checking", url)
+            print("=============================== Checking", url,
+                  file=sys.stderr)
 
         # Now we need just the directory part. This might be
         # dirname(urlparsed.path), if the url is a file, or it
@@ -199,18 +201,20 @@ class Spider:
         # but if they themselves XXX
         localpath = self.get_local_for_url(urlparsed.path)
         if self.debug:
-            print("=== local for", urlpath, "is", localpath)
+            print("=== local for", urlpath, "is", localpath, file=sys.stderr)
 
         if not localpath:
             if self.debug:
-                print(urlparsed.path, "is outside original directory; skipping")
+                print(urlparsed.path, "is outside original directory; skipping",
+                      file=sys.stderr)
             if url not in self.outside_urls:
                 self.outside_urls.append(url)
             return
 
         if not os.path.exists(localpath):
             if self.debug:
-                print("Local path '%s' doesn't exist! %s" % (localpath,  url))
+                print("Local path '%s' doesn't exist! %s" % (localpath,  url),
+                      file=sys.stderr)
             self.urls_failed.append(urlpath)
             return
 
@@ -220,7 +224,8 @@ class Spider:
             lurl[2] = urlpath
             url = urllib.parse.urlunparse(lurl)
             if self.debug:
-                print("Substituted characters, recombined to", url)
+                print("Substituted characters, recombined to", url,
+                      file=sys.stderr)
 
         if os.path.isdir(localpath):
             # The web server will substitute index.something,
@@ -228,6 +233,7 @@ class Spider:
             # will show up as an orphan.
             localdir = localpath
             localpath = None
+            # Indices the web server will try appending to "index.":
             for ext in ( "php", "cgi", "html" ):
                 indexfile = os.path.join(localdir, "index." + ext)
                 if os.path.exists(indexfile):
@@ -242,8 +248,9 @@ class Spider:
             urldir = posixpath.dirname(urlpath)
 
         if self.debug:
-            print("localpath", localpath, "localdir", localdir)
-            print("urldir:", urldir)
+            print("localpath", localpath, "localdir", localdir,
+                  file=sys.stderr)
+            print("urldir:", urldir, file=sys.stderr)
 
         try:
             request = urllib.request.Request(url)
@@ -259,10 +266,12 @@ class Spider:
         try:
             response = handle.open(request)
             info = response.info()
-            if 'content-type' not in list(info.keys()) or \
+            if 'content-type' not in info or \
                not info['content-type'].startswith('text/html'):
                 if self.debug:
-                    print(url, "isn't HTML; skipping")
+                    print(url, "isn't HTML; skipping", file=sys.stderr)
+                    print("content-type: '%s'" % info['content-type'],
+                          file=sys.stderr)
                 self.urls_succeeded.append(urlpath)
                 self.files_succeeded.append(localpath)
                 return
@@ -270,9 +279,9 @@ class Spider:
 
         except urllib.error.HTTPError as error:
             if error.code == 404:
-                print("ERROR: %s -> %s" % (error, error.url))
+                print("ERROR: %s -> %s" % (error, error.url), file=sys.stderr)
             else:
-                print("ERROR: %s" % error)
+                print("ERROR: %s" % error, file=sys.stderr)
             self.urls_failed.append(urlpath)
             return
 
@@ -287,10 +296,11 @@ class Spider:
         ctype = response.headers['content-type']
         if not ctype.startswith("text/html"):
             if self.debug:
-                print(url, "isn't HTML (%s); not reading content" % ctype)
+                print(url, "isn't HTML (%s); not reading content" % ctype,
+                      file=sys.stderr)
             return
 
-        soup = BeautifulSoup(content)
+        soup = BeautifulSoup(content, 'lxml')
 
         for tag in soup.findAll('a', href=True):
             href = tag.get("href")
@@ -298,6 +308,8 @@ class Spider:
                 continue
             if href[0] == '#':
                 continue
+            if self.debug:
+                print("  sub-url:", href, file=sys.stderr)
 
             href = self.make_absolute(href, urldir)
             if not href:
