@@ -307,7 +307,7 @@ def print_remind_for_interval(enddate, formatter):
         # If remind has added an "on longday, longmonth Nth, remove it
         # and add the date back at the beginning in an easier to read format.
         firstline = '%s: %s' % (
-            d.strftime('%a, %-d %b'),
+            d.strftime('%a, %b %-d'),
             re.sub('on [A-Z][a-z]+day, [A-Z][a-z]+ [0-9]{1,2}[a-z]{2} *',
                    '', firstline))
 
