@@ -178,7 +178,8 @@ class Spider:
         # So we'll need to know the parsed parts of this url.
         urlparsed = urllib.parse.urlparse(url)
         if not urlparsed.scheme or not urlparsed.path.startswith('/'):
-            print("EEK! Non-relative URL passed to check_url, bailing")
+            print("EEK! Non-relative URL '%s' passed to check_url, bailing"
+                  % url, file=sys.stderr)
             return
 
         # URL encode special characters like spaces:
