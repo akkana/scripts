@@ -160,10 +160,21 @@ def find_first_maildir_file(maildir):
                 return os.path.join(root, f)
     return None
 
-# Sanitize a filename to make sure there's nothing dangerous, like ../
+
+MAX_FILENAME_LENGTH = 225
+
 def sanitize_filename(badstr):
-    return ''.join([x for x in badstr if x.isalpha() or x.isdigit()
-                    or x in '-_.'])
+    """Sanitize a filename to make sure there's nothing dangerous, like ../
+       Also make sure it's under MAX_FILENAME_LENGTH.
+    """
+    filename = ''.join([x for x in badstr if x.isalpha() or x.isdigit()
+                      or x in '-_.'])
+    if len(filename) > MAX_FILENAME_LENGTH:
+        half = MAX_FILENAME_LENGTH // 2
+        filename = filename[:half] + filename[-half:]
+
+    return filename
+
 
 def view_html_message(f, tmpdir):
     # Note: the obvious way to read a message is
@@ -412,7 +423,7 @@ def view_html_message(f, tmpdir):
                                       "-o", pdffile, partfile])
                 partfile = pdffile
 
-            if part.get_content_subtype() == "pdf" or partfile.endswith(pdf):
+            if part.get_content_subtype() == "pdf" or partfile.endswith("pdf"):
                 if WORKING_BROWSER and \
                    BROWSERS[WORKING_BROWSER]['CONVERT_PDF_TO_HTML']:
                     print("Calling pdftohtml and delaying browser")
