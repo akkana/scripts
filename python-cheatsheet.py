@@ -353,6 +353,14 @@ match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr)
 if match: return match.group()
 
 
+########################################################
+# Text wrapping
+########################################################
+
+import textwrap
+textwrap.fill(intext, width=w)
+
+
 ################################################################
 # Python3-specific stringy stuff
 ################################################################
@@ -2184,6 +2192,7 @@ PySonar: a type inferencer and indexer
 '''
 List all packages installed with pip:
     pip list -l
+(that doesn't actually list everything, though)
 
 Related but less helpful commands, which include system packages:
     pip list
@@ -2227,6 +2236,7 @@ option so you have to actually install the package to see the file list.
 ################################################################
 # Virtualenv
 ################################################################
+
 '''Python2
 virtualenv ~/pythonenv/envname
   (requires virtualenv and python-virtualenv)
@@ -2292,6 +2302,12 @@ pip install wheel
 pip install .
 
 Test and make sure it works.
+
+Save what's installed in the venv, with versions:
+pip freeze > requirements.txt
+
+Install from a requirements.txt:
+pip install -r requirements.txt
 
 Generate a dist:
 python3 setup.py clean
