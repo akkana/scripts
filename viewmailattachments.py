@@ -5,7 +5,7 @@
 # Can be run from within a mailer like mutt, or independently
 # on a single message file.
 #
-# Usage: viewhtmlmail
+# Usage: viewhtmlmail.py email_message_file
 #
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
@@ -15,10 +15,10 @@
 #   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
 #   Antonio Terceiro 2018: Allow piping directly from mutt.
 
-# To use it from mutt, install it somewhere in your path as viewhtmlmail,
+# To use it from mutt, install it somewhere in your path,
 # then put the following lines in your .muttrc:
-# macro index <F9> "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
-# macro pager <F9> "<pipe-message>~/bin/viewhtmlmail\n" "View HTML in browser"
+# macro index <F9> "<pipe-message>~/bin/viewhtmlmail.py\n" "View HTML email in browser"
+# macro pager <F9> "<pipe-message>~/bin/viewhtmlmail,ot\n" "View HTML email in browser"
 
 # TESTING: Use the email file in test/files/htmlmail.eml.
 
@@ -348,8 +348,7 @@ def view_html_message(f, tmpdir):
         for sf_cid in subfiles:
             # Yes, yes, I know:
             # https://stackoverflow.com/questions/1732348/regex-match-open-tags-except-xhtml-self-contained-tags/
-            # but eventually this script will be integrated with viewmailattachments
-            # (which uses BeautifulSoup) and that problem will go away.
+            # and this should be changed to use BeautifulSoup.
             if DEBUG:
                 print("Replacing cid", sf_cid, "with", subfiles[sf_cid][0])
             newhtmlsrc = re.sub(b'cid: ?' + sf_cid.encode(),
