@@ -3,7 +3,7 @@
 # Build GIMP.
 # First argument is the version (which is also the name of the
 # build directory), e.g. buildgimp master will use a
-# SRCDIR=$HOME/outsrc/gimp-master and a GIMP_PREFIX=$HOME/run/gimp-master
+# SRCDIR=$HOME/outsrc/gimp-master and a PREFIX=$HOME/run/gimp-master
 #
 # With no args, will assume "master".
 #
@@ -20,10 +20,10 @@ if [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
 fi
 echo "GIMPVER: $GIMPVER"
 
-export GIMP_PREFIX=$HOME/run/gimp-$GIMPVER
+export PREFIX=$HOME/run/gimp-$GIMPVER
 export SRCDIR=$HOME/outsrc/gimp-$GIMPVER
 
-echo "Using PREFIX of $GIMP_PREFIX"
+echo "Using PREFIX of $PREFIX"
 echo "Using SRCDIR of $SRCDIR"
 
 usage() {
@@ -31,11 +31,11 @@ usage() {
     exit 1
 }
 
-if [ ! -d $GIMP_PREFIX ]; then
-    echo "$GIMP_PREFIX does not exist."
+if [ ! -d $PREFIX ]; then
+    echo "$PREFIX does not exist."
     usage
 else
-    echo "$GIMP_PREFIX exists"
+    echo "$PREFIX exists"
 fi
 
 if [ ! -d $SRCDIR ]; then
@@ -45,10 +45,10 @@ else
     echo "$SRCDIR exists"
 fi
 
-export PATH="$GIMP_PREFIX/bin:$PATH"
-export PKG_CONFIG_PATH="$GIMP_PREFIX/lib/pkgconfig:$GIMP_PREFIX/share/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="$GIMP_PREFIX/lib:$LD_LIBRARY_PATH"
-export ACLOCAL_FLAGS="-I $GIMP_PREFIX/share/aclocal $ACLOCAL_FLAGS"
+export PATH="$PREFIX/bin:$PATH"
+export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig:$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
+export ACLOCAL_FLAGS="-I $PREFIX/share/aclocal $ACLOCAL_FLAGS"
 
 
 if [[ "${@: -1}" == "clean" ]]; then
@@ -56,19 +56,19 @@ if [[ "${@: -1}" == "clean" ]]; then
     echo "Cleaning all directories"
     echo ""
     sleep 3
-    rm -rf $GIMP_PREFIX/*
+    rm -rf $PREFIX/*
 
     # The build will fail if the share/aclocal dir isn't already created.
     # The share dir needs to be there in any case, for config.site.
-    mkdir -p $GIMP_PREFIX/share/aclocal
+    mkdir -p $PREFIX/share/aclocal
 
     # Overwrite config.site:
-    cat >$GIMP_PREFIX/share/config.site <<EOF
-GIMP_PREFIX=$GIMP_PREFIX
-export PATH="\$GIMP_PREFIX/bin:\$PATH"
-export PKG_CONFIG_PATH="\$GIMP_PREFIX/lib/pkgconfig:\$GIMP_PREFIX/share/pkgconfig:\$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="\$GIMP_PREFIX/lib:\$LD_LIBRARY_PATH"
-export ACLOCAL_FLAGS="-I \$GIMP_PREFIX/share/aclocal \$ACLOCAL_FLAGS"
+    cat >$PREFIX/share/config.site <<EOF
+PREFIX=$PREFIX
+export PATH="\$PREFIX/bin:\$PATH"
+export PKG_CONFIG_PATH="\$PREFIX/lib/pkgconfig:\$PREFIX/share/pkgconfig:\$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="\$PREFIX/lib:\$LD_LIBRARY_PATH"
+export ACLOCAL_FLAGS="-I \$PREFIX/share/aclocal \$ACLOCAL_FLAGS"
 export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
 EOF
 else
@@ -90,9 +90,9 @@ setopt errreturn
 # both say it defaults to /usr/local/share:/usr/share.
 # The error is only sporadic so it's difficult to test.
 if [[ x$XDG_DATA_DIRS == x ]]; then
-    export XDG_DATA_DIRS=$GIMP_PREFIX/share:/usr/local/share:/usr/share
+    export XDG_DATA_DIRS=$PREFIX/share:/usr/local/share:/usr/share
 else
-    export XDG_DATA_DIRS=$GIMP_PREFIX/share:$XDG_DATA_DIRS
+    export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
 fi
 
 # meson/ninja are now used for babl and gegl
@@ -110,7 +110,7 @@ meson-build() {
     if [ -e build.ninja ]; then
         meson reconfigure
     else
-        meson -Dprefix=$GIMP_PREFIX --libdir=lib $MESONSRC
+        meson -Dprefix=$PREFIX --libdir=lib $MESONSRC
     fi
 
     ninja && \
@@ -128,7 +128,7 @@ meson-build() {
 pull-clone() {
     repo=$1
 
-    # SRCDIR=$GIMP_PREFIX
+    # SRCDIR=$PREFIX
 
     pullstatus=0
 
@@ -219,7 +219,7 @@ branch=v1.3.x
 pull-clone https://github.com/mypaint/mypaint-brushes.git
 echo "after pull-clone, clean:" $clean
 if [[ $pullstatus == 1 ]]; then
-    ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
+    ./autogen.sh && ./configure --prefix=$PREFIX && make -j4 && make install
 fi
 echo "after building, clean:" $clean
 
@@ -232,7 +232,7 @@ echo "after building, clean:" $clean
 # pull-clone https://github.com/mypaint/libmypaint.git
 # echo "pullstatus:" $pullstatus
 # if [[ $pullstatus == 1 ]]; then
-#     ./autogen.sh && ./configure --prefix=$GIMP_PREFIX && make -j4 && make install
+#     ./autogen.sh && ./configure --prefix=$PREFIX && make -j4 && make install
 # fi
 
 echo '========== babl'
@@ -283,9 +283,9 @@ echo "pullstatus:" $pullstatus
 if [[ 1 || $pullstatus == 1 ]]; then
     # You can build GIMP with either autotools or meson.
     # Comment out one of these lines.
-    # ./autogen.sh --prefix=$GIMP_PREFIX --disable-vector-icons && make -j4 && make install
-    ./autogen.sh --prefix=$GIMP_PREFIX && make -j4 && make install
-    # meson-build
+    # ./autogen.sh --prefix=$PREFIX --disable-vector-icons && make -j4 && make install
+    # ./autogen.sh --prefix=$PREFIX && make -j4 && make install
+    meson-build
 fi
 
 unset clean
