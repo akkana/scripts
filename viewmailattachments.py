@@ -122,23 +122,34 @@ def run_browser(browser, htmlfile):
 def call_some_browser(htmlfile):
     """Try the list of browsers to find which one works."""
     global WORKING_BROWSER
+    errstr = ""
 
     if DEBUG:
         print("Calling browser for file://%s" % htmlfile)
 
     if WORKING_BROWSER:
         run_browser(WORKING_BROWSER, htmlfile)
-    else:
-        for b in BROWSERS:
-            try:
-                run_browser(b, htmlfile)
-                # If it worked, break out of the loop
-                WORKING_BROWSER = b
-                break
-            except Exception as e:
-                print("**** Couldn't run", b, "!", e)
+        return
+
+    for b in BROWSERS:
+        try:
+            run_browser(b, htmlfile)
+            # If it worked, break out of the loop
+            WORKING_BROWSER = b
+            break
+        except Exception as e:
+            thiserr = "\n**** Couldn't run %s! %s" % (b, e)
+            errstr += thiserr
+            if DEBUG:
+                print(thiserr)
                 # traceback.print_exc()
-                continue
+            continue
+
+    if not WORKING_BROWSER:
+        print("Couldn't use any known browser: bailing.")
+        print("Errors:", errstr)
+        print("Run with -d (debug) to see more details.")
+        sys.exit(1)
 
 
 # Seconds to wait between refreshes when waiting for translated content
@@ -468,6 +479,9 @@ if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
     if len(sys.argv) > 1:
         for f in sys.argv[1:]:
+            if f == '-d':
+                DEBUG = True
+                continue
             view_html_message(f, tmpdir)
     else:
         view_html_message(None, tmpdir)
