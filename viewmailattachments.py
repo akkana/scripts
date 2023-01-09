@@ -87,8 +87,8 @@ BROWSERS = OrderedDict([
     }),
 
     ('firefox', {
-        'ARGS_FIRST': [ "-new-tab" ],
-        'ARGS': [  "-private-window" ],
+        'ARGS_FIRST': [ "--new-tab" ],
+        'ARGS': [  "--private-window" ],
         'BACKGROUND': True,
         'CONVERT_PDF_TO_HTML': False,
     })
