@@ -17,8 +17,7 @@
 
 # To use it from mutt, install it somewhere in your path,
 # then put the following lines in your .muttrc:
-# macro index <F9> "<pipe-message>viewmailattachments.py\n" "View HTML email in browser"
-# macro pager <F9> "<pipe-message>viewmailattachments.py\n" "View HTML email in browser"
+# macro index,pager <F9> "<pipe-message>viewmailattachments.py\n" "View HTML email in browser"
 
 # TESTING: Use the email file in test/files/htmlmail.eml.
 
