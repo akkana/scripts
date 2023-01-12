@@ -5,7 +5,7 @@
 # Can be run from within a mailer like mutt, or independently
 # on a single message file.
 #
-# Usage: viewhtmlmail.py email_message_file
+# Usage: viewmailattachments.py email_message_file
 #
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
@@ -17,8 +17,8 @@
 
 # To use it from mutt, install it somewhere in your path,
 # then put the following lines in your .muttrc:
-# macro index <F9> "<pipe-message>~/bin/viewhtmlmail.py\n" "View HTML email in browser"
-# macro pager <F9> "<pipe-message>~/bin/viewhtmlmail,ot\n" "View HTML email in browser"
+# macro index <F9> "<pipe-message>~/bin/viewmailattachments.py\n" "View HTML email in browser"
+# macro pager <F9> "<pipe-message>~/bin/viewmailattachments.py\n" "View HTML email in browser"
 
 # TESTING: Use the email file in test/files/htmlmail.eml.
 
