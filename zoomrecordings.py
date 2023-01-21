@@ -11,8 +11,8 @@
 # before running this program.
 
 import requests
+import subprocess
 import os, sys
-from pprint import pprint
 
 
 # Get the JWT token from the environment
@@ -33,35 +33,60 @@ def show_zoom_recordings(fetch=False):
     r = requests.get(ZOOMBASE + "/users/me/recordings?from=2022-01-01",
                      headers=AUTHORIZATION_HEADER)
     j = r.json()
-    pprint(j)
 
     try:
         print(len(j["meetings"]), "meetings:")
-        for m in j["meetings"]:
-            print()
-            print(m["topic"], m["start_time"])
+    except KeyError as e:
+        print(e)
+        print("No meetings! JSON was:")
+        from pprint import pprint
+        pprint(j)
+        return
 
-            # Get URLs for the download URLs for that meeting
-            for recording in m['recording_files']:
+    for m in j["meetings"]:
+        print()
+        print(m["topic"], m["start_time"])
+
+        # e.g., "2022-01-20T18:44:47Z/LWVLA Lunch with a Leader"
+        subdir = os.path.join(m["start_time"], m["topic"])
+        os.makedirs(subdir, mode=0o755, exist_ok=True)
+
+        # Get URLs for the download URLs for that meeting
+        for recording in m['recording_files']:
+            print("    %s (%s): %s?access_token=%s"
+                  % (recording['file_type'],
+                     prettysize(recording['file_size']),
+                     recording['download_url'],
+                     JWT_TOKEN))
+
+            if not fetch:
+                continue
+
+            ext = recording["file_extension"].lower()
+            filepath = os.path.join(subdir, "zoom."+ext)
+
+            if not os.path.exists(filepath):
                 print("    %s (%s): %s?access_token=%s"
                       % (recording['file_type'],
                          prettysize(recording['file_size']),
                          recording['download_url'],
                          JWT_TOKEN))
+                url = recording["download_url"]
+                if ext in ['txt', 'vtt']:
+                    print("Trying to fetch", url)
+                    r1 = requests.get(url,
+                                      headers=AUTHORIZATION_HEADER)
+                    with open(filepath, "wb") as outfile:
+                        outfile.write(r1.content)
+                    os.chmod(filepath, 0o444)
+                else:
+                    print("Calling yt-dlp")
+                    subprocess.call(["yt-dlp", "-o", filepath,
+                                     url + "?access_token="+JWT_TOKEN],
+                                    shell=False)
 
-                if fetch:
-                    filename = m["start_time"] + '.' \
-                        + recording['file_extension']
-                    r = requests.get(recording['download_url'])
-                    with open(filename, 'wb') as ofp:
-                        for chunk in r.iter_content(chunk_size=128):
-                            ofp.write(chunk)
-                    print("Wrote", filename)
-
-    except KeyError as e:
-        print(e)
-        print("JSON was:")
-        pprint(j)
+    if not fetch:
+        print("\nNothing downloaded: specify a base directory to fetch to")
 
 
 def prettysize(nbytes):
@@ -72,11 +97,10 @@ def prettysize(nbytes):
 
 
 if __name__ == '__main__':
-    try:
-        if sys.argv[1] == '-d':
-            show_zoom_recordings(fetch=True)
-            exit(0)
-    except:
-        pass
+    # First (and only) argument is a base directory into which to download
+    if len(sys.argv) == 2:
+        os.chdir(sys.argv[1])
+        show_zoom_recordings(fetch=True)
 
-    show_zoom_recordings(fetch=False)
+    else:
+        show_zoom_recordings(fetch=False)
