@@ -7,16 +7,26 @@ from urllib.parse import urlencode, quote_plus
 import json
 from shapely.geometry import Point, Polygon
 from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
+import sys
 
 
 Geolocator = Nominatim(user_agent="constituents")
+
+# Nominatim has a limit of 1 request per second for free non-OSM use.
+# (They don't always enforce this, but be nice and follow the guidelines!)
+Geocode = RateLimiter(Geolocator.geocode, min_delay_seconds=1)
+print("Geolocation courtesy of OpenStreetMap/Nominatim")
+print("Warning: rate limiting to 1 address per second.")
+print("For faster bulk queries, consider using OpenMapQuest or PickPoint")
+print("(see https://geopy.readthedocs.io/en/latest/#geopy-is-not-a-service)")
 
 
 def geocode(addr):
     """Geocode a single address using GeoPY/Nominatim.
        Returns a (lat, lon) pair, or None, None.
     """
-    location = Geolocator.geocode(addr)
+    location = Geocode(addr)
     if not location:
         return None, None
     # Nominatim returns a tuple of number, street, city, county,state, zip,
@@ -51,6 +61,8 @@ def districts_for_addresses(addressfile, district_json):
     with open(addressfile) as fp:
         for addrline in fp:
             addrline = addrline.strip()
+            print(".", end="")
+            sys.stdout.flush()
             try:
                 lat, lon = geocode(addrline)
             except:
@@ -73,6 +85,13 @@ def districts_for_addresses(addressfile, district_json):
             else:
                 constituents["unknown"].append(addrline)
 
+    return constituents
+
+
+if __name__ == '__main__':
+    constituents = districts_for_addresses(sys.argv[1], sys.argv[2])
+
+    print()
     for dist in sorted(constituents.keys(), key=district_sort_key):
         print("\nDistrict", dist)
         if constituents[dist]:
@@ -80,9 +99,3 @@ def districts_for_addresses(addressfile, district_json):
                 print("   ", addr)
         else:
             print("    No constituents")
-
-
-if __name__ == '__main__':
-    import sys
-
-    districts_for_addresses(sys.argv[1], sys.argv[2])
