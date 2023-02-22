@@ -24,61 +24,6 @@ def geocode(addr):
     return location[-1]
 
 
-def geocode_census(addr):
-    """Geocode a single address using the US Census API.
-       Returns a (lat, lon) pair, or None, None.
-       But the census API is extremely flaky and often fails,
-       so it's not reliable enough to use.
-    """
-    url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
-    url += '?benchmark=Public_AR_Current'
-    url += '&vintage=Current'
-    url += '&format=json'
-    url += '&address=' + quote_plus(addr)
-
-    # print("url:", url)
-    # print()
-
-    r = requests.get(url)
-    dataj = r.json()
-
-    if not dataj['result']['addressMatches']:
-        return None, None
-
-    firstmatch = dataj['result']['addressMatches'][0]
-
-    # Weirdly, they call the coordinates x and y, not longitude/latitude
-    return (float(firstmatch['coordinates']['y']),
-            float(firstmatch['coordinates']['x']))
-
-
-# The Census claims to offer batch geocoding, but apparently they
-# continually tweak that API, meaning that none of the examples
-# on the web or even the curl example in the official documentation
-# actually work any more.
-# So don't use this.
-def addresses_to_districts(addressfile):
-    """Input: a filename containing addresses in text format, one per line.
-       Output: a list of dictionaries of { "id": int, "addr": str,
-                                           "lat": float, "lon": float }
-    """
-    output = {}
-    url = 'https://geocoding.geo.census.gov/geocoder/locations/addressbatch'
-    # Get a list of vintages with:
-    # https://geocoding.geo.census.gov/geocoder/vintages?benchmark=Public_AR_Current
-    payload = { 'benchmark':'Public_AR_Current',
-                # 'vintage':'ACS2013_Current'
-               }
-    # files = { 'addressFile': open(addressfile, 'rb') }
-    if addressfile.endswith(".csv"):
-        mimetype = "text/csv"
-    else:
-        mimetype = "text/plain"
-    files = { 'addressFile': (addressfile, open(addressfile, 'rb'), mimetype)
-            }
-    r = requests.get(url, files=files, data=payload)
-
-
 def load_geojson(geojson_file):
     with open(geojson_file, 'rb') as fp:
         district_json = json.load(fp)
