@@ -68,7 +68,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     logfp = open(logfile, 'w')
-    print("mbsync daemon, ouput to %s" % logfile)
+    print("mbsync daemon, time %d, ouput to %s" % (secs, logfile))
 
     while True:
         subprocess.call(["date"], stdout=logfp, stderr=logfp)
