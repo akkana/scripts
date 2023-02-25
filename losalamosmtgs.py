@@ -25,10 +25,11 @@ from math import isclose
 
 # Try to use PyMuPDF if available.
 # For some inexplicable reason the package PyMuPDF is imported as "fitz".
-try:
-    import fitz
-except:
-    print("No PyMuPDF installed, using pdftohtml")
+# But the fitz code is currently not seeing links, so it doesn't work anyway.
+# try:
+#     import fitz
+# except:
+#     print("No PyMuPDF installed, using pdftohtml")
 
 
 ########## CONFIGURATION ##############
@@ -67,6 +68,14 @@ localtz = now.tzinfo
 # throws away any %Z info anyway rather than parsing it.
 # Better to get an error if we see any time that's not GMT.
 RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
+
+# Match the date format used in the tickler, e.g. Tue Feb 28
+TICKLER_HDR_DATE_PAT = re.compile("[MTWFS][a-z]{2} [A-Z][a-z]{2} [0-9]{1,2}")
+
+# Items are introduced with a "file number" which can help separate them
+# in what otherwise looks like a sea of text.
+FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
+
 
 # Where temp files will be created. pdftohtml can only write to a file.
 tempdir = tempfile.mkdtemp()
@@ -243,11 +252,13 @@ def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
         print("Using fitz")
         return html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename)
 
-    print("No fitz, using pdftohtml")
+    # print("No fitz, using pdftohtml")
     return html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename)
 
 
 def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
+    """Use fitz (mupdf's engine) to convert PDF to HTML, returned as a string.
+    """
     doc = fitz.open(agendaloc)
 
     def find_indent_levels(pdfdoc):
@@ -295,7 +306,7 @@ def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
         return group_clusters(indents, 10)
 
     indent_levels = find_indent_levels(doc)
-    print("Found indent levels:", indent_levels)
+    # print("Found indent levels:", indent_levels)
 
     html = """<html>
 <body>
@@ -324,7 +335,7 @@ def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
             # Then it's a header.
             # Decide which level of header to use based on content.
             if isclose(b[0], indent_levels[0], abs_tol=10):
-                print("HEADER:", b[4].replace('\n', ' '))
+                # print("HEADER:", b[4].replace('\n', ' '))
                 if re.match('[0-9]+\.\n', b[4]):
                     html += "<h1>%s</h1>\n<p>\n" % b[4]
                 elif re.match('[A-Z]+\.\n', b[4]):
@@ -333,38 +344,56 @@ def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
                     html += "<p>%s</p>" % b[4]
 
             elif isclose(b[0], indent_levels[1], abs_tol=10):
-                print("    ", b[4].replace('\n', ' '))
+                # print("    ", b[4].replace('\n', ' '))
                 html += "<br>\n%s\n" % b[4]
             else:
-                print("        OTHER INDENT:", b[4].replace('\n', ' '))
+                # print("        OTHER INDENT:", b[4].replace('\n', ' '))
                 html += "<br><blockquote>\n%s</blockquote>\n" % b[4]
 
     html += "</body></html>"
     return html
 
 
-def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename):
+def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename=None):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        then returned cleaned_up bytes (not str).
-       save_pdf_filename is for debugging: if set, save the PDF there
-       and don't delete it.
-       Returns bytes, not str.
+       save_pdf_filename is for debugging:
+       if set, save the PDF there and don't delete it.
+       Returns the HTML source as bytes, not str.
     """
+    if not save_pdf_filename:
+        save_pdf_filename = "/tmp/tmpagenda.pdf"
     if agendaloc.lower().startswith('http') and ':' in agendaloc:
         r = requests.get(agendaloc, timeout=30)
 
         with open(save_pdf_filename, "wb") as pdf_fp:
             pdf_fp.write(r.content)
         agendaloc = save_pdf_filename
+    elif ':' in agendaloc:
+        print("Don't understand location", agendaloc, file=sys.stderr)
+        return None
 
     htmlfile = save_pdf_filename + ".html"
     args = [ "pdftohtml", "-c", "-s", "-i", "-noframes",
              # "-enc", "utf-8",
-             save_pdf_filename, htmlfile ]
+             agendaloc, htmlfile ]
     print("Calling", ' '.join(args))
     subprocess.call(args)
 
     return clean_up_htmlfile(htmlfile, meetingtime)
+
+
+def highlight_filenumbers(soup):
+    for para in soup.find_all("p"):
+        # If it matches the FILENO_PAT, wrap a header around it
+        if FILENO_PAT.match(para.text.strip()):
+            # para.wrap(soup.new_tag("h3"))
+            para.name = "h3"
+            para["class"] = "highlight"
+
+    head = soup.head
+    head.append(soup.new_tag('style', type='text/css'))
+    head.style.append('.highlight { width: 100%; background-color: #7fb; }')
 
 
 def clean_up_htmlfile(htmlfile, meetingtime):
@@ -385,6 +414,12 @@ def clean_up_htmlfile(htmlfile, meetingtime):
     # Make some changes. Primarily,
     # replace the grey background that htmltotext wires in
     soup = BeautifulSoup(html_bytes, "lxml")
+
+    # The <style> tag just contains a long comment. No idea why it's there.
+    try:
+        soup.head.style.decompose()
+    except:
+        pass
 
     body = soup.body
 
@@ -469,6 +504,9 @@ def clean_up_htmlfile(htmlfile, meetingtime):
         # but we can change the tag name:
         bold.name = 'h2'
 
+    # Highlight all the file numbers, which helps separate items
+    highlight_filenumbers(soup)
+
     pretty_html_bytes = soup.prettify(encoding='utf-8')
 
     # Testing: maybe the above changes removed the body contents?
@@ -540,10 +578,75 @@ def join_consecutive_tags(soup, tagname, add_spaces=False):
             tag.decompose()
 
 
-VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
+def get_tickler(agenda_str, meetingtime, tickler_html_file):
+    """Does an agenda include a tickler?
+       Input can be either a filename or HTML source as a string or bytes.
+       If there's a tickler, return full path to the written tickler html,
+       else None.
+    """
+    if not agenda_str:
+        return None
 
-def clean_filename(badstr):
-    return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
+    soup = BeautifulSoup(agenda_str, "lxml")
+    if not soup:
+        print("rss_for_tickler: No soup", file=sys.stderr)
+        return None
+
+    # Does it have a tickler?
+
+    tickler_url = None
+    for a in soup.find_all("a"):
+        if "tickler" in a.text.lower():
+            tickler_url = a.get("href")
+            break
+    else:
+        # print("No tickler")
+        return None
+
+    # The tickler is another PDF file, natch. Convert it:
+    tickler_html = html_agenda_pdftohtml(tickler_url, meetingtime).decode()
+    soup = BeautifulSoup(tickler_html, "lxml")
+
+    # First give it a clear title. After html_agenda_pdf2html,
+    # there's an h3 at the beginning with the date of the tickler.
+    firstheader = soup.find('h3')
+    if firstheader:
+        headerchild = next(firstheader.children)
+        headertext = headerchild.strip()
+        if TICKLER_HDR_DATE_PAT.match(headertext):
+            firstheader.name = 'h1'
+            headerchild.replaceWith("Tickler, " + headertext)
+        else:
+            print("Didn't match, firstheader =", firstheader, file=sys.stderr)
+    else:
+        print("No h3 anywhere in tickler file", file=sys.stderr)
+
+    # The tickler html comes out with no structure at all; you can't even
+    # assume that each item has its own <b> tag.
+    # XXX Would be nice to separate the separate lines into separate
+    # <p>s and <b>s.
+    lines = []
+    for para in soup.find_all("p"):
+        lines = para.text.strip().splitlines()
+        if len(lines) > 1:
+            # Discussion of depth-first iteration:
+            # https://stackoverflow.com/q/4814317
+            # Get rid of some of the whitespace-only tags:
+            for i, p in enumerate(para.recursiveChildGenerator()):
+                if type(p) is NavigableString:
+                    if not p.text.strip():
+                        del p
+
+    highlight_filenumbers(soup)
+
+    pretty_html_bytes = soup.prettify(encoding='utf-8')
+    tickler_html_file = os.path.join(RSS_DIR, tickler_html_file)
+    with open(tickler_html_file, "wb") as fp:
+        fp.write(pretty_html_bytes)
+        # print("Wrote tickler to", tickler_html_file, file=sys.stderr)
+        os.system("ls -l " + tickler_html_file)
+
+    return tickler_html_file
 
 
 NO_AGENDA = b"No agenda available."
@@ -601,7 +704,47 @@ As of: {gendate}
 
 """, file=htmlfp)
 
+        agendafile = None
+        agenda_html = None
+        meetingtime = None
+
         for mtg in mtglist:
+            # Did the previous meeting have a tickler?
+            # Only applicable for County Council meetings
+            # agendafile = os.path.join(RSS_DIR, cleanname + ".html")
+            if agendafile and agenda_html and "CountyCouncil" in agendafile:
+                print("Just finished a council meeting, looking for a tickler",
+                      file=sys.stderr)
+                meetingtimestr = meetingtime.strftime("%Y-%m-%d")
+                tickler_filename = meetingtimestr + "-Tickler.html"
+                tickler_filepath = os.path.join(RSS_DIR, tickler_filename)
+                tickler_filepath = get_tickler(agenda_html, meetingtime,
+                                               tickler_filename)
+                desc = f"County Council Tickler for {meetingtimestr}"
+                lastmod = datetime.datetime.now()
+                guid = tickler_filename
+                url = f"{RSS_URL}{tickler_filename}"
+
+                # Add to the RSS
+                if tickler_filepath:
+                    active_meetings.append(tickler_filename)
+                    print(f"""<item>
+   <title>{desc}</title>
+   <guid isPermaLink="false">{guid}</guid>
+   <link>{url}</link>
+   <description><![CDATA[ {desc} ]]>
+   </description>
+   <pubDate>{lastmod}</pubDate>
+</item>""",
+                          file=rssfp)
+
+                    # Add to the HTML
+                    print(f"""<h2>{desc}</h2>
+<p>
+<a href="{tickler_filename}">{desc}</a>
+<p>(Last modified: {lastmod}.)
+""",
+                          file=htmlfp)
 
             # Is the meeting in the future? Don't list past meetings.
             meetingtime = meeting_datetime(mtg)
@@ -872,6 +1015,12 @@ As of: {gendate}
             os.unlink(os.path.join(RSS_DIR, f))
 
 
+VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
+
+def clean_filename(badstr):
+    return ''.join(c for c in badstr if c in VALID_FILENAME_CHARS)
+
+
 def mtgdic_to_cleanname(mtgdic):
     """A standard way to turn date and committee name into something
        that can be used for filenames or URLs.
@@ -886,13 +1035,12 @@ def mtgdic_to_cleanname(mtgdic):
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        RSS_URL = sys.argv[1]
+        RSS_DIR = sys.argv[1]
+
+        RSS_URL = sys.argv[2]
         # RSS_URL is a directory and must end with a slash
         if not RSS_URL.endswith('/'):
             RSS_URL += '/'
-
-        if len(sys.argv) > 2:
-            RSS_DIR = sys.argv[2]
 
     build_upcoming_meetings_list()
 
