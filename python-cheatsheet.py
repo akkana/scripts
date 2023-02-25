@@ -530,6 +530,11 @@ print(u'\N{snowman}'))
 import unicodedata
 print(unicodedata.name('\u03b1'))
 
+# Remove accented characters
+>>> accented = 'Eleanor Chávez'
+>>> unicodedata.normalize('NFD', accented).encode('ascii', 'ignore').decode('ascii')
+'Eleanor Chavez'
+
 # See also unidecode.py, e.g. for how to search in names.
 
 
@@ -597,6 +602,13 @@ mylist.pop(i)            # Removes and returns list[i]
 1
 >>> rest
 [2, 3, 4]
+
+# Get the next item in the middle of a loop:
+listiter = iter(mylist)
+for val in listiter:
+    if val == 42:
+        val = next(iter)
+        val = next(iter, None)  # to avoid a StopIteration exception
 
 # () turns a list comprehension into a generator:
 >>> ( i*2 for i in range(5) )
@@ -908,7 +920,7 @@ if (now - time_end).seconds < 7200:
     time_end = now - datetime.timedelta(seconds=7200)
 
 # Setting fixed parts of datetime
-dt.replace(hour=11, minute=59)
+dt = dt.replace(hour=11, minute=59)
 
 #
 # Add N months to a date: same day of month but next month.
@@ -1343,6 +1355,15 @@ for tag in invalid_tags:
     for match in soup.findAll(tag):
         match.replaceWithChildren()
 
+# Get first child
+next(tag.children)
+
+# Replace children (at least if they're NavigableString)
+headerchild.replaceWith("Tickler " + headertext)
+
+# Wrap a container around an existing node
+tag.wrap(soup.new_tag("b"))
+
 # Replace a tag with another tag:
 for b in soup.find_all('b'):
     b.name = 'strong'
@@ -1364,6 +1385,15 @@ b_tag = soup.new_tag("b")
 soup.body.insert(0, b_tag)
 btext = NavigableString("this is bold")
 b_tag.append(btext)
+
+# Add some style to an element or to the head:
+para["class"] = "fileno"
+head = soup.head
+head.append(soup.new_tag('style', type='text/css'))
+head.style.append('.someclass { background-color: #7fb; }')
+
+
+# Prettyprint output:
 
 
 ########################################################
@@ -1497,7 +1527,7 @@ else:
 os.getcwd()
 
 # Current URL
-url = os.environ["REQUEST_URI"] 
+url = os.environ["REQUEST_URI"]
 
 
 ###########################################################
@@ -2186,7 +2216,7 @@ PySonar: a type inferencer and indexer
 '''
 
 ################################################################
-# pip tios
+# pip tips
 ################################################################
 
 '''
@@ -2237,13 +2267,13 @@ option so you have to actually install the package to see the file list.
 # Virtualenv
 ################################################################
 
-'''Python2
-virtualenv ~/pythonenv/envname
-  (requires virtualenv and python-virtualenv)
-'''
 '''Python3
 python3 -m venv ~/pythonenv/envname
   (requires python3-venv)
+'''
+'''Python2
+virtualenv ~/pythonenv/envname
+  (requires virtualenv and python-virtualenv)
 '''
 
 '''
