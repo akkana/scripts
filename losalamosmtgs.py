@@ -229,10 +229,7 @@ def diffhtml(before_html, after_html, title=None):
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>%s</title>
-<style>
-ins { background: #9ff; }
-del { background: #fbb; }
-</style>
+<link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
 </head>
 
 <body>
@@ -396,6 +393,16 @@ def highlight_filenumbers(soup):
     head.style.append('.highlight { width: 100%; background-color: #7fb; }')
 
 
+def add_stylesheet(soup):
+    # link to the stylesheet:
+    csslink =  soup.new_tag("link")
+    csslink.attrs["rel"] = "stylesheet"
+    csslink.attrs["type"] = "text/css"
+    csslink.attrs["title"] = "Style"
+    csslink.attrs["href"] = "meetingstyle.css"
+    soup.head.insert(0, csslink)
+
+
 def clean_up_htmlfile(htmlfile, meetingtime):
     """Clean up the scary HTML written by pdftohtml,
        removing the idiotic dark grey background pdftohtml has hardcoded in,
@@ -477,7 +484,7 @@ def clean_up_htmlfile(htmlfile, meetingtime):
     # Do this while the p tags still have classes, so paragraphs of
     # different classes don't get merged.
     join_consecutive_tags(body, 'p')
-    # return soup.prettify(encoding='utf-8')
+
     join_consecutive_tags(body, 'i')
     join_consecutive_tags(body, 'b')
 
@@ -507,6 +514,7 @@ def clean_up_htmlfile(htmlfile, meetingtime):
     # Highlight all the file numbers, which helps separate items
     highlight_filenumbers(soup)
 
+    add_stylesheet(soup)
     pretty_html_bytes = soup.prettify(encoding='utf-8')
 
     # Testing: maybe the above changes removed the body contents?
@@ -589,7 +597,7 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
 
     soup = BeautifulSoup(agenda_str, "lxml")
     if not soup:
-        print("rss_for_tickler: No soup", file=sys.stderr)
+        print("get_tickler: No soup", file=sys.stderr)
         return None
 
     # Does it have a tickler?
@@ -617,7 +625,7 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
             firstheader.name = 'h1'
             headerchild.replaceWith("Tickler, " + headertext)
         else:
-            print("Didn't match, firstheader =", firstheader, file=sys.stderr)
+            print("firstheader didn't match:", firstheader, file=sys.stderr)
     else:
         print("No h3 anywhere in tickler file", file=sys.stderr)
 
@@ -634,11 +642,12 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
             # Get rid of some of the whitespace-only tags:
             for i, p in enumerate(para.recursiveChildGenerator()):
                 if type(p) is NavigableString:
-                    if not p.text.strip():
+                    if not p.strip():
                         del p
 
     highlight_filenumbers(soup)
 
+    add_stylesheet(soup)
     pretty_html_bytes = soup.prettify(encoding='utf-8')
     tickler_html_file = os.path.join(RSS_DIR, tickler_html_file)
     with open(tickler_html_file, "wb") as fp:
@@ -695,6 +704,7 @@ def write_rss20_file(mtglist):
   <link rel="alternate" type="application/rss+xml"
         title="Los Alamos Meetings Feed"
         href="{RSS_URL}index.rss" />
+  <link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
 </head>
 <body>
 <h1>Los Alamos County Government Meetings</h1>
