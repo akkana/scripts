@@ -310,10 +310,10 @@ def view_html_message(f, tmpdir):
         # So check whether we have to uniquify the names.
         if filename in filenames:
             orig_basename, orig_ext = os.path.splitext(filename)
-            counter = 0
+            dedup_counter = 0
             while filename in filenames:
-                counter += 1
-                filename = "%s-%d%s" % (orig_basename, counter, orig_ext)
+                dedup_counter += 1
+                filename = "%s-%d%s" % (orig_basename, dedup_counter, orig_ext)
 
         filenames.add(filename)
 
