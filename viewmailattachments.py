@@ -454,6 +454,9 @@ def view_html_message(f, tmpdir):
                 print("Calling", IMAGE_VIEWER, "on", image_files)
             cmd = [ IMAGE_VIEWER ] + IMAGE_VIEWER_ARGS + image_files
             mysubprocess.call_bg(cmd)
+        else:
+            for img in image_files:
+                call_some_browser(img)
 
 
 # For debugging:
