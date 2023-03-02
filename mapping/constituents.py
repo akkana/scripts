@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 
-import requests
 from collections import defaultdict
 from urllib.parse import urlencode, quote_plus
 import json
 from shapely.geometry import Point, Polygon
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
-import sys
+import sys, os
 
 
 Geolocator = Nominatim(user_agent="constituents")
@@ -17,21 +16,45 @@ Geolocator = Nominatim(user_agent="constituents")
 # (They don't always enforce this, but be nice and follow the guidelines!)
 Geocode = RateLimiter(Geolocator.geocode, min_delay_seconds=1)
 print("Geolocation courtesy of OpenStreetMap/Nominatim")
-print("Warning: rate limiting to 1 address per second.")
+print("Warning: rate limiting new addresses to 1 per second.")
 print("For faster bulk queries, consider using OpenMapQuest or PickPoint")
 print("(see https://geopy.readthedocs.io/en/latest/#geopy-is-not-a-service)")
+print()
+
+# Nominatim also requires local caching.
+# Would be nice to cache to a permanent place, but for now, just /tmp.
+CACHEFILE = "/tmp/constituents-cache.json"
+
+Cachedata = {}
+if os.path.exists(CACHEFILE):
+    try:
+        with open(CACHEFILE) as fp:
+            Cachedata = json.load(fp)
+            print("Read cached data from", CACHEFILE)
+    except:
+        print("Couldn't read JSON from cache file", CACHEFILE)
 
 
 def geocode(addr):
     """Geocode a single address using GeoPY/Nominatim.
        Returns a (lat, lon) pair, or None, None.
     """
+    if addr in Cachedata:
+        # print(addr, "was cached: returning", Cachedata[addr])
+        return Cachedata[addr]
+
+    print(".", end="")
+    sys.stdout.flush()
+
     location = Geocode(addr)
     if not location:
-        return None, None
+        Cachedata[addr] = (None, None)
+        return Cachedata[addr]
+
     # Nominatim returns a tuple of number, street, city, county,state, zip,
     # (lat, lon)
-    return location[-1]
+    Cachedata[addr] = location[-1]
+    return Cachedata[addr]
 
 
 def load_geojson(geojson_file):
@@ -61,8 +84,6 @@ def districts_for_addresses(addressfile, district_json):
     with open(addressfile) as fp:
         for addrline in fp:
             addrline = addrline.strip()
-            print(".", end="")
-            sys.stdout.flush()
             try:
                 lat, lon = geocode(addrline)
             except:
@@ -85,6 +106,8 @@ def districts_for_addresses(addressfile, district_json):
             else:
                 constituents["unknown"].append(addrline)
 
+    with open(CACHEFILE, 'w') as fp:
+        json.dump(Cachedata, fp, indent=2)
     return constituents
 
 

@@ -543,6 +543,12 @@ speedtestserver:
     not very useful except as an illustration of how to make
     a mini server in Python. Use delaytest.cgi for actual testing.
 
+strongpasswd.py:
+    Generate a strong random password.
+    Firefox's is useless because it doesn't include punctuation
+    (see bug 1559986), while password managers tend to assume a wider
+    set of punctuation than most real websites allow.
+
 tee.py:
     A file-like class that can optionally send output to a log file.
 
