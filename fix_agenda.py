@@ -33,6 +33,8 @@ import subprocess
 # uno_env['HOME'] = '/tmp'
 # uno_env["UNOPATH"] ="/usr/bin/libreoffice"
 
+VERBOSE = True
+
 
 def fix_agenda(agenda_infile):
     # Convert agenda_infile to absolute path
@@ -112,14 +114,17 @@ def fix_agenda(agenda_infile):
             em.extract()
             continue
 
+        if VERBOSE:
+            print("\n===", em_text)
+
         # Strip off any extension, if any.
         # But this doesn't work because there might be dots in the filename,
         # e.g. 10.1_CNM_Report_03.2021
         # em_text, fileext = os.path.splitext(em_text)
 
         # Find the original file.
-        # Can't just search for em_text in origbases, because
-        # non-technical users seem incapable of understanding
+        # Can't just search for em_text in origbases,
+        # because non-technical users don't seem to grok
         # "put the filename in the agenda", and will instead put
         # something that vaguely resembles the filename, e.g.
         # the agenda might have "Budget proposal FY 21-23" where
@@ -144,8 +149,17 @@ def fix_agenda(agenda_infile):
                 return best_match
             return -1
 
+        def replace_em(href):
+            nonlocal em, em_text
+            a = soup.new_tag("a", href=href, target="_blank")
+            a.string = em_text
+            em.contents[0].replace_with(a)
+            em_text = None
+
         index = fuzzy_search(em_text, origbases)
-        if index < 0:    # No fuzzy match
+        htmlindex = fuzzy_search(em_text, htmlbases)
+
+        if index < 0 and htmlindex < 0:    # No fuzzy match
             print("Couldn't find a match for", em_text)
             nosuchfiles.append(em_text)
             continue
@@ -153,22 +167,45 @@ def fix_agenda(agenda_infile):
         # Found a match by searching origbases, returning index.
         # So the actal original file is origfiles[index].
 
-        origfile = origfiles[index]
-        origbase, ext = os.path.splitext(origfile)
+        if index >= 0:
+            origfile = origfiles[index]
+            origbase, ext = os.path.splitext(origfile)
 
+        # Is there already an HTML file matching this em?
+        if htmlindex >= 0:
+            orightml = htmlfiles[htmlindex]
+
+            # an original HTML file, or one already converted from Word?
+            if index >= 0:
+                if VERBOSE:
+                    print("  There's both Word and HTML for", origbase)
+                try:
+                    orig_mtime = os.stat("orig/" + origfile).st_mtime
+                    html_mtime = os.stat("html/" + orightml).st_mtime
+                    if orig_mtime <= html_mtime:
+                        replace_em("html/" + orightml)
+                        already_converted.append(origfile)
+                        print("  ... The HTML was newer")
+                        continue
+                    else:
+                        print("  Replacement Word file, re-converting")
+                except Exception as e:
+                    print("Couldn't get mtime:", e)
+
+            # No Word file, it's just an HTML file that stands by itself
+            else:
+                print("standalone html file", orightml)
+                replace_em("html/" + orightml)
+                already_converted.append(orightml)
+                continue
+
+        # Okay, the original file isn't HTML. Is it Word?
         if ext == ".docx" or ext == ".doc":
             infile = os.path.join(origdir, origfile)
             htmlfile = origbase + ".html"
             outfile = os.path.join(htmldir, htmlfile)
 
-            # Is there already an html file?
-
-            # Maybe it's already been converted in an earlier run
-            if os.path.exists(outfile):
-                already_converted.append(origfile)
-                # print(outfile, "was already converted")
-
-            elif origbase.startswith('1') and "Agenda" in origbase:
+            if origbase.startswith('1') and "Agenda" in origbase:
                 # When converting the agenda, use mammoth because
                 # there won't be colors (that we care about, anyway)
                 # and it's sometimes handy to be able to edit the
@@ -201,10 +238,7 @@ def fix_agenda(agenda_infile):
 
             if os.path.exists(outfile):
                 htmlfile = "html/" + htmlfile
-                a = soup.new_tag("a", href=htmlfile, target="_blank")
-                a.string = em_text
-                em.contents[0].replace_with(a)
-                em_text = None
+                replace_em(htmlfile)
                 # Don't add to htmlfiles, should be already there
 
                 # Add a parenthesizedlink to the original document.
@@ -219,12 +253,11 @@ def fix_agenda(agenda_infile):
                 em.append(NavigableString(")"))
 
         else:
+            if VERBOSE:
+                print("Not word or html:", origfile)
             cantconvert.append(origfile)
             linkfile = "orig/" + origfile
-            a = soup.new_tag("a", href=linkfile, target="_blank")
-            a.string = em_text
-            em.contents[0].replace_with(a)
-            em_text = None
+            replace_em(linkfile)
 
     # Make sure all the originals are readable -- mutt insists on
     # saving all attachments as mode 600.
