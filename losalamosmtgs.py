@@ -72,6 +72,9 @@ RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
 # Match the date format used in the tickler, e.g. Tue Feb 28
 TICKLER_HDR_DATE_PAT = re.compile("[MTWFS][a-z]{2} [A-Z][a-z]{2} [0-9]{1,2}")
 
+# Match the predicted agenda dates in the tickler, e.g. Agenda Date: 03/14/2023
+TICKLER_AGENDA_DATE_PAT = re.compile("^Agenda Date: [0-9]+/[0-9]+/[0-9]+")
+
 # Items are introduced with a "file number" which can help separate them
 # in what otherwise looks like a sea of text.
 FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
@@ -382,9 +385,17 @@ def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename=None):
 
 def highlight_filenumbers(soup):
     for para in soup.find_all("p"):
+        paratext = para.text.strip()
+
+        # Upcoming agenda dates should be headers
+        if TICKLER_AGENDA_DATE_PAT.match(paratext):
+            # newhdr = soup.new_tag("h2")
+            # para.wrap(newhdr)
+            para.name = "h2"
+            para["class"] = "highlight"
+
         # If it matches the FILENO_PAT, wrap a header around it
-        if FILENO_PAT.match(para.text.strip()):
-            # para.wrap(soup.new_tag("h3"))
+        elif FILENO_PAT.match(paratext):
             para.name = "h3"
             para["class"] = "highlight"
 
