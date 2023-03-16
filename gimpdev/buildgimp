@@ -107,11 +107,15 @@ meson-build() {
 
     # Sometimes the meson command fails, but meson reconfigure works.
     # I'm not sure what the difference is.
-    if [ -e build.ninja ]; then
-        meson reconfigure
-    else
+    # But as of 2023-03-14, reconfigure creates something that ninja
+    # can't build, so don't do it.
+    # Though apparently meson setup -D... now does what reconfigure did.
+    # if [ -e build.ninja ]; then
+    #     echo "There's a build.ninja; Running meson reconfigure"
+    #     meson -Dprefix=$PREFIX --libdir=lib $MESONSRC reconfigure
+    # else
         meson -Dprefix=$PREFIX --libdir=lib $MESONSRC
-    fi
+    # fi
 
     ninja && \
     ninja install && \
@@ -267,7 +271,7 @@ cd gimp
 # pull, but don't merge, all branches
 curbranch=$(git status | grep "On branch" | awk '{print $3}')
 
-if [[ x"$curbranch" != 'master' ]]; then
+if [[ x"$curbranch" != x'master' ]]; then
     echo "Rebasing master to $curbranch"
     pullstatus=$(git fetch)
     git rebase origin/master
