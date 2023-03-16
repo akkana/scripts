@@ -548,6 +548,7 @@ strongpasswd.py:
     Firefox's is useless because it doesn't include punctuation
     (see bug 1559986), while password managers tend to assume a wider
     set of punctuation than most real websites allow.
+    (On Linux, you can do this with pwgen or goxkcdpwgen.)
 
 tee.py:
     A file-like class that can optionally send output to a log file.
