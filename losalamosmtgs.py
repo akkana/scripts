@@ -25,11 +25,10 @@ from math import isclose
 
 # Try to use PyMuPDF if available.
 # For some inexplicable reason the package PyMuPDF is imported as "fitz".
-# But the fitz code is currently not seeing links, so it doesn't work anyway.
-# try:
-#     import fitz
-# except:
-#     print("No PyMuPDF installed, using pdftohtml")
+try:
+    import fitz
+except:
+    print("No PyMuPDF installed, using pdftohtml")
 
 
 ########## CONFIGURATION ##############
@@ -48,6 +47,16 @@ if not os.path.exists(RSS_DIR):
     os.makedirs(RSS_DIR)
 
 ######## END CONFIGURATION ############
+
+###### constants used by html_agenda_fitz ########
+# Range where the left margin will normally be for headers
+HEADER_COL = (50, 65)
+
+NUMBER_HEADER_RE = re.compile('^[0-9]+\.\n[A-Z0-9]')
+# Letter headers are sometimes like 6.A. and sometimes just A.
+LETTER_HEADER_RE = re.compile('^[0-9\.]*[A-Z]+\.\n[A-Z0-9]')
+SUBNUM_HEADER_RE = re.compile('^[0-9]+\)\n[A-Z0-9]')
+######## END fitz configuration ############
 
 
 # Needed to deal with meetings that don't list a time:
@@ -77,7 +86,10 @@ TICKLER_AGENDA_DATE_PAT = re.compile("^Agenda Date: [0-9]+/[0-9]+/[0-9]+")
 
 # Items are introduced with a "file number" which can help separate them
 # in what otherwise looks like a sea of text.
-FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
+# With fitz, the succeeding characters may include newlines,
+# so it needs DOTALL.
+# FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
+FILENO_PAT = re.compile('([A-Z0-9]{2,}-[A-Z0-9]{2,})\s*(.*)$', flags=re.DOTALL)
 
 
 # Where temp files will be created. pdftohtml can only write to a file.
@@ -248,107 +260,125 @@ def diffhtml(before_html, after_html, title=None):
 
 
 def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
+    """Convert a PDF agenda from legistar,
+       returning an HTML str (fitz) or bytes (pdftohtml).
+    """
     if 'fitz' in sys.modules:
         print("Using fitz")
         return html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename)
 
-    # print("No fitz, using pdftohtml")
+    print("No fitz, using pdftohtml")
     return html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename)
 
 
 def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
     """Use fitz (mupdf's engine) to convert PDF to HTML, returned as a string.
     """
-    doc = fitz.open(agendaloc)
+    if not save_pdf_filename:
+        save_pdf_filename = "/tmp/tmpagenda.pdf"
+    if agendaloc.lower().startswith('http') and ':' in agendaloc:
+        r = requests.get(agendaloc, timeout=30)
 
-    def find_indent_levels(pdfdoc):
-        indents = []
-        for page in pdfdoc.pages():
-            for block in page.get_text("blocks"):
-                indent = round(block[0])
-                if indent not in indents:
-                    indents.append(indent)
-        indents.sort()
+        with open(save_pdf_filename, "wb") as pdf_fp:
+            pdf_fp.write(r.content)
+        agendaloc = save_pdf_filename
+    elif agendaloc.startswith("file://"):
+        agendaloc = agendaloc[7:]
+    elif ':' in agendaloc:
+        print("Don't understand location", agendaloc, file=sys.stderr)
+        return None
+    # Now agendaloc should be a filename
 
-        def group_clusters(lis, max_sep):
-            """Reduce a list of numbers removing numbers that are
-               close to each other.
-               E.g. [1, 2, 3, 44, 46] -> [2, 45].
-               lis is a sorted list of numbers.
-               max_sep is the maximum separation allowed.
-            """
-            # clusters is a list of [ (low, high) ]
-            clusters = []
-            def add_to_clusters(l):
-                for c in clusters:
-                    if l >= c[0] and l <= c[1]:
-                        # the value is already represented by this cluster
-                        return
-                    # Okay, l is outside this cluster. But is it close?
-                    # On the low end?
-                    if l <= c[1] and l >= c[1] - max_sep:
-                        c[0] = l
-                        return
-                    # Or on the high end?
-                    if l >= c[0] and l <= c[0] + max_sep:
-                        c[1] = l
-                        return
-                # It's outside all of the known ranges.
-                # Add a new range.
-                clusters.append([l, l])
+    def get_link(block, links):
+        """Is there a link over this text block? If so, return the URL,
+           else None.
 
-            for l in lis:
-                add_to_clusters(l)
+           The rect for a link will typically be a little bigger than the
+           rect for the corresponding block.
+        """
+        for l in links:
+            # Find the overlap area between the two rectangles, block and link.
+            dx = min(block[2], l['from'].x1) - max (block[0], l['from'].x0)
+            dy = min(block[3], l['from'].y1) - max (block[1], l['from'].y0)
+            if (dx > 0) and (dy > 0):
+                return l['uri']
+        return None
 
-            # Now clusters is a list of ranges. Take the average of each.
-            return [ int((c[0] + c[1])/2.) for c in clusters ]
 
-        return group_clusters(indents, 10)
-
-    indent_levels = find_indent_levels(doc)
-    # print("Found indent levels:", indent_levels)
-
-    html = """<html>
+    html = """<head>
+<link href="meetingstyle.css" rel="stylesheet" title="Style" type="text/css"/>
+</head>
 <body>
-<h3>%s</h3>
-""" % (meetingtime.strftime("%a %y-%m-%d"))
-    for page in doc.pages():
-        # blocks are like paragraphs in a normal PDF. Here, ??
-        # block is supposedly a tuple,
-        #   (x0, y0, x1, y1, "lines in block", block_type, block_no)
-        # according to https://pymupdf.readthedocs.io/en/latest/app2.html
-        # but I think the last two are reversed, it's really no, type.
-        # flags=0 disables images, but might also disable other
-        # desirable things, so watch out.
-        # https://pymupdf.readthedocs.io/en/latest/app2.html#text-extraction-flags
-        # values include TEXT_PRESERVE_IMAGES, TEXT_PRESERVE_LIGATURES,
-        # TEXT_PRESERVE_SPANS, TEXT_PRESERVE_WHITESPACE.
-        blocks = page.get_text("blocks", flags=0)
+"""
+    with fitz.open(agendaloc) as doc:
+        started = False
+        for page in doc:
+            links = page.get_links()
 
-        for b in blocks:
-            # This clause isn't needed if TEXT_PRESERVE_IMAGES isn't set.
-            # if b[4].startswith("<image:"):
-            #     print("Skipping an image")
-            #     continue
+            # wlist = page.get_text("words")
+            # This is a list of tuples:
+            # (x0, y0, x1, y1, "word", block_no, line_no, word_no)
 
-            # Is the indent close to the minimum indent?
-            # Then it's a header.
-            # Decide which level of header to use based on content.
-            if isclose(b[0], indent_levels[0], abs_tol=10):
-                # print("HEADER:", b[4].replace('\n', ' '))
-                if re.match('[0-9]+\.\n', b[4]):
-                    html += "<h1>%s</h1>\n<p>\n" % b[4]
-                elif re.match('[A-Z]+\.\n', b[4]):
-                    html += "<h2>%s</h2>\n<p>\n" % b[4]
+            blocks = page.get_text("blocks", sort=True)
+            # This is a list of tuples:
+            # (x0, y0, x1, y1, "lines in the block", block_no, block_type)
+            # To get font info as well, use
+            # page.get_text("dict", flags=11)["blocks"]
+            # which is much more granular
+
+            for block in blocks:
+                blocktext = block[4].strip()
+
+                if blocktext.startswith("<image:"):
+                    continue
+
+                link = get_link(block, links)
+                if not link and blocktext.startswith("https://"):
+                    link = blocktext
+
+                # Look for headers
+                if block[0] >= HEADER_COL[0] and block[0] <= HEADER_COL[1]:
+                    if NUMBER_HEADER_RE.match(blocktext):
+                        if not started and blocktext.startswith("1.\n"):
+                            started = True
+                        blocktext = blocktext.replace('\n', ' ')
+                        html += f'<h2 class="highlight">{blocktext}</h2>'
+
+                    elif LETTER_HEADER_RE.match(blocktext):
+                        # Letter headers are generally something like
+                        # A.\n17018-23\nblah blah blah blah
+                        # where there's typically a link over the code (#1).
+                        # The blah blah blah may be separated into many lines,
+                        # in which case they should be rejoined.
+                        # However, in some cases there's just a letter+title
+                        # and no link: E. Council Chair Report
+                        parts = blocktext.splitlines()
+                        if link:
+                            html += f'<h3 class="highlight">{parts[0]} <a href="{link}">{parts[1]}</a></h3>'
+                        else:
+                            html += f'<h3 class="highlight">{parts[0]} {parts[1]}</h3>'
+                        if len(parts) > 2:
+                            html += "<p>\n" + ' '.join(parts[2:])
+
+                    elif link:
+                        html += f'<p><a href="{link}">{blocktext}</a>'
+                    else:
+                        html += "<p>\n" + blocktext.replace('\n', ' ')
+
                 else:
-                    html += "<p>%s</p>" % b[4]
-
-            elif isclose(b[0], indent_levels[1], abs_tol=10):
-                # print("    ", b[4].replace('\n', ' '))
-                html += "<br>\n%s\n" % b[4]
-            else:
-                # print("        OTHER INDENT:", b[4].replace('\n', ' '))
-                html += "<br><blockquote>\n%s</blockquote>\n" % b[4]
+                    # Something not starting at the left margin.
+                    # But it might still have a link, or start with
+                    # the FILENO_PAT.
+                    m = FILENO_PAT.match(blocktext)
+                    if m:
+                        if link:
+                            html += f'<h3 class="highlight"><a href="{link}">{m.group(1)}</a> {m.group(2)}</h3>'
+                        else:
+                            html += f'<h3 class="highlight">{blocktext}</h3>'
+                    elif link:
+                        html += f'<p><a href="{link}">{blocktext}</a>'
+                    else:
+                        html += "<p>\n" + blocktext
 
     html += "</body></html>"
     return html
@@ -887,8 +917,16 @@ As of: {gendate}
 
             # Write the agenda file if it's changed:
             if write_agenda_file:
-                with open(agendafile, 'wb') as outfp:
-                    outfp.write(agenda_html)
+                if type(agenda_html) is bytes:
+                    with open(agendafile, 'wb') as outfp:
+                        outfp.write(agenda_html)
+                elif type(agenda_html) is str:
+                    with open(agendafile, 'w') as outfp:
+                        outfp.write(agenda_html)
+                else:
+                    print("Internal error: agenda_html is type",
+                          type(agenda_html), file=sys.stderr)
+                    continue
 
             # Either way, this meeting is still listed:
             # note it so it won't be cleaned from the directory.
