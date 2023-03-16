@@ -46,9 +46,9 @@ class TestSampleMessage(unittest.TestCase):
 
         viewhtmlmail.view_html_message("test/files/htmlmail.eml", tmpdir)
 
-        print("Check to make sure the message window looks right")
+        print("***** Check to make sure the message window looks right")
 
-        htmlfile = os.path.join(tmpdir, "viewhtml.html")
+        htmlfile = os.path.join(tmpdir, "viewhtml00.html")
         self.assertTrue(os.path.exists(htmlfile))
         self.assertEqual(md5sum(htmlfile), "b15a4e42651073042ec01940a1eaed75")
 

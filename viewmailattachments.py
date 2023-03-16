@@ -42,8 +42,8 @@ DEBUG = False
 # If IMAGE_VIEWER is set, a message that has no multipart/related
 # images will use the image viewer rather than a browser window
 # for images. To use a browser, set IMAGE_VIEWER = None.
-IMAGE_VIEWER = "pho"
-# IMAGE_VIEWER = None
+# IMAGE_VIEWER = "pho"
+IMAGE_VIEWER = None
 IMAGE_VIEWER_ARGS = ["-P"]   # For pho, don't use presentation mode
 
 USE_WVHTML_FOR_DOC = False
