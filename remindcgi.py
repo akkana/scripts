@@ -2,15 +2,57 @@
 
 """CGI script to run /usr/bin/remind and output as HTML"""
 
-import cgi
+# This is a way to make a Unix remind file available both locally
+# on the command line, and on the web, so you can check your schedule
+# from a browser if you prefer not to share your entire schedule
+# with companies like Google or Apple.
+#
+# Looks for a remind.txt in the same directory as the script.
+
+# Usage:
+#
+# Local use:
+#    ln -s /path/to/remindcgi.py ~/bin/reminders
+#    reminders [week|month|remind]
+#
+# Web use:
+#    On web server:
+#        mkdir [webroot]/remind
+#        cp /path/to/remindcgi.py [webroot]/remind/index.cgi
+#            (or use your server's cgi-bin dir, if you prefer)
+#        cp /path/to/your-remind-file [webroot]/remind/remind.txt
+#        Now you can access https://your.doma.in/cal/
+#                           https://your.doma.in/cal/?when=month
+#
+#    Optionally, maintain the remind file on your desktop/laptop machine
+#    and set up a crontab:
+#    15 * * * * rsync -rL /path/to/remindfile webserver:web/cal/
+
+# Why use the archaic Unix remind rather than inventing a simpler format?
+# Because remind already handles weird cases like repeating events,
+# advance warnings, Easter, etc. and I don't want to reinvent all that.
+
+# Copyright 2022-2023 by Akkana Peck; share and enjoy under the GPL2 or later.
+
+
 import subprocess
 import re
 import os, sys
 from datetime import date, datetime, timedelta, MAXYEAR
 
+# Don't print the warning about cgi being deprecated.
+# My understanding is that it will still be available,
+# it just won't be in the stdlib.
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+import cgi
 
-today = date.today()
 
+TODAY = date.today()
+
+REMINDDIR = "."
+
+# CSS: respect dark/light scheme preferences
 css = '''@media (prefers-color-scheme: dark) {
   * { background: black; color: white; }
   a:link { color: #ffff00; }
@@ -72,8 +114,6 @@ class ColorFormat:
 
 
 class TextFormatter:
-    REMINDDIR = os.path.expanduser("~/web/cal/")
-
     @staticmethod
     def linkify(word):
         return "%s%s%s%s%s" % (ColorFormat.F_Blue, ColorFormat.Italic,
@@ -118,8 +158,6 @@ class TextFormatter:
 
 
 class HTMLFormatter:
-    REMINDDIR = os.getcwd()
-
     @staticmethod
     def linkify(line):
         line = line.strip()
@@ -155,16 +193,23 @@ class HTMLFormatter:
         # print("SERVER_NAME:", os.environ["SERVER_NAME"], file=sys.stderr)
         # print("REQUEST_URI:", os.environ["REQUEST_URI"], file=sys.stderr)
 
-        fullurl = f'{os.environ["REQUEST_SCHEME"]}://' \
-            f'{os.environ["SERVER_NAME"]}' \
-            f'{os.environ["REQUEST_URI"]}'
+        # REQUEST_SCHEME may not be available, in testcgi mode.
+        if "REQUEST_SCHEME" in os.environ:
+            fullurl = f'{os.environ["REQUEST_SCHEME"]}://' \
+                f'{os.environ["SERVER_NAME"]}' \
+                f'{os.environ["REQUEST_URI"]}'
 
-        # Strip off the query string. urlparse or urlsplit from urllib.parse
-        # seem like they ought to be the way to do that, except that they
-        # give path='//cal/' so you have to do string manipulation anyway
-        # to fix that. Seems like urllib.parse is more trouble than it's worth.
-        baseurl = fullurl.split('?')[0]
-        # print("baseurl:", baseurl, file=sys.stderr)
+            # Strip off the query string. urlparse or urlsplit from urllib.parse
+            # seem like they ought to be the way to do that, except that they
+            # give path='//cal/' so you have to do string manipulation anyway
+            # to fix that. Seems like urllib.parse is more trouble than it's worth.
+            baseurl = fullurl.split('?')[0]
+            # print("baseurl:", baseurl, file=sys.stderr)
+
+        else:
+            print("No REQUEST_SCHEME in environment")
+            fullurl = "FULLURL"
+            baseurl = "BASEURL"
 
         print(f'''Content-type: text/html
 
@@ -207,11 +252,14 @@ class HTMLFormatter:
 link_re = re.compile(r'((https?|ftp|file)://[\S]+)', flags=re.IGNORECASE)
 
 def linkify_line(line, formatter):
+    """Linkify, using the given formatter, anything inside the line
+       that looks like a link.
+    """
     links = re.findall(link_re, line)
-    # print("\n======== line:", line)
-    # print("links:", links)
+    # print("\n======== line:", line, file=sys.stderr)
+    # print("links:", links, file=sys.stderr)
     if not links:
-        # print("  No links in line")
+        # print("  No links in line", file=sys.stderr)
         return line
     linkified_string = ''
     for link in links:
@@ -259,7 +307,7 @@ def print_remind_for_interval(enddate, formatter):
        That means everything except that for repeating events, only the
        first instance will be printed.
     """
-    with open(os.path.join(formatter.REMINDDIR, "remind.txt"), 'rb') as infp:
+    with open(os.path.join(REMINDDIR, "remind.txt"), 'rb') as infp:
         remindin = infp.read()
 
     # Replace any %x directives that are by themselves as words
@@ -374,7 +422,7 @@ def print_reminders(formatter):
        and things that have a +N reminder window set up.
     """
     remindout = subprocess.check_output(["/usr/bin/remind", "-g",
-                                         os.path.join(formatter.REMINDDIR,
+                                         os.path.join(REMINDDIR,
                                                       "remind.txt")])
     remindout = remindout.decode().replace("||", "\n")
 
@@ -384,8 +432,10 @@ def print_reminders(formatter):
         if not line:
             new_event = True
             continue
-        line = formatter.linkify(line)
-        if new_event:
+        line = linkify_line(line, formatter)
+        if line.startswith("Reminders for"):
+            print(formatter.header(line))
+        elif new_event:
             print(formatter.eventbreak(), formatter.highlight(line))
         else:
             print(line, formatter.linebreak())
@@ -395,6 +445,8 @@ def print_reminders(formatter):
 
 
 if __name__ == '__main__':
+
+    REMINDDIR = os.path.dirname(__file__)
 
     if 'REQUEST_METHOD' in os.environ:
         formatter = HTMLFormatter()
@@ -406,12 +458,16 @@ if __name__ == '__main__':
         else:
             when = None
     else:
+        if len(sys.argv) > 1 and sys.argv[1] == "--testcgi":
+            sys.argv = sys.argv[1:]
+            formatter = HTMLFormatter()
+        else:
+            formatter = TextFormatter()
+
         if len(sys.argv) <= 1:
             when = None
         else:
             when = sys.argv[1].lower()
-
-        formatter = TextFormatter()
 
     if not when:
         when = "week"
@@ -421,25 +477,28 @@ if __name__ == '__main__':
         enddate = date(MAXYEAR, 12, 31)
     elif when == "week":
         formatter.print_head("Upcoming Week")
-        enddate = today + timedelta(days=7)
+        enddate = TODAY + timedelta(days=7)
     elif when == "month":
         formatter.print_head("Upcoming Month")
-        enddate = today + timedelta(days=31)
+        enddate = TODAY + timedelta(days=31)
     elif when == "remind":
         formatter.print_head("Reminders")
     else:
         # Show everything
-        print(f"<p>\nDon't understand when '{when}';",
-              "showing all events", file=sys.stderr)
-        print("Usage: %s [week|month|remind]"
+        if when != "-h" and when != "--help":
+            print(f"<p>\nDon't understand when '{when}'", file=sys.stderr)
+        print("Usage: %s [--testcgi] [week|month|remind]"
               % os.path.basename(sys.argv[0]))
         sys.exit(0)
 
-    print("Today is", today.strftime("%A, %B %-d"))
+    print("Today is", TODAY.strftime("%A, %B %-d"))
     print(formatter.linebreak())
 
-    if when == "remind":
-        print_reminders(formatter)
-    else:
+    if when != "remind":
         print_remind_for_interval(enddate, formatter)
+
+        formatter.header("Reminders:")
+
+    # Show reminders regardless
+    print_reminders(formatter)
 
