@@ -52,6 +52,9 @@ getattr(os, 'get_terminal_size', "Doesn't exist")
 if 'myVar' in locals():
 if 'myVar' in globals():
 
+# Where is this script located?
+__file__
+
 # ChainMap looks something up in a series of dict-like variables:
 pylookup = ChainMap(locals(), globals(), vars(builtins))
 
