@@ -87,7 +87,7 @@ BROWSERS = OrderedDict([
     }),
 
     ('firefox', {
-        'ARGS_FIRST': [ "--new-tab" ],
+        'ARGS_FIRST': [ "--new-tab", "--private-window" ],
         'ARGS': [  "--private-window" ],
         'BACKGROUND': True,
         'CONVERT_PDF_TO_HTML': False,
@@ -104,12 +104,10 @@ def run_browser(browser, htmlfile):
     """Call a specific browser with the appropriate arguments.
        May raise various errors.
     """
-    global first_browser
     cmd = [ browser ]
 
     if first_browser:
         cmd += BROWSERS[browser]['ARGS_FIRST']
-        first_browser = False
     else:
         cmd += BROWSERS[browser]['ARGS']
 
@@ -122,6 +120,7 @@ def run_browser(browser, htmlfile):
 def call_some_browser(htmlfile):
     """Try the list of browsers to find which one works."""
     global WORKING_BROWSER
+    global first_browser
     errstr = ""
 
     if DEBUG:
@@ -136,6 +135,7 @@ def call_some_browser(htmlfile):
             run_browser(b, htmlfile)
             # If it worked, break out of the loop
             WORKING_BROWSER = b
+            first_browser = False
             break
         except Exception as e:
             thiserr = "\n**** Couldn't run %s! %s" % (b, e)
@@ -310,10 +310,10 @@ def view_html_message(f, tmpdir):
         # So check whether we have to uniquify the names.
         if filename in filenames:
             orig_basename, orig_ext = os.path.splitext(filename)
-            counter = 0
+            dedup_counter = 0
             while filename in filenames:
-                counter += 1
-                filename = "%s-%d%s" % (orig_basename, counter, orig_ext)
+                dedup_counter += 1
+                filename = "%s-%d%s" % (orig_basename, dedup_counter, orig_ext)
 
         filenames.add(filename)
 
@@ -339,7 +339,6 @@ def view_html_message(f, tmpdir):
     # We're done saving the parts. It's time to save the HTML part(s),
     # with img tags rewritten to refer to the files we just saved.
     embedded_parts = []
-    first_browser = True
     for i, html_part in enumerate(html_parts):
         htmlfile = os.path.join(tmpdir, "viewhtml%02d.html" % i)
         fp = open(htmlfile, 'wb')
@@ -454,6 +453,9 @@ def view_html_message(f, tmpdir):
                 print("Calling", IMAGE_VIEWER, "on", image_files)
             cmd = [ IMAGE_VIEWER ] + IMAGE_VIEWER_ARGS + image_files
             mysubprocess.call_bg(cmd)
+        else:
+            for img in image_files:
+                call_some_browser(img)
 
 
 # For debugging:
