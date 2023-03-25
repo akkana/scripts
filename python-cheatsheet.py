@@ -1301,6 +1301,15 @@ if __name__ == '__main__':
           time.sleep(2)
 
 ########################################################
+# CSV
+########################################################
+
+with open(filename) as csvfp:
+    reader = csv.DictReader(csvfp)
+    for row in reader:
+        # Each row is an OrderedDict
+
+########################################################
 # Use the same StringIO for both input and output
 ########################################################
 
@@ -1314,15 +1323,6 @@ for row in csvreader:
 outfp.seek(0)
 reader = csv.DictReader(csvfp)
 ...
-
-########################################################
-# CSV
-########################################################
-
-with open(filename) as csvfp:
-    reader = csv.DictReader(csvfp)
-    for row in reader:
-        # Each row is an OrderedDict
 
 ########################################################
 # BeautifulSoup
