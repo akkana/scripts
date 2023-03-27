@@ -185,6 +185,12 @@ eggtimer.py:
     Also has an example of how to do full-duplex interprocess
     communication with Unix domain sockets.
 
+fakefileman.py:
+    A way to have the XDG desktop system pop up a terminal when
+    it thinks you want a file manager.
+    Useful for things like Zoom, Firefox's download manager,
+    some Wine programs, etc.
+
 falls_between.py:
     given a day of the week ("tue") or a day of the month (15),
     did it occur between two given dates?
