@@ -34,7 +34,10 @@ def kobo_convert_file(filename, destdir):
         if name.endswith('.html') or name.endswith('.xhtml'):
             # print("Converting %s" % name)
             fp = book.zip.open(name)
-            soup = BeautifulSoup(fp, "lxml")
+            # Parsing with "lxml" gives a warning:
+            # XMLParsedAsHTMLWarning: It looks like you're parsing an XML document using an HTML parser. If this really is an HTML document (maybe it's XHTML?), you can ignore or filter this warning. If it's XML, you should know that using an XML parser will be more reliable. To parse this document as XML, make sure you have the lxml package installed, and pass the keyword argument `features="xml"` into the BeautifulSoup constructor
+            # This seems to be the answer:
+            soup = BeautifulSoup(fp, features="xml")
             altertags(soup)
             fp.close()
             ozf.writestr(name, str(soup))
