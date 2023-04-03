@@ -299,8 +299,15 @@ r == c    # True
 s = s.replace("\u00A0"," ")
 
 ################################################################
-# Regular expressions/regexp:
+# re: Regular expressions/regexp:
 ################################################################
+
+# Build up expressions using f-strings:
+# https://death.andgravity.com/f-re
+
+# Some useful regexp builders:
+# https://regex-generator.olafneumann.org/
+# https://regex101.com/ (but doesn't allow pasting)
 
 # Difference between match and search:
 # match matches only from the beginning of the string,
@@ -805,7 +812,7 @@ def parse_args():
     """Parse commandline arguments."""
     parser = argparse.ArgumentParser(description="Do some stuff")
 
-    # Boolean flag
+    # Boolean flag (don't use type=bool, gives a TypeError)
     parser.add_argument('-c', "--check", dest="check", default=False,
                         action="store_true", help="Help string")
 
