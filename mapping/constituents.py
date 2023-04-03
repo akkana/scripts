@@ -8,10 +8,13 @@
 from collections import defaultdict
 from urllib.parse import unquote_plus
 import json
+from simplejson.errors import JSONDecodeError
 from shapely.geometry import Point, Polygon
 from geopy.geocoders import Nominatim, PickPoint
 from geopy.extra.rate_limiter import RateLimiter
+import requests
 import argparse
+import traceback
 import csv
 import re
 import sys, os
@@ -36,16 +39,95 @@ PATTERNS_TO_REMOVE = [
     "\# *[0-9]+ *"
 ]
 
+
+def geocode_US_census(addr):
+    """Geocode using the US Census API"""
+    url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=%s&benchmark=2020&format=json' % addr.replace(' ', '+')
+    try:
+        req = requests.get(url)
+        output = req.json()
+        # print("Got JSON:", output)
+        matches = output["result"]["addressMatches"]
+        if len(matches) == 0:
+            print("Couldn't match", addr)
+            return [ (None, None) ]
+
+        if len(matches) > 1:
+            print("Yikes, more than one match for", addr)
+            for match in matches:
+                print("   ", match, ":", match["coordinates"])
+        # print('coordinates:', matches[0]["coordinates"])
+
+        # To be consistent with geopy, should return a tuple of
+        # number, street, city, county,state, zip, (lat, lon)
+        # but nothing except the final tuple is used, so
+        # for now, that's enough. (Census doesn't differentiate number.)
+        match = matches[0]
+        return [ ( match["coordinates"]["y"],
+                   match["coordinates"]["x"] ) ]
+
+    except JSONDecodeError as e:
+        # When this happens it can't print req.text either,
+        print("JSON decode error on: '%s'" % req.text)
+        return [ (None, None) ]
+    except Exception as e:
+        print("Exception: '%s' geolocating '%s'" % (e, addr))
+        traceback.print_exc(file=sys.stderr)
+        return [ (None, None) ]
+
+
 def init_geolocator():
     global Geocode, Cachedata
 
+    # geocoding API investigation:
+    # US Census!
+    # https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
+    # e.g. https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=123+Main+Street,+Las+Cruces,+NM+88007-8816&benchmark=2020&format=json
+    #
+    # Nominatim: randomly stops serving anything, giving only timeouts
+    #   (even when used on only one address or with rate limiter)
+    # Pelias: doesn't seem to understand searching for addresses,
+    #   gives a list of results most of which aren't near the specified city
+    #   even with sources=oa which is supposed to search for addresses
+    # OpenCageData: gives two results one of which is a completely different
+    #   address than the one asked for
+    #
+    # Services that you can't even try without registering:
+    # PickPoint: Has free tier, but fails on about 1/3 of US addresses
+    # Google: wants a credit card, claims it won't charge it if you
+    #   don't make too many queries (but no way to check or limit that)
+    # geonames.org: their examples use an account named "demo"
+    #   but you can't actually use that for testing
+    # mapbox.com
+    # here.com
+    # developer.what3words.com
+    # developer.tomtom.com
+    # smarty.com
+    # mapquest.com: they have an example at
+    # https://developer.mapquest.com/documentation/samples/geocoding/v1/address
+    # but it doesn't actually do anything, just stays on the default query.
+    # OpenMapQuest (https://developer.mapquest.com/documentation/open/):
+    # intro page doesn't even load, just spins a busy indicator forever.
+    #
+    # Services that don't work via geopy:
+    # Don't work without an API key:
+    # www.geocod.io/docs/: the "try this in your browser right now"
+    #   links don't work since they use api_key=YOUR_API_KEY
+    # USPS: does address validation but not geolocation
+    # https://geocoding.geo.census.gov/geocoder/
+
     pickpointapikey = os.getenv("PICKPOINTAPIKEY")
-    if pickpointapikey:
+    if True:
+        # Use the Census API
+        Geocode = geocode_US_census
+        print("Geolocation using the US Census API")
+
+    elif pickpointapikey:
         # https://geopy.readthedocs.io/en/latest/#geopy.geocoders.PickPoint
         Geocode = PickPoint(pickpointapikey).geocode
         print("Geolocation courtesy of PickPoint.io")
 
-    else:
+    elif False:
         # Use the free Nominatim service, though it doesn't always work
         # even with the rate limiter in place.
 
@@ -59,6 +141,7 @@ def init_geolocator():
         Geocode = RateLimiter(Geolocator.geocode, min_delay_seconds=1)
         print("Geolocation courtesy of OpenStreetMap/Nominatim")
         print()
+
 
     # Set up a cache
     if os.path.exists(CACHEFILE):
@@ -97,13 +180,13 @@ def clean_addr(addr):
     return addr
 
 
-def geocode(addr):
+def geocode(addr, ignore_cache=False):
     """Geocode a single address using GeoPY.
        Returns a (lat, lon) pair, or None, None.
     """
-    print("\n*** geocode '%s'" % addr, file=sys.stderr)
+    print("*** geocode '%s'" % addr, file=sys.stderr)
 
-    if addr in Cachedata:
+    if addr in Cachedata and not ignore_cache:
         print(addr, "was cached: returning", Cachedata[addr], file=sys.stderr)
         return Cachedata[addr]
 
@@ -117,7 +200,7 @@ def geocode(addr):
         Cachedata[addr] = (None, None)
         return Cachedata[addr]
 
-    print("geocoded:", location)
+    print("geocoded:", location[-1])
 
     # Nominatim returns a tuple of number, street, city, county,state, zip,
     # (lat, lon)
@@ -147,16 +230,20 @@ def district_sort_key(k):
 
 
 def save_cachefile():
+    print("Saving cachefile with", len(Cachedata), "entries")
+
     with open(CACHEFILE, 'w') as fp:
         json.dump(Cachedata, fp, indent=2)
 
 
 def read_csv(inputcsv):
+    print("Reading CSV file", inputcsv)
     # Read everyone in from the inputcsv to members
     members = []
     with open(inputcsv) as fp:
         reader = csv.DictReader(fp)
         for row in reader:
+            print(row)
             # Fields we care about: "League: League Name", "First Name".
             # "Last Name", "Mailing Street", "Mailing City",
             # "Mailing State/Province" "Mailing Country",
@@ -208,6 +295,7 @@ def whichdistrict(point, polygons):
 
 def districts_for_csv(csvfile, districtfiles, naddrs=0):
     members = read_csv(csvfile)
+
     # Now all the members in the CSV have been read in to members
     print("Read", len(members), "members")
 
@@ -229,7 +317,6 @@ def districts_for_csv(csvfile, districtfiles, naddrs=0):
                 break
 
     # Make sure all coordinates are cached before proceding
-    print("Saving cachefile with", len(Cachedata), "entries")
     save_cachefile()
 
     print()
@@ -277,12 +364,40 @@ def districts_for_csv(csvfile, districtfiles, naddrs=0):
         print("Saved to member-districts.csv")
 
 
+def tryagain():
+    """Retry any address that has cached coordinates of None, None"""
+    changes = False
+    for addr in Cachedata:
+        for pat in BAD_ADDR_PATTERNS:
+            if re.match(pat, addr):
+                print("Skipping", addr)
+                addr = None
+                break
+        if not addr:
+            continue
+
+        if not Cachedata[addr][0] or not Cachedata[addr][1]:
+            print("Retrying", addr)
+            foo = geocode(addr, ignore_cache=True)
+            print("geocode", addr, "returned", foo)
+            lat, lon = foo
+            if lat and lon:
+                changes = True
+
+    if changes:
+        print("There were changes", end="")
+        save_cachefile()
+
+
 if __name__ == '__main__':
     # Check arguments
     print("Parsing arguments ...")
     parser = argparse.ArgumentParser(description="Map addresses to districts")
     parser.add_argument('-n', action="store", default=0, dest="naddrs",
                         type=int, help='How many addresses to process.')
+    parser.add_argument('--tryagain', dest="tryagain", default=False,
+                        action="store_true",
+        help="Try again to get addresses that aren't already geocoded")
     parser.add_argument('inputcsv', nargs=1, help="Input CSV file")
     parser.add_argument('distfiles', nargs='+', help="district files (geojson)")
     args = parser.parse_args()
@@ -296,6 +411,9 @@ if __name__ == '__main__':
 
     init_geolocator()
     print("Initially Cachedata has", len(Cachedata), "entries")
+
+    if args.tryagain:
+        tryagain()
 
     # Argparse sets inputcsv as a list even though it's nargs=1
     districts_for_csv(args.inputcsv[0], args.distfiles, args.naddrs)
