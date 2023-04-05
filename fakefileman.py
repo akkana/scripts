@@ -36,6 +36,9 @@ try:
         os.chdir(sys.argv[1])
         print("Current directory:", sys.argv[1])
 
+        if len(sys.argv) > 2:
+            print("Other arguments:", sys.argv[2:])
+
     else:
         print("Arguments:", sys.argv[1:])
 
