@@ -130,8 +130,13 @@ def handle_wakeup(signal, frame):
             data = conn.recv(1024)
             if not data:
                 break
+
+            endtime = time.strftime('%H:%M',
+                                    time.localtime(time.time() + timeleft))
+
             if data == b"STATUS":
-                conn.sendall(f"In {user_timestr(timeleft)}: "
+                print("checking status")
+                conn.sendall(f"In {user_timestr(timeleft)} (at {endtime}): "
                              f"{message} (PID {os.getpid()})".encode())
 
             elif data.startswith(b"ADD "):
@@ -141,7 +146,8 @@ def handle_wakeup(signal, frame):
                     wakeuptime += addsecs
 
                     conn.sendall(f"Adding {addsecs} seconds, "
-                                 f"now {user_timestr(timeleft)}".encode())
+                                 f"now {user_timestr(timeleft)}"
+                                 f"({endtime})".encode())
                 except ValueError:
                     conn.sendall(f"Can't add {data[4:]} seconds".encode())
 

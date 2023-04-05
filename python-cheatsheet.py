@@ -919,9 +919,9 @@ date                       datetime                  \
 >>> d.strftime("%-H:%M")
 '9:30'
 
-##################
-# Date Arithmetic
-##################
+######################
+# Datetime Arithmetic
+######################
 
 # Subtracting datetimes gives a datetime.timedelta, and that's also
 # a good way to add or subtract time from a datetime.
@@ -983,6 +983,16 @@ calendar.monthrange(year, month)[1]
 # omits the zero prefix.
 time.strftime("%-d days %-H hours %-M minutes %-S seconds",
               time.gmtime(timesecs))
+
+########################
+# time module Arithmetic
+########################
+
+time.time() just returns a float, so you can add seconds:
+time.time() + 3600
+# but you have to turn it into a tuple to format it,
+# using functions localtime() or gmtime()
+time.strftime("%H:%M", time.localtime(time.time() + 3600))
 
 ###############
 # Date Parsing
