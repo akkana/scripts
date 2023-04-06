@@ -22,8 +22,9 @@ try:
     # called on a BrowserView doesn't do anything for views in
     # background tabs; the QWebEngineView just ignores the load(),
     # and I haven't found any way to get load() to work.
+    # This mainly prevents multiple tabs from working.
     # QT5 still works fine, so it's used by default
-    # unless you uncomment the next line:
+    # unless you comment out the next line:
     import DONT_USE_QT6
 
     from PyQt6.QtCore import Qt, QUrl, QEvent, QObject, \
@@ -56,6 +57,7 @@ try:
     Qt.Key_U = 85
 
 except ImportError:
+    # Fall back to Qt5
     from PyQt5.QtCore import Qt, QUrl, QObject, QEvent, QSocketNotifier
     from PyQt5.QtCore import pyqtSlot as Slot
     from PyQt5.QtWidgets import QApplication, QMainWindow, QToolBar, QAction, \
