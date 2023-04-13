@@ -374,6 +374,9 @@ def datetimekey(s):
         dateutil.parser.parse() is good at parsing different formats,
         but it can't handle extra stuff in the line, or ranges.
     """
+    # Replace noon everywhere with 12pm
+    s = s.replace("noon", "12pm")
+
     savedate = s[:10]
     m = re.match(datetimerangepat, s[11:])
     if not m:
