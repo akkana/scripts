@@ -156,6 +156,18 @@ def fix_agenda(agenda_infile):
             em.contents[0].replace_with(a)
             em_text = None
 
+        def append_parenthesized_orig(em, origfile):
+            # Add a parenthesizedlink to the original document.
+            # This doesn't end up getting called for every .doc*
+            # file, though.
+            base, ext = os.path.splitext(origfile)
+            em.append(NavigableString(" (original "))
+            linkfile = "orig/" + origfile
+            a = soup.new_tag("a", href=linkfile, target="_blank")
+            a.string = ext
+            em.append(a)
+            em.append(NavigableString(")"))
+
         index = fuzzy_search(em_text, origbases)
         htmlindex = fuzzy_search(em_text, htmlbases)
 
@@ -186,6 +198,8 @@ def fix_agenda(agenda_infile):
                         replace_em("html/" + orightml)
                         already_converted.append(origfile)
                         print("  ... The HTML was newer")
+                        # Still want a link to the orig doc file, though
+                        append_parenthesized_orig(em, origfile)
                         continue
                     else:
                         print("  Replacement Word file, re-converting")
@@ -241,16 +255,7 @@ def fix_agenda(agenda_infile):
                 replace_em(htmlfile)
                 # Don't add to htmlfiles, should be already there
 
-                # Add a parenthesizedlink to the original document.
-                # This doesn't end up getting called for every .doc*
-                # file, though.
-                base, ext = os.path.splitext(origfile)
-                em.append(NavigableString(" (original "))
-                linkfile = "orig/" + origfile
-                a = soup.new_tag("a", href=linkfile, target="_blank")
-                a.string = ext
-                em.append(a)
-                em.append(NavigableString(")"))
+            append_parenthesized_orig(em, origfile)
 
         else:
             if VERBOSE:
