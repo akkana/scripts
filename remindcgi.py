@@ -40,13 +40,6 @@ import re
 import os, sys
 from datetime import date, datetime, timedelta, MAXYEAR
 
-# Don't print the warning about cgi being deprecated.
-# My understanding is that it will still be available,
-# it just won't be in the stdlib.
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-import cgi
-
 
 TODAY = date.today()
 
@@ -454,12 +447,35 @@ if __name__ == '__main__':
     if 'REQUEST_METHOD' in os.environ:
         formatter = HTMLFormatter()
 
-        form = cgi.FieldStorage()
+        when = "week"
 
-        if 'when' in form:
-            when = form['when'].value.lower()
-        else:
-            when = None
+        if (os.environ['REQUEST_METHOD'] == 'GET' and
+            'QUERY_STRING' in os.environ):
+            from urllib.parse import parse_qsl
+
+            # Replacement for cgi module's cgi.FieldStorage() for GET args:
+            getargs = parse_qsl(os.environ['QUERY_STRING'])
+            for arg, val in getargs:
+                if arg == 'when':
+                    when = val
+
+        elif os.environ['REQUEST_METHOD'] == 'POST':
+            # I don't really use POST for this, the documentation at the to
+            # of the file never encouraged POST, and it's probably not worth
+            # writing a replacement for when the cgi module gets removed.
+            # But as long as cgi continues to exist:
+            try:
+                import cgi
+                form = cgi.FieldStorage()
+
+                if 'when' in form:
+                    when = form['when'].value.lower()
+            except:
+                formatter.print_head("Error")
+                print("<p>Sorry, POST arguments require CGI, which is"
+                      " no longer in the Python standard library.")
+                formatter.print_foot()
+                sys.exit(0)
     else:
         if len(sys.argv) > 1 and sys.argv[1] == "--testcgi":
             sys.argv = sys.argv[1:]
@@ -472,8 +488,6 @@ if __name__ == '__main__':
         else:
             when = sys.argv[1].lower()
 
-    if not when:
-        when = "week"
     if when == "all":
         # Show everything
         formatter.print_head("All Events")
