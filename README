@@ -486,6 +486,14 @@ randombg:
     current X resolution. So you can have different sets of backgrounds
     sized for laptop screen, external monitor etc.
 
+randomgeom.bash:
+    bash (or zsh or other modern shell) script to generate an
+    X11 geometry argument with a random position along the edge
+    of the monitor, like 165x65-1899-0.
+    I use this to position dclock in different places each day to
+    avoid monitor burn-in; to anyone else, it's mostly useful as an
+    example of how to do random number calculations in a shell script.
+
 randomline:
     Print a random line from a file. Useful for things like choosing
     a random wallpaper or random system beep tone.
@@ -498,6 +506,10 @@ remindcgi.py:
     CGI: Run remind from a "remind.txt" source file in the same directory,
     showing either upcoming reminders or all events for the next
     week/month/ever.
+
+remindexpire.py:
+    Expire events in remind.txt that are now in the past,
+    saving them to "archived.txt" in the same directory.
 
 repo-pullpush:
     Modify a git repository, taking the existing URL, making that
