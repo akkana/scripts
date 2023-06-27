@@ -238,6 +238,7 @@ def view_html_message(f, tmpdir):
         indentstr = ' ' * indent
         for part in msg.iter_parts():
             print("%scontent-type:" % indentstr, part.get_content_type())
+            print("  content-subtype:", part.get_content_subtype())
             print("  content-id:", part.get('Content-ID'))
             print("%scontent-disposition:" % indentstr,
                   part.get_content_disposition())
@@ -405,17 +406,20 @@ def view_html_message(f, tmpdir):
         if part.get_content_maintype() == "application":
             htmlfilename = fileparts[0] + ".html"
 
+            subtype = part.get_content_subtype()
             if DEBUG:
-                print("Application subtype:", part.get_content_subtype())
-            if part.get_content_subtype() == "msword" and USE_WVHTML_FOR_DOC:
+                print("Application subtype:", subtype)
+            is_word = ("msword" in subtype or "ms-word" in subtype)
+            if is_word and USE_WVHTML_FOR_DOC:
                 mysubprocess.call(["wvHtml", partfile, htmlfilename])
                 call_some_browser(htmlfilename)
                 continue
 
-            if part.get_content_subtype() == \
-                 "vnd.openxmlformats-officedocument.wordprocessingml.document" \
-                 or part.get_content_subtype() == "msword" \
-                 or part.get_content_subtype() == "vnd.oasis.opendocument.text":
+            # Unfortunately, unoconv can't convert excel files:
+            # it hangs forever trying.
+            if (is_word or subtype ==
+                "vnd.openxmlformats-officedocument.wordprocessingml.document"
+                or subtype == "vnd.oasis.opendocument.text"):
                 mysubprocess.call(["unoconv", "-f", "html",
                                       "-T", UNOCONV_STARTUP_TIME,
                                       "-o", htmlfilename, partfile])
