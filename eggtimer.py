@@ -299,6 +299,8 @@ Examples:
             parser.print_help()
             sys.exit(1)
         message = ' '.join(rest[1:])
+        if not message:
+            message = "Wake up!"
 
         fork_timer(sleeptime, message)
         sys.exit(0)
