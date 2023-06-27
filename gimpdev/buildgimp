@@ -259,15 +259,15 @@ if [[ $pullstatus == 1 ]]; then
 fi
 
 echo '========== gimp'
+
 cd $SRCDIR
-# pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
-cd gimp
+pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 
 # If on master, git pull. If on another branch,
 # pull, but don't merge, all branches
 curbranch=$(git status | grep "On branch" | awk '{print $3}')
 
-if [[ x"$curbranch" != 'master' ]]; then
+if [[ x"$curbranch" != 'xmaster' ]]; then
     echo "Rebasing master to $curbranch"
     pullstatus=$(git fetch)
     git rebase origin/master
