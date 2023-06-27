@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# Bring up a translucent image that allows clickthroughs.
+# If you're not already running a compositor as part of your window manager,
+# I suggest xcompmgr -c -t-6 -l-6 -o.1
+
 import sys
 import os
 
@@ -11,7 +15,7 @@ from Xlib.ext import shape
 
 class XImageWindow():
     def __init__(self, imgname, opacity=1, magnification=100):
-        self.imgname = sys.argv[1]
+        self.imgname = imgname
         self.img = Image.open(self.imgname)
 
         if magnification != 100:
@@ -123,6 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--magnify', type=int, default=100,
                         help='magnification factor (percent: default 100)')
     args = parser.parse_args(sys.argv[1:])
+    # print("args:", args)
 
     imgwin = XImageWindow(args.imgfile, opacity=args.opacity,
                           magnification=args.magnify)
