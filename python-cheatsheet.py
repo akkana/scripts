@@ -302,6 +302,11 @@ s = s.replace("\u00A0"," ")
 # re: Regular expressions/regexp:
 ################################################################
 
+""" For parsing, consider using something other than an f-string:
+    for HTML, use BeautifulSoup; for things with more pythonic syntax,
+    use json.loads() or ast.literal_eval()
+"""
+
 # Build up expressions using f-strings:
 # https://death.andgravity.com/f-re
 
@@ -328,6 +333,12 @@ re.search('[0-9]+\..*[A-Z]+', teststr, flags=re.DOTALL)
 # re.MULTILINE controls whether ^ and $ match line beginnings
 # and ends in the pattern, but doesn't affect whether the
 # search can cross newlines.
+
+# Grouping without capturing: use (?: ... ) e.g.
+re.match(r'''\s*([a-zA-Z]+)\s*(?:([a-zA-Z]+)\s*=\s*(.*))?''',
+         '  div class="green"  ')
+# the class=green part is optional because of the enclosing (?: )
+# but if it's there, we can capture class and green inside it.
 
 # Transliteration:
 # https://docs.python.org/3/library/stdtypes.html#str.maketrans
@@ -2271,6 +2282,10 @@ Upgrade all packages:
 Some people point to things like:
 pip install $(pip list --outdated | tail -n +2 | awk '{ print $1 }') --upgrade
 but that doesn't actually work.
+
+Some other possibilities:
+pip3 list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1 | xargs -n1 pip3 install -U
+pip3 list | awk '{print $1}' | xargs -n1 pip3 install -U
 
 https://coderwall.com/p/quwaxa/update-all-installed-python-packages-with-pip
 has some other suggestions.
