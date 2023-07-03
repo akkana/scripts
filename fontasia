@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-# fontasia 0.8:
+# fontasia 0.9:
 # List all fonts on the system and let the user group them into categories.
 #
-# Can be run as a standalone script, or as a GIMP plug-in font chooser
+# Can be run as a standalone script, or as a GIMP 2.x plug-in font chooser
 # (where it shows up as Windows->Fontasia).
 
 #
@@ -25,15 +25,20 @@
 
 # Thanks to jan bodnar's ZetCode.com PyGTK/Pango tutorial.
 
-from __future__ import print_function
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
+# gi.require_version('Pango', '1.0')
 from gi.repository import Pango
+
 
 import re
 import os
+
+# Maximum number of faces (in the Pango sense, e.g. italic, bold, light)
+# to show for a given font family:
+MAX_FACES = 27
 
 # A buttonbox class, which can hold an arbitrary number of buttons.
 # This is expected to occupy a space which may expand or contract.
@@ -88,9 +93,15 @@ class FontApp(Gtk.Window):
         # after checking the selected font.
         self.quit = False
 
+        # Pango seems to have no way to get a font family given its name,
+        # so store all font families when we iterate through them,
+        # which will happen in update_font_list().
+        self.font_families = {}
+
         # No categories to start with
         self.category_fontlists = []
         self.category_buttons = []
+        self.facebuttons = []
         self.DEFAULT_TEXT = "The quick brown fox jumped over the lazy dog"
         self.preview_text = self.DEFAULT_TEXT
         self.DEFAULT_FONT_SIZE = 18
@@ -122,6 +133,10 @@ class FontApp(Gtk.Window):
         self.preview = Gtk.Entry()
         self.preview.set_width_chars(45)
         self.preview.set_text(self.preview_text)
+        # These don't work: I think because grab_focus_without_selecting()
+        # (called in render_font()) sets the position to 0.
+        # self.preview.select_region(-1, -1)
+        # self.preview.set_position(-1)
 
         # Don't use fallbacks for characters not in the current font.
         # This apparently didn't work in Gtk2, and is deprecated in Gtk3.
@@ -157,7 +172,7 @@ class FontApp(Gtk.Window):
         selection = self.treeview.get_selection()
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
-        self.treeview.connect("cursor-changed", self.render_font);
+        self.treeview.connect("cursor-changed", self.choose_family);
 
         self.sw.add(self.treeview)
 
@@ -178,7 +193,7 @@ class FontApp(Gtk.Window):
         # Checkbox for showing fonts in the font list
         self.fancy_btn = Gtk.ToggleButton(label="Fancy list")
         self.fancy_btn.set_active(self.fancy_list)
-        self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb);
+        self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb)
         hbox.pack_start(self.fancy_btn, expand=False, fill=True, padding=0)
 
         # Button to copy current font name
@@ -194,21 +209,13 @@ class FontApp(Gtk.Window):
                              step_increment=1)
         self.sizespin = Gtk.SpinButton(adjustment=adj)
         self.sizespin.set_numeric(True)
-        self.sizespin.connect("value-changed", self.render_font);
+        self.sizespin.connect("value-changed", self.choose_family);
         hbox.pack_start(self.sizespin, expand=False, fill=True, padding=0)
-
-        # Bold and italic buttons
-        self.bold_btn = Gtk.ToggleButton(label="Bold")
-        hbox.pack_start(self.bold_btn, expand=False, fill=True, padding=0)
-        self.bold_btn.connect("toggled", self.render_font);
-        self.italic_btn = Gtk.ToggleButton(label="Italic")
-        hbox.pack_start(self.italic_btn, expand=False, fill=True, padding=0)
-        self.italic_btn.connect("toggled", self.render_font);
 
         #
         # View category menu
         #
-        label = Gtk.Label(label="View:")
+        label = Gtk.Label(label="Category:")
         # This is supposed to right-align the label, but alas it does nothing
         # and is now deprecated in Gtk3:
         #label.set_alignment(1.0, .5)
@@ -221,10 +228,14 @@ class FontApp(Gtk.Window):
         self.combo_connect_id = self.view_cat_combo.connect("changed",
                                                             self.combochanged)
 
+        # A space for face buttons like Bold, Italic
+        self.facebuttonbox = Gtk.FlowBox()
+        vbox.pack_start(self.facebuttonbox, expand=False, fill=True, padding=0)
+
         # Categories header row
         hbox = Gtk.HBox(spacing=8)
         vbox.pack_start(hbox, expand=False, fill=True, padding=0)
-        label = Gtk.Label(label="Categories")
+        label = Gtk.Label(label="Add category:")
         hbox.pack_start(label, expand=False, fill=True, padding=0)
 
         entry = Gtk.Entry()
@@ -237,9 +248,6 @@ class FontApp(Gtk.Window):
         btn.connect("clicked", self.add_category, entry);
         # The entry and button are tied together:
         entry.connect("changed", self.new_cat_entry_changed, btn);
-
-        label = Gtk.Label(label="Categories")
-        hbox.pack_start(label, expand=False, fill=True, padding=0)
 
         #
         # The buttonbox: the list of category togglebuttons.
@@ -380,14 +388,15 @@ class FontApp(Gtk.Window):
         # A recent Gtk3 change requires this or none of the combobox entries
         # will appear at all.
         self.view_cat_combo.set_entry_text_column(0)
-        self.view_cat_combo.append_text("All fonts")
-        self.view_cat_combo.append_text("All in categories")
-        self.view_cat_combo.append_text("All uncategorized")
 
         for btn in self.category_buttons:
             catname = btn.get_name()
             item = Gtk.MenuItem(label=catname)
             self.view_cat_combo.append_text(catname)
+
+        self.view_cat_combo.append_text("All in categories")
+        self.view_cat_combo.append_text("All uncategorized")
+        self.view_cat_combo.append_text("All fonts")
 
         self.view_cat_combo.set_active(0)
 
@@ -427,8 +436,13 @@ class FontApp(Gtk.Window):
         # Create or clear the list store:
         self.store.clear()
 
+        self.font_families = {}
         for ff in self.all_families:
             fname = ff.get_name()
+
+            # Pango doesn't seem to have any way to get the font family object
+            # from its name. So store all families as a dictionary.
+            self.font_families[fname] = ff
 
             # Else not a special case. Just check for cat membership:
             if not special:
@@ -589,7 +603,7 @@ class FontApp(Gtk.Window):
             except:
                 print("Problem saving the string; reverting to default string")
 
-        curfont = self.current_font()
+        curfont = self.current_font_family()
         if curfont:
             print("set fontname=" + curfont, file=catfp)
 
@@ -673,7 +687,7 @@ class FontApp(Gtk.Window):
                 self.change_button_color(self.category_buttons[i], False)
                 #self.category_buttons[i].set_active(False)
 
-    def current_font(self):
+    def current_font_family(self):
         selection = self.treeview.get_selection()
         model, item = selection.get_selected_rows()
         if not item:
@@ -683,7 +697,7 @@ class FontApp(Gtk.Window):
 
     def copy_font_name(self, widget):
         """Copy current font face name to both PRIMARY and CLIPBOARD"""
-        curfont = self.current_font()
+        curfont = self.current_font_family()
 
         atom = Gdk.atom_intern('PRIMARY', True)
         clipboard = widget.get_clipboard(atom)
@@ -693,7 +707,46 @@ class FontApp(Gtk.Window):
         clipboard = widget.get_clipboard(atom)
         clipboard.set_text(curfont, -1)
 
-    def render_font(self, widget):
+    def render_font(self, family, face):
+        context = self.preview.get_pango_context()
+        if face:
+            fontstr = "%s %s %d" % (family.get_name(), face.get_face_name(),
+                                    self.fontsize)
+        else:
+            fontstr = family.get_name()
+
+        fontdesc = Pango.font_description_from_string(fontstr)
+        # print("fontdesc:", fontdesc)
+        # print("fontdesc str:", fontdesc.to_string())
+        # print("family:", fontdesc.get_family())
+        # print("size:", fontdesc.get_size())
+        # print("weight:", fontdesc.get_weight())
+        # print("stretch:", fontdesc.get_stretch())
+        # print("style:", fontdesc.get_style())
+        # print("variant:", fontdesc.get_variant())
+        # print("variations:", fontdesc.get_variations())
+
+        # This works better than context.set_font_description,
+        # but it's deprecated:
+        # self.preview.modify_font(fontdesc)
+
+        # Another, less reliable way to change an entry's font --
+        # but it requires getting context = self.preview.get_pango_context()
+        # earlier, before creating the new fontdesc, for some reason.
+        context.set_font_description(fontdesc)
+
+        # It's not good to grab the focus like this -- the user might
+        # want focus somewhere else, like in the buttons to try the
+        # next button. But this is the only way I've found to make
+        # the GTK Entry actually change to the new font;
+        # without it, it changes maybe 1/3 of the time.
+        # Also, this is the only way I've found to keep the text
+        # from being all selected. You'd think that
+        # self.preview.select_region(0, 0)
+        # would do that, but it doesn't.
+        # (See https://stackoverflow.com/q/20225691 for discussion.)
+        self.preview.grab_focus_without_selecting()
+
         # Heroic efforts to keep font changes in the Entry from
         # making the whole window resize every time.
         # GTK offers no way to say "make the damn entry stay the same size."
@@ -703,36 +756,119 @@ class FontApp(Gtk.Window):
         if alloc.width > 1 and alloc.height > 1:
             self.preview.set_size_request(alloc.width, alloc.height)
 
-        fontname = self.current_font()
-        if not fontname:
-            return
+        # Used to use self.apply_CSS here, but it doesn't handle
+        # font faces, just families.
 
-        newCSS = FontApp.CSS + """
-.preview { font-family: %s; """ % fontname
-
-        size = int(self.sizespin.get_value())
-        newCSS += " font-size: %dpt;" % size
-
-        if self.bold_btn.get_active():
-            # fontdesc.set_weight(Pango.WEIGHT_BOLD)
-            newCSS += " font-weight: bold;"
-
-        if self.italic_btn.get_active():
-            # fontdesc.set_style(Pango.STYLE_ITALIC)
-            newCSS += " font-style: italic;"
-
-        # Close out the style string
-        newCSS += " }"
-        # print("New CSS:", newCSS)
-        self.apply_CSS(newCSS)
-
-        self.update_category_buttons(fontname)
+        self.update_category_buttons(family.get_name())
 
         # Now that we're done changing things,
         # allow resizing from the user again:
         # Unfortunately this is still too early: the entry still resizes!
         # So for now, live with the user not being able to resize smaller.
         #self.preview.set_size_request(-1, -1)
+
+    def choose_family(self, widget):
+        familyname = self.current_font_family()
+        if not familyname:
+            return
+
+        # Show buttons for faces within this family (bold, italic etc.)
+        font_family = self.font_families[familyname]
+        if not font_family:
+            print("eek, font families not initialized yet")
+            return
+
+        # font_family.list_faces() may have lots of repeats:
+        # for instance, JetBrains Mono has two of almost every item.
+        # So iterate through it looking for repeats.
+        self.faces = []
+        facenames = []
+        basebutton = None
+        # baseindex is only for debugging and should be removed later
+        baseindex = None
+
+        i = 0
+        for face in font_family.list_faces():
+            facename = face.get_face_name()
+            if facename in facenames:
+                # A lot of fonts have repeated face names
+                # print(familyname, "skipping duplicate face", facename)
+                continue
+            if i >= MAX_FACES:
+                # print("eek! Too many face names", len(self.faces))
+                # print("Truncated to", ', '.join([f.get_face_name()
+                #                                  for f in self.faces]))
+                break
+
+            facenames.append(facename)
+            self.faces.append(face)
+            if i < len(self.facebuttons):  # already exists; change its name
+                btn = self.facebuttons[i]
+                btn.set_label(facename)
+            else:                          # Make a new button
+                btn = Gtk.ToggleButton(label=facename)
+                btn.set_active(False)
+                btn.connect("toggled", self.facebutton_cb, i)
+
+                self.facebuttons.append(btn)
+                # self.facebuttonbox.pack_start(btn, expand=False,
+                #                               fill=True, padding=0)
+                self.facebuttonbox.insert(btn, position=-1)
+
+            lface = facename.lower()
+            if lface == "normal":
+                basebutton = btn
+                baseindex = i
+            elif lface == "regular":
+                basebutton = btn
+                baseindex = i
+
+            i += 1
+
+            # Don't connect the callback until after setting active,
+            # else it will be called from here before we're ready.
+            # btn.connect("toggled", self.facebutton_cb, [font_family, face])
+            btn.show()
+
+        # hide the unused buttons
+        for j, btn in enumerate(self.facebuttons[i:]):
+            index = i + j
+            btn.hide()
+            if btn.get_active():
+                btn.set_active(False)
+
+        if not basebutton and self.facebuttons:
+            basebutton = self.facebuttons[0]
+            baseindex = 0
+        if basebutton:
+            basebutton.set_active(True)
+        else:
+            self.render_font(font_family, None)
+
+    def facebutton_cb(self, button, index):
+        if not button.get_active():
+            return
+
+        # for i, b in enumerate(self.facebuttons):
+        #     if b.get_visible():
+        #         print(i, ":", b.get_label())
+        #     else:
+        #         print(i, " (hidden)")
+
+        # family, face = data
+        family = self.font_families[self.current_font_family()]
+        face = self.faces[index]
+
+        # Toggle off all the other buttons.
+        # It might be nice to use Gtk.RadioButton, but those
+        # don't look as good for this application and the docs
+        # are pretty unclear about how to set them up.
+        for btn, btnface in zip(self.facebuttons, self.faces):
+            if (btn.get_active() and
+                face.get_face_name() != btnface.get_face_name()):
+                btn.set_active(False)
+
+        self.render_font(family, face)
 
     def show_all_categories(self, widget):
         for btn in self.category_buttons:
@@ -762,7 +898,7 @@ if __name__ == '__main__':
             "An alternate font chooser.",
             "Akkana Peck",
             "Akkana Peck",
-            "2016",
+            "2016-2023",
             "Fontasia...",
             "",
             [
