@@ -900,6 +900,17 @@ parser = argparse.ArgumentParser(description="Long string\nwith newlines",
 parser.print_help()
 
 ########################################################
+# built-in help
+########################################################
+
+# Save help to a string, without a lot of formatting crap:
+import pydoc
+helptxt = pydoc.render_doc(Pango, renderer=pydoc.plaintext)
+with open("pangodoc.txt", 'w') as fp:
+    fp.write(helptxt)
+
+
+########################################################
 # Dates and times
 ########################################################
 
