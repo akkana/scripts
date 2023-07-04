@@ -767,6 +767,18 @@ class FontApp(Gtk.Window):
         # So for now, live with the user not being able to resize smaller.
         #self.preview.set_size_request(-1, -1)
 
+    @staticmethod
+    def facename_key(face):
+        facename = face.get_face_name()
+        words = facename.split()
+        lastword = words[-1]
+        if lastword == "Normal":
+            lastword = '0 ' + lastword
+        elif lastword == "Regular":
+            lastword = '1 ' + lastword
+
+        return lastword + ' ' + ' '.join(words)
+
     def choose_family(self, widget):
         familyname = self.current_font_family()
         if not familyname:
@@ -788,7 +800,7 @@ class FontApp(Gtk.Window):
         baseindex = None
 
         i = 0
-        for face in font_family.list_faces():
+        for face in sorted(font_family.list_faces(), key=FontApp.facename_key):
             facename = face.get_face_name()
             if facename in facenames:
                 # A lot of fonts have repeated face names
