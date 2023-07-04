@@ -267,6 +267,11 @@ class FontApp(Gtk.Window):
         # Not sure if this could be done earlier
         self.preview.get_style_context().add_class("preview")
 
+        # Pango can tell us about monospace fonts, so make a special category
+        # which will be at index 0:
+        self.add_category("_Monospace")
+        self.MONOSPACE_CAT_I = 0
+
         # Read in all system and user fonts and update the UI accordingly
         self.update_font_list()
 
@@ -296,6 +301,8 @@ class FontApp(Gtk.Window):
         #self.preview.set_size_request(-1, -1)
 
         self.ignore_callbacks = False
+
+        # Try again to set multi-selection mode: sometimes it doesn't work
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
 
@@ -436,9 +443,16 @@ class FontApp(Gtk.Window):
         # Create or clear the list store:
         self.store.clear()
 
+        # Clear the special _Monospace category too:
+        self.category_fontlists[self.MONOSPACE_CAT_I] = []
+
         self.font_families = {}
         for ff in self.all_families:
             fname = ff.get_name()
+
+            # Is it monospace?
+            if ff.is_monospace():
+                self.category_fontlists[self.MONOSPACE_CAT_I].append(fname)
 
             # Pango doesn't seem to have any way to get the font family object
             # from its name. So store all families as a dictionary.
@@ -473,6 +487,7 @@ class FontApp(Gtk.Window):
         # Reset all the button colors, since nothing is selected now
         # (eventually might be nice to retain the old selection,
         # if it's still in the list):
+        # XXX Should change this to call set_active()
         for btn in self.category_buttons:
             self.change_button_color(btn, False)
 
@@ -578,16 +593,16 @@ class FontApp(Gtk.Window):
             print("No fontasia conf file yet -- Welcome to fontasia!")
 
             # Set up a couple of default categories with likely fonts
-            self.add_category('monospace')
-            self.toggle_font_in_category('Courier 10 Pitch', 'monospace', True)
-            self.toggle_font_in_category('DejaVu Sans Mono', 'monospace', True)
-            self.toggle_font_in_category('FreeMono', 'monospace', True)
-            self.toggle_font_in_category('Monospace', 'monospace', True)
-            self.toggle_font_in_category('Liberation Mono', 'monospace', True)
-            self.toggle_font_in_category('Nimbus Mono L', 'monospace', True)
-            self.add_category('script')
-            self.toggle_font_in_category('Purisa', 'script', True)
-            self.toggle_font_in_category('URW Chancery L', 'script', True)
+            # self.add_category('monospace')
+            # self.toggle_font_in_category('Courier 10 Pitch', 'monospace', True)
+            # self.toggle_font_in_category('DejaVu Sans Mono', 'monospace', True)
+            # self.toggle_font_in_category('FreeMono', 'monospace', True)
+            # self.toggle_font_in_category('Monospace', 'monospace', True)
+            # self.toggle_font_in_category('Liberation Mono', 'monospace', True)
+            # self.toggle_font_in_category('Nimbus Mono L', 'monospace', True)
+            # self.add_category('script')
+            # self.toggle_font_in_category('Purisa', 'script', True)
+            # self.toggle_font_in_category('URW Chancery L', 'script', True)
 
             return
 
@@ -625,6 +640,8 @@ class FontApp(Gtk.Window):
 
         for i in range(0, len(self.category_buttons)):
             catname = self.category_buttons[i].get_name()
+            if catname.startswith('_'):
+                continue
             print(catname + ":", ', '.join(self.category_fontlists[i]),
                   file=catfp)
         catfp.close()
