@@ -95,7 +95,7 @@ else
     export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
 fi
 
-# meson/ninja are now used for babl and gegl
+# meson/ninja are now used for babl, gegl and gimp
 meson-build() {
     # setopt localoptions errreturn doesn't work: use && for everything
 
@@ -108,7 +108,12 @@ meson-build() {
     # Sometimes the meson command fails, but meson reconfigure works.
     # I'm not sure what the difference is.
     if [ -e build.ninja ]; then
-        meson reconfigure
+        # As of July 2023 meson reconfigure no longer works:
+        # ERROR: Neither source directory 'reconfigure' nor build directory None contain a build file meson.build.
+        # WARNING: Running the setup command as `meson [options]` instead of `meson setup [options]` is ambiguous and deprecated.
+
+        # but supposedly ninja will do whatever's needed.
+        # meson reconfigure
     else
         meson -Dprefix=$PREFIX --libdir=lib $MESONSRC
     fi
