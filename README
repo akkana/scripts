@@ -365,6 +365,12 @@ mpcdemo.py:
     multiprocessing module to start a worker thread and pass messages
     to it.
 
+mplayerfilenames.py:
+    Run mplayer on a list of files, showing each filename as a subtitle.
+    Helpful for triaging video files.
+    Creates .srt subtitle files which will be left in /tmp
+    in case you want to view the same videos repeatedly.
+
 musicplayer.py:
     A little toy music player in Python, illustrating how to play audio.
     Actually more than a toy now -- I use it as my main music player.
