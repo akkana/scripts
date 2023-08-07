@@ -7,15 +7,21 @@
 # Basic video playing code came from https://stackoverflow.com/a/75268088
 
 from tkinter import (
-    Tk, Menu, Frame, Label, Button, Scale, Toplevel, StringVar,
+    Tk, Frame, Label, Button, Toplevel, StringVar,
     X, BOTH, Entry, DISABLED, END, HORIZONTAL, VERTICAL
 )
+from tkinter.ttk import Progressbar
+
 from vlc import Instance, State
+
 import time
 import sys, os
 
 
 class VLCwin:
+    PROGRESSLENGTH = 600    # Length of the progressbar in pixels
+    UPDATE_TIME = 100
+
     def __init__(self, vidlist):
         self.vidlist = vidlist
         self.vidlist_index = 0
@@ -40,11 +46,18 @@ class VLCwin:
         # Set key bindings
         self.root.bind('<space>', self.spacebar)
         self.root.bind('<Escape>', self.toggle_fullscreen)
+
+        self.root.bind('<Right>', self.skip_forward)
+        self.root.bind('<Left>', self.skip_backward)
+
+        self.root.bind('d', self.mark_for_deletion)
+        self.root.bind('<Delete>', self.mark_for_deletion)
+        self.root.bind('u', self.unmark_for_deletion)
+
         self.root.bind('q', self.quit)
 
         for c in range(0, 9):
             self.root.bind(chr(ord('0') + c), self.digit)
-        self.root.bind('d', self.digit)
 
         # self.root.bind('<Expose>', self.expose)
 
@@ -60,8 +73,15 @@ class VLCwin:
         self.flagslabeltext = StringVar()
         self.flagslabel = Label(self.button_frame, bg='#eeffcc',
                                 textvariable=self.flagslabeltext)
-        self.flagslabel.pack(side='left', expand=True)
+        self.flagslabel.pack(side='left', expand=False, padx=100)
         # self.flagslabel.grid(row=0, column=1)
+
+        self.progress = Progressbar(self.button_frame,
+                                    orient='horizontal',
+                                    mode='determinate',
+                                    length=__class__.PROGRESSLENGTH)
+        self.progress.pack(side='left', expand=False)
+        self.progress['value'] = 0
 
         self.fullscreen_btn = Button(
             self.button_frame, text="Full Screen (<ESC>)",
@@ -72,6 +92,8 @@ class VLCwin:
         # Set up a place to put the video when not in fullscreen mode
         self.display = Frame(self.frame, bd=4)
         self.display.place(relwidth=1, relheight=1)
+
+        self.root.after(__class__.UPDATE_TIME, self.update_progress)
 
     def repack_buttons(self):
         self.button_frame.pack(expand=True, fill=X)
@@ -106,8 +128,17 @@ class VLCwin:
             self.duration/1000.))
         self.flagslabeltext.set(self.get_vid_flags())
 
-    # def expose(self, event):
-    #     print("Exposed, will play", sys.argv[1])
+    def update_progress(self):
+        if self.player.get_state() == State.Playing:
+            self.progress['value'] = 100 * self.player.get_position()
+        elif self.player.get_state() == State.Ended:
+            if self.vidlist_index >= len(self.vidlist)-1:
+                # Already on last video, wait for input
+                return
+            self.skip_forward()
+            self.progress['value'] = 0
+
+        self.root.after(__class__.UPDATE_TIME, self.update_progress)
 
     def get_vid_flags(self):
         flags = []
@@ -171,6 +202,23 @@ class VLCwin:
         if pause:
             print("Paused at", self.player.get_position())
 
+    def skip_forward(self, event=None):
+        """Skip to the next video"""
+        if self.vidlist_index >= len(self.vidlist)-1:
+            print("Already on last video")
+            return
+        self.vidlist_index += 1
+        # print("Skipping forward to", self.vidlist[self.vidlist_index])
+        self.play(self.vidlist[self.vidlist_index])
+
+    def skip_backward(self, event=None):
+        """Skip to the previous video"""
+        if self.vidlist_index == 0:
+            print("Already on first video")
+            return
+        self.vidlist_index -= 1
+        self.play(self.vidlist[self.vidlist_index])
+
     def digit(self, event):
         """Handle typed digits or 'd' """
         curvid = self.vidlist[self.vidlist_index]
@@ -185,6 +233,19 @@ class VLCwin:
         # print("Getting vid flags:", self.get_vid_flags())
         self.flagslabeltext.set(self.get_vid_flags())
 
+    def mark_for_deletion(self, event):
+        curvid = self.vidlist[self.vidlist_index]
+        if "d" not in self.tags:
+            self.tags["d"] = [curvid]
+        elif curvid not in self.tags["d"]:
+            self.tags["d"].append(curvid)
+        self.skip_forward()
+
+    def unmark_for_deletion(self, event):
+        curvid = self.vidlist[self.vidlist_index]
+        if "d" in self.tags and curvid in self.tags["d"]:
+            self.tags["d"].remove(curvid)
+
     def quit(self, event):
         print("Tags:")
         for k in sorted(self.tags.keys()):
@@ -194,7 +255,7 @@ class VLCwin:
                 continue
             print(f"{ k }: { ' '.join(self.tags[k]) }")
         if 'd' in self.tags:
-            print("DELETE:", ' '.join(self.tags['d']))
+            print("\nDELETE:", ' '.join(self.tags['d']))
         sys.exit(0)
 
 
