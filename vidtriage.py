@@ -34,6 +34,7 @@ class VLCwin:
         self.player = self.Instance.media_player_new()
         self.fullscreen = 0
         self.root = Tk()
+        self.root.title("vidtriage")
 
         # get the default background to use it when in non-fullscreen
         self.defaultbg = self.root.cget('bg')
@@ -115,6 +116,8 @@ class VLCwin:
         if not vidsource:
             vidsource = self.vidlist[self.vidlist_index]
         # print("Playing", vidsource)
+        self.root.title("vidtriage: " + vidsource)
+
         Media = self.Instance.media_new(vidsource)
         self.player.set_xwindow(self.display.winfo_id())
         #setting the xwindow is for embedding the video
@@ -199,8 +202,8 @@ class VLCwin:
 
         pause = self.player.is_playing()
         self.player.set_pause(pause)
-        if pause:
-            print("Paused at", self.player.get_position())
+        # if pause:
+        #     print("Paused at", self.player.get_position())
 
     def skip_forward(self, event=None):
         """Skip to the next video"""
