@@ -109,10 +109,10 @@ class Crawler:
         return (head.status_code == 200)
 
     def check_all_externals(self):
-        self.bad_externals = []
-        for url in self.external_urls:
-            if not self.check_external_link(url):
-                self.bad_externals.append(url)
+        self.bad_externals = [
+            url for url in self.external_urls
+            if not self.check_external_link(url)
+        ]
 
     def run(self):
         while self.urls_to_visit:
