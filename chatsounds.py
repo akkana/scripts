@@ -108,7 +108,7 @@ class XchatSoundHandler :
 
     def __init__(self) :
         self.start_time = time.time()
-        for event in XchatSoundHandler.EVENTS :
+        for event in XchatSoundHandler.EVENTS:
             xchat.hook_print(event, self.handle_message, event)
 
         xchat.hook_command("chatsounds", self.handle_prefs)
@@ -134,7 +134,7 @@ class XchatSoundHandler :
         so you can play different sounds depending on what happened.
         """
 
-        if len(word) < 1:
+        if len(word) < 2:
             return
 
         # If it's too soon after startup, don't do anything.
