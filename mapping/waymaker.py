@@ -118,6 +118,9 @@ def geocode(addr):
     return (float(firstmatch['coordinates']['y']),
             float(firstmatch['coordinates']['x']))
 
+
+statezip = '.*[A-Z]{2}(\s+\d{5})*$'
+
 def read_description_file(filename):
     """Read a file filled with multi-line descriptions, blank line separated.
        The first line of each description may be latitude and longitude,
@@ -167,7 +170,6 @@ def read_description_file(filename):
             # are an address. But we should be able to tell them apart:
             # The last two fields of an address are a state
             # (2 uppercase letters) followed by a 5-digit zip code.
-            statezip = '.*[A-Z]{2}\s+\d{5}$'
             match = re.search(statezip, line)
             # If the state/zip wasn't in the first line, try the second:
             line2 = None
