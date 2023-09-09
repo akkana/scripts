@@ -38,7 +38,6 @@ class TestSampleMessage(unittest.TestCase):
         """
 
         tmpdir = os.path.abspath("test/files/tmp")
-        print("tmpdir is", tmpdir)
         try:
             os.mkdir(tmpdir)
         except FileExistsError:
@@ -46,11 +45,14 @@ class TestSampleMessage(unittest.TestCase):
 
         viewhtmlmail.view_html_message("test/files/htmlmail.eml", tmpdir)
 
-        print("Check to make sure the message window looks right")
+        print("""
+====================================================
+= Check to make sure the message window looks right
+=====================================================""")
 
-        htmlfile = os.path.join(tmpdir, "viewhtml.html")
+        htmlfile = os.path.join(tmpdir, "viewhtml00.html")
         self.assertTrue(os.path.exists(htmlfile))
-        self.assertEqual(md5sum(htmlfile), "b15a4e42651073042ec01940a1eaed75")
+        self.assertEqual(md5sum(htmlfile), "153b0a4b10d6c7bda313607118e54788")
 
         imgfile = os.path.join(tmpdir, "tuxnetwork.jpg")
         self.assertTrue(os.path.exists(imgfile))

@@ -55,7 +55,7 @@ Content-Transfer-Encoding: quoted-printable
 
 *This is in bold*
 
-Something about pi=C3=B1on trees=E2=80=94and em and en=E2=80=93dashes.
+Something about pi=C3=B1on trees, and em=E2=80=94 and en=E2=80=93dashes.
 
 And an image!
 [image: tuxnetwork.jpg]
@@ -69,7 +69,7 @@ Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: quoted-printable
 
 <div dir=3D"ltr"><div><b>This is in bold</b></div><div><br></div><div>Somet=
-hing about pi=C3=B1on trees=E2=80=94and em and en=E2=80=93dashes.</div><div=
+hing about pi=C3=B1on trees, and em=E2=80=94 and en=E2=80=93dashes.</div><div=
 ><br></div><div>And an image!<br><div><img src=3D"cid:ii_kh9ezunp0" alt=3D"=
 tuxnetwork.jpg" width=3D"256" height=3D"187"><br></div><div>and some text a=
 fter the image. And an emoji! =F0=9F=98=80<br></div></div><div><br>-- <br><=
