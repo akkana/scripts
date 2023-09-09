@@ -254,6 +254,12 @@ u'pi\xf1on'
 # Fix "UnicodeEncodeError: 'ascii' codec can't encode character":
 .encode('utf-8', "xmlcharrefreplace")
 
+# Detect charset if you don't know it:
+>>> chardet.detect(b'\301\242\300\200\300\231')
+{'encoding': 'Windows-1252', 'confidence': 0.73, 'language': ''}
+>>> b'\301\242\300\200\300\231'.decode('Windows-1252')
+'Á¢À€À™'
+
 # Split a long string over multiple lines in the source file
 url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
          "bs3/documentation.html" )
@@ -1381,10 +1387,12 @@ intervening NavigableString whitespace, whereas tag.next_sibling
 and tag.previous_sibling will return the whitespace.
 """
 
+# Iterate depth-first over all tags: soup.find_all()
+
 # Find tags with inline style attribute:
-for t in soup.findAll(style=True)
+for t in soup.find_ll(style=True)
 # Harder way, using lambda:
-soup.findAll(lambda tag: 'style' in tag.attrs)
+soup.find_all(lambda tag: 'style' in tag.attrs)
 
 # Remove a tag and its children.
 tag.decompose()
@@ -1394,11 +1402,11 @@ tag.decompose()
 
 # Remove a tag but keep what's inside it:
 for tag in invalid_tags:
-    for match in soup.findAll(tag):
+    for match in soup.find_all(tag):
         match.replaceWithChildren()
 
 # Get first child
-next(tag.children)
+child = next(tag.children)
 
 # Replace children (at least if they're NavigableString)
 headerchild.replaceWith("Tickler " + headertext)
@@ -1434,8 +1442,22 @@ head = soup.head
 head.append(soup.new_tag('style', type='text/css'))
 head.style.append('.someclass { background-color: #7fb; }')
 
+# linkify according to a pattern (use a smarter pattern than this):
+from bs4 import BeautifulSoup, NavigableString
+LINK_PAT = re.compile('^https://')
+def linkify(soup):
+    for link in soup.body.findAll(string=LINK_PAT):
+        if type(link) is not NavigableString:
+            continue
+        url = str(link)
+        print("linkifying", url, file=sys.stderr)
+        atag = soup.new_tag("a", href=url)
+        atag.string = url
+        link.replace_with(atag)
+
 
 # Prettyprint output:
+soup.prettify()
 
 
 ########################################################
