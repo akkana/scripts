@@ -25,7 +25,6 @@ from math import isclose
 
 # Try to use PyMuPDF if available.
 # For some inexplicable reason the package PyMuPDF is imported as "fitz".
-# But the fitz code is currently not seeing links, so it doesn't work anyway.
 # try:
 #     import fitz
 # except:
@@ -36,11 +35,11 @@ from math import isclose
 # You can also pass in RSS_URL RSS_DIR as two optional arguments
 
 # Where to start: the public legistar meeting list
-MEETING_LIST_URL = "http://losalamos.legistar.com/Calendar.aspx"
+MEETING_LIST_URL = "https://losalamos.legistar.com/Calendar.aspx"
 
 # The place where the RSS will be hosted. Must end with a slash.
 # The RSS file will be this/index.rss.
-RSS_URL = "http://localhost/los-alamos-meetings/"
+RSS_URL = "https://localhost/los-alamos-meetings/"
 
 # Where to put the generated RSS file. Customize this for your website.
 RSS_DIR = os.path.expanduser("~/web/los-alamos-meetings")
@@ -75,6 +74,12 @@ TICKLER_HDR_DATE_PAT = re.compile("[MTWFS][a-z]{2} [A-Z][a-z]{2} [0-9]{1,2}")
 # Items are introduced with a "file number" which can help separate them
 # in what otherwise looks like a sea of text.
 FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
+
+# What to search for when linkifying.
+# Note: this doesn't always get the whole link, but that's not the fault
+# of LINK_PAT; it's that sometimes the PDFs split the URL across
+# several lines.
+LINK_PAT = re.compile('^https://')
 
 
 # Where temp files will be created. pdftohtml can only write to a file.
@@ -245,6 +250,11 @@ def diffhtml(before_html, after_html, title=None):
 
 
 def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
+    if save_pdf_filename:
+        prettyname = os.path.basename(save_pdf_filename)
+    else:
+        prettyname = agendaloc
+    print("Converting agenda for", prettyname, file=sys.stderr)
     if 'fitz' in sys.modules:
         print("Using fitz")
         return html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename)
@@ -408,6 +418,7 @@ def clean_up_htmlfile(htmlfile, meetingtime):
        removing the idiotic dark grey background pdftohtml has hardcoded in,
        the assortment of absolute-positioned styles,
        the new-paragraph-for-each-line, etc.
+       Also, try to linkify links.
        Returns bytes, not str.
     """
     with open(htmlfile, 'rb') as htmlfp:
@@ -513,6 +524,16 @@ def clean_up_htmlfile(htmlfile, meetingtime):
 
     # Highlight all the file numbers, which helps separate items
     highlight_filenumbers(soup)
+
+    # linkify links, particularly the Zoom link
+    for link in soup.body.findAll(string=LINK_PAT):
+        if type(link) is not NavigableString:
+            continue
+        url = str(link)
+        print("linkifying", url, file=sys.stderr)
+        atag = soup.new_tag("a", href=url)
+        atag.string = url
+        link.replace_with(atag)
 
     add_stylesheet(soup)
     pretty_html_bytes = soup.prettify(encoding='utf-8')
@@ -623,7 +644,7 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
         headertext = headerchild.strip()
         if TICKLER_HDR_DATE_PAT.match(headertext):
             firstheader.name = 'h1'
-            headerchild.replaceWith("Tickler, " + headertext)
+            headerchild.replace_with("Tickler, " + headertext)
         else:
             print("firstheader didn't match:", firstheader, file=sys.stderr)
     else:
@@ -959,7 +980,7 @@ As of: {gendate}
 
             if mtg["Agenda"]:
                 desc = f"""{desc}<p>
-<a href="{mtg["Agenda"]}">Agenda PDF</a><br>
+<a href="{mtg['Agenda']}" target='_none'>Agenda PDF</a><br>
 </p>
 """
 
@@ -967,7 +988,7 @@ As of: {gendate}
                 # The agenda packet links tend to have & in them
                 # and so need to be escaped with CDATA
                 if 'http' in mtg["Agenda Packets"]:
-                    desc += f"""<p><a href="{mtg["Agenda Packets"]}">Agenda Packet</a></p>\n"""
+                    desc += f"""<p><a href="{mtg["Agenda Packets"]}" target="_none">Agenda Packet</a></p>\n"""
                 else:
                     desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
 

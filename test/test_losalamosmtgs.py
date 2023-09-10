@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 import losalamosmtgs
 
-class TestCleanUp(unittest.TestCase):
+class TestLosAlamosMtgs(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pass
