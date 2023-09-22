@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-A PyQt6 drop target.
+A PyQt6 drop target. Also understands middleclick paste.
 
 Derived from the ZetCode PyQt6 tutorial by Jan Bodnar
 Copyright 2023 by Akkana Peck: share and enjoy under the GPLv2 or later.
@@ -10,7 +10,8 @@ Copyright 2023 by Akkana Peck: share and enjoy under the GPLv2 or later.
 import sys
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QApplication)
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
+from PyQt5.QtGui import QClipboard
 
 
 class DropButton(QPushButton):
@@ -26,7 +27,7 @@ class DropButton(QPushButton):
 
         self.timer = QTimer()
         self.timer.setSingleShot(True)
-        self.timer.setInterval(1200)
+        self.timer.setInterval(1000)
         self.timer.timeout.connect(self.invert)
 
         self.inverted = False
@@ -45,6 +46,31 @@ class DropButton(QPushButton):
         print("Dropped:", e.mimeData().text())
         self.invert()
         self.timer.start()
+
+    def mouseReleaseEvent(self, e):
+        """On middleclick release, get the PRIMARY selection if possible,
+           else CLIPBOARD.
+        """
+        if e.button() != Qt.MouseButton.MiddleButton:
+            print("Ignoring button", e.button())
+            return
+
+        # Pyside docs (which seem to be all that exist, I haven't found
+        # any pyqt6 docs on QClipboard) say you can do
+        # QClipboard().supportsSelection() and
+        # mode=QClipboard.Mode.Selection,
+        # but in reality those lead to core dumps with
+        # "argument 'mode' has unexpected type 'Mode'" and
+        # "'mode' is not a valid keyword argument".
+        # Instead, use QApplication.clipboard().Mode.Selection.
+        if QApplication.clipboard().supportsSelection():
+            mode = QApplication.clipboard().Mode.Selection
+        else:
+            print("No Selection (PRIMARY) support! Using clipboard instead")
+            mode = QApplication.clipboard().Mode.Clipboard
+
+        selection_text = QApplication.clipboard().text(mode=mode)
+        print("Pasted:", selection_text)
 
     def invert(self):
         if self.inverted:
