@@ -23,8 +23,9 @@ SMARTQUOTE_CHARMAP = { 0x201c : u'"',
                        0x2018 : u"'",
                        0x2019 : u"'" }
 
-# The column index of the first question (hope this doesn't change):
-FIRST_Q_COL = 16
+# The column index of the first question.
+# This is subject to change each year.
+FIRST_Q_COL = 18
 
 # The global list of all questions from the header of the CSV file.
 allquestions = None
@@ -35,6 +36,7 @@ allquestions = None
 # So store a dictionary "race name": [low_index, high_index]
 # storing the beginning and end index (into the global allquestions)
 # of questions that any candidate for that race answered.
+# Plus, questions aren't unique, so you have to watch out for that.
 # This is just so horrible.
 race_questions = {}
 
@@ -46,6 +48,26 @@ def tally_race_question(racename, qnum):
              max(race_questions[racename][1], qnum))
     else:
         race_questions[racename] = (qnum, qnum)
+
+
+# An ordered list of candidates (really only the "fullname" field)
+# in the order specified by the order file, normally ballot order.
+order = []
+
+
+def is_in_order(fullname):
+    """Is fullname is in the order file?
+       If so, return the order file's version of fullname,
+       else False.
+    """
+    lowername = fullname.lower()
+    for c in order:
+        if lowername == c['fullname'].lower():
+            return c['fullname']
+        print(lowername, "!=", c['fullname'].lower())
+    return False
+
+
 
 
 NO_RESPONSE = "No response was received."
@@ -60,10 +82,10 @@ class Candidate:
         # and remove any dots after middle initials.
         # It's unpredictable whether a candidate without a middle name
         # will have two spaces or one between the names in the export
-        # file, and our uploading was completely inconsistent about
-        # whether middle initials have a dot after them.
-        self.comparename = re.sub('\.', '',
-                                  re.sub('\s+', ' ', name.lower())).strip()
+        # file, and the upload, which comes from the SOS office,
+        # is completely inconsistent about whether middle initials
+        # have a dot after them.
+        self.comparename = self.simplify_name(name)
 
         # fullname
         self.name = name
@@ -96,6 +118,12 @@ class Candidate:
 
         self.sortkey = ''.join([ c.lower() for c in self.lastname
                                            if c.isalpha() ])
+
+    @staticmethod
+    def simplify_name(name):
+        return re.sub('\.', '',
+                      re.sub('\s+', ' ', name.lower())).strip()
+
 
     def has_answers(self):
         return bool(self.q_and_a.values())
@@ -347,7 +375,7 @@ def sort_candidates(candidates, order):
 
         foundit = False
         for cand_c in candidates:
-            if cand_c.comparename == fullname:
+            if cand_c.comparename == Candidate.simplify_name(fullname):
                 sorted_candidates.append(cand_c)
                 foundit = True
                 break
@@ -477,7 +505,6 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
     global allquestions
 
     # Read the orderfile, if any:
-    order = []
     if orderfile:
         with open(orderfile) as orderfp:
             if orderfile.endswith('.csv'):
@@ -503,7 +530,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             # Make the fullnames match the comparenames from the full database,
             # by removing dots and extra spaces and converting to lowercase.
             for cand in order:
-                cand['fullname'] = re.sub('\.', '',
+                cand['fullname'] = re.sub('\.\.\.', '',
                                           re.sub(' +', ' ',
                                                  cand['fullname'])) \
                                                  .translate(SMARTQUOTE_CHARMAP)
@@ -543,6 +570,10 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             # Up to where the questions start, a dict is useful.
             rowdict = dict(zip(infields[:FIRST_Q_COL], row[:FIRST_Q_COL]))
 
+            # Try to throw out any candidate not in the order file.
+            if not is_in_order(rowdict["Full Name"]):
+                continue
+
             # Which questions did this candidate answer?
             q_and_a = {}
             for qindex, col in enumerate(row[FIRST_Q_COL:]):
@@ -565,7 +596,12 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                         .strip().replace('NM', 'N.M.')
 
         # Done with loop over tab-separated lines. All candidates are read.
-        print(len(candidates), "candidates")
+        print("\n*** Found", len(candidates), "candidates")
+
+        # print("Race questions:")
+        # pprint(race_questions)
+        # print("All questions:")
+        # pprint(allquestions)
 
         # Sort the candidates and measures, and limit them to
         # what's in the order file.
