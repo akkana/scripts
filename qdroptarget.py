@@ -3,11 +3,16 @@
 """
 A PyQt6 drop target. Also understands middleclick paste.
 
+Optionally, you can specify a command to run whenever something
+is dropped or pasted into the window.
+
 Derived from the ZetCode PyQt6 tutorial by Jan Bodnar
 Copyright 2023 by Akkana Peck: share and enjoy under the GPLv2 or later.
 """
 
-import sys
+import sys, os
+
+import subprocess
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QApplication)
 from PyQt6.QtCore import Qt, QTimer
@@ -16,9 +21,10 @@ from PyQt5.QtGui import QClipboard
 
 class DropButton(QPushButton):
 
-    def __init__(self, parent):
+    def __init__(self, parent, command=None):
 
         self.title = "Drop\nURL\nhere"
+        self.command = command
 
         super().__init__(self.title, parent)
 
@@ -43,9 +49,13 @@ class DropButton(QPushButton):
             e.ignore()
 
     def dropEvent(self, e):
-        print("Dropped:", e.mimeData().text())
+        text = e.mimeData().text()
         self.invert()
         self.timer.start()
+        if self.command:
+            self.run_command(text)
+        else:
+            print("Dropped:", text)
 
     def mouseReleaseEvent(self, e):
         """On middleclick release, get the PRIMARY selection if possible,
@@ -55,8 +65,8 @@ class DropButton(QPushButton):
             print("Ignoring button", e.button())
             return
 
-        # Pyside docs (which seem to be all that exist, I haven't found
-        # any pyqt6 docs on QClipboard) say you can do
+        # Pyside docs (which seem to be all that exist, I haven't
+        # found any pyqt6 docs on QClipboard) say you can do
         # QClipboard().supportsSelection() and
         # mode=QClipboard.Mode.Selection,
         # but in reality those lead to core dumps with
@@ -69,8 +79,18 @@ class DropButton(QPushButton):
             print("No Selection (PRIMARY) support! Using clipboard instead")
             mode = QApplication.clipboard().Mode.Clipboard
 
-        selection_text = QApplication.clipboard().text(mode=mode)
-        print("Pasted:", selection_text)
+        text = QApplication.clipboard().text(mode=mode)
+        if self.command:
+            self.run_command(text)
+        else:
+            print("Pasted:", text)
+
+    def run_command(self, text):
+        if not self.command:
+            print("qdroptarget:", command)
+            return
+        command = self.command.replace('%s', text)
+        subprocess.run(["sh", "-c", command])
 
     def invert(self):
         if self.inverted:
@@ -84,15 +104,39 @@ class DropButton(QPushButton):
 
 class DropWindow(QWidget):
 
-    def __init__(self):
+    def __init__(self, command=None):
         super().__init__()
 
-        button = DropButton(self)
+        button = DropButton(self, command=command)
+
+
+def Usage():
+    print(f"""Usage: {os.path.basename(sys.argv[0])} [command]
+
+If a command is provided (quoted), it will be run any time something is
+dropped onto or middlemouse-pasted into the window, with any occurrences
+of %s in the command replaced with the text dropped/pasted.
+For instance, you could use a command like 'sensible-browser %s'.
+Obviously, don't let people you don't trust drag into this window.""")
+    sys.exit(1)
 
 
 def main():
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-h' or sys.argv[1] == '--help':
+            Usage()
+        command = sys.argv[-1]
+        if '%s' not in command:
+            Usage()
+    else:
+        command = None
+
+    rc = os.fork()
+    if rc:
+        sys.exit(0)
+
     app = QApplication(sys.argv)
-    win = DropWindow()
+    win = DropWindow(command=command)
     win.show()
     app.exec()
 
