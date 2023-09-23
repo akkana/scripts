@@ -16,7 +16,7 @@ import subprocess
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QApplication)
 from PyQt6.QtCore import Qt, QTimer
-from PyQt5.QtGui import QClipboard
+from PyQt6.QtGui import QClipboard, QKeySequence, QShortcut
 
 
 class DropButton(QPushButton):
@@ -62,7 +62,6 @@ class DropButton(QPushButton):
            else CLIPBOARD.
         """
         if e.button() != Qt.MouseButton.MiddleButton:
-            print("Ignoring button", e.button())
             return
 
         # Pyside docs (which seem to be all that exist, I haven't
@@ -108,6 +107,12 @@ class DropWindow(QWidget):
         super().__init__()
 
         button = DropButton(self, command=command)
+
+        self.shortcut_quit = QShortcut(QKeySequence('Ctrl+Q'), self)
+        self.shortcut_quit.activated.connect(lambda : sys.exit())
+
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
 
 
 def Usage():
