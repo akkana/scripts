@@ -180,6 +180,11 @@ dirsneeded.py:
 
 docx2html, doc2html have been replaced by word2html.
 
+droplink.py:
+    Search for the biggest firefox window and use Linux utilities like
+    xdotool, wmctrl and xwininfo to cause the firefox window to browse
+    to a given URL in a new tab.
+
 eggtimer.py:
     Pop up a reminder window in a specified number of minutes.
     Also has an example of how to do full-duplex interprocess
@@ -447,7 +452,11 @@ pysync:
     password between the two calls.
 
 python-cheatsheet.py:
-    Cheatsheet and syntax reminders for useful Python features.
+    My personal cheatsheet and syntax reminders for useful Python features.
+
+qdroptarget.py:
+    A little PyQt window that acts as a drop target and can run a
+    program on text that's dropped or middlemouse-pasted there.
 
 qhtmlprint:
     Convert a set of HTML slides (e.g. in navigate.js) into PDF.
@@ -493,12 +502,18 @@ randombg:
     sized for laptop screen, external monitor etc.
 
 randomgeom.bash:
+    Obsoleted by randomgeom.py.
     bash (or zsh or other modern shell) script to generate an
     X11 geometry argument with a random position along the edge
     of the monitor, like 165x65-1899-0.
-    I use this to position dclock in different places each day to
+    I used this to position dclock in different places each day to
     avoid monitor burn-in; to anyone else, it's mostly useful as an
     example of how to do random number calculations in a shell script.
+
+randomgeom.py:
+    A smarter, more general version of randomgeom.bash:
+    generate an X11 geometry argument with a random position along the
+    edge of the monitor.
 
 randomline:
     Print a random line from a file. Useful for things like choosing
