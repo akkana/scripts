@@ -180,11 +180,6 @@ dirsneeded.py:
 
 docx2html, doc2html have been replaced by word2html.
 
-droplink.py:
-    Search for the biggest firefox window and use Linux utilities like
-    xdotool, wmctrl and xwininfo to cause the firefox window to browse
-    to a given URL in a new tab.
-
 eggtimer.py:
     Pop up a reminder window in a specified number of minutes.
     Also has an example of how to do full-duplex interprocess
@@ -399,6 +394,11 @@ nonblock.py, nonblock-py3.py:
 noteplayer.py:
     Spun off of play_chord.py: a more general pygame-based  note generator
     usable asynchronously, like from a Raspberry Pi piano keyboard.
+
+openlink.py:
+    Search for the biggest firefox window and use Linux utilities like
+    xdotool, wmctrl and xwininfo to cause the firefox window to browse
+    to a given URL in a new tab.
 
 pathmatch:
     Search your executable path to find programs matching a string.
