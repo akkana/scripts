@@ -21,12 +21,29 @@ from PyQt6.QtGui import QClipboard, QKeySequence, QShortcut
 
 class DropButton(QPushButton):
 
+    basic_style = """background-color: white;
+                     color: black;
+                     border-style: outset;
+                     border-width: 4px;
+                     border-radius: 5px;
+                     border-color: grey;
+                   """
+    accept_style = """background-color: green;
+                      color: white;
+                   """
+    invert_style = """background-color: blue;
+                      color: white;
+                      border-style: inset;
+                   """
+
     def __init__(self, parent, command=None):
 
         self.title = "Drop\nURL\nhere"
         self.command = command
 
         super().__init__(self.title, parent)
+
+        self.setStyleSheet(__class__.basic_style)
 
         self.setAcceptDrops(True)
         self.resize(100, 70)
@@ -43,7 +60,7 @@ class DropButton(QPushButton):
         # print("Formats:", mime_data.formats())
         if mime_data.hasFormat('text/plain'):
             e.accept()
-            self.setStyleSheet("background-color: green; color: white")
+            self.setStyleSheet(__class__.accept_style)
         else:
             print("Ignoring, no text/plain")
             e.ignore()
@@ -93,10 +110,10 @@ class DropButton(QPushButton):
 
     def invert(self):
         if self.inverted:
-            self.setStyleSheet("background-color: white")
+            self.setStyleSheet(__class__.basic_style)
             self.setText(self.title)
         else:
-            self.setStyleSheet("background-color: black; color: white")
+            self.setStyleSheet(__class__.invert_style)
             self.setText("Dropped")
         self.inverted = not self.inverted
 
