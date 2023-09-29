@@ -17,27 +17,17 @@ def open_in_existing_firefox(url, minwidth=800):
     """Find the oldest firefox window that's bigger than minwidth pixels
        and open a URL in it using xdotool events.
     """
-    def get_window_width(windowid):
-        proc = subprocess.run(["xwininfo", "-id", windowid],
-                              capture_output=True)
-        for line in proc.stdout.splitlines():
-            line = line.strip()
-            if not line.startswith(b'Width: '):
-                continue
-            return int(line.split()[1])
-        return None
-
     def find_biggest_firefox_window_and_desktop():
         maxwidth = 0
         biggest_win = (None, None)
-        proc = subprocess.run(["wmctrl", "-l"], capture_output=True)
+        proc = subprocess.run(["wmctrl", "-l", "-G"], capture_output=True)
         for line in proc.stdout.splitlines():
             if not line.endswith(b'irefox'):
                 continue
             words = line.split()
             windowid = words[0]
             desktop = words[1]
-            w = get_window_width(windowid)
+            w = int(words[4])
             if w < minwidth:
                 continue
             if w > maxwidth:
