@@ -27,13 +27,21 @@ class DropButton(QPushButton):
                      border-width: 4px;
                      border-radius: 5px;
                      border-color: grey;
-                   """
+                  """
     accept_style = """background-color: green;
                       color: white;
+                      border-style: outset;
+                      border-width: 4px;
+                      border-radius: 5px;
+                      border-color: grey;
                    """
     invert_style = """background-color: blue;
                       color: white;
                       border-style: inset;
+                      border-style: outset;
+                      border-width: 4px;
+                      border-radius: 5px;
+                      border-color: grey;
                    """
 
     def __init__(self, parent, command=None):
