@@ -1,0 +1,20 @@
+Check a web page, summarizing just the specific part you care about.
+Uses selenium so that JavaScript and dynamically loaded pages work.
+
+For instance, if you're trying to buy a car and the manufacturer
+has a page showing inventory for a particular zip code and set of options,
+but you're willing to travel or to accept several combinations of options,
+you can monitor several pages to see what comes up, and email yourself
+the results each day or create an RSS file for it.
+
+Since pages vary so much, and you might need to do things like search
+for the list of things and then loop through the things, you'll need
+to write the part that actually parses the page as a loadable module.
+Basically, create a file named yourmodulename.py that defines a function
+named summarize(driver). Your summarize function is responsible for
+loading the URL(s), parsing them using the selenium driver passed in,
+and doing something useful (perhaps just print()) with the results.
+
+If you get selenium errors in driver initialization, try making a
+virtualenv where you can pip install selenium before giving up.
+Distro seleniums (at least on Debian) are sometimes broken.

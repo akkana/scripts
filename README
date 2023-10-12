@@ -34,6 +34,11 @@ motioncam:
     An automated motion-sensitive camera driver, for Raspberry Pi or
     other machines. Requires pycamera module.
 
+pagewatch:
+    Watch a website and summarize the important parts of it.
+    For instance, watch a page to see when something you want to buy
+    is in stock, or to see when tickets for an event become available.
+
 pycamera:
     A wrapper that can drive a Pi camera module, a USB webcam or an
     external gphoto2-compatible camera using similar APIs.
