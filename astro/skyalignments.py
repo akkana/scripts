@@ -176,7 +176,7 @@ def read_waypoint_file_CSV(filename):
                 else:
                     ele = 0
                 point = [ row['name'],
-                          float(row['latitude']), float(row['latitude']),
+                          float(row['latitude']), float(row['longitude']),
                           ele ]
             except ValueError:
                 print("ValueError on", row)
