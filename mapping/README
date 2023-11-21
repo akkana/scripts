@@ -35,6 +35,15 @@ greatcircle.py:
     Calculate bearings for a great circle trip between two coordinates
     on a spherical planet.
 
+pixel_photo_comparison.py:
+    Compare GPS coordinates from photos to the actual coordinates where
+    the photo was taken, to analyze how far off the Google Pixel 6a's
+    photo coordinates are. Doesn't make any attempt to be general,
+    e.g. coordinates are specified in the script.
+    See upcoming blog entry for discussion.
+    Also has a useful comparison of two different types of markers
+    in folium.
+
 plotrivers.py:
     Follow the tutorial at
     https://towardsdatascience.com/creating-beautiful-river-maps-with-python-37c9b5f5b74c
