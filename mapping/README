@@ -35,12 +35,16 @@ greatcircle.py:
     Calculate bearings for a great circle trip between two coordinates
     on a spherical planet.
 
+map_named_features.py:
+    Map features from the USGS National Map's Geographic Names
+    Information System (GNIS) on a Folium map.
+
 pixel_photo_comparison.py:
     Compare GPS coordinates from photos to the actual coordinates where
     the photo was taken, to analyze how far off the Google Pixel 6a's
     photo coordinates are. Doesn't make any attempt to be general,
     e.g. coordinates are specified in the script.
-    See upcoming blog entry for discussion.
+    Discussion at https://shallowsky.com/blog/mapping/pixel_photo_gps_bad.html
     Also has a useful comparison of two different types of markers
     in folium.
 
