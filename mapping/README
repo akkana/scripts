@@ -39,6 +39,13 @@ map_named_features.py:
     Map features from the USGS National Map's Geographic Names
     Information System (GNIS) on a Folium map.
 
+map_valleys.py
+    Starting from the USGS National Map's Geographic Names Information
+    System (GNIS) and a Digital Elevation Map (DEM) tif file,
+    trace named valleys using PySheds to analyze the DEM,
+    then save the traces to a GeoJSON or GPX file
+    which can be carried along on a mobile device.
+
 pixel_photo_comparison.py:
     Compare GPS coordinates from photos to the actual coordinates where
     the photo was taken, to analyze how far off the Google Pixel 6a's
