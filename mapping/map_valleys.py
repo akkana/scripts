@@ -12,9 +12,16 @@ from pysheds.grid import Grid
 import geojson
 from geopy.distance import distance
 from os.path import splitext
-from sys import argv, float_info
+from sys import argv, stderr, float_info, exit
 # import matplotlib.pyplot as plt
 import csv
+
+from pprint import pprint
+
+
+# The pysheds grid calculates a bounding box,
+# which we'll use later.
+bbox = None
 
 
 branchfilename = "branches.geojson"
@@ -83,6 +90,8 @@ def map_branches(demname):
        Return a JSON FeatureList of branches,
        plus the list of connections between branches.
     """
+    global bbox
+
     branchfilename = splitext(demname)[0] + '-branches.geojson'
 
     # Branches already written?
@@ -101,6 +110,14 @@ def map_branches(demname):
     # ----------------------------
     grid = Grid.from_raster(demname)
     dem = grid.read_raster(demname)
+
+    # Save the bounding box
+    # Except PySheds apparently underestimates the bounding box.
+    # So make it a big bigger.
+    margin = .1
+    bbox = (dem.bbox[0] - margin, dem.bbox[1] - margin,
+            dem.bbox[2] + margin, dem.bbox[3] + margin)
+    print("dem.bbox:", dem.bbox)
 
     # Condition DEM
     # ----------------------
@@ -199,7 +216,7 @@ def nearest_line(point, lines, which_end=WhichEnd.NO_PREFERENCE):
     # as a sort key, a low number means it will be preferred.
     distance_list = []
 
-    print("total of", len(lines), "lines")
+    # print("total of", len(lines), "lines")
     for lindex, line in enumerate(lines):
         min_dist = float_info.max
         closest_line_index = None
@@ -225,26 +242,10 @@ def nearest_line(point, lines, which_end=WhichEnd.NO_PREFERENCE):
 
     # Sort distance_list to decide which one to return.
     # If there are multiple entries of similar close
-    print("distance_list[0]", distance_list[0][0])
-    print("type", type(distance_list[0][0]))
-    print("km", distance_list[0][0].km)
+    # print("distance_list[0]", distance_list[0][0])
+    # print("type", type(distance_list[0][0]))
+    # print("km", distance_list[0][0].km)
     distance_list.sort(key=lambda x: f'{x[2]} {float(x[0].km):.2f}')
-
-    # TEMPORARY: to visualize this list, save a GPX file of the list.
-#     with open("nearest_pts.gpx", 'w') as fp:
-#         print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-# <gpx version="1.1" creator="OsmAnd+" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-# ''', file=fp)
-#         print(f'''  <wpt lat="{point[0]}" lon="{point[1]}">
-#     <name>*** POINT ***</name>
-#   </wpt>''', file=fp)
-#         for d in distance_list:
-#             dist, i, percent_along, coords = d
-#             print(f'''  <wpt lat="{coords[0]}" lon="{coords[1]}">
-#     <name>i={i}, ({dist.km:.02f}, &lt;{along_key}%gt;)</name>
-#   </wpt>''', file=fp)
-#         print('</gpx>', file=fp)
-#         print("saved nearest_pts.gpx")
 
     # Return index of line, distance, index within line of closest point
     return distance_list[0][1], distance_list[0][0], distance_list[0][3]
@@ -260,10 +261,10 @@ def follow_downstream(startpoint, endpoint, branches, connections):
     lines = branches['features']
     startline, dist, starti = nearest_line(startpoint, lines,
                                            which_end=WhichEnd.PREFER_TOP)
-    print("startline:", startline, "at distance:", dist)
+    # print("startline:", startline, "at distance:", dist)
     endline, dist, endi = nearest_line(endpoint, lines,
                                        which_end=WhichEnd.PREFER_BOTTOM)
-    print("endline:", endline, "at distance:", dist)
+    # print("endline:", endline, "at distance:", dist)
 
     basin_points = []
     # print("start line:", lines[startline])
@@ -303,44 +304,141 @@ def follow_downstream(startpoint, endpoint, branches, connections):
 
 
 def trace_GNIS_valleys(GNISfile, branches, connections):
-    """Parse a USGS GNIS CSV file, and
+    """Parse a USGS GNIS CSV file to find valleys, and
        using branches and connections from analyzing a DEM with PySheds,
-       create JSON for the valley traces.
+       create LineStrings for the valley traces, saving to both JSON and GPX.
+       (Note: GNIS uses "Valley" for features like canyons, washes, etc.)
     """
+    features = []
+    featureid = 0
+    print("bbox:", bbox)
+    # Make linestrings showing the bbox, for debugging
+    features.append(geojson.Feature(
+        properties = {
+            'id': featureid,
+            'name': "Bounding box"
+        },
+        geometry=geojson.LineString(
+            coordinates=((bbox[0], bbox[1]), (bbox[0], bbox[3]),
+                         (bbox[2], bbox[3]), (bbox[2], bbox[1]),
+                         (bbox[0], bbox[1]))
+        )))
+
+    with open(GNISfile) as csvfp:
+        reader = csv.DictReader(csvfp, delimiter="|")
+        for row in reader:
+            if row['feature_class'].lower() != "valley":
+                continue
+
+            startpt = (float(row['source_lat_dec']),
+                       float(row['source_long_dec']))
+            endpt = (float(row['prim_lat_dec']),
+                     float(row['prim_long_dec']))
+
+            def out_of_bounds(lat, lon):
+                # bbox is minlon, minlat, maxlon, maxlat
+                if lat < bbox[1] or lat > bbox[3]:
+                    if row['feature_name'] == 'Walnut Canyon' and \
+                       row['county_name'] == 'Los Alamos':
+                        print(lat, "isn't between", bbox[1], "and", bbox[3])
+                    return True
+                if lon < bbox[0] or lon > bbox[2]:
+                    if row['feature_name'] == 'Walnut Canyon' and \
+                       row['county_name'] == 'Los Alamos':
+                        print(lon, "isn't between", bbox[0], "and", bbox[2])
+                    return True
+                return False
+
+            if out_of_bounds(*startpt):
+                continue
+            if out_of_bounds(*endpt):
+                continue
+
+            coords = follow_downstream(startpt, endpt, branches, connections)
+
+            features.append(geojson.Feature(
+                properties = {
+                    'id': featureid,
+                    'name': row['feature_name'] + " source"
+                },
+                geometry=geojson.Point(coordinates=(startpt[1], startpt[0]))
+            ))
+            featureid += 1
+            features.append(geojson.Feature(
+                properties = {
+                    'id': featureid,
+                    'name': row['feature_name'] + " mouth"
+                },
+                geometry=geojson.Point(coordinates=(endpt[1], endpt[0]))
+            ))
+            featureid += 1
+
+            feature = geojson.Feature(
+                properties = {
+                    'id': featureid,
+                    'name': row['feature_name']
+                },
+                geometry=geojson.LineString(
+                    coordinates=coords
+                ))
+            features.append(feature)
+            print("Mapped valley feature", row['feature_name'])
+            featureid += 1
+
+    # print("Saw", featureid, "features")
+    # print("features:")
+    # pprint(features)
+
+    feature_collection = geojson.FeatureCollection(features)
+
+    filename = 'valleys'
+    with open(filename + '.geojson', 'w') as fp:
+        geojson.dump(feature_collection, fp, indent=2)
+        print(f"Wrote to {filename}.geojson")
+
+    with open(filename + '.gpx', 'w') as fp:
+        dump_gpx(feature_collection, fp)
+        print(f"Wrote to {filename}.gpx")
+
+
+def dump_gpx(feature_collection, fp):
+    print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<gpx version="1.1" creator="OsmAnd+" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+''', file=fp)
+
+    # print("\n\n\n======= feature_collection: ========")
+    # Weirdly, pprint doesn't prettyprint the feature collection,
+    # it just jams it all together
+    # pprint(feature_collection)
+    for feature in feature_collection["features"]:
+        # print("feature:", feature, "(type is", type(feature), ")")
+        if type(feature['geometry']) is geojson.Point:
+            # print("point:", feature)
+            try:
+                print(f'''  <wpt lat="{feature['geometry']['coordinates'][1]}" lon="{feature['geometry']['coordinates'][0]}">
+    <name>{feature["properties"]["name"]}</name>
+  </wpt>''', file=fp)
+            except KeyError:
+                print("Been through the desert for a point with no name",
+                      file=stderr)
+
+        elif type(feature.geometry) is geojson.LineString:
+            print('  <trk>', file=fp)
+            print(f'    <name>{feature["properties"]["name"]}</name>', file=fp)
+            print('    <trkseg>', file=fp)
+
+            for coords in feature.geometry.coordinates:
+                print(f'''      <trkpt lat="{coords[1]}" lon="{coords[0]}">''',
+                      file=fp)
+                print('''       </trkpt>''', file=fp)
+
+            print('''    </trkseg>\n  </trk>''', file=fp)
+
+    print('''</gpx>''', file=fp)
 
 
 if __name__ == '__main__':
     branches, connections = map_branches(argv[1])
 
-    startpt = (float(row['source_lat_dec']), float(row['source_long_dec']))
-    endpt = (float(row['prim_lat_dec']), float(row['prim_long_dec']))
+    trace_GNIS_valleys(argv[2], branches, connections)
 
-    basin = follow_downstream(startpt, endpt, branches, connections)
-    # print()
-    # print("Basin:", basin)
-
-    with open("valleys.gpx", 'w') as fp:
-        print('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<gpx version="1.1" creator="OsmAnd+" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-''', file=fp)
-
-        print(f'''  <wpt lat="{startpt[0]}" lon="{startpt[1]}">
-    <name>*** {row['feature_name']} SOURCE ***</name>
-  </wpt>''', file=fp)
-
-        print(f'''  <wpt lat="{endpt[0]}" lon="{endpt[1]}">
-    <name>*** {row['feature_name']} MOUTH ***</name>
-  </wpt>''', file=fp)
-
-        print('  <trk>', file=fp)
-        print(f'    <name>{row["feature_name"]}</name>', file=fp)
-        print('    <trkseg>', file=fp)
-
-        for coords in basin:
-            print(f'''      <trkpt lat="{coords[1]}" lon="{coords[0]}">
-      </trkpt>''', file=fp)
-
-        print('''    </trkseg>\n  </trk>\n''', file=fp)
-
-        print('</gpx>', file=fp)
-        print("saved valleys.gpx")
