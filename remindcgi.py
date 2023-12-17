@@ -309,8 +309,18 @@ def print_remind_for_interval(enddate, formatter):
     remindin = remindin.replace(b'%', b'%%')
 
     proc = subprocess.Popen(["/usr/bin/remind", "-n", "-" ],
-                            stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    remindout = proc.communicate(input=remindin)[0]
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    remindout, reminderr = proc.communicate(input=remindin)
+
+    # Remind has some weird and inexplicable errors. For instance,
+    # 30 Dec Last day to do whatever
+    # leads to the error: -stdin-(54): Day specified twice
+    # so make sure to show any errors prominently, otherwise such events
+    # will be silently dropped.
+    if reminderr:
+        print("<fieldset><b>Warning from remind:", reminderr.decode(),
+              "</b></fieldset>")
     lines = remindout.decode().split('\n')
     # lines look like
     # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
