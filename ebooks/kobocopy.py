@@ -20,15 +20,19 @@ before running this.""")
 
 
 def kobocopy_file(inpath, destdir):
+    if inpath.startswith("/"):
+        raise NotImplementedError(
+            "%s: only relative paths are currently supported, not %s"
+            % (os.path.basename(sys.argv[0]), inpath))
     linpath = inpath.lower()
     if not linpath.endswith(".epub"):
         print(inpath, "doesn't end with .epub: skipping!", file=sys.stderr)
         return
 
     destpath = os.path.normpath(os.path.join(destdir, inpath))
-    print("kobocopy_file", inpath, destdir, ": destpath =", destpath)
 
     destdirpath = os.path.dirname(destpath)
+    print("Destpath:", destpath, "destdirpath", destdirpath)
     if not os.path.isdir(destdirpath):
         print("Creating dir", destdirpath)
         os.makedirs(destdirpath)
@@ -38,7 +42,7 @@ def kobocopy_file(inpath, destdir):
         shutil.copyfile(inpath, destpath)
         return
 
-    print("Calling kobo_convert_file(", inpath, destpath, ")")
+    print("Calling kobo_convert_file:", inpath, "to dest dir", destdirpath)
     kobopath = kobo_convert_file(inpath, destdirpath)
 
 
@@ -66,6 +70,10 @@ if __name__ == '__main__':
     if not os.path.isdir(destdir):
         Usage()
 
-    for inpath in sys.argv[1:-1]:
-        kobocopy_file_or_dir(inpath, destdir)
+    try:
+        for inpath in sys.argv[1:-1]:
+            kobocopy_file_or_dir(inpath, destdir)
+    except Exception as e:
+        print("Error on", inpath, file=sys.stderr)
+        print(e, file=sys.stderr)
 
