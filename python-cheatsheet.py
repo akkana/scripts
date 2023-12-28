@@ -480,6 +480,7 @@ filename = 'file%s.txt' % num
 print(f'Fly to {name}: {lat}N {lon}E')
 print(f'The value of pi is approximately {math.pi:.3f}.')
 print(f"{setting:>27}: ")    # right-justify with >
+>>> print(f"{foo=}")         # prints: foo=42
 
 # decimals and field widths
 >>> f'{math.pi:.2f}'
@@ -1493,7 +1494,7 @@ timeout is not a time limit on the entire response download; rather, an exceptio
 
 
 ########################################################
-# Enumerators and similar
+# Enum and similar
 ########################################################
 
 # Enum Howto: https://docs.python.org/3.10/howto/enum.html
@@ -2414,13 +2415,15 @@ python3 setup.py sdist bdist_wheel
 
 Upload to Test PyPI
   First disable keyring (only need once) if you don't use Kwallet:
-keyring disable
+    keyring disable
   per https://twine.readthedocs.io/en/latest/#disabling-keyring
   then:
 python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 
 Install and test in a new empty virtualenv:
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
+Ideally, also test on a separate default account on some distro like Ubuntu,
+or on other OSes.
 
 If that doesn't work (e.g. on Ubuntu eoan), try:
   python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
