@@ -12,7 +12,7 @@ Copyright 2023 by Akkana Peck: share and enjoy under the GPLv2 or later.
 
 import sys, os
 
-import subprocess
+import subprocess, re
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QApplication)
 from PyQt6.QtCore import Qt, QTimer
@@ -109,10 +109,19 @@ class DropButton(QPushButton):
         else:
             print("Pasted:", text)
 
+    @staticmethod
+    def strip_newlines(url):
+        """Strip newlines and leading spaces from multi-line URLs.
+           Firefox used to handle this, but it broke in Firefox 120.
+        """
+        return re.sub('\s*\n\s*', '', url.strip(), flags=re.MULTILINE)
+
     def run_command(self, text):
         if not self.command:
             print("qdroptarget:", command)
             return
+
+        text = __class__.strip_newlines(text)
         command = self.command.replace('%s', text)
         subprocess.run(["sh", "-c", command])
 
