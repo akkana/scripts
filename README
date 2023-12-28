@@ -317,7 +317,7 @@ louder:
     Bind those to volume increase/decrease keys on your laptop.
     and set it as the system wallpaper.
 
-mac_lookup.p:
+mac_lookup.py:
     Map MAC network addresses to manufacturers.
     Useful for things like scanning your network to find your Raspberry Pi.
 
