@@ -10,6 +10,11 @@ fixbookcover.py:
     Fix books whose cover doesn't include the title, like many
     Project Gutenberg books.
 
+fixlines.py:
+    Apply a line-length heuristic to fix books converted by Calibre's
+    ebook-convert, which even with --heuristics makes a new double-
+    spaced paragraph for every line in the PDF.
+
 grebook.sh:
     A shell script adapted from one by mosh on Stack Exchange
     to grep in un-DRMed epub (and presumably also mobi) ebooks.
