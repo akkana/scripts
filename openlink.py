@@ -36,7 +36,7 @@ def open_in_existing_firefox(url, minwidth=800):
 
         return biggest_win
 
-    # Find the biggest firefox window
+    # Find the widest firefox window
     windowid, desktop, winwidth = find_biggest_firefox_window_and_desktop()
     if not windowid:
         print("Can't find a firefox process")
@@ -45,16 +45,23 @@ def open_in_existing_firefox(url, minwidth=800):
     # Switch to appropriate desktop if needed
     if desktop:
         subprocess.call(['wmctrl', '-s', desktop])
+        # This sometimes doesn't finish in time, and part of the text
+        # ends up in the wrong window. So delay slightly:
+        time.sleep(.5)
 
     # Move mouse to center of urlbar (winwidth/2)
     subprocess.call(['xdotool', 'mousemove', '--window', windowid,
                      f'{winwidth/2}', '75'])
-    time.sleep(.5)
+    time.sleep(.3)
+
     # Open a new tab
     subprocess.call(['xdotool', 'keydown', 'Ctrl', 'keydown', 't',
                      'keyup', 't', 'keyup', 'Ctrl'])
+    time.sleep(.3)
+
     # insert url
     subprocess.call(['xdotool', 'type', url])
+    time.sleep(.1)
 
     # hit Enter to go there
     subprocess.call(['xdotool', 'keydown', 'Return', 'keyup', 'Return'])
