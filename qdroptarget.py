@@ -112,13 +112,14 @@ class DropButton(QPushButton):
     @staticmethod
     def strip_newlines(url):
         """Strip newlines and leading spaces from multi-line URLs.
-           Firefox used to handle this, but it broke in Firefox 120.
+           Firefox sometimes handles this, but it isn't 100% reliable
+           at least in Firefox 120.
         """
         return re.sub('\s*\n\s*', '', url.strip(), flags=re.MULTILINE)
 
     def run_command(self, text):
         if not self.command:
-            print("qdroptarget:", command)
+            print("qdroptarget:", text)
             return
 
         text = __class__.strip_newlines(text)
