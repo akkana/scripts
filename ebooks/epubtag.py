@@ -1,8 +1,9 @@
 #! /usr/bin/env python3
 
-# Utilities viewing and modifying the tags inside epub books.
+# Utilities for viewing and modifying epub books,
+# especially the tags inside them.
 #
-# Copyright 2015,2018,2019 by Akkana Peck.
+# Copyright 2015,2018,2019,2024 by Akkana Peck.
 # Share and enjoy under the GPL v2 or later.
 
 from __future__ import print_function
@@ -11,6 +12,9 @@ import os
 import sys
 import zipfile
 import xml.dom.minidom
+
+
+DEBUG = FALSE
 
 
 class EpubBook:
@@ -68,6 +72,18 @@ class EpubBook:
                   file=sys.stderr)
 
         content.close()
+
+    def content_files(self):
+        """An iterator over named content files, like
+           "index_split_000.html", "index_split_001.html", ...
+        """
+        if not self.dom:
+            self.parse_contents()
+
+        for node in self.dom.getElementsByTagName("manifest"):
+            for item in node.getElementsByTagName("item"):
+                if item.hasAttribute("href"):
+                    yield item.getAttribute("href")
 
     def close(self):
         self.zip.close()
@@ -326,6 +342,8 @@ Python 2 minidom has trouble encoding non-ASCII characters")
                 # For every other file, just copy directly.
                 try:
                     ozf.writestr(info, self.zip.read(info.filename))
+                    # if DEBUG:
+                    #     print("Writing orig", info.filename)
                 except OSError as e:
                     print("Exception on filename", info.filename)
                     print(e)
@@ -336,9 +354,11 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         # Rename appropriately:
         bakfile = self.filename + ".bak"
         os.rename(self.filename, bakfile)
+        if DEBUG:
+            print("Saved a backup copy in", bakfile)
         os.rename(new_epub_file, self.filename)
         print("Wrote", self.filename)
-        os.remove(bakfile)
+        # os.remove(bakfile)
 
     def extract_cover_image(self, outdir=''):
         """Extract just an image named cover.*.
