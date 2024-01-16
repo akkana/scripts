@@ -70,12 +70,17 @@ angle_properties.py:
 animate.js:
     Simple code for animating a series of images in javascript.
 
-aotsearch: Easier way of using aptitude search, which then calls
+aptsearch: Easier way of using aptitude search, which then calls
     apt-file search if aptitude doesn't find any matches.
 
 aptver:
     Search for Debian packages, installed or uninstalled, matching
     a pattern, and print out versions and descriptions.
+
+attention.py:
+    Keep a log of which virtual desktop you're on and the current idle time.
+    The idea is to run it all day in a loop, and plot how often you're
+    context-switching.
 
 balanceparens.py:
     A very simple parenthesis (and brace and bracket) counter.
