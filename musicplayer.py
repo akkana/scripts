@@ -618,6 +618,9 @@ using a no-play file or a single playlist""")
 
         try:
             id3info = ID3(self.songs[self.song_ptr])
+            # If encoded in other than the system encoding, these
+            # may display incorrectly in the UI. So recode them.
+            
         except:
             id3info = {}
 
