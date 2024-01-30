@@ -14,7 +14,7 @@ import zipfile
 import xml.dom.minidom
 
 
-DEBUG = FALSE
+DEBUG = False
 
 
 class EpubBook:
