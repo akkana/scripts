@@ -851,6 +851,9 @@ def main():
 
     for path in (args.paths):
         path = expandpath(path, pathdict)
+        if not path:
+            print(Usage())
+            sys.exit(0)
         print("\n%s :" % path)
         files, dirs = list_dir(path, sizes=(not args.nosize),
                                recursive=args.recursive)
