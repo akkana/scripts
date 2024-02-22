@@ -613,6 +613,10 @@ tklabelimage.py:
     in TkInter, and of how to conditionally import Tk in python2 or 3.
     Doesn't do anything useful.
 
+towebhost.zsh:
+    Handy script to figure out which web host files need to be
+    uploaded to, based on their local directories.
+
 transimageviewer_gtk2.py:
     OBSOLETE because GTK2 is.
     A translucent image viewer (inheriting from imageviewer.py)
