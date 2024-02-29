@@ -26,7 +26,6 @@ import sys, os
 import subprocess
 import posixpath
 import shutil
-import pipes
 import re
 import argparse
 
@@ -373,36 +372,31 @@ def list_local_dir(path, sorted=True, sizes=False, recursive=False):
 
 # Helper routines to copy to/from/on android.
 # These assume the schemas have already been removed.
-def quote(s):
-    #return pipes.quote(s)
-    # Actually, quoting breaks things. subprocess segments the arguments
-    # on its own just fine.
-    return s
 
 def copy_to_android(src, dst):
-    sp_call(["adb", "push", quote(src), quote(dst)])
+    sp_call(["adb", "push", src, dst])
 
 def copy_from_android(src, dst):
     # Copy from android to local
-    sp_call(["adb", "pull", quote(src), quote(dst)])
+    sp_call(["adb", "pull", src, dst])
 
 def copy_on_android(src, dst):
-    sp_call(["adb", "shell", "cp", quote(src), quote(dst)])
+    sp_call(["adb", "shell", "cp", src, dst])
 
 def move_on_android(src, dst):
-    sp_call(["adb", "shell", "mv", quote(src), quote(dst)])
+    sp_call(["adb", "shell", "mv", src, dst])
 
 def remove_from_android(f):
-    sp_call(["adb", "shell", "rm", quote(f)])
+    sp_call(["adb", "shell", "rm", f])
 
 def mkdir_on_android(d):
-    sp_call(["adb", "shell", "mkdir", quote(d)])
+    sp_call(["adb", "shell", "mkdir", d])
 
 def rmdir_on_android(d, recursive=False):
     if recursive:
-        sp_call(["adb", "shell", "rm", "-rf", quote(d)])
+        sp_call(["adb", "shell", "rm", "-rf", d])
     else:
-        sp_call(["adb", "shell", "rmdir", quote(d)])
+        sp_call(["adb", "shell", "rmdir", d])
 
 
 ####################################################################
@@ -810,8 +804,8 @@ def parse_args():
                         action="store_true")
     parser.add_argument('-z', "--no-size", dest="nosize", default=False,
                         action="store_true")
-    parser.add_argument('-l', "--list", dest="list_locations", default=False,
-                        action="store_true")
+    parser.add_argument('-l', "--list-locations", dest="list_locations",
+                        default=False, action="store_true")
     parser.add_argument('-v', "--verbose", dest="verbose", default=False,
                         action="store_true")
     parser.add_argument("paths", nargs='*')
