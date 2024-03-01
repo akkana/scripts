@@ -103,7 +103,7 @@ def fix_agenda(agenda_infile):
     cantconvert = []
     converted = []
     already_converted = []
-    guesses = []
+    guesses = {}
 
     for em in soup.findAll('em'):
         # em_text = os.path.splitext(em.text.strip())[0]
@@ -131,9 +131,13 @@ def fix_agenda(agenda_infile):
         # the actual filename is "45. Budget proposal FY 21-23.pdf".
         # elif em_text in origbases:
         def fuzzy_search(agendaname, filenames):
+            if agendaname in guesses:
+                return filenames.index(guesses[agendaname])
+
             # First try non-fuzzy, with fingers tightly crossed
             if agendaname in filenames:
                 return filenames.index(agendaname)
+
             # No luck there, try fuzzy matches
             best_ratio = -1
             best_match = None
@@ -145,7 +149,6 @@ def fix_agenda(agenda_infile):
                     best_match = i
                     best_ratio = r
             if best_ratio > .88:
-                guesses.append((agendaname, filenames[best_match]))
                 return best_match
             return -1
 
@@ -175,6 +178,19 @@ def fix_agenda(agenda_infile):
             print("Couldn't find a match for", em_text)
             nosuchfiles.append(em_text)
             continue
+
+        if index > 0 and origbases[index] != em_text:
+            guesses[em_text] = origbases[index]
+
+        # Is the html match fuzzy but the original match not?
+        # e.g. if origfiles include 9.1_CNM_Report_03.2024.docx and
+        # 9.7_SNM_Report_03.2024.pdf, then there won't be an HTML file
+        # for SNM but fuzzy_match for SNM will match the CNM HTML,
+        # which it shouldn't.
+        if index and htmlindex and origbases[index] != htmlbases[htmlindex]:
+            print("%s and %s don't match: probably not the right HTML file"
+                  % (origbases[index], htmlbases[htmlindex]))
+            htmlindex = -1
 
         # Found a match by searching origbases, returning index.
         # So the actal original file is origfiles[index].
@@ -336,8 +352,8 @@ def fix_agenda(agenda_infile):
 
     if guesses:
         print("\nFuzzy matches:")
-        for a, b in guesses:
-            print(f"    {a} -> {b}")
+        for a in guesses:
+            print(f"    {a} -> {guesses[a]}")
         print("BE SURE TO LOOK OVER THIS LIST!")
 
     if nosuchfiles:
