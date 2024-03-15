@@ -31,8 +31,6 @@ from gi.repository import Gdk, GLib
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 from pygame import mixer
 
-import cgi
-
 try:
     import mutagen
     from mutagen.id3 import ID3
@@ -620,7 +618,7 @@ using a no-play file or a single playlist""")
             id3info = ID3(self.songs[self.song_ptr])
             # If encoded in other than the system encoding, these
             # may display incorrectly in the UI. So recode them.
-            
+
         except:
             id3info = {}
 
@@ -643,7 +641,9 @@ using a no-play file or a single playlist""")
 
     def key_press_event(self, widget, event):
         if event.keyval == MusicWin.Q_KEY and \
-           event.state == Gdk.ModifierType.CONTROL_MASK:
+           event.state | Gdk.ModifierType.CONTROL_MASK:
+            # Can't just check for == CONTROL_MASK because GTK randomly
+            # sets other bits like GDK_MOD2_MASK for no apparent reason
             self.quit()
         elif event.keyval == MusicWin.LEFT_KEY:
             self.prev_song()
@@ -664,7 +664,7 @@ using a no-play file or a single playlist""")
         # so it won't be played by default.
         # ctrl-d actually deletes the song from disk.
         elif event.keyval == MusicWin.D_KEY:
-            if event.state == Gdk.ModifierType.CONTROL_MASK:
+            if event.state | Gdk.ModifierType.CONTROL_MASK:
                 self.delete_song(True)
             else:
                 self.delete_song(False)
@@ -673,7 +673,7 @@ using a no-play file or a single playlist""")
             self.delete_song(False)
 
         elif event.keyval == MusicWin.S_KEY and \
-           event.state == Gdk.ModifierType.CONTROL_MASK:
+           event.state | Gdk.ModifierType.CONTROL_MASK:
             self.save_playlist()
 
         return True
