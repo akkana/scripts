@@ -255,6 +255,11 @@ gquickbrowse:
     releases. If you don't pass an argument but there's anything in
     the X selection when you run it, it will use that as initial argument.
 
+guitarflash.py:
+    Play and display guitar chords, intended for a "flash cards" sort
+    of learning tool for beginning guitar students.
+    Uses command-line sox play to play chords and metronome ticks.
+
 headerfooter.py:
     Take standalone HTML files and add customized headers and footers
     to make them fit in with a website, replacing anything up to and
