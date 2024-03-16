@@ -79,7 +79,8 @@ DELAY_BETWEEN_STRINGS = .06
 
 def fretboard_to_note(stringbase, fret):
     stringnote = ALLNOTES.index(stringbase)
-    print("string", stringbase, "fret", fret, "->", ALLNOTES[stringnote + fret])
+    # print("string", stringbase, "fret", fret,
+    #       "->", ALLNOTES[stringnote + fret])
     return ALLNOTES[stringnote + fret]
 
 
@@ -119,7 +120,9 @@ def display_chord(chord):
 
 
 def play_chord(chordname, volume=.25):
-    args = [ "play", "-n", "synth" ]
+    """Play a chord, specified by name like "Em".
+    """
+    args = [ "play", "-nq", "-t", "alsa", "synth" ]
     # pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
     #      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
     chordnotes = chord_to_notes(GUITAR_CHORDS[chordname])
@@ -134,7 +137,7 @@ def play_chord(chordname, volume=.25):
     args += [ "remix", "-",
               "fade", "0", str(delay + 1.5), ".1",
               "norm", "-1", "vol", str(volume) ]
-    print(' '.join(args))
+    # print(' '.join(args))
     subprocess.call(args)
 
 
@@ -144,7 +147,7 @@ def play_notes(notestr, delay=.6):
        Useful for testing.
     """
     notes = notestr.split(',')
-    args = [ "play", "-n", "synth" ]
+    args = [ "play", "-nq", "-t", "alsa", "synth" ]
     for note in notes:
         args.append("pl")
         args.append(note)
@@ -156,17 +159,20 @@ def play_notes(notestr, delay=.6):
     args += [ "remix", "-",
               "fade", "0", str(len(notes) * delay + 2), ".1",
               "norm", "-1", "vol", ".2" ]
-    print(' '.join(args))
+    # print(' '.join(args))
     subprocess.call(args)
 
 
-song = "C,D,G,Em,C,D,G,Em"
+song = "C,D,G,Em,C,D,G"
 
 # read song, one chord at a time
-song_chords = song.split(",")
-for chord in song_chords:
-    display_chord(chord)
-    play_chord(chord)
-    # time.sleep(.75)
+try:
+    song_chords = song.split(",")
+    for chord in song_chords:
+        display_chord(chord)
+        play_chord(chord)
+        # time.sleep(.75)
+except KeyboardInterrupt:
+    print("Exiting")
 
 
