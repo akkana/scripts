@@ -47,21 +47,29 @@ You can also save them: right after the -n, add
 # https://www.101computing.net/guitar-chords-reader/
 
 import time
-import os
+import os, sys
 import subprocess
+import random
+import argparse
+
+try:
+    import pyfiglet
+except:
+    pass
 
 
 #A Python Dictionary matching chord names with "fret notation"
 GUITAR_CHORDS = {
     "D": "xx0232",
-    "A":"x02220",
+    "A": "x02220",
     "E": "022100",
-    "G": "320033",
-    "C": "x32010",
-    "F": "x3321x",
+    "G": "320003",
+    # "C": "x32010",
+    # "F": "x3321x",
     "Am": "x02210",
     "Dm": "xx0231",
-    "Em": "022000"
+    "Em": "022000",
+    # "G2": "320033",
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
@@ -75,6 +83,10 @@ ALLNOTES = [ note + '2' for note in basicnotes ] + \
 GUITAR_STRINGS = [ "E2", "A2", "D3", "G3", "B3", "E4" ]
 
 DELAY_BETWEEN_STRINGS = .06
+
+Volume = .3
+
+Metroproc = None
 
 
 def fretboard_to_note(stringbase, fret):
@@ -163,16 +175,83 @@ def play_notes(notestr, delay=.6):
     subprocess.call(args)
 
 
-song = "C,D,G,Em,C,D,G"
-
-# read song, one chord at a time
-try:
-    song_chords = song.split(",")
-    for chord in song_chords:
-        display_chord(chord)
-        play_chord(chord)
-        # time.sleep(.75)
-except KeyboardInterrupt:
-    print("Exiting")
+def start_metronome(bpm, duration=None):
+    global Metroproc
+    args = [ "play", "-nq", "-t", "alsa",
+             "-c1", "synth", "0.004", "sine", "2000",
+             "pad", str(60/bpm -.004),
+             "repeat", str(bpm * duration) if duration else '-',
+             "vol", str(Volume) ]
+    print(args)
+    Metroproc = subprocess.Popen(args, close_fds=True)
 
 
+def stop_metronome():
+    global Metroproc
+    if not Metroproc:
+        # print("Metronome isn't running")
+        return
+    print("Stopping metronome")
+    Metroproc.kill()
+    Metroproc = None
+
+
+def test_main():
+    start_metronome(85)
+
+    song = "C,D,G,Em,C,D,G"
+
+    # read song, one chord at a time
+    try:
+        song_chords = song.split(",")
+        for chord in song_chords:
+            display_chord(chord)
+            play_chord(chord)
+            print()
+            # time.sleep(.75)
+    except KeyboardInterrupt:
+        print("Exiting")
+
+    stop_metronome()
+
+
+def chord_quiz(metronome=None):
+    if metronome:
+        start_metronome(metronome)
+    lastchord = None
+    try:
+        while True:
+            print("\n\n\n")
+            chord = random.choice(list(GUITAR_CHORDS))
+            if chord == lastchord:
+                continue
+            lastchord = chord
+            try:
+                print(pyfiglet.figlet_format(chord))
+            except:
+                print(f"\n{ chord }\n")
+
+            time.sleep(2)
+            for i in range(2):
+                play_chord(chord)
+            time.sleep(1)
+
+            display_chord(chord)
+            for i in range(2):
+                play_chord(chord)
+
+    except KeyboardInterrupt:
+        print("Exiting")
+
+    stop_metronome()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Guitar Flashcards")
+    parser.add_argument('-m', "--bpm", "--metronome",
+                        action="store", default=0, dest="bpm", type=int,
+                        help='Metronome Beats per Minute')
+    args = parser.parse_args(sys.argv[1:])
+
+    # test_main()
+    chord_quiz(metronome=args.bpm)
