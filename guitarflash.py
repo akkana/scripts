@@ -2,63 +2,26 @@
 
 """A program to help with practicing guitar.
    Can run a metronome, play notes, display guitar tablature for notes,
-   etc.
-   Eventually will include flashcard-style quizzes.
+   and give a flashcard-style quiz.
+   Copyright 2024 by Akkana: share and enjoy under the GPLv2 or later.
 """
 
-# The sox manual gives the example:
-# play -n synth pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
-#      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
-# pl is apparently short for pluck
-# Add vol 0.25 *at the end* to reduce volume.
-# fade is timed from the beginning, so make sure it's long enough
-# to cover all the notes plus your desired fade time,
-# or else you'll miss the later notes.
-# Single plucked string: play -n synth 0 pluck E3
-# Here's a metronome:
-#  play -n -c1 synth 0.004 sine 2000 \
-#       pad $(awk "BEGIN { print 60/$bpm -.004 }") repeat $beats vol $volume
-
-
-
-"""Other interesting URLs re Python and guitar:
-https://www.mvanga.com/blog/deriving-guitar-theory-in-400-lines-of-python
-https://alvaroaguirre.com/blog/chord_of_the_day.html
-https://briancaffey.github.io/2018/04/26/generating-music-from-guitar-tabs-with-python.html/
-
-The last answer in this thead might explain why pygame.midi never makes a sound:
-https://forums.raspberrypi.com/viewtopic.php?t=116715
-
-Good breakdown of the sox/play commandline arguments:
-https://scruss.com/blog/2017/12/19/synthesizing-simple-chords-with-sox/
-Breakdown:
-play -n               use no input file
-     synth            synthesize notes
-     pl G2            first note is a G2 with a waveform like a plucked string
-     ....
-     delay 0 .05 .1 .15 .2 .25    delay the first note 0, second .05, etc.
-     remix            mix the tones in an internal pipe to the output
-     fade 0 1 .095    fade the audio smoothly down to nothing in 1 s
-     norm -1          normalize the volume to -1 dB.
-You can also save them: right after the -n, add
-     -r 16000 -b 16 "chord-${chord}.wav"
-"""
-
+# Uses chord display code and fret notation adapted from
 # https://www.101computing.net/guitar-chords-reader/
 
-import time
-import os, sys
 import subprocess
 import random
 import argparse
+import time
+import os, sys
 
 try:
     import pyfiglet
 except:
-    pass
+    print("pyfiglet isn't available: can't draw big chord names")
 
 
-#A Python Dictionary matching chord names with "fret notation"
+# A Python Dictionary matching chord names with "fret notation"
 GUITAR_CHORDS = {
     "D": "xx0232",
     "A": "x02220",
@@ -84,7 +47,7 @@ GUITAR_STRINGS = [ "E2", "A2", "D3", "G3", "B3", "E4" ]
 
 DELAY_BETWEEN_STRINGS = .06
 
-Volume = .3
+Volume = 1
 
 Metroproc = None
 
@@ -215,7 +178,7 @@ def test_main():
     stop_metronome()
 
 
-def chord_quiz(metronome=None):
+def chord_flashcards(metronome=None):
     if metronome:
         start_metronome(metronome)
     lastchord = None
@@ -247,11 +210,16 @@ def chord_quiz(metronome=None):
 
 
 if __name__ == '__main__':
+    # test_main()
+
     parser = argparse.ArgumentParser(description="Guitar Flashcards")
     parser.add_argument('-m', "--bpm", "--metronome",
                         action="store", default=0, dest="bpm", type=int,
                         help='Metronome Beats per Minute')
+    parser.add_argument('-v', "--volume",
+                        action="store", default=1, dest="volume", type=float,
+                        help='Metronome Beats per Minute')
     args = parser.parse_args(sys.argv[1:])
+    Volume = args.volume
 
-    # test_main()
-    chord_quiz(metronome=args.bpm)
+    chord_flashcards(metronome=args.bpm)
