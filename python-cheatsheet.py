@@ -367,6 +367,11 @@ PERCENTPAT = re.compile(
     r"($|:|\s)"  # end of string, colon, or whitespace
 )
 
+# Replace matched groups:
+re.sub('(DP(?:/a){0,1})(-)([A-Z]{3,})', r'\g<1> Sent to \g<3>', 'DP/a-HAFC')
+'DP/a Sent to HAFC'
+
+
 ########################################################
 # Useful regular expressions
 ########################################################
@@ -482,7 +487,8 @@ print(f'The value of pi is approximately {math.pi:.3f}.')
 print(f"{setting:>27}: ")    # right-justify with >
 >>> print(f"{foo=}")         # prints: foo=42
 
-# decimals and field widths
+# decimals and field widths:
+# NOTE: SPACES INSIDE THE BRACES MAY LEAD TO Invalid format specifier ERROR
 >>> f'{math.pi:.2f}'
 '3.14'
 >>> f'{5:>3d}'
@@ -631,12 +637,20 @@ mylist.pop(i)            # Removes and returns list[i]
 >>> rest
 [2, 3, 4]
 
+# get first or next item in an iterator:
+python3: next(iter)
+
 # Get the next item in the middle of a loop:
 listiter = iter(mylist)
 for val in listiter:
     if val == 42:
         val = next(iter)
         val = next(iter, None)  # to avoid a StopIteration exception
+
+# Eliminate duplicates from a list.
+# Converting to set and back would do it, but can mess up the order
+# since there's no ordered set class.
+thelist = list(dict.fromkeys(thelist))
 
 # () turns a list comprehension into a generator:
 >>> ( i*2 for i in range(5) )
@@ -928,10 +942,13 @@ From                       To                        Use
 seconds since the epoch    struct_time in UTC        gmtime()
 seconds since the epoch    struct_time in localtime  localtime()
 struct_time in UTC         seconds since the epoch   calendar.timegm()
-struct_time in local time  seconds since the epoch   mktime()
+struct_time in local time  seconds since the epoch   time.mktime()
 datetime                   date                      d.date()
-date                       datetime                  \
-    datetime.datetime.combine(d, datetime.datetime.min.time())
+date                       datetime                  datetime.datetime.combine(d, datetime.datetime.min.time())
+datetime                   struct_time               dt.timetuple()
+datetime                   seconds since the epoch   time.mktime(dt.timetuple()))
+# More conversions:
+# https://www.saltycrane.com/blog/2008/11/python-datetime-time-conversions/
 
 # Printing formats:
 >>> dt = datetime.datetime.now()
@@ -1242,8 +1259,10 @@ for filename in Path('/').rglob('*.py'):
 ########################################################
 # subprocess
 ########################################################
+
 # Read lines from a subprocess as they appear, both stdout and stderr:
 outstring = subprocess.check_output(arglist)
+
 # To suppress stderr, add stderr=subprocess.DEVNULL
 # stdout can't be redirected with check_output.
 # To capture only stderr:
@@ -1569,6 +1588,11 @@ Point(x=11, y=22)
 # Handle quoting for something that might need to be passed to a shell:
 # in Python 3, shlex.quote() does it, but if it needs to be compatible
 # with both 2 and 3, use pipes.quote().
+# shlex also has split() and join(), e.g.
+>>> html_index_links = 'div class="layout-homepage__lite"'
+>>> shlex.split(html_index_links)
+['div', 'class=layout-homepage__lite']
+
 
 
 ########################################################
@@ -2224,6 +2248,43 @@ df.plot(x='datetime', y='temp0')
 >>> for row in df.loc[:, ['name', 'city', 'total']].itertuples():
 ...     print(row)
 ...
+
+################################################################
+# properties: lazy evaluation for a member variable
+# instead of getters and setters
+################################################################
+
+class Temperature:
+    def __init__(self, temperature=0):
+        self.tempC = temperature
+    def get_celcius(self):
+        return self.tempC
+    def set_celcius(self, tc):
+        self.tempC = tc
+    def get_fahrenheit(self):
+        return (self.tempC * 1.8) + 32
+    def set_fahrenheit(self, tf):
+        self.tempC = (tf - 32) / 1.8
+    # creating property objects
+    celcius = property(get_celcius, set_celcius)
+    fahrenheit = property(get_fahrenheit, set_fahrenheit)
+
+# Or you can use a decorator:
+class Temp:
+    def __init__(self, temperature=0):
+        self._tempC = temperature
+    @property
+    def celcius(self):
+       return self._tempC
+    @celcius.setter
+    def celcius(self, value):
+        self._tempC = value
+    @property
+    def F(self):
+       return (self._tempC * 1.8) + 32
+    @F.setter
+    def F(self, value):
+        self._tempC = (value - 32) / 1.8
 
 ################################################################
 # Python3 only
