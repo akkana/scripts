@@ -15,7 +15,7 @@ import time
 import subprocess
 
 
-SLEEPSECS = 60
+SLEEPSECS = 30
 
 
 def wakeup():
