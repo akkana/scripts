@@ -103,6 +103,10 @@ bookfind.py:
     List books by author optionally year of publication,
     to find new books by particular authors.
 
+breaktime.py:
+    Reminds you to take a break from the computer every half-hour,
+    looking at idle time to see if you're already away.
+
 browser_cookies.py:
     Unpack a firefox or chrome/chromium cookie file to show your cookies.
 
