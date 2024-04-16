@@ -64,10 +64,8 @@ def is_in_order(fullname):
     for c in order:
         if lowername == c['fullname'].lower():
             return c['fullname']
-        print(lowername, "!=", c['fullname'].lower())
+        # print(lowername, "!=", c['fullname'].lower())
     return False
-
-
 
 
 NO_RESPONSE = "No response was received."
@@ -571,6 +569,9 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             rowdict = dict(zip(infields[:FIRST_Q_COL], row[:FIRST_Q_COL]))
 
             # Try to throw out any candidate not in the order file.
+            # In 2024, a lot of the candidates have spurious extra spaces
+            # in their fullname, so try to remove those first:
+            rowdict["Full Name"] = re.sub(' +', ' ', rowdict["Full Name"])
             if not is_in_order(rowdict["Full Name"]):
                 continue
 
@@ -651,6 +652,10 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                                      race_descriptions[candidate.office])
             num_for_office += 1
             candidate.output(formatter)
+
+        # The last office didn't get printed, so do that now
+        if cur_office and num_for_office:
+            print(num_for_office, "running for", cur_office)
 
         formatter.save()
 
