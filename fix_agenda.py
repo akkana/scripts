@@ -187,7 +187,11 @@ def fix_agenda(agenda_infile):
         # 9.7_SNM_Report_03.2024.pdf, then there won't be an HTML file
         # for SNM but fuzzy_match for SNM will match the CNM HTML,
         # which it shouldn't.
-        if index and htmlindex and origbases[index] != htmlbases[htmlindex]:
+        # print("index", index, "htmlindex", htmlindex)
+        # print("origbases", origbases)
+        # print("htmlbases", htmlbases)
+        if index >= 0 and htmlindex >= 0 and \
+           origbases[index] != htmlbases[htmlindex]:
             print("%s and %s don't match: probably not the right HTML file"
                   % (origbases[index], htmlbases[htmlindex]))
             htmlindex = -1
