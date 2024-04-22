@@ -158,8 +158,6 @@ def get_check_msg():
 
     now = time.time()
     idlesecs = idle.getIdleSec()
-    # if DEBUG:
-    #     print(f"\nnow: {int(now)}, idle for {int(idlesecs)}")
     if idlesecs < POLL_INTERVAL:
         # Currently nonidle
         idle_start = 0
@@ -187,7 +185,7 @@ for {(nonidle_time/60):.1f} min"""
     if not idle_start:
         idle_start = now
         if DEBUG:
-            return "Starting away timer", COLORS_NORMAL, ("Serif", 18, "normal")
+            return "Starting idle timer", COLORS_NORMAL, ("Serif", 18, "normal")
 
     idle_time = now - idle_start
 
@@ -199,7 +197,12 @@ for {(nonidle_time/60):.1f} min"""
         msg = f"Away long enough,\n{(idle_time/60):.1f} minutes"
         return msg, COLORS_LONGENOUGH, ("Serif", 18, "bold")
 
-    # else still idle
+    # else still idle.
+    # Avoid the "Idle for 0.0 minutes" message:
+    if idle_time < 30:
+        return ( "Starting idle timer",
+                 COLORS_NORMAL, ("Serif", 18, "normal") )
+
     return ( f"\nIdle for {(idle_time/60):.1f} minutes\n",
              COLORS_NORMAL, ("Serif", 18, "normal") )
 
