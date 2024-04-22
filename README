@@ -292,6 +292,11 @@ imgcpy.py:
     Copy a file, suitably downsized, to the clipboard in PNG format
     so it can be pasted by an app like Discord that uses image pastes.
 
+ipcsimple.py:
+    A module intended to make it easy to do the sort of simple
+    inter-process communication used by eggtimer and breaktime,
+    like querying a running process to get information from it.
+
 ipsearch:
     Search for live hosts on the current net, or hosts with a
     particular port open..

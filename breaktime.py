@@ -5,23 +5,26 @@
 
 # Requires idle.py from gajim:
 # https://dev.gajim.org/gajim/gajim/-/blob/89c7eb6e6ab3f61a188c6cee063a000526df522c/gajim/common/idle.py
-# 
+#
+
+# ipcsimple comes from Akkana's scripts repository, same as this script
+import ipcsimple
 
 import idle
 
 import time
 import tkinter
-# import signal
+import signal
 import sys, os
 
 
 # Times are all in seconds
 
-# How often should you get up and take time away from the computer?
-GETUP_INTERVAL = 60 * 30
+# How often should you get up and take time away from the computer? (minutes)
+GETUP_INTERVAL = 30
 
-# How long, at minimum, do you have to stay away for it to count?
-AWAY_MINIMUM = 60 * 4
+# How long, at minimum, do you have to stay away for it to count? (minutes)
+AWAY_MINIMUM = 4
 
 # How often does the program wake up and poll?
 POLL_INTERVAL = 30
@@ -31,7 +34,7 @@ DIALOG_PADDING = 30
 
 COLORS_NEEDBREAK = ("white", "darkred")
 COLORS_NORMAL = ("black", "lightgrey")
-COLORS_LONGENOUGH = ("black", "lightsteelblue")
+COLORS_LONGENOUGH = ("black", "palegreen")
 
 DEBUG = False
 
@@ -88,12 +91,35 @@ MMMMMMMMMMMMMMMMMMMMMMMMMMM""",
 
     tkroot.resizable(False, False)
 
-    tkroot.after(1, check)
+    tkroot.after(1000, poll_for_time)
+
+    ipcsimple.set_ipc_handler(communicate)
+    tkroot.after(50, poll_for_signals)  #  time in ms.
 
     tkroot.mainloop()
 
 
-def update_dialog(msg, colors=None, popup=True):
+def poll_for_time():
+    msg, colors, font = get_check_msg()
+    update_dialog(msg=msg, popup=("bold" in font), colors=colors, font=font)
+
+    tkroot.after(POLL_INTERVAL*1000, poll_for_time)
+
+
+def poll_for_signals():
+    """This controls how promptly the Tk app can respond to a signal"""
+    tkroot.after(1000, poll_for_signals)  #  time in ms.
+
+
+def communicate(bytestring=None):
+    """Called by the ipc_handler that is invoked on a SIGUSR1.
+       Return a string that will be sent through the handler.
+       bytestring is probably None and will be ignored.
+    """
+    return get_check_msg()
+
+
+def update_dialog(msg, colors=None, popup=True, font=None):
     if DEBUG:
         print("update_dialog:", msg)
 
@@ -102,6 +128,9 @@ def update_dialog(msg, colors=None, popup=True):
         button["activeforeground"] = colors[0]
         button["bg"] = colors[1]
         button["activebackground"] = colors[1]
+
+    if font:
+        button["font"] = font
 
     button["text"] = msg   # Can also use button.config(text=message)
     if popup:
@@ -116,8 +145,16 @@ def update_dialog(msg, colors=None, popup=True):
 #     sys.exit(0)
 
 
-def check():
+def get_check_msg():
+    """Figure out the current status/time left.
+       Return message, color, font for the dialog
+       (also used when querying from an external process).
+    """
     global idle_start, nonidle_start
+
+    msg = None
+    colors = None
+    font = None
 
     now = time.time()
     idlesecs = idle.getIdleSec()
@@ -140,75 +177,83 @@ for {(nonidle_time/60):.1f} min"""
 
             if nonidle_time > GETUP_INTERVAL:
                 msg += "\nTime to take a break"
-                update_dialog(msg=msg, colors=COLORS_NEEDBREAK)
+                return msg, COLORS_NEEDBREAK, ("Serif", 18, "bold")
             else:
                 msg += f"\n(of {int(GETUP_INTERVAL/60)})"
-                update_dialog(msg=msg, colors=COLORS_NORMAL, popup=False)
-    else:
-        # Currently idle
-        idle_time = now - idle_start
-        # if DEBUG:
-        #     print(f"Idle time: {(idle_time/60):.1f} minutes")
+                return msg, COLORS_NORMAL, ("Serif", 18, "normal")
 
-        if not idle_start:
-            idle_start = now
-            if DEBUG:
-                print("Starting away timer")
-        elif idle_time >= AWAY_MINIMUM:
-            # Away long enough
-            # zero the nonidle timer so it can be restarted when nonidle
-            if nonidle_start:
-                nonidle_start = 0
-            if button:
-                msg = f"Away long enough,\n{(idle_time/60):.1f} minutes"
-                update_dialog(msg=msg, colors=COLORS_LONGENOUGH, popup=False)
-        else:
-            update_dialog(msg=f"\nIdle for {(idle_time/60):.1f} minutes\n",
-                          popup=False, colors=COLORS_NORMAL)
+    # Else currently idle
 
-    tkroot.after(POLL_INTERVAL*1000, check)
+    if not idle_start:
+        idle_start = now
+        if DEBUG:
+            return "Starting away timer", COLORS_NORMAL, ("Serif", 18, "normal")
 
+    idle_time = now - idle_start
 
-def Usage():
-    print("Usage: %s [-d] [max_time_at_computer [min_time_of_breaks]]"
-          % (os.path.basename(sys.argv[0])))
-    print("Times are in minutes. Defaults:")
-    print("  Max %d (%.1f min) at computer"
-          % (GETUP_INTERVAL, GETUP_INTERVAL/60))
-    print("  Min %d (%.1f min) away" % (AWAY_MINIMUM, AWAY_MINIMUM/60))
-    print("  -d: print debug messages")
-    sys.exit(0)
+    if idle_time >= AWAY_MINIMUM:
+        # Away long enough
+        # zero the nonidle timer so it can be restarted when nonidle
+        if nonidle_start:
+            nonidle_start = 0
+        msg = f"Away long enough,\n{(idle_time/60):.1f} minutes"
+        return msg, COLORS_LONGENOUGH, ("Serif", 18, "bold")
+
+    # else still idle
+    return ( f"\nIdle for {(idle_time/60):.1f} minutes\n",
+             COLORS_NORMAL, ("Serif", 18, "normal") )
 
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description=\
+        """Monitor time spent at the computer, and suggest taking breaks.
+Times should be specified in minutes.""")
+    parser.add_argument('-d', "--debug", dest="debug", default=False,
+                        action="store_true", help="Print debugging messages")
+    parser.add_argument('-q', "--query", dest="query", default=False,
+                        action="store_true",
+                        help="Query running instance for current status")
+    parser.add_argument('-b', '--break', dest='min_break_time',
+                        default=AWAY_MINIMUM, nargs='?', type=float,
+                        help='Minimum time for a break')
+    parser.add_argument('max_time', nargs='?', type=float,
+                        default=GETUP_INTERVAL,
+                      help='Maximum time at the computer before taking a break')
+    args = parser.parse_args(sys.argv[1:])
+
     # Debug mode?
-    if len(sys.argv) > 1 and sys.argv[1] == '-d':
+    if args.debug:
         DEBUG = True
-        sys.argv = sys.argv[1:]
+
+    if args.query:
+        try:
+            pidlist = ipcsimple.list_procs("breaktime", uid=os.getuid())
+            for pid in pidlist:
+                pid = int(pid)
+                result = ipcsimple.ping_running_process(pid)
+                print("Process", pid, "status:")
+                print(result)
+        except RuntimeError as e:
+            print("Couldn't find a running breaktime:", e)
+
+        sys.exit(0)
+
+    # Should only allow one running instance of breaktime
+    ipcsimple.kill_instances("breaktime")
 
     if not DEBUG:
         rc = os.fork()
         if rc:
             sys.exit(0)
 
-    # Optional first argument, how often to interrupt, and second argument,
-    # how long a break must be.
-    try:
-        GETUP_INTERVAL = int(sys.argv[1]) * 60
-        if len(sys.argv) > 2:
-            try:
-                AWAY_MINIMUM = int(sys.argv[2]) * 60
-            except ValueError:
-                pass
-            except:
-                Usage()
-    except IndexError:    # no argv[1]
-        pass
-    except:
-        Usage()
+    GETUP_INTERVAL = args.max_time * 60
+    AWAY_MINIMUM = args.min_break_time * 60
 
     print("Max time at computer of %.1f min" % (GETUP_INTERVAL/60))
-    print("Using min time away of %.1f min" % (AWAY_MINIMUM/60))
+    print("Min time away of %.1f min" % (AWAY_MINIMUM/60))
+
     try:
         create_window()
 
