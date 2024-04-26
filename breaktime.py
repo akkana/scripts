@@ -36,11 +36,17 @@ COLORS_NEEDBREAK = ("white", "darkred")
 COLORS_NORMAL = ("black", "lightgrey")
 COLORS_LONGENOUGH = ("black", "palegreen")
 
+FONT_NORMAL = ("Serif", 18, "normal")
+FONT_BOLD = ("Serif", 18, "bold")
+
 DEBUG = False
 
 # Timers counting idle and nonidle time
 idle_start = 0
 nonidle_start = 0
+
+# When was the last check?
+last_check = 0
 
 # The dialog button where messages will show
 tkroot = None
@@ -70,7 +76,7 @@ MMMMMMMMMMMMMMMMMMMMMMMMMMM""",
                             activeforeground=COLORS_NORMAL[0],
                             bg=COLORS_NORMAL[1],
                             activebackground=COLORS_NORMAL[1],
-                            font=("Serif", 18, "bold"),
+                            font=FONT_NORMAL,
                             # width=WINWIDTH, height=WINHEIGHT,
                             command=close)
 
@@ -150,13 +156,25 @@ def get_check_msg():
        Return message, color, font for the dialog
        (also used when querying from an external process).
     """
-    global idle_start, nonidle_start
+    global idle_start, nonidle_start, last_check
 
     msg = None
     colors = None
     font = None
 
     now = time.time()
+    # print("get_check_msg: last_check", last_check, ", now", now)
+
+    # Special case: if the machine is waking up from suspend or hibernate,
+    # then that time should be treated as idle.
+    if last_check and now - last_check > AWAY_MINIMUM:
+        last_check = now
+        nonidle_start = now
+        idle_start = 0
+        return "Restarting timer after a break", COLORS_NORMAL, FONT_NORMAL
+
+    last_check = now
+
     idlesecs = idle.getIdleSec()
     if idlesecs < POLL_INTERVAL:
         # Currently nonidle
@@ -175,17 +193,17 @@ for {(nonidle_time/60):.1f} min"""
 
             if nonidle_time > GETUP_INTERVAL:
                 msg += "\nTime to take a break"
-                return msg, COLORS_NEEDBREAK, ("Serif", 18, "bold")
+                return msg, COLORS_NEEDBREAK, FONT_BOLD
             else:
                 msg += f"\n(of {int(GETUP_INTERVAL/60)})"
-                return msg, COLORS_NORMAL, ("Serif", 18, "normal")
+                return msg, COLORS_NORMAL, FONT_NORMAL
 
     # Else currently idle
 
     if not idle_start:
         idle_start = now
         if DEBUG:
-            return "Starting idle timer", COLORS_NORMAL, ("Serif", 18, "normal")
+            return "Starting idle timer", COLORS_NORMAL, FONT_NORMAL
 
     idle_time = now - idle_start
 
@@ -195,16 +213,16 @@ for {(nonidle_time/60):.1f} min"""
         if nonidle_start:
             nonidle_start = 0
         msg = f"Away long enough,\n{(idle_time/60):.1f} minutes"
-        return msg, COLORS_LONGENOUGH, ("Serif", 18, "bold")
+        return msg, COLORS_LONGENOUGH, FONT_BOLD
 
     # else still idle.
     # Avoid the "Idle for 0.0 minutes" message:
     if idle_time < 30:
         return ( "Starting idle timer",
-                 COLORS_NORMAL, ("Serif", 18, "normal") )
+                 COLORS_NORMAL, FONT_NORMAL )
 
     return ( f"\nIdle for {(idle_time/60):.1f} minutes\n",
-             COLORS_NORMAL, ("Serif", 18, "normal") )
+             COLORS_NORMAL, FONT_NORMAL )
 
 
 if __name__ == '__main__':
