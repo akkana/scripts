@@ -169,6 +169,14 @@ class EpubBook:
         authors, elements, parent = self.get_matches('dc:creator')
         return authors
 
+    def set_authors(self, newauthors):
+        authors, elements, parent = self.get_matches('dc:creator')
+        for el in elements:
+            if el.firstChild.nodeType == el.TEXT_NODE:
+                el.firstChild.replaceWholeText(newauthors)
+            else:
+                print("Error: dc:author contains something other than text")
+
     def get_tags(self):
         """Get all tags in this epub book.
         """
@@ -560,18 +568,19 @@ if __name__ == "__main__":
         progname = os.path.basename(sys.argv[0])
         print("""Usage: %s file.epub [file.epub...] [-d] [-t tag1 [tag2...]]
        %s -T "New title" file.epub [file.epub...]
+       %s -a "New authors" file.epub [file.epub...]
        %s -i [imagedir] file.epub [file.epub...]
 Display, add or remove tags in epub ebooks,
 or extract images from them.
 
-Copyright 2012,2014 by Akkana Peck: share and enjoy under the GPL v2 or later.
+Copyright 2012,2014,2024 by Akkana Peck: share and enjoy under the GPL v2 or later.
 
 Options:
     -t: add tags (otherwise, just print existing tags)
     -d: delete existing tags before adding new ones
     -b: print only one line for each book (useful with grep)
     -i [dir]: extract images into given directory (default .)"""
-              % (progname, progname, progname))
+              % (progname, progname, progname, progname))
         sys.exit(0)
 
     # optparse can't handle multiple arguments of the same type
@@ -592,8 +601,15 @@ Options:
     delete_tags = False
     change_title = False
     new_title = None
+    change_authors = False
+    new_authors = None
     brief = False
-    for arg in sys.argv[1:]:
+    args = sys.argv
+    while True:
+        args = args[1:]
+        if not args:
+            break
+        arg = args[0]
         if change_title and not new_title:
             new_title = arg
             continue
@@ -605,8 +621,19 @@ Options:
             continue
         if arg.startswith('-T'):
             change_title = True
-            if len(arg) > 2:
-                new_title = arg[2:]
+            if len(args) < 2:
+                print("Must specify new title with -t")
+                Usage()
+            new_title = args[1]
+            args = args[1:]
+            continue
+        if arg.startswith('-a'):
+            change_authors = True
+            if len(arg) < 2:
+                print("Must specify new authors with -a")
+                Usage()
+            new_authors = args[1]
+            args = args[1:]
             continue
         if arg == '-b':
             brief = True
@@ -623,7 +650,11 @@ Options:
             Usage()
 
         if change_title and not new_title:
-            print("Must specify a new title with -T\n")
+            print("Must specify a new title for -T\n")
+            Usage()
+
+        if change_authors and not new_authors:
+            print("Must specify new authors for -a\n")
             Usage()
 
         # If we're here, the argument doesn't start with '-'.
@@ -673,6 +704,11 @@ Options:
             if new_title:
                 book.set_title(new_title)
                 print("Set title to", new_title, "in", f)
+                needs_save = True
+
+            if new_authors:
+                book.set_authors(new_authors)
+                print("Set authors to", new_authors, "in", f)
                 needs_save = True
 
             if delete_tags:
