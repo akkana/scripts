@@ -49,15 +49,21 @@ if not os.path.exists(RSS_DIR):
 ######## END CONFIGURATION ############
 
 
+# Make a timezone-aware datetime for now:
+now = datetime.datetime.now().astimezone()
+localtz = now.tzinfo
+
+today = now.date()
+todaystr = today.strftime("%Y-%m-%d")
+
+# and a UTC version
+utcnow = datetime.datetime.now(tz=datetime.timezone.utc)
+
 # Needed to deal with meetings that don't list a time:
 NO_TIME = "NO TIME"
-localtz = datetime.datetime.now().astimezone().tzinfo
 
 
 Verbose = True
-
-# Make a timezone-aware datetime for now:
-now = datetime.datetime.now().astimezone()
 
 # and save the timezone
 localtz = now.tzinfo
@@ -85,11 +91,114 @@ LINK_PAT = re.compile('^https://')
 # Where temp files will be created. pdftohtml can only write to a file.
 tempdir = tempfile.mkdtemp()
 
+#
+# Meeting Records (Minutes, Video, Audio):
+# Records are stored in a JSON file records.json
+# Each record has the date it was first seen.
+# It may also include a URL, but the URL is bogus:
+# unfortunately Legistar doesn't offer externally-viable links,
+# so the audio and video links they show on the calendar page
+# just go back to the calendar page, while the links for minutes
+# go to the agenda page instead.
+#
+# Sadly, the links in the Legistar audio/video are completely
+# bogus and just go back to the Legistar calendar;
+# there's no way to link directly to the Video or Audio.
+# Even worse, you can't even link to the correct month
+# where someone might find the transcript: they have to
+# load the calendar and then figure out how to navigate to
+# the correct month, which will then screw them up the next
+# time they want to load the calendar.
+# ARGHHH!
+#
+# Clients need easy access both by cleanname and by date.
+# Dates are yyyy-mm-dd strings.
+#
+class MeetingRecords:
+    # Types of records of meetings (to match the legistar calendar page):
+    RECORD_TYPES = [ 'Minutes', 'Video', 'Audio' ]
+
+    RECORDFILENAME = "records.json"
+
+    def __init__(self):
+        # record_dic is indexed by cleanname, and consists of
+        # a list of dictionaries of { record_type: (date, url) }
+        # Each cleanname also has a latest-record date.
+        self.record_dic = {}
+
+    def add_meeting(self, mtg_dic):
+        # print("add_meeting from:", mtg_dic['cleanname'])
+        for rtype in self.RECORD_TYPES:
+            if rtype in mtg_dic and mtg_dic[rtype]:
+                self.add_record(mtg_dic['cleanname'], rtype, mtg_dic[rtype])
+
+    def add_record(self, cleanname, record_type, url):
+        """Add a record of one type for one meeting.
+           If the indicated meeting already has that record type,
+           don't update anything, else set the date to today's date.
+        """
+        if cleanname not in self.record_dic or \
+           record_type not in self.record_dic[cleanname] or \
+           self.record_dic[cleanname][record_type][0] != url:
+
+            if cleanname not in self.record_dic:
+                print("It's a new record")
+                self.record_dic[cleanname] = { 'name': cleanname }
+
+            self.record_dic[cleanname][record_type] = (url, todaystr)
+            self.record_dic[cleanname]['latest-record'] = todaystr
+            # Only need to add name if there's been at least one record
+
+    def new_records_today(self):
+        """An iterator that returns dicts of meetings that had
+           at least one new record appear today.
+        """
+        for name in self.record_dic:
+            if self.record_dic[name]['latest-record'] == todaystr:
+                yield self.record_dic[name]
+            # else:
+            #     print(name, "has older date,",
+            #           self.record_dic[name]['latest-record'])
+
+    def records_by_date(self):
+        """An iterator yielding dicts, sorted by latest record date.
+           starting with the most recent.
+        """
+        # The bydate list is a list of (cleanname, date) sorted by date,
+        # most recent first.
+        bydate_list = []
+        for name in self.record_dic:
+            bydate_list.append(( name, self.record_dic[name]['latest-record'] ))
+
+        bydate_list.sort(key=lambda t: t[1], reverse=True)
+
+        for name, lastmod in bydate_list:
+            yield self.record_dic[name]
+
+    def read_file(self):
+        try:
+            with open(os.path.join(RSS_DIR, self.RECORDFILENAME)) as fp:
+                self.record_dic = json.load(fp)
+        except:
+            if not self.record_dic and Verbose:
+                print("No records saved from last time")
+
+    def save_file(self):
+        with open(os.path.join(RSS_DIR, self.RECORDFILENAME), 'w') as fp:
+            json.dump(self.record_dic, fp, indent=4)
+            # XXX Would be nice to save them in sorted order
+        print("Saved records to", os.path.join(RSS_DIR, self.RECORDFILENAME))
+
+
+mtg_records = MeetingRecords()
 
 upcoming_meetings = []
 
 
-def build_upcoming_meetings_list(only_future=False):
+def build_upcoming_meetings_list():
+    # Initialize MeetingRecords from the saved file.
+    mtg_records.read_file()
+
     # By default, the calendar page only shows the current month,
     # even when there are meetings scheduled for next month.
     # To see anything from the upcoming month you have to set cookies
@@ -102,12 +211,21 @@ def build_upcoming_meetings_list(only_future=False):
     if now.day > 20:
         cookiedict = { 'Setting-69-Calendar Year': 'Next Month' }
         r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
-        parse_html_meeting_list(r.text, only_future)
+        parse_html_meeting_list(r.text)
 
     # Get the meetings on the default (this month) page.
     # These will be appended to the global list upcoming_meetings.
     r = requests.get(MEETING_LIST_URL, timeout=30)
-    parse_html_meeting_list(r.text, only_future)
+    parse_html_meeting_list(r.text)
+
+    # Look at last month to get any new records that have been posted
+    cookiedict = { 'Setting-69-Calendar Year': 'Last Month' }
+    r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+    parse_html_meeting_list(r.text)
+
+    # Now that all relevant months have been read,
+    # it's safe to save the records file.
+    mtg_records.save_file()
 
     # The meeting list is in date/time order, latest first.
     # Better to list them in the other order, starting with
@@ -118,10 +236,9 @@ def build_upcoming_meetings_list(only_future=False):
     upcoming_meetings.reverse()
 
 
-def parse_html_meeting_list(page_html, only_future=False):
+def parse_html_meeting_list(page_html):
     """Parse the page listing meetings, which is HTML generated by pdftohtml.
        Return a list of dictionaries for each meeting.
-       If only_future is set, don't include past meetings.
     """
     soup = BeautifulSoup(page_html, 'lxml')
 
@@ -144,23 +261,23 @@ def parse_html_meeting_list(page_html, only_future=False):
 
     # Loop over meetings, rows in the table:
     for row in caltbl.tbody.find_all("tr"):
-        dic = {}
+        mtg = {}
         # Loop over columns describing this meeting:
-        for i, field in enumerate(row.find_all("td")):
+        for i, cell in enumerate(row.find_all("td")):
             if fieldnames[i].startswith("Agenda"):
                 # If there's an Agenda URL, make it absolute.
-                a = field.find("a")
+                a = cell.find("a")
                 href = a.get("href")
                 if href:
-                    dic[fieldnames[i]] = urljoin(MEETING_LIST_URL, href)
+                    mtg[fieldnames[i]] = urljoin(MEETING_LIST_URL, href)
                 else:
-                    dic[fieldnames[i]] = None
+                    mtg[fieldnames[i]] = None
 
             elif fieldnames[i] == 'Meeting Location':
                 # The Location field has simple formatting
                 # such as <br>, so can't just take .text, alas.
-                dic[fieldnames[i]] = ' '.join([str(c).strip()
-                                               for c in field.contents]) \
+                mtg[fieldnames[i]] = ' '.join([str(c).strip()
+                                               for c in cell.contents]) \
                                         .strip()
 
             # The little calendar icon somehow comes out with a name of '2'.
@@ -168,17 +285,50 @@ def parse_html_meeting_list(page_html, only_future=False):
             elif fieldnames[i] == '2' or not fieldnames[i]:
                 continue
 
-            # Most fields are simple and won't have any formatting.
+            # Minutes/Video/Audio: save the URL, if any, else None
+            # XXX Though the URL is actually meaningless and doesn't work,
+            # so consider changing this to not store it.
+            elif fieldnames[i] in MeetingRecords.RECORD_TYPES:
+                # print(mtg["Name"], "record type", fieldnames[i])
+                try:
+                    # Legistar uses \xa0 instead of spaces
+                    fieldtext = cell.text.replace('\u00a0', ' ').strip()
+                    assert fieldtext != "Not available"
+                    # print("Not not available")
+                    # In case they start playing other games with characters,
+                    # check the href too:
+                    href = a.get("href")
+                    hclass = a.get("class")
+                    # Real video links don't have a class, but
+                    # "Not available" has fake links with a class.
+                    if hclass:
+                        assert 'NotAvailable' not in hclass
+                        # But Legistar misspells it:
+                        assert 'NotAvailble' not in hclass
+                    # print("Real href")
+                    mtg[fieldnames[i]] = urljoin(MEETING_LIST_URL, href)
+                    # print("  Set link to", mtg[fieldnames[i]])
+                except AssertionError:
+                    mtg[fieldnames[i]] = None
+
+            # Most cells are simple and won't have any formatting.
             # They are full of nbsps '\u00a0', though.
             else:
-                dic[fieldnames[i]] = field.text.replace('\u00a0', ' ').strip()
+                val = cell.text.replace('\u00a0', ' ').strip()
+                # if fieldnames[i] == "Name":
+                #     print("--", val)
+                if val:
+                    mtg[fieldnames[i]] = val
 
-        if "Meeting Date" in dic:
-            mtg_datetime = meeting_datetime(dic)
-            if mtg_datetime and only_future and mtg_datetime < utcnow:
-                continue
+        mtg['cleanname'] = mtgdic_to_cleanname(mtg)
+        mtg_records.add_meeting(mtg)
 
-        upcoming_meetings.append(dic)
+        # Now we have a good mtg dictionary.
+        # If it's in the future, save it in upcoming_meetings;
+        # if the past, save it in past_records if it has records.
+        meetingdate = meeting_datetime(mtg).date()
+        if meetingdate >= today:
+            upcoming_meetings.append(mtg)
 
 
 def meeting_datetime(mtg):
@@ -209,6 +359,34 @@ def meeting_datetime(mtg):
         return None
 
 
+def html_head(title):
+    return f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html>
+<head>
+  <title>{ title }</title>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="alternate" type="application/rss+xml"
+        title="Los Alamos Meetings Feed"
+        href="{RSS_URL}index.rss" />
+  <link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
+</head>
+<body>
+<h1>{ title }</h1>"""
+
+
+def rss_entry(desc, guid, url, lastmod):
+    return f"""<item>
+   <title>{desc}</title>
+   <guid isPermaLink="false">{guid}</guid>
+   <link>{url}</link>
+   <description><![CDATA[ {desc} ]]>
+   </description>
+   <pubDate>{lastmod}</pubDate>
+</item>"""
+
+
 def diffhtml(before_html, after_html, title=None):
     """Diffs the two files, and returns an html fragment that wraps
        differences in <ins> or <del> tags, which you can style as desired.
@@ -228,18 +406,7 @@ def diffhtml(before_html, after_html, title=None):
 
     # lxml.html.htmldiff returns fragments, not full documents.
     # So add a header that includes a style for ins and del.
-    diff = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-<meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%s</title>
-<link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
-</head>
-
-<body>
-<h1>%s</h1>
-''' % (title, title)
+    diff = html_head(title)
 
     diff += htmldiff(before_html, after_html)
 
@@ -681,9 +848,8 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
 
 NO_AGENDA = b"No agenda available."
 
-def write_rss20_file(mtglist):
-    """Take a list meeting dictionaries
-       and make RSS and HTML files from it.
+def write_files(mtglist):
+    """Take a list of meeting dictionaries and make RSS and HTML files.
     """
     active_meetings = []
 
@@ -715,25 +881,25 @@ def write_rss20_file(mtglist):
 """,
               file=rssfp)
 
-        print(f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-
-<html>
-<head>
-  <title>Los Alamos County Government Meetings</title>
-  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="alternate" type="application/rss+xml"
-        title="Los Alamos Meetings Feed"
-        href="{RSS_URL}index.rss" />
-  <link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
-</head>
-<body>
-<h1>Los Alamos County Government Meetings</h1>
-As of: {gendate}
+        print(html_head("Los Alamos County Government Meetings"), file=htmlfp)
+        print(f"""As of: {gendate}
  ... <a href="about.html">About Los Alamos Meetings (How to Use This Page)</a>
  ... <a href="{RSS_URL}index.rss">Los Alamos Meetings RSS2.0 Feed</a>.
 
 """, file=htmlfp)
+
+        record_str, recordfile = write_meeting_records_file()
+        if record_str and recordfile:
+            print(f"<p>\n{ record_str }:", file=htmlfp)
+            print("<h2>Meeting Records (Minutes, Audio, Video</h2>", file=htmlfp)
+            print(f'<a href="{ recordfile }">See records available</a>',
+                  file=htmlfp)
+            url = RSS_URL + recordfile
+            print(rss_entry(desc="Meeting records",
+                            guid=recordfile, url=url,
+                            lastmod=now), file=rssfp)
+        else:
+            print("<p>\nNo new meeting records.", file=htmlfp)
 
         agendafile = None
         agenda_html = None
@@ -752,21 +918,17 @@ As of: {gendate}
                 tickler_filepath = get_tickler(agenda_html, meetingtime,
                                                tickler_filename)
                 desc = f"County Council Tickler for {meetingtimestr}"
-                lastmod = datetime.datetime.now()
-                guid = tickler_filename
-                url = f"{RSS_URL}{tickler_filename}"
+                # lastmod = datetime.datetime.now()
+                # guid = tickler_filename
+                # url = f"{RSS_URL}{tickler_filename}"
 
                 # Add to the RSS
                 if tickler_filepath:
                     active_meetings.append(tickler_filename)
-                    print(f"""<item>
-   <title>{desc}</title>
-   <guid isPermaLink="false">{guid}</guid>
-   <link>{url}</link>
-   <description><![CDATA[ {desc} ]]>
-   </description>
-   <pubDate>{lastmod}</pubDate>
-</item>""",
+                    print(rss_entry(desc=desc,
+                                    guid=tickler_filename,
+                                    url=f"{RSS_URL}{tickler_filename}",
+                                    lastmod=now),
                           file=rssfp)
 
                     # Add to the HTML
@@ -790,9 +952,7 @@ As of: {gendate}
                 continue
 
             lastmod = None
-            mtg['cleanname'] = mtgdic_to_cleanname(mtg)
             cleanname = mtg['cleanname']
-            print("\n====", cleanname)
 
             if mtg["Agenda"]:      # There is an agenda URL listed
                 print(cleanname, "has an agenda: fetching it")
@@ -840,10 +1000,10 @@ As of: {gendate}
 
                 else:                            # there was a previous agenda
                     if Verbose:
-                        print("There was a previous agenda: ===============")
+                        print("There was a previous agenda:")
                     if agenda_html == NO_AGENDA:
                         print(oldhtml)
-                        print("========= but now, ===============")
+                        print("  ... but now:")
                         print(agenda_html)
 
                         if not agendastatus:
@@ -904,7 +1064,7 @@ As of: {gendate}
             # note it so it won't be cleaned from the directory.
             active_meetings.append(cleanname)
 
-            # Get the old JSON
+            # Get the old JSON for this meeting, if any
             changestr = ""
             jsonfile = os.path.join(RSS_DIR, mtg['cleanname'] + ".json")
             try:
@@ -924,7 +1084,7 @@ As of: {gendate}
                     print("Keys changed:", changed_keys, "lastmod is", lastmod)
 
                 elif not lastmod:
-                    print("Nothing has changed, keeping lastmod")
+                    # print("Nothing has changed, keeping lastmod")
                     lastmod = datetime.datetime.strptime(oldmtg['lastmod'],
                                                          RSS_DATE_FORMAT)
             except (RuntimeError, OSError) as e:
@@ -941,7 +1101,7 @@ As of: {gendate}
             mtg['GUID'] = cleanname + '.' + lastmod.strftime("%Y%m%d-%H%M")
 
             # If the meeting is new or something has changed,
-            # (re)write the JSON file..
+            # (re)write the JSON file.
             with open(jsonfile, 'w') as jsonfp:
                 jsonfp.write(json.dumps(mtg, indent=4))
 
@@ -991,18 +1151,33 @@ As of: {gendate}
                     desc += f"""<p><a href="{mtg["Agenda Packets"]}" target="_none">Agenda Packet</a></p>\n"""
                 else:
                     desc = f"""<p>Agenda packet: {mtg["Agenda Packets"]}</p>\n"""
+                # XXX TODO:
+                # Fetch the PDF agenda packet;
+                # there are two inner tabs, Details and Reports
+                # under Details are links to the Attachments
+                # under Reports may be other links, e.g. Staff Report
+                # so try to fetch all of these links and show them
+                # The packet is, fortunately, HTML
+                # Packet:  https://losalamos.legistar.com/LegislationDetail.aspx?ID=6448866&GUID=37428716-C1EB-412C-9BA4-5DDE1ADCACF2&Options=&Search=
+                # Details: https://losalamos.legistar.com/LegislationDetail.aspx?ID=6448866&GUID=37428716-C1EB-412C-9BA4-5DDE1ADCACF2&Options=&Search=#
+                # Details: https://losalamos.legistar.com/LegislationDetail.aspx?ID=6448866&GUID=37428716-C1EB-412C-9BA4-5DDE1ADCACF2&Options=&Search=#
+                # But the links don't work without JS!
+                # There may be no way to get to them.
+                # Try using the dev tools network inspector to see what
+                # URL is actually followed clicking on each of those links.
+                # Details has cookie: Setting-69-Calendar Options=info|; Setting-69-Calendar Year=2023; Setting-69-Calendar Body=All; Setting-69-ASP.calendar_aspx.gridCalendar.SortExpression=MeetingStartDate DESC; Setting-69-ASP.meetingdetail_aspx.gridMain.SortExpression=Sequence ASC; Setting-69-ASP.legislationdetail_aspx.tabTop.TabIndex=1; ASP.NET_SessionId=up0olsdiy2cigdbhr1oi52jc; BIGipServerinsite.legistar.com_443=908198666.47873.0000
+                # Set-Cookie: Setting-69-ASP.legislationdetail_aspx.tabTop.TabIndex=0; expires=Sun, 12-Dec-2123 05:00:00 GMT; path=/; secure
+                # Reports has cookie: Setting-69-Calendar Options=info|; Setting-69-Calendar Year=2023; Setting-69-Calendar Body=All; Setting-69-ASP.calendar_aspx.gridCalendar.SortExpression=MeetingStartDate DESC; Setting-69-ASP.meetingdetail_aspx.gridMain.SortExpression=Sequence ASC; Setting-69-ASP.legislationdetail_aspx.tabTop.TabIndex=0; ASP.NET_SessionId=up0olsdiy2cigdbhr1oi52jc; BIGipServerinsite.legistar.com_443=908198666.47873.0000
+                # Set-Cookie: Setting-69-ASP.legislationdetail_aspx.tabTop.TabIndex=1; expires=Sun, 12-Dec-2123 05:00:00 GMT; path=/; secure
+
+                # The Set-Cookie legislationdetail_aspx.tabTop.TabIndex changes!
 
             print("GUID will be", mtg['GUID'], "lastmod is", mtg['lastmod'])
 
             # Add the item to the RSS
-            print(f"""<item>
-   <title>{mtgtitle} {agenda_hdr}</title>
-   <guid isPermaLink="false">{mtg['GUID']}</guid>
-   <link>{link}</link>
-   <description><![CDATA[ {desc} ]]>
-   </description>
-   <pubDate>{mtg['lastmod']}</pubDate>
-</item>""", file=rssfp)
+            print(rss_entry(desc=f'{mtgtitle} {agenda_hdr}',
+                            guid=mtg['GUID'], url=link,
+                            lastmod=mtg['lastmod']), file=rssfp)
 
             # And add it to the HTML
             print(f"<p><h2>{mtgtitle} {agenda_hdr}</h2>", file=htmlfp)
@@ -1016,7 +1191,6 @@ As of: {gendate}
 <p>(Last modified: {gendate}.)
 """,
                   file=htmlfp)
-
 
         print("</channel>\n</rss>", file=rssfp)
         print("</body></html>", file=htmlfp)
@@ -1034,6 +1208,13 @@ As of: {gendate}
         # Protected files
         if f.startswith("index") or f.startswith("about"):
             continue
+        # Don't remove the records file
+        if f.startswith('records'):
+            continue
+        if f.endswith('meeting-records.html') and f.startswith(todaystr):
+            if Verbose:
+                print("Not removing", f)
+            continue
 
         def is_active(f):
             for act in active_meetings:
@@ -1044,6 +1225,78 @@ As of: {gendate}
         if not is_active(f):
             print("removing", f)
             os.unlink(os.path.join(RSS_DIR, f))
+
+def write_meeting_records_file():
+    """Write one file holding all the meeting records we've seen.
+       Return a string summarizing today's new records,
+       which can be used in both HTML and RSS indices.
+    """
+    initialized = False
+    filename = None
+    outfp = None
+    newrecords = []
+
+    for rec in mtg_records.records_by_date():
+        recdate = datetime.datetime.strptime(rec["latest-record"],
+                                             "%Y-%m-%d").astimezone()
+        # if rec["latest-record"] == todaystr:
+        if (now - recdate).days < 3:
+            if not initialized:
+                filename = f'{ todaystr }-meeting-records.html'
+                outfp = open(os.path.join(RSS_DIR, filename), 'w')
+                print(html_head(title=f"Meeting Records as of {todaystr}"),
+                      file=outfp)
+                print("""<p>
+To see any of these records, go to the
+<a href="https://losalamos.legistar.com/Calendar.aspx" target="_blank">Legistar
+calendar page</a>, then set the Month appropriately (e.g. <i>Last Month</i>).
+Don't forget to set the Month back to Current Month when you're done.
+Sorry, Legistar doesn't allow links directly to meeting records.""",
+                      file=outfp)
+                initialized = True
+                print("Initialized file", filename)
+
+            newrecords.append(rec['name'])
+
+        elif not initialized or not outfp:
+            print("Didn't see any new records")
+            return "", None
+
+        retstr = ""
+
+        # print a header if there are any new records at all for this meeting
+        print(f"<p>\n<b>{ rec['name'] }</b> records:", file=outfp)
+
+        print("Records for", rec['name'], ":")
+
+        for rkey in rec:
+            if rkey not in MeetingRecords.RECORD_TYPES:
+                continue
+            if not rec[rkey]:
+                continue
+            # Don't add links: the Legistar links are bogus and don't work
+            if False and rec[rkey][0]:
+                s = f'<a href="{ rec[rkey][0] }" target="_none">{ rkey }</a>'
+            else:
+                s = rkey
+            s += f' (Updated {rec[rkey][1]})'
+            print(rec['name'], ": adding record for", rkey)
+            print(s, file=outfp)
+            retstr += s + '\n'
+
+        # # Also add the date this record was updated
+        # if 'latest-record' in 
+        # print("
+
+    print("</body></html>", file=outfp)
+    outfp.close()
+
+    if Verbose:
+        print("Wrote meeting records file", filename)
+
+    retstr = "New records for: " + ', '.join(newrecords)
+
+    return retstr, filename
 
 
 VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
@@ -1075,5 +1328,5 @@ if __name__ == '__main__':
 
     build_upcoming_meetings_list()
 
-    write_rss20_file(upcoming_meetings)
+    write_files(upcoming_meetings)
 
