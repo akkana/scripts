@@ -20,7 +20,7 @@ LINESPACING = 0
 # PIL, unbelievably, has no way to get fonts from the system
 # font handler, and no way to specify a font name in a
 # cross-platform way; it can only handle filenames.
-font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf', 60)
+FONTFILENAME = 'FreeSerifBold.ttf'
 
 
 def generate_image(width, height, bg_color):
@@ -107,13 +107,13 @@ if __name__ == '__main__':
 
     img, imgdraw = generate_image(IMG_WIDTH, IMG_HEIGHT, BG_COLOR)
 
-    font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf', 80)
+    font = ImageFont.truetype(FONTFILENAME, 80)
 
     bottom = draw_text_wrapped(' '.join(sys.argv[1:]),
                       imgdraw, font, (IMG_WIDTH, IMG_HEIGHT), 60,
                       TEXT_COLOR, BORDER, LINESPACING)
 
-    font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf', 50)
+    font = ImageFont.truetype(FONTFILENAME, 50)
 
     draw_text_wrapped(' '.join(sys.argv[1:]),
                       imgdraw, font, (IMG_WIDTH, IMG_HEIGHT), bottom + 100,
