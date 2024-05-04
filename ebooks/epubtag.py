@@ -11,6 +11,7 @@ from __future__ import print_function
 import os
 import sys
 import zipfile
+import tempfile
 import xml.dom.minidom
 
 
@@ -304,13 +305,21 @@ class EpubBook:
         ozf = zipfile.ZipFile(new_epub_file, 'w')
         for info in self.zip.infolist():
             if info.filename in self.replace_files:
-                fp = open(self.replace_files[info.filename])
-                ozf.writestr(info, fp.read())
-                fp.close()
+                print("info.filename =", info.filename,
+                      "<- ", self.replace_files[info.filename])
+                # Can't use writestr because it fails on images, like cover
+                # newfp = open(self.replace_files[info.filename], 'r')
+                # ozf.writestr(info, newfp.read())
+                # newfp.close()
+                ozf.write(self.replace_files[info.filename],
+                          arcname=info.filename)
+                # XXX os.unlink(self.replace_files[info.filename])
+
             elif info.filename == "mimetype":
                 # The mimetype file must be written uncompressed.
                 ozf.writestr(info, self.zip.read(info.filename),
                              zipfile.ZIP_STORED)
+
             elif info.filename.endswith('.opf'):
                 # dom.toprettyprintxml() returns unicode, which
                 # zipfile.writestr() can't write. If you pass in
@@ -369,11 +378,14 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         # os.remove(bakfile)
 
     def extract_cover_image(self, outdir=''):
-        """Extract just an image named cover.*.
+        """Extract just an image named cover.* into the given directory
+           If outdir is omitted, use the current directory
            Return (newfilename, filename_in_zip_archive)
            or (None, None) if it can't find anything.
+           If outdir is None, don't write an image, just return None, filename.
         """
-        """
+
+        '''
         Notes on covers: the epub format doesn't actually specify how to make
         a cover, so apparently there are all sorts of different conventions.
 
@@ -465,7 +477,7 @@ Python 2 minidom has trouble encoding non-ASCII characters")
         Some URLs suggesting best practices:
         https://www.safaribooksonline.com/blog/2009/11/20/best-practices-in-epub-cover-images/
         http://wiki.mobileread.com/wiki/Ebook_Covers
-        """
+        '''
 
         coverimg = None
         parent = self.dom.getElementsByTagName("manifest")[0]
@@ -525,11 +537,15 @@ Python 2 minidom has trouble encoding non-ASCII characters")
             print("Couldn't find", coverimg, "in zip archive")
             return None, None
 
-        outfilename = os.path.join(outdir, base)
-        outfp = open(outfilename, 'wb')
-        outfp.write(infp.read())
-        infp.close()
-        outfp.close()
+        if outdir != None:
+            outfilename = os.path.join(outdir, base)
+            outfp = open(outfilename, 'wb')
+            outfp.write(infp.read())
+            infp.close()
+            outfp.close()
+        else:
+            outfilename = None
+
         return outfilename, coverimg
 
     def extract_images(self, outdir=''):
@@ -562,6 +578,70 @@ Python 2 minidom has trouble encoding non-ASCII characters")
 
         return imagefiles
 
+    def generate_cover_image(self):
+        """Generate a simple cover image that includes title, authors.
+        """
+        from PIL import Image, ImageFont, ImageDraw
+        import textwrap
+
+        # Get the name of the current cover in the zipfile
+        dummy, filename_in_zip = self.extract_cover_image(outdir=None)
+        if not filename_in_zip:
+            print("Can't find a cover image in", self.filename,
+                  file=sys.stderr)
+            return None, None
+
+        COVER_WIDTH = 1200
+        COVER_HEIGHT = 1600
+
+        im = Image.new(mode="RGB", size=(COVER_WIDTH, COVER_HEIGHT))
+
+        draw = ImageDraw.Draw(im)
+
+        # Background
+        draw.rectangle([(0, 0), (COVER_WIDTH, COVER_HEIGHT)],
+                       fill ="#cceeff", outline ="black")
+
+        border = 30
+        draw.rectangle([(border, border),
+                        (COVER_WIDTH-border, COVER_HEIGHT-border)],
+                       fill = None, outline ="#000088", width=6)
+
+        def draw_text_wrapped(text, font, init_y, wraplen, textcolor):
+            """Wrap text and loop over lines. Return Y coordinate of bottom.
+            """
+            # XXX eventually should wrap according to getbbox,
+            # but for now, 22 seems fairly safe to fit in the available width
+            text_wrapped = textwrap.wrap(text, wraplen)
+
+            offset = init_y
+            for line in text_wrapped:
+                left, top, right, bottom = font.getbbox(line)
+                width = right - left
+                lineheight = (bottom - top) * 1.4
+                draw.text(((COVER_WIDTH - width)/2, offset), line,
+                          font=font, fill=textcolor)
+                offset += lineheight
+
+            return offset + lineheight
+
+        # PIL, unbelievably, has no way to get fonts from the system
+        # font handler, and no way to specify a font name in a
+        # cross-platform way; it can only handle filenames.
+        font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf', 120)
+        bottom = draw_text_wrapped(self.get_title(), font, 200, 20, 'black')
+
+        authors = ', '.join(self.get_authors())
+        font = ImageFont.truetype('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf', 60)
+        draw_text_wrapped(authors, font, bottom + 200, 35, 'black')
+
+        # Now queue it to be written to the zip archive
+        fd, tmpfile = tempfile.mkstemp(prefix="title", suffix=".jpg")
+        # im.save(tmpfile, format="JPEG")
+        im.save(tmpfile)
+        # print(self.filename, ": Saved new cover to", tmpfile)
+        self.replace_file(filename_in_zip, tmpfile)
+
 
 if __name__ == "__main__":
     def Usage():
@@ -575,11 +655,13 @@ or extract images from them.
 
 Copyright 2012,2014,2024 by Akkana Peck: share and enjoy under the GPL v2 or later.
 
-Options:
+More options:
     -t: add tags (otherwise, just print existing tags)
     -d: delete existing tags before adding new ones
     -b: print only one line for each book (useful with grep)
-    -i [dir]: extract images into given directory (default .)"""
+    -i [dir]: extract all images into given directory (default .)
+    -c [dir]: extract cover image into given directory (default .),
+    -C: generate a cover image with the book's title and authors"""
               % (progname, progname, progname, progname))
         sys.exit(0)
 
@@ -603,6 +685,7 @@ Options:
     new_title = None
     change_authors = False
     new_authors = None
+    generate_cover = False
     brief = False
     args = sys.argv
     while True:
@@ -640,11 +723,22 @@ Options:
             continue
         if arg == '-i':
             extract_images = True
-            imagedir = './'
+            if len(args) > 1 and os.isdir(args[1]):
+                imagedir = args[1]
+                args = args[1:]
+            else:
+                imagedir = './'
             continue
         if arg == '-c':
             extract_images = "cover"
-            imagedir = './'
+            if len(args) > 1 and os.isdir(args[1]):
+                imagedir = args[1]
+                args = args[1:]
+            else:
+                imagedir = './'
+            continue
+        if arg == '-C':
+            generate_cover = True
             continue
         if arg[0] == '-':
             Usage()
@@ -718,6 +812,10 @@ Options:
             if tags:
                 print(f, ": old tags:", book.get_tags())
                 book.add_tags(tags)
+                needs_save = True
+
+            if generate_cover:
+                book.generate_cover_image()
                 needs_save = True
 
             if needs_save:
