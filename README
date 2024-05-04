@@ -622,6 +622,9 @@ termsize:
     Set stty size to the size of the current terminal window,
     e.g. when logged in to an embedded Posix device over a serial line.
 
+text_wrapped_image.py:
+    Demo of how to add wrapped text to an image using PIL/Pillow.
+
 tklabelimage.py:
     Mini example of how to display text and images together in a label
     in TkInter, and of how to conditionally import Tk in python2 or 3.
