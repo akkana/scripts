@@ -83,6 +83,9 @@ MMMMMMMMMMMMMMMMMMMMMMMMMMM""",
     # make it a bit bigger than necessary
     button.pack(ipadx=DIALOG_PADDING, ipady=DIALOG_PADDING)
 
+    # Allow quitting the whole app with ctrl-q in the dialog.
+    tkroot.bind('<Control-Key-q>', quit)
+
     # # Callback for key events:
     # def key_event(event):
     #     if event.char == 'q':
@@ -213,7 +216,7 @@ for {(nonidle_time/60):.1f} min"""
         if nonidle_start:
             nonidle_start = 0
         msg = f"Away long enough,\n{(idle_time/60):.1f} minutes"
-        return msg, COLORS_LONGENOUGH, FONT_BOLD
+        return msg, COLORS_LONGENOUGH, FONT_NORMAL
 
     # else still idle.
     # Avoid the "Idle for 0.0 minutes" message:
