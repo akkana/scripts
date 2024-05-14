@@ -10,7 +10,7 @@
 # Inspired by John Eikenberry <jae@zhar.net>'s view_html_mail.sh
 # which sadly no longer works, at least with mail from current Apple Mail.
 #
-# Copyright 2013-2022 by Akkana Peck. Share and enjoy under the GPL v2 or later.
+# Copyright 2013-2024 by Akkana Peck. Share and enjoy under the GPL v2 or later.
 # Contributions:
 #   Holger Klawitter 2014: create a secure temp file and avoid temp mbox
 #   Antonio Terceiro 2018: Allow piping directly from mutt.
@@ -54,6 +54,8 @@ USE_WVHTML_FOR_DOC = False
 UNOCONV_STARTUP_TIME = "14"
 
 # A list of supported browsers, in order of preference.
+# You can override this preference by setting the environment variable
+# EMAIL_BROWSER to one of the browser names below.
 BROWSERS = OrderedDict([
     ('qutebrowser', {
         'ARGS_FIRST': [ "--target", "private-window",
@@ -130,7 +132,14 @@ def call_some_browser(htmlfile):
         run_browser(WORKING_BROWSER, htmlfile)
         return
 
-    for b in BROWSERS:
+    keyorder = list(BROWSERS.keys())
+
+    preferred = os.getenv("EMAIL_BROWSER")
+    if preferred:
+        keyorder.sort(key=lambda k: '1' + k if k == preferred else '2' + k)
+        # XXX Eventually maybe allow specifying several, comma separated
+
+    for b in keyorder:
         try:
             run_browser(b, htmlfile)
             # If it worked, break out of the loop
