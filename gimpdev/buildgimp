@@ -13,6 +13,13 @@
 #
 # This also serves as a cheatsheet for how to build GIMP.
 #
+# Some references (none of these has everything, but between them
+# hopefully you can get all the instructions):
+# https://testing.developer.gimp.org/core/setup/build/
+# https://testing.developer.gimp.org/core/setup/build/linux/
+#   (or the one for your OS, if not Linux)
+# https://gitlab.gnome.org/GNOME/gimp/-/blob/master/INSTALL.in
+# https://testing.developer.gimp.org/core/submit-patch/
 
 GIMPVER="$1"
 if [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
@@ -70,6 +77,7 @@ export PKG_CONFIG_PATH="\$PREFIX/lib/pkgconfig:\$PREFIX/share/pkgconfig:\$PKG_CO
 export LD_LIBRARY_PATH="\$PREFIX/lib:\$LD_LIBRARY_PATH"
 export ACLOCAL_FLAGS="-I \$PREFIX/share/aclocal \$ACLOCAL_FLAGS"
 export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
+# export GI_TYPELIB_PATH=
 EOF
 else
     echo "Not cleaning"
@@ -267,6 +275,12 @@ echo '========== gimp'
 
 cd $SRCDIR
 pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
+
+# This is now required to get the images in gimp-data.
+# If it doesn't work, try once running git submodule update --init
+# though you might not need that if you cloned with --recurse as suggested in
+# https://testing.developer.gimp.org/core/submit-patch/#checkout-the-source
+git submodule update
 
 # If on master, git pull. If on another branch,
 # pull, but don't merge, all branches
