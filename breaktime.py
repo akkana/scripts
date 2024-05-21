@@ -178,6 +178,11 @@ def get_check_msg():
 
     last_check = now
 
+    nonidle_time = -1
+
+    def nonidle_str():
+        return f"{(nonidle_time/60):.1f} min"
+
     idlesecs = idle.getIdleSec()
     if idlesecs < POLL_INTERVAL:
         # Currently nonidle
@@ -191,8 +196,7 @@ def get_check_msg():
                       % ((now - idle_start)/60))
         else:
             nonidle_time = now - nonidle_start
-            msg = f"""You've been at the computer
-for {(nonidle_time/60):.1f} min"""
+            msg = f"""You've been at the computer\nfor {nonidle_str()}"""
 
             if nonidle_time > GETUP_INTERVAL:
                 msg += "\nTime to take a break"
@@ -200,13 +204,16 @@ for {(nonidle_time/60):.1f} min"""
             else:
                 msg += f"\n(of {int(GETUP_INTERVAL/60)})"
                 return msg, COLORS_NORMAL, FONT_NORMAL
+    elif nonidle_start:
+        # Even though we're idle, calculate nonidle_time
+        # because it's useful to see in the message.
+        nonidle_time = now - nonidle_start
 
     # Else currently idle
 
     if not idle_start:
         idle_start = now
-        if DEBUG:
-            return "Starting idle timer", COLORS_NORMAL, FONT_NORMAL
+        return "Starting idle timer", COLORS_NORMAL, FONT_NORMAL
 
     idle_time = now - idle_start
 
@@ -221,10 +228,11 @@ for {(nonidle_time/60):.1f} min"""
     # else still idle.
     # Avoid the "Idle for 0.0 minutes" message:
     if idle_time < 30:
-        return ( "Starting idle timer",
+        return ( f"Starting idle timer\n(after {nonidle_str()} nonidle)",
                  COLORS_NORMAL, FONT_NORMAL )
 
-    return ( f"\nIdle for {(idle_time/60):.1f} minutes\n",
+    return ( f"""\nIdle for {(idle_time/60):.1f} minutes
+({nonidle_str()} nonidle)""",
              COLORS_NORMAL, FONT_NORMAL )
 
 
