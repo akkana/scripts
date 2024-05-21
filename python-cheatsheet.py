@@ -2399,6 +2399,7 @@ option so you have to actually install the package to see the file list.
 
 '''Python3
 python3 -m venv ~/pythonenv/envname
+python3 -m venv --system-site-packages ~/pythonenv/envname
   (requires python3-venv)
 '''
 '''Python2
