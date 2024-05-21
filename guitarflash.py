@@ -13,12 +13,18 @@ import subprocess
 import random
 import argparse
 import time
+import xdg.BaseDirectory
 import os, sys
 
 try:
     import pyfiglet
 except:
     print("pyfiglet isn't available: can't draw big chord names")
+
+
+# If there's no GUITARFLASH env variable or ~/.config/guitarflash.conf,
+# show only these chords (space separated):
+BEGINNER_CHORDS = "D A E"
 
 
 # A Python Dictionary matching chord names with "fret notation"
@@ -28,11 +34,14 @@ GUITAR_CHORDS = {
     "E": "022100",
     "G": "320003",
     "C": "x32010",
-    # "F": "x3321x",
+    "F": "x3321x",
     "Am": "x02210",
     "Dm": "xx0231",
     "Em": "022000",
-    # "G2": "320033",
+    "G2": "320033",
+    "B": "x24442",
+    "F#m": "244222",
+    "B7": "o212o2",
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
@@ -159,33 +168,35 @@ def stop_metronome():
     Metroproc = None
 
 
-def test_main():
-    start_metronome(85)
+def sanity_check(chords):
+    """Do all the indicated chords actually exist?"""
+    goodchords = []
+    badchords = set()
+    for c in chords:
+        if c in GUITAR_CHORDS:
+            goodchords.append(c)
+        else:
+            badchords.add(c)
 
-    song = "C,D,G,Em,C,D,G"
+    if badchords:
+        print("Ignoring unsupported chords", ' '.join(badchords))
 
-    # read song, one chord at a time
-    try:
-        song_chords = song.split(",")
-        for chord in song_chords:
-            display_chord(chord)
-            play_chord(chord)
-            print()
-            # time.sleep(.75)
-    except KeyboardInterrupt:
-        print("Exiting")
+    if not goodchords:
+        print("No chords left; defaulting to beginner chords")
+        return BEGINNER_CHORDS,
 
-    stop_metronome()
+    return goodchords
 
 
-def chord_flashcards(metronome=None):
+def chord_flashcards(chords=BEGINNER_CHORDS, metronome=None):
+    chords = sanity_check(chords)
     if metronome:
         start_metronome(metronome)
     lastchord = None
     try:
         while True:
             print("\n\n\n")
-            chord = random.choice(list(GUITAR_CHORDS))
+            chord = random.choice(chords)
             if chord == lastchord:
                 continue
             lastchord = chord
@@ -209,10 +220,47 @@ def chord_flashcards(metronome=None):
     stop_metronome()
 
 
+def read_config():
+    """Look for GUITARFLASH env variable or ~/.config/guitarflash/*.conf
+       for a list of chords to show.
+       Return a list of chord name strings, defaulting to BEGINNER_CHORDS.
+       Chords are not unique; if a chord name repeats, it will be shown more.
+       Suggested conf file name is $XDG_CONFIG_HOME/guitarflash/guitarflash.conf
+       but you can have multiple files; everything matching
+       $XDG_CONFIG_HOME/guitarflash/*.conf will be read.
+    """
+    if "GUITARFLASH" in os.environ:
+        return os.environ["GUITARFLASH"].split()
+
+    try:
+        chords = []
+        confdir = os.path.join(xdg.BaseDirectory.xdg_config_home,
+                               "guitarflash")
+        for conffile in os.listdir(confdir):
+            if not conffile.endswith(".conf"):
+                continue
+            with open(os.path.join(confdir, conffile)) as fp:
+                for line in fp:
+                    chords += line.split()
+        if chords:
+            return chords
+        print("Didn't find any chords in", confdir)
+    except Exception as e:
+        print("Exception finding conffiles; showing beginner chords")
+        print(e)
+        pass
+
+    return BEGINNER_CHORDS
+
+
 if __name__ == '__main__':
     # test_main()
 
     parser = argparse.ArgumentParser(description="Guitar Flashcards")
+    parser.add_argument('-c', "--chords", default=None, action="store",
+                        help="chords to use (you can also specify them in "
+                        "GUITARFLASH env variable or "
+                        "XDG_CONFIG_HOME/guitarflash/*.conf")
     parser.add_argument('-m', "--bpm", "--metronome",
                         action="store", default=0, dest="bpm", type=int,
                         help='Metronome Beats per Minute')
@@ -222,4 +270,10 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
     Volume = args.volume
 
-    chord_flashcards(metronome=args.bpm)
+    # Get a list of chords to use, otherwise, show just beginner chords
+    if args.chords:
+        chords = args.chords.split()
+    else:
+        chords = read_config()
+
+    chord_flashcards(chords=chords, metronome=args.bpm)
