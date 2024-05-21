@@ -13,10 +13,10 @@
 # ~/.config/zsh/webhosts.sh
 
 if [[ -r ~/.config/webhosts/webhosts.sh ]]; then
-    echo Reading from .config/webhosts
+    echo Reading from .config/webhosts/webhosts.sh
     . ~/.config/webhosts/webhosts.sh
 elif [[ -r ~/.config/zsh/webhosts.sh ]]; then
-    echo Reading from .config/zsh
+    echo Reading from .config/zsh/webhosts.sh
     . ~/.config/zsh/webhosts.sh
 fi
 
