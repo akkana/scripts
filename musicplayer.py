@@ -442,31 +442,56 @@ button:hover { background: #dff; border-color: #8bb; }
     def pause(self, w=None):
         if self.play_state == MusicWin.PLAYING:
             mixer.music.pause()
-            self.pause_btn.set_label(u"\u25B6") # black right-pointing triangle
+            self.pause_btn.set_label(u"||")
             self.pause_btn.set_tooltip_text("Un-pause")
+            self.pause_btn.set_sensitive(True)
+
+            self.stop_btn.set_label(u"\u25B6") # black right-pointing triangle
+            self.stop_btn.set_tooltip_text("Play")
+            self.stop_btn.set_sensitive(True)
+
             self.play_state = MusicWin.PAUSED
+
         elif self.play_state == MusicWin.PAUSED:
             mixer.music.unpause()
             self.pause_btn.set_label('||')
             self.pause_btn.set_tooltip_text("Pause")
+            self.pause_btn.set_sensitive(True)
+
+            self.stop_btn.set_sensitive(False)
+
             self.play_state = MusicWin.PLAYING
         # else must be MusicWin.STOPPED. Do nothing, keep it there.
 
     def stop(self, w=None):
-        if self.play_state == MusicWin.PLAYING \
-           or self.play_state == MusicWin.PAUSED:
+        if self.play_state == MusicWin.PLAYING:
             mixer.music.stop()
             self.stop_btn.set_label(u"\u25B6") # black right-pointing triangle
             self.stop_btn.set_tooltip_text("Play")
+            self.stop_btn.set_sensitive(True)
+
+            self.pause_btn.set_label('||')
+            self.pause_btn.set_tooltip_text("Pause")
+            self.pause_btn.set_sensitive(False)
+
             self.play_state = MusicWin.STOPPED
             self.skipped_seconds = 0
             self.set_time_label(0)
             self.set_scale_slider(0)
-        else:    # Must be stopped already. Play something.
-            mixer.music.play()
+
+        else:    # Must be stopped or paused already. Play from beginning.
             self.stop_btn.set_label(u"\u25A0") # black square
             self.stop_btn.set_tooltip_text("Play")
+
+            self.pause_btn.set_label('||')
+            self.pause_btn.set_tooltip_text("Pause")
+            self.pause_btn.set_sensitive(True)
+
             self.play_state = MusicWin.PLAYING
+            self.skipped_seconds = 0
+            self.set_scale_slider(0)
+            self.set_time_label(0)
+            mixer.music.play()
 
     def toggle_shuffle(self, w):
         self.shuffle = w.get_active()
