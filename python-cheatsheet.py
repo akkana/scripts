@@ -941,6 +941,8 @@ From                       To                        Use
 ----                       ----                      ------
 seconds since the epoch    struct_time in UTC        gmtime()
 seconds since the epoch    struct_time in localtime  localtime()
+seconds since the epoch    datetime (localtime)      datetime.fromtimestamp()
+seconds since the epoch    datetime (utc)            datetime.utcfromtimestamp()
 struct_time in UTC         seconds since the epoch   calendar.timegm()
 struct_time in local time  seconds since the epoch   time.mktime()
 datetime                   date                      d.date()
@@ -1684,6 +1686,10 @@ else:
 
 # Run one test in one class in one file:
 # python -m unittest test.test_epubtags.TestEpubTags.test_epubtags
+
+# Compare the contents of two files, giving errors for non-matching lines:
+self.assertListEqual(list(open(test_path)),
+                     list(open(reference_path)))
 
 # approximate tests
 def assertCloseEnough(a, b, tolerance=1e-5):
