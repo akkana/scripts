@@ -52,7 +52,10 @@ class TestSampleMessage(unittest.TestCase):
 
         htmlfile = os.path.join(tmpdir, "viewhtml00.html")
         self.assertTrue(os.path.exists(htmlfile))
-        self.assertEqual(md5sum(htmlfile), "153b0a4b10d6c7bda313607118e54788")
+        # How to compare contents of a file, giving errors for unmatched lines
+        self.assertListEqual(
+            list(open(htmlfile)),
+            list(open("test/files/htmlmail.html")))
 
         imgfile = os.path.join(tmpdir, "tuxnetwork.jpg")
         self.assertTrue(os.path.exists(imgfile))
