@@ -775,6 +775,8 @@ def Usage():
         List the given paths
     %s -s [-n] srcpath dstpath
         Sync from srcpath to dstpath
+    %s -l
+        List known shortcuts
 
 Paths may be local files, android:/path/to, or androidsd:/path/to.
 
@@ -783,9 +785,8 @@ You can also make shortcuts to frequently used paths in %s, like this:
 books: android:/storage/emulated/0/Books
 osmand: android:/Android/data/net.osmand.plus/files/
 
-
 """
-        % (progname, progname, CONFIGPATH))
+        % (progname, progname, progname, CONFIGPATH))
 
 
 def parse_args():
