@@ -300,7 +300,8 @@ def print_remind_for_interval(enddate, formatter):
        That means everything except that for repeating events, only the
        first instance will be printed.
     """
-    with open(os.path.join(REMINDDIR, "remind.txt"), 'rb') as infp:
+    reminderfile = os.path.join(REMINDDIR, "remind.txt")
+    with open(reminderfile, 'rb') as infp:
         remindin = infp.read()
 
     # Replace any %x directives that are by themselves as words
@@ -318,9 +319,11 @@ def print_remind_for_interval(enddate, formatter):
     # leads to the error: -stdin-(54): Day specified twice
     # so make sure to show any errors prominently, otherwise such events
     # will be silently dropped.
+    # Some things that cau cause "Day specified twice":
+    # 18 Jun First thing happens today -- the "First" confuses remind
     if reminderr:
-        print("<fieldset><b>Warning from remind:", reminderr.decode(),
-              "</b></fieldset>")
+        print("<fieldset><b>Warning from 'remind -n - <", reminderfile, ":",
+              reminderr.decode(), "</b></fieldset>")
     lines = remindout.decode().split('\n')
     # lines look like
     # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
