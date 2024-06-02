@@ -105,6 +105,13 @@ MMMMMMMMMMMMMMMMMMMMMMMMMMM""",
     ipcsimple.set_ipc_handler(communicate)
     tkroot.after(50, poll_for_signals)  #  time in ms.
 
+    # Show dialog by default. XXX Eventually might make this configurable;
+    # omitting this step makes the dialog hidden until the first time
+    # an alert is shown.
+    def show_dialog():
+        update_dialog("Starting...", popup=True)
+    tkroot.after(50, show_dialog)
+
     tkroot.mainloop()
 
 
