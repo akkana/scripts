@@ -11,6 +11,7 @@
 import requests
 from bs4 import BeautifulSoup, NavigableString
 import datetime
+import time
 from urllib.parse import urljoin
 import io
 import string
@@ -61,6 +62,10 @@ utcnow = datetime.datetime.now(tz=datetime.timezone.utc)
 
 # Needed to deal with meetings that don't list a time:
 NO_TIME = "NO TIME"
+
+# Something guaranteed to be before any meetings.
+# Can't use datetime.datetime.min because it needs to be tz-aware.
+EARLY_DATE = datetime.datetime(1970, 1, 1).astimezone()
 
 
 Verbose = True
@@ -376,9 +381,13 @@ def html_head(title):
 <h1>{ title }</h1>"""
 
 
-def rss_entry(desc, guid, url, lastmod):
+def rss_entry(title, desc, guid, url, lastmod):
+    # lastmod must be in RSS_DATE_FORMAT
+    # url will be made absolute
+    if ':' not in url:
+        url = RSS_URL + url
     return f"""<item>
-   <title>{desc}</title>
+   <title>{title}</title>
    <guid isPermaLink="false">{guid}</guid>
    <link>{url}</link>
    <description><![CDATA[ {desc} ]]>
@@ -865,8 +874,7 @@ def write_files(mtglist):
 
         gendate = now.strftime(RSS_DATE_FORMAT)
         print(f"""<?xml version="1.0" encoding="iso-8859-1" ?>
-<rss version="2.0"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 
 <channel>
    <title>Los Alamos County Government Meetings</title>
@@ -877,6 +885,7 @@ def write_files(mtglist):
    <ttl>14</ttl>
    <pubDate>{gendate}</pubDate>
    <managingEditor>akk at shallowsky dot com (Akkana Peck)</managingEditor>
+   <atom:link href="{RSS_URL}" rel="self" type="application/rss+xml" />
    <generator>losalamosmtgs</generator>
 """,
               file=rssfp)
@@ -888,22 +897,11 @@ def write_files(mtglist):
 
 """, file=htmlfp)
 
-        record_str, recordfile = write_meeting_records_file()
-        if record_str and recordfile:
-            print(f"<p>\n{ record_str }:", file=htmlfp)
-            print("<h2>Meeting Records (Minutes, Audio, Video</h2>", file=htmlfp)
-            print(f'<a href="{ recordfile }">See records available</a>',
-                  file=htmlfp)
-            url = RSS_URL + recordfile
-            print(rss_entry(desc="Meeting records",
-                            guid=recordfile, url=url,
-                            lastmod=now), file=rssfp)
-        else:
-            print("<p>\nNo new meeting records.", file=htmlfp)
-
         agendafile = None
         agenda_html = None
         meetingtime = None
+
+        no_agenda_yet = []
 
         for mtg in mtglist:
             # Did the previous meeting have a tickler?
@@ -925,7 +923,8 @@ def write_files(mtglist):
                 # Add to the RSS
                 if tickler_filepath:
                     active_meetings.append(tickler_filename)
-                    print(rss_entry(desc=desc,
+                    print(rss_entry(title=desc,
+                                    desc=desc,
                                     guid=tickler_filename,
                                     url=f"{RSS_URL}{tickler_filename}",
                                     lastmod=now),
@@ -954,24 +953,25 @@ def write_files(mtglist):
             lastmod = None
             cleanname = mtg['cleanname']
 
-            if mtg["Agenda"]:      # There is an agenda URL listed
-                print(cleanname, "has an agenda: fetching it")
-                # XXX TEMPORARY: save the PDF filename, because sometimes
-                # pdftohtml produces an HTML file with no content even
-                # though there's content in the PDF.
-                pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
-                try:
-                    agenda_html = agenda_to_html(mtg["Agenda"],
-                                                 meetingtime,
-                                                 save_pdf_filename=pdfout)
-                except ReadTimeoutError:
-                    print("Timed out on " + agendaloc)
-                    agenda_html = NO_AGENDA
-                    agendastatus = "timeout"
-            else:                   # No previous agenda
+            if not mtg["Agenda"]:      # No agenda posted yet
+                no_agenda_yet.append(mtg)
                 print(cleanname, "has no agenda to fetch")
+                agenda_html = None
+                continue
+
+            print(cleanname, "has an agenda: fetching it")
+            # XXX TEMPORARY: save the PDF filename, because sometimes
+            # pdftohtml produces an HTML file with no content even
+            # though there's content in the PDF.
+            pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
+            try:
+                agenda_html = agenda_to_html(mtg["Agenda"],
+                                             meetingtime,
+                                             save_pdf_filename=pdfout)
+            except ReadTimeoutError:
+                print("Timed out on " + agendaloc)
                 agenda_html = NO_AGENDA
-            # Now agenda_html is guaranteed to be set, either way.
+                agendastatus = "timeout"
 
             # Might need a diff file too:
             agenda_diff = None
@@ -1175,7 +1175,8 @@ def write_files(mtglist):
             print("GUID will be", mtg['GUID'], "lastmod is", mtg['lastmod'])
 
             # Add the item to the RSS
-            print(rss_entry(desc=f'{mtgtitle} {agenda_hdr}',
+            print(rss_entry(title=f'{mtgtitle} {agenda_hdr}',
+                            desc=f'{mtgtitle} {agenda_hdr}',
                             guid=mtg['GUID'], url=link,
                             lastmod=mtg['lastmod']), file=rssfp)
 
@@ -1192,8 +1193,70 @@ def write_files(mtglist):
 """,
                   file=htmlfp)
 
+        # Done looping over meetings. Check for any new records.
+        record_str, recordfile = write_meeting_records_file()
+        if record_str and recordfile:
+            print("<h2>Meeting Records (Minutes, Audio, Video)</h2>", file=htmlfp)
+            print(f"<p>\n{ record_str }", file=htmlfp)
+            print(f'<p><a href="{ recordfile }">See records available</a>',
+                  file=htmlfp)
+            url = RSS_URL + recordfile
+            print(rss_entry(title="Meeting records",
+                            desc=record_str,
+                            guid=recordfile,
+                            url=url,
+                            lastmod=utcnow.strftime(RSS_DATE_FORMAT)),
+                  file=rssfp)
+        else:
+            print("<p>\nNo new meeting records.", file=htmlfp)
+
+        # Are there any meetings with no agenda yet?
+        if not no_agenda_yet:
+            try:
+                os.unlink(no_agenda_path)
+            except:
+                pass
+        else:
+            no_agenda_file = "no-agenda.html"
+            no_agenda_path = os.path.join(RSS_DIR, no_agenda_file)
+            lastmod_noagenda = datetime.datetime.min
+            with open(no_agenda_path, "w") as na_fp:
+                print(html_head("Scheduled Meetings, No Agenda Yet"),
+                      file=na_fp)
+                lastmod_all = EARLY_DATE
+                for mtg in no_agenda_yet:
+                    print("Parsing meeting date", mtg["Meeting Date"])
+                    mtgdate = datetime.datetime.strptime(mtg["Meeting Date"],
+                                                         "%m/%d/%Y")
+                    print("<p>\n%s %s: %s\n" % (mtgdate.strftime("%b %d, %Y"),
+                                                mtg["Meeting Time"],
+                                                mtg["Name"]),
+                          file=na_fp)
+                    try:
+                        mtg_lastmod = datetime.datetime.strftime(
+                            mtg['lastmod'], RSS_DATE_FORMAT)
+                    except Exception as e:
+                        mtg_lastmod = now
+                        print("Exception with lastmod", e)
+                        print("on", mtg)
+                    if mtg_lastmod > lastmod_all:
+                        lastmod_noagenda = mtg_lastmod
+
+            # Now the no_agenda file is written. Add it to the RSS and HTML.
+            lastmod_str = lastmod_noagenda.strftime(RSS_DATE_FORMAT)
+            print(rss_entry(title="No agenda",
+                            desc="Scheduled meetings with no agenda yet",
+                            guid="%s-%s" % (no_agenda_file,
+                                time.mktime(lastmod_noagenda.timetuple())),
+                            url=no_agenda_file,
+                            lastmod=lastmod_str),
+                  file=rssfp)
+            print("<h2>Meetings with no agenda yet:</h2>", file=htmlfp)
+            print("<p><a href='%s'>Meetings with no agenda yet</a>"
+                  % no_agenda_file, file=htmlfp)
+
         print("</channel>\n</rss>", file=rssfp)
-        print("</body></html>", file=htmlfp)
+        print("</body>\n</html>", file=htmlfp)
 
     print("Wrote", outrssfilename, "and", outhtmlfilename)
 
@@ -1208,12 +1271,12 @@ def write_files(mtglist):
         # Protected files
         if f.startswith("index") or f.startswith("about"):
             continue
-        # Don't remove the records file
+        # Don't remove these files
         if f.startswith('records'):
             continue
         if f.endswith('meeting-records.html') and f.startswith(todaystr):
-            if Verbose:
-                print("Not removing", f)
+            continue
+        if f.startswith('no-agenda'):
             continue
 
         def is_active(f):
@@ -1233,68 +1296,85 @@ def write_meeting_records_file():
     """
     initialized = False
     filename = None
-    outfp = None
+    recordfp = None
     newrecords = []
+    most_recent = EARLY_DATE
 
-    for rec in mtg_records.records_by_date():
+    records = mtg_records.records_by_date()
+    if not records:
+        print("No meeting records")
+        return
+
+    for rec in records:
         recdate = datetime.datetime.strptime(rec["latest-record"],
                                              "%Y-%m-%d").astimezone()
+        if recdate > most_recent:
+            most_recent = recdate
+
         # if rec["latest-record"] == todaystr:
         if (now - recdate).days < 3:
             if not initialized:
                 filename = f'{ todaystr }-meeting-records.html'
-                outfp = open(os.path.join(RSS_DIR, filename), 'w')
+                recordfp = open(os.path.join(RSS_DIR, filename), 'w')
                 print(html_head(title=f"Meeting Records as of {todaystr}"),
-                      file=outfp)
+                      file=recordfp)
                 print("""<p>
+Dates are when the record was last updated.
+<p>
 To see any of these records, go to the
 <a href="https://losalamos.legistar.com/Calendar.aspx" target="_blank">Legistar
 calendar page</a>, then set the Month appropriately (e.g. <i>Last Month</i>).
 Don't forget to set the Month back to Current Month when you're done.
 Sorry, Legistar doesn't allow links directly to meeting records.""",
-                      file=outfp)
+                      file=recordfp)
+
+                # print a header if there are any new records at all for this meeting
+                print("<table border=1>\n <tr>\n  <th>Name", file=recordfp)
+                for rkey in MeetingRecords.RECORD_TYPES:
+                    print("  <th>%s" % rkey, file=recordfp)
+
                 initialized = True
                 print("Initialized file", filename)
 
             newrecords.append(rec['name'])
 
-        elif not initialized or not outfp:
+        elif not initialized or not recordfp:
             print("Didn't see any new records")
             return "", None
 
         retstr = ""
+        print(" <tr>\n  <td><b>%s</b>" % rec['name'], file=recordfp)
 
-        # print a header if there are any new records at all for this meeting
-        print(f"<p>\n<b>{ rec['name'] }</b> records:", file=outfp)
-
-        print("Records for", rec['name'], ":")
-
-        for rkey in rec:
-            if rkey not in MeetingRecords.RECORD_TYPES:
+        for rkey in MeetingRecords.RECORD_TYPES:
+            if rkey not in rec or not rec[rkey]:
+                print("   <td>&nbsp;", file=recordfp)
                 continue
-            if not rec[rkey]:
-                continue
+
             # Don't add links: the Legistar links are bogus and don't work
+            # print(rec['name'], ": adding record for", rkey)
+            print("<td>%s" % rec[rkey][1], file=recordfp)
             if False and rec[rkey][0]:
                 s = f'<a href="{ rec[rkey][0] }" target="_none">{ rkey }</a>'
             else:
                 s = rkey
-            s += f' (Updated {rec[rkey][1]})'
-            print(rec['name'], ": adding record for", rkey)
-            print(s, file=outfp)
+            s += f' ({rec[rkey][1]})'
             retstr += s + '\n'
+
+        print("</tr>", file=recordfp)
 
         # # Also add the date this record was updated
         # if 'latest-record' in 
         # print("
 
-    print("</body></html>", file=outfp)
-    outfp.close()
+    print("</body></html>", file=recordfp)
+    recordfp.close()
 
     if Verbose:
         print("Wrote meeting records file", filename)
 
-    retstr = "New records for: " + ', '.join(newrecords)
+    retstr = "<p>\nRecent records for:\n<ul>\n<li>" + '\n<li>'.join(newrecords)
+    retstr += "</ul>\n<p>\nMost recent record updated: " \
+        + most_recent.strftime("%Y-%m-%d")
 
     return retstr, filename
 
