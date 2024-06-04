@@ -836,6 +836,9 @@ def main():
                 print("%13s: %s" % (key, pathdict[key]))
         else:
             print("None")
+
+        print("android: corresponds to:", ANDROID_BASE)
+
         sys.exit(0)
 
     if args.sync:
