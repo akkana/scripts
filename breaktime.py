@@ -24,7 +24,7 @@ import sys, os
 GETUP_INTERVAL = 30
 
 # How long, at minimum, do you have to stay away for it to count? (minutes)
-AWAY_MINIMUM = 4
+AWAY_MINIMUM = 5
 
 # How often does the program wake up and poll?
 POLL_INTERVAL = 30
@@ -203,7 +203,7 @@ def get_check_msg():
                       % ((now - idle_start)/60))
         else:
             nonidle_time = now - nonidle_start
-            msg = f"""You've been at the computer\nfor {nonidle_str()}"""
+            msg = f"You've been at the computer\nfor {nonidle_str()}"
 
             if nonidle_time > GETUP_INTERVAL:
                 msg += "\nTime to take a break"
@@ -220,7 +220,8 @@ def get_check_msg():
 
     if not idle_start:
         idle_start = now
-        return "Starting idle timer", COLORS_NORMAL, FONT_NORMAL
+        return (f"You've been at the computer\nfor {nonidle_str()}",
+                COLORS_NORMAL, FONT_NORMAL)
 
     idle_time = now - idle_start
 
