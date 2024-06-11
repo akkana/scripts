@@ -606,6 +606,10 @@ class BrowserWindow(QMainWindow):
                     print("\nBrowserWindow: trying to load", url, "in new tab")
                     self.load_url(url)
 
+                # Now clear init_urls, otherwise it will keep trying to
+                # load the first one in whatever tab is active.
+                self.init_urls = []
+
             return True
 
         return super().eventFilter(object, event)
