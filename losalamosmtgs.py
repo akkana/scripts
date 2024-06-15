@@ -26,6 +26,7 @@ from math import isclose
 
 # Try to use PyMuPDF if available.
 # For some inexplicable reason the package PyMuPDF is imported as "fitz".
+# But it doesn't seem to work as well as pdftohtml anyway.
 # try:
 #     import fitz
 # except:
@@ -46,6 +47,10 @@ RSS_URL = "https://localhost/los-alamos-meetings/"
 RSS_DIR = os.path.expanduser("~/web/los-alamos-meetings")
 if not os.path.exists(RSS_DIR):
     os.makedirs(RSS_DIR)
+
+# Directory to store long-term records (CSV) of agenda items vs. dates.
+# If None, long-term records will not be stored.
+AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "ItemStore")
 
 ######## END CONFIGURATION ############
 
@@ -147,7 +152,6 @@ class MeetingRecords:
            self.record_dic[cleanname][record_type][0] != url:
 
             if cleanname not in self.record_dic:
-                print("It's a new record")
                 self.record_dic[cleanname] = { 'name': cleanname }
 
             self.record_dic[cleanname][record_type] = (url, todaystr)
@@ -425,7 +429,7 @@ def diffhtml(before_html, after_html, title=None):
     return diff.encode()
 
 
-def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
+def agenda_to_html(mtg, meetingtime, save_pdf_filename=None):
     if save_pdf_filename:
         prettyname = os.path.basename(save_pdf_filename)
     else:
@@ -433,15 +437,16 @@ def agenda_to_html(agendaloc, meetingtime, save_pdf_filename=None):
     print("Converting agenda for", prettyname, file=sys.stderr)
     if 'fitz' in sys.modules:
         print("Using fitz")
-        return html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename)
+        return html_agenda_fitz(mtg, meetingtime, save_pdf_filename)
 
     # print("No fitz, using pdftohtml")
-    return html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename)
+    return html_agenda_pdftohtml(mtg, meetingtime, save_pdf_filename)
 
 
-def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
+def html_agenda_fitz(mtg, meetingtime, save_pdf_filename=None):
     """Use fitz (mupdf's engine) to convert PDF to HTML, returned as a string.
     """
+    agendaloc = mtg["Agenda"]
     doc = fitz.open(agendaloc)
 
     def find_indent_levels(pdfdoc):
@@ -537,13 +542,14 @@ def html_agenda_fitz(agendaloc, meetingtime, save_pdf_filename=None):
     return html
 
 
-def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename=None):
+def html_agenda_pdftohtml(mtg, meetingtime, save_pdf_filename=None):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        then returned cleaned_up bytes (not str).
        save_pdf_filename is for debugging:
        if set, save the PDF there and don't delete it.
        Returns the HTML source as bytes, not str.
     """
+    agendaloc = mtg["Agenda"]
     if not save_pdf_filename:
         save_pdf_filename = "/tmp/tmpagenda.pdf"
     if agendaloc.lower().startswith('http') and ':' in agendaloc:
@@ -560,23 +566,53 @@ def html_agenda_pdftohtml(agendaloc, meetingtime, save_pdf_filename=None):
     args = [ "pdftohtml", "-c", "-s", "-i", "-noframes",
              # "-enc", "utf-8",
              agendaloc, htmlfile ]
-    print("Calling", ' '.join(args))
+    print("Calling", ' '.join(args), file=sys.stderr)
     subprocess.call(args)
 
-    return clean_up_htmlfile(htmlfile, meetingtime)
+    return clean_up_htmlfile(htmlfile, mtg, meetingtime)
 
 
 def highlight_filenumbers(soup):
+    """Find agenda items, which match FILENO_PAT and contain a link
+       to related documents on Legistar.
+       Highlight them with h3.highlight,
+       and return a list of dicts with 'href' and 'desc'
+       that can be saved to the item store.
+    """
+    # Create the agenda item store directory if not already there
+    item_list = []
+
     for para in soup.find_all("p"):
-        # If it matches the FILENO_PAT, wrap a header around it
+        # If it matches the FILENO_PAT, change the p tag to an h3 highlight.
         if FILENO_PAT.match(para.text.strip()):
             # para.wrap(soup.new_tag("h3"))
             para.name = "h3"
             para["class"] = "highlight"
 
+        if not AGENDA_ITEM_STORE:
+            continue
+
+        # Get the link, if any
+        try:
+            href = para.find('a').attrs['href']
+        except:
+            href = None
+
+        if para.name == 'h3':
+            # Look forward to the next paragraph, which is the description
+            # of the item.
+            nextpara = para.find_next('p')
+            if nextpara:
+                desctext = re.sub(r'\s{2,}', ' ', nextpara.text.strip())
+                item_list.append({ 'url': href, 'desc': desctext })
+            else:
+                print("Couldn't find next paragraph after h3", para)
+
     head = soup.head
     head.append(soup.new_tag('style', type='text/css'))
     head.style.append('.highlight { width: 100%; background-color: #7fb; }')
+
+    return item_list
 
 
 def add_stylesheet(soup):
@@ -589,14 +625,16 @@ def add_stylesheet(soup):
     soup.head.insert(0, csslink)
 
 
-def clean_up_htmlfile(htmlfile, meetingtime):
+def clean_up_htmlfile(htmlfile, mtg, meetingtime):
     """Clean up the scary HTML written by pdftohtml,
        removing the idiotic dark grey background pdftohtml has hardcoded in,
        the assortment of absolute-positioned styles,
        the new-paragraph-for-each-line, etc.
-       Also, try to linkify links.
+       Also, try to linkify links, identify sections, save agenda items, etc.
        Returns bytes, not str.
     """
+    global AGENDA_ITEM_STORE
+
     with open(htmlfile, 'rb') as htmlfp:
         # The files produced by pdftohtml contain '\240' characters,
         # which are ISO-8859-1 for nbsp.
@@ -699,7 +737,40 @@ def clean_up_htmlfile(htmlfile, meetingtime):
         bold.name = 'h2'
 
     # Highlight all the file numbers, which helps separate items
-    highlight_filenumbers(soup)
+    # to make the HTML more readable.
+    item_list = highlight_filenumbers(soup)
+
+    # Write agenda items found by highlight_filenumbers to the item store,
+    # if there is one.
+    # XXX need a way to avoid duplicates when meetings are re-posted
+    if item_list and AGENDA_ITEM_STORE:
+        try:
+            os.mkdir(AGENDA_ITEM_STORE)
+        except FileExistsError:
+            pass
+        except Exception as e:
+            print("Couldn't mkdir", AGENDA_ITEM_STORE,
+                  ": not saving agenda items", file=sys.stderr)
+            print(e, file=sys.stderr)
+            AGENDA_ITEM_STORE = None
+
+        try:
+            # To create the filename, remove spaces, anything following a dash
+            groupname = mtg["Name"].replace(' ', '').split('-')[0]
+            itemfile = os.path.join(AGENDA_ITEM_STORE, groupname + '.jsonl')
+            with open(itemfile, 'a') as itemsfp:
+                for item in item_list:
+                    print("item:", item)
+                    item['group'] = groupname
+                    item['date'] = mtg['Meeting Date']
+                    item['name'] = mtg["Name"]
+                    json.dump(item, itemsfp)
+                    # json.dump doesn't add a newline
+                    print('', file=itemsfp)
+                    print("dumped item")
+        except Exception as e:
+            print("Exception trying to save item store from", mtg)
+            print(e)
 
     # linkify links, particularly the Zoom link
     for link in soup.body.findAll(string=LINK_PAT):
@@ -783,7 +854,7 @@ def join_consecutive_tags(soup, tagname, add_spaces=False):
             tag.decompose()
 
 
-def get_tickler(agenda_str, meetingtime, tickler_html_file):
+def get_tickler(agenda_str, mtg, meetingtime, tickler_html_file):
     """Does an agenda include a tickler?
        Input can be either a filename or HTML source as a string or bytes.
        If there's a tickler, return full path to the written tickler html,
@@ -809,7 +880,7 @@ def get_tickler(agenda_str, meetingtime, tickler_html_file):
         return None
 
     # The tickler is another PDF file, natch. Convert it:
-    tickler_html = html_agenda_pdftohtml(tickler_url, meetingtime).decode()
+    tickler_html = html_agenda_pdftohtml(tickler_url, mtg, meetingtime).decode()
     soup = BeautifulSoup(tickler_html, "lxml")
 
     # First give it a clear title. After html_agenda_pdf2html,
@@ -913,7 +984,7 @@ def write_files(mtglist):
                 meetingtimestr = meetingtime.strftime("%Y-%m-%d")
                 tickler_filename = meetingtimestr + "-Tickler.html"
                 tickler_filepath = os.path.join(RSS_DIR, tickler_filename)
-                tickler_filepath = get_tickler(agenda_html, meetingtime,
+                tickler_filepath = get_tickler(agenda_html, mtg, meetingtime,
                                                tickler_filename)
                 desc = f"County Council Tickler for {meetingtimestr}"
                 # lastmod = datetime.datetime.now()
@@ -965,7 +1036,7 @@ def write_files(mtglist):
             # though there's content in the PDF.
             pdfout = os.path.join(RSS_DIR, cleanname + ".pdf")
             try:
-                agenda_html = agenda_to_html(mtg["Agenda"],
+                agenda_html = agenda_to_html(mtg,
                                              meetingtime,
                                              save_pdf_filename=pdfout)
             except ReadTimeoutError:
@@ -1235,6 +1306,8 @@ def write_files(mtglist):
                     try:
                         mtg_lastmod = datetime.datetime.strftime(
                             mtg['lastmod'], RSS_DATE_FORMAT)
+                    except KeyError as e:
+                        mtg_lastmod = now
                     except Exception as e:
                         mtg_lastmod = now
                         print("Exception with lastmod", e)
