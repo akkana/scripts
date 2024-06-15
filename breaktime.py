@@ -85,6 +85,7 @@ MMMMMMMMMMMMMMMMMMMMMMMMMMM""",
 
     # Allow quitting the whole app with ctrl-q in the dialog.
     tkroot.bind('<Control-Key-q>', quit)
+    tkroot.bind('<Control-Key-r>', reset)
 
     # # Callback for key events:
     # def key_event(event):
@@ -159,6 +160,16 @@ def update_dialog(msg, colors=None, popup=True, font=None):
 # rc = os.fork()
 # if rc:
 #     sys.exit(0)
+
+
+def reset(event):
+    global idle_start, nonidle_start
+
+    now = time.time()
+    idle_start = now - AWAY_MINIMUM - 1
+    nonidle_start = 0
+    update_dialog(msg="Resetting...", popup=False,
+                  colors=COLORS_LONGENOUGH, font=FONT_BOLD)
 
 
 def get_check_msg():
@@ -239,9 +250,14 @@ def get_check_msg():
         return ( f"Starting idle timer\n(after {nonidle_str()} nonidle)",
                  COLORS_NORMAL, FONT_NORMAL )
 
+    if nonidle_time > GETUP_INTERVAL:
+        color = COLORS_NEEDBREAK
+    else:
+        color = COLORS_NORMAL
+
     return ( f"""\nIdle for {(idle_time/60):.1f} minutes
 ({nonidle_str()} nonidle)""",
-             COLORS_NORMAL, FONT_NORMAL )
+             color, FONT_NORMAL )
 
 
 if __name__ == '__main__':
