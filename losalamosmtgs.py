@@ -50,7 +50,7 @@ if not os.path.exists(RSS_DIR):
 
 # Directory to store long-term records (CSV) of agenda items vs. dates.
 # If None, long-term records will not be stored.
-AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "ItemStore")
+AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItemRecords")
 
 ######## END CONFIGURATION ############
 
@@ -607,7 +607,7 @@ def highlight_filenumbers(soup):
                 # so sub them out first before replacing runs of whitespace
                 desctext = re.sub(r'\s{2,}', ' ',
                                   nextpara.text.strip().replace('\xa0', ' '))
-                item_list.append({ 'url': href, 'desc': desctext })
+                item_list.append({ 'url': href, 'itemdesc': desctext })
             else:
                 print("Couldn't find next paragraph after h3", para)
 
@@ -759,18 +759,16 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
 
         try:
             # To create the filename, remove spaces, anything following a dash
-            groupname = mtg["Name"].replace(' ', '').split('-')[0]
-            itemfile = os.path.join(AGENDA_ITEM_STORE, groupname + '.jsonl')
+            bodyname = mtg["Name"].replace(' ', '').split('-')[0]
+            itemfile = os.path.join(AGENDA_ITEM_STORE, bodyname + '.jsonl')
             with open(itemfile, 'a') as itemsfp:
                 for item in item_list:
-                    print("item:", item)
-                    item['group'] = groupname
-                    item['date'] = mtg['Meeting Date']
-                    item['name'] = mtg["Name"]
+                    # item['body'] = bodyname
+                    item['mtgdate'] = mtg['Meeting Date']
+                    item['mtgname'] = mtg["Name"]
                     json.dump(item, itemsfp)
                     # json.dump doesn't add a newline
                     print('', file=itemsfp)
-                    print("dumped item")
         except Exception as e:
             print("Exception trying to save item store from", mtg)
             print(e)
