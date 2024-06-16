@@ -603,7 +603,10 @@ def highlight_filenumbers(soup):
             # of the item.
             nextpara = para.find_next('p')
             if nextpara:
-                desctext = re.sub(r'\s{2,}', ' ', nextpara.text.strip())
+                # Legistar likes to use \xa0, non-breaking spaces
+                # so sub them out first before replacing runs of whitespace
+                desctext = re.sub(r'\s{2,}', ' ',
+                                  nextpara.text.strip().replace('\xa0', ' '))
                 item_list.append({ 'url': href, 'desc': desctext })
             else:
                 print("Couldn't find next paragraph after h3", para)
