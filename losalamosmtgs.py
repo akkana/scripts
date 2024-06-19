@@ -1386,7 +1386,7 @@ def write_meeting_records_file():
             most_recent = recdate
 
         # if rec["latest-record"] == todaystr:
-        if (now - recdate).days < 3:
+        if (now - recdate).days < 2:
             if not initialized:
                 filename = f'{ todaystr }-meeting-records.html'
                 recordfp = open(os.path.join(RSS_DIR, filename), 'w')
@@ -1399,7 +1399,12 @@ To see any of these records, go to the
 <a href="https://losalamos.legistar.com/Calendar.aspx" target="_blank">Legistar
 calendar page</a>, then set the Month appropriately (e.g. <i>Last Month</i>).
 Don't forget to set the Month back to Current Month when you're done.
-Sorry, Legistar doesn't allow links directly to meeting records.""",
+Sorry, Legistar doesn't allow links directly to meeting records.
+<p>
+Also, if you need to download the audio, clicking on <i>Audio download</i>
+from Legistar doesn't seem to work; instead, click on <i>Video</i>
+instead, and from the Video page, click on <i>Download</i>,
+then <i>Audio Download.</i>""",
                       file=recordfp)
 
                 # print a header if there are any new records at all for this meeting
@@ -1435,10 +1440,6 @@ Sorry, Legistar doesn't allow links directly to meeting records.""",
             retstr += s + '\n'
 
         print("</tr>", file=recordfp)
-
-        # # Also add the date this record was updated
-        # if 'latest-record' in 
-        # print("
 
     print("</body></html>", file=recordfp)
     recordfp.close()
