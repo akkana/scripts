@@ -50,7 +50,7 @@ if not os.path.exists(RSS_DIR):
 
 # Directory to store long-term records (CSV) of agenda items vs. dates.
 # If None, long-term records will not be stored.
-AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItemRecords")
+AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItems")
 
 ######## END CONFIGURATION ############
 
@@ -579,7 +579,6 @@ def highlight_filenumbers(soup):
        and return a list of dicts with 'href' and 'desc'
        that can be saved to the item store.
     """
-    # Create the agenda item store directory if not already there
     item_list = []
 
     for para in soup.find_all("p"):
@@ -588,9 +587,6 @@ def highlight_filenumbers(soup):
             # para.wrap(soup.new_tag("h3"))
             para.name = "h3"
             para["class"] = "highlight"
-
-        if not AGENDA_ITEM_STORE:
-            continue
 
         # Get the link, if any
         try:
@@ -746,6 +742,8 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
     # Write agenda items found by highlight_filenumbers to the item store,
     # if there is one.
     # XXX need a way to avoid duplicates when meetings are re-posted
+
+    # Create the agenda item store directory if not already there
     if item_list and AGENDA_ITEM_STORE:
         try:
             os.mkdir(AGENDA_ITEM_STORE)
@@ -757,10 +755,15 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
             print(e, file=sys.stderr)
             AGENDA_ITEM_STORE = None
 
+    if item_list and AGENDA_ITEM_STORE:
         try:
             # To create the filename, remove spaces, anything following a dash
+            # then add the year and month
             bodyname = mtg["Name"].replace(' ', '').split('-')[0]
-            itemfile = os.path.join(AGENDA_ITEM_STORE, bodyname + '.jsonl')
+            itemfilebase = os.path.join(AGENDA_ITEM_STORE,
+                                    bodyname + '-'
+                                    + meetingtime.strftime('%Y-%m'))
+            itemfile = itembase +' .jsonl'
             with open(itemfile, 'a') as itemsfp:
                 for item in item_list:
                     # item['body'] = bodyname
