@@ -38,12 +38,10 @@ def checkupdate(datadir, url):
     # Version files have form version-%Y-%m-%d %H:%M
     files = os.listdir(datadir)
     files.sort(reverse=True)
-    print("Reverse sorted files:", files)
     lastversion = ''
     for filename in files:
         if filename.startswith("version"):
             lastversion = filename
-            print("lastversion:", lastversion)
             break
 
     lastbytes = b''
@@ -57,15 +55,9 @@ def checkupdate(datadir, url):
     r = requests.get(url)
     newbytes = r.content.strip()
     if newbytes != lastbytes:
-        print("They're different!")
-        print("Old:", lastbytes)
-        print("New:", newbytes)
         curversion = 'version-' + datetime.now().strftime(DATEFORMAT)
         with open(os.path.join(datadir, curversion), 'wb') as fp:
             fp.write(newbytes)
-        print("Wrote", curversion)
-    else:
-        print("Hasn't changed")
 
 
 if __name__ == '__main__':
