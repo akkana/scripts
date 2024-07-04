@@ -707,6 +707,10 @@ weborphans:
     Check a web site (perhaps localhost) against a local mirror,
     checking for broken links and orphaned files.
 
+whenupdated.py:
+    Keep track of the content of a URL, and when it changes, store
+    the new version with a timestamp so you can see when a page is updated.
+
 wikifollow.py:
     Starting with any Wikipedia page, follow the first real link
     on each successive page until it arrives at a target endpoing.
