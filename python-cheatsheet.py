@@ -1413,6 +1413,11 @@ and tag.previous_sibling will return the whitespace.
 
 # Find tags with inline style attribute:
 for t in soup.find_ll(style=True)
+
+# Find tags with inline absolute positioning style
+P_ABSOLUTE = re.compile(r'position:\s*absolute')
+soup.find_all('p', style=P_ABSOLUTE)
+
 # Harder way, using lambda:
 soup.find_all(lambda tag: 'style' in tag.attrs)
 
@@ -1458,11 +1463,25 @@ soup.body.insert(0, b_tag)
 btext = NavigableString("this is bold")
 b_tag.append(btext)
 
+# Insert a tag after another one:
+article = soup.find('article')
+new_tag = soup.new_tag("tagname")
+new_tag.append("some text here")
+# insert the new tag after the article
+article.insert_after(new_tag)
+
 # Add some style to an element or to the head:
 para["class"] = "fileno"
 head = soup.head
 head.append(soup.new_tag('style', type='text/css'))
 head.style.append('.someclass { background-color: #7fb; }')
+
+# Look for the next p tag after the current tag:
+tag.find_next('p')
+tag.find_next_sibling('p')
+
+# Find the next sibling after a tag:
+tag.find_next_sibling()
 
 # linkify according to a pattern (use a smarter pattern than this):
 from bs4 import BeautifulSoup, NavigableString
@@ -1497,7 +1516,7 @@ r = requests.get(url)
 session = requests.Session()
 r = session.get(url)
 
-# requests.text gives a string, requests.content gives bytes
+# r.text (string), r.content (bytes), or r.json()
 
 # r.encoding comes from the server,
 # r.apparent_encoding is guessed from the text
@@ -2456,7 +2475,7 @@ pip that it's installed. Read more:
 https://stackoverflow.com/questions/30306099/pip-install-editable-vs-python-setup-py-develop
 )
 
-This makes links to the live sourcedir, so it will see changes.
+This makes links to the live sourcedir, so you will get changes automatically.
 
 When finished, if you don't want the package there any more:
   setup.py develop --uninstall
