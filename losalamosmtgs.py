@@ -54,6 +54,8 @@ AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItems")
 
 ######## END CONFIGURATION ############
 
+RECORDS_FILEBASE = 'meeting-records.html'
+
 
 # Make a timezone-aware datetime for now:
 now = datetime.datetime.now().astimezone()
@@ -70,7 +72,8 @@ NO_TIME = "NO TIME"
 
 # Something guaranteed to be before any meetings.
 # Can't use datetime.datetime.min because it needs to be tz-aware.
-EARLY_DATE = datetime.datetime(1970, 1, 1).astimezone()
+EARLY_DATETIME = datetime.datetime(1970, 1, 1).astimezone()
+EARLY_DATE = EARLY_DATETIME.date()
 
 
 Verbose = True
@@ -96,6 +99,11 @@ FILENO_PAT = re.compile('[A-Z0-9]{2,}-[A-Z0-9]{2,}')
 # of LINK_PAT; it's that sometimes the PDFs split the URL across
 # several lines.
 LINK_PAT = re.compile('^https://')
+
+# A few other patterns that are used here and there
+sectionnum_pat = re.compile(r'[0-9A-Z]{,2}\.')
+pagediv_pat = re.compile('page[0-9]*-div')
+header_pat = re.compile(r'([0-9]+)\.\s*([A-Z \(\)\/,]+)$', flags=re.DOTALL)
 
 
 # Where temp files will be created. pdftohtml can only write to a file.
@@ -193,6 +201,17 @@ class MeetingRecords:
                 print("No records saved from last time")
 
     def save_file(self):
+        """Clean and save the records.json file.
+        """
+        # Don't keep anything older than 15 days.
+        keys = list(self.record_dic.keys())
+        for key in keys:
+            recdate = datetime.datetime.strptime(
+                self.record_dic[key]["latest-record"], "%Y-%m-%d").date()
+            if (today - recdate).days > 15:
+                del self.record_dic[key]
+
+        # Now save it
         with open(os.path.join(RSS_DIR, self.RECORDFILENAME), 'w') as fp:
             json.dump(self.record_dic, fp, indent=4)
             # XXX Would be nice to save them in sorted order
@@ -524,9 +543,9 @@ def html_agenda_fitz(mtg, meetingtime, save_pdf_filename=None):
             # Decide which level of header to use based on content.
             if isclose(b[0], indent_levels[0], abs_tol=10):
                 # print("HEADER:", b[4].replace('\n', ' '))
-                if re.match('[0-9]+\.\n', b[4]):
+                if re.match(r'[0-9]+\.\n', b[4]):
                     html += "<h1>%s</h1>\n<p>\n" % b[4]
-                elif re.match('[A-Z]+\.\n', b[4]):
+                elif re.match(r'[A-Z]+\.\n', b[4]):
                     html += "<h2>%s</h2>\n<p>\n" % b[4]
                 else:
                     html += "<p>%s</p>" % b[4]
@@ -642,8 +661,7 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
         # and won't see anything in the file at all.
         html_bytes = htmlfp.read().decode('ISO-8859-1')
 
-    # Make some changes. Primarily,
-    # replace the grey background that htmltotext wires in
+    # Make some changes to make the HTML readable and parseable.
     soup = BeautifulSoup(html_bytes, "lxml")
 
     # The <style> tag just contains a long comment. No idea why it's there.
@@ -690,7 +708,6 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
         del tag["style"]
 
     # Get rid of the pagination
-    pagediv_pat = re.compile('page[0-9]*-div')
     divs = list(body.find_all(id=pagediv_pat))
     for div in divs:
         div.replace_with_children()
@@ -717,7 +734,6 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
         del tag["class"]
 
     # Try to identify major headers, to highlight them better.
-    header_pat = re.compile('([0-9]+)\.\s*([A-Z \(\)\/,]+)$', flags=re.DOTALL)
 
     # This doesn't work. I don't know why. find_all(text=pat) works fine
     # in simple test cases, but not on the real files.
@@ -763,7 +779,7 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
             itemfilebase = os.path.join(AGENDA_ITEM_STORE,
                                     bodyname + '-'
                                     + meetingtime.strftime('%Y-%m'))
-            itemfile = itembase +' .jsonl'
+            itemfile = itemfilebase +' .jsonl'
             with open(itemfile, 'a') as itemsfp:
                 for item in item_list:
                     # item['body'] = bodyname
@@ -811,7 +827,6 @@ def join_consecutive_tags(soup, tagname, add_spaces=False):
     to_merge = []
     tags = list(soup.find_all(tagname))
     prev = None
-    sectionnum_pat = re.compile('[0-9A-Z]{,2}\.')
     for tag in tags:
         prev = tag.find_previous_sibling()
 
@@ -1298,7 +1313,7 @@ def write_files(mtglist):
             with open(no_agenda_path, "w") as na_fp:
                 print(html_head("Scheduled Meetings, No Agenda Yet"),
                       file=na_fp)
-                lastmod_all = EARLY_DATE
+                lastmod_all = EARLY_DATETIME
                 for mtg in no_agenda_yet:
                     print("Parsing meeting date", mtg["Meeting Date"])
                     mtgdate = datetime.datetime.strptime(mtg["Meeting Date"],
@@ -1345,15 +1360,16 @@ def write_files(mtglist):
         if ext not in rmexts:
             continue
 
-        # Protected files
+        # Protected files: don't remove these
         if f.startswith("index") or f.startswith("about"):
             continue
-        # Don't remove these files
         if f.startswith('records'):
             continue
-        if f.endswith('meeting-records.html') and f.startswith(todaystr):
-            continue
         if f.startswith('no-agenda'):
+            continue
+        # *-meeting-records.html will be managed by write_meeting_records_file()
+        # and only deleted when a new one is to be added.
+        if f.endswith(RECORDS_FILEBASE):
             continue
 
         def is_active(f):
@@ -1367,34 +1383,96 @@ def write_files(mtglist):
             os.unlink(os.path.join(RSS_DIR, f))
 
 def write_meeting_records_file():
-    """Write one file holding all the meeting records we've seen.
+    """Write one file holding all the meeting records we've seen,
+       but only if there's something newer than the last known records.
        Return a string summarizing today's new records,
-       which can be used in both HTML and RSS indices.
+       which can be used in both HTML and RSS indices,
+       plus the filename of the most recent records file.
     """
     initialized = False
     filename = None
     recordfp = None
     newrecords = []
-    most_recent = EARLY_DATE
+    most_recent_date = EARLY_DATE
+
+    # Find any existing meeting records files.
+    # There should be no more than one, but allow for mistakes.
+    old_records = []
+    for f in os.listdir(RSS_DIR):
+        if f.endswith(RECORDS_FILEBASE):
+            old_records.append(f)
+
+    if len(old_records) > 1:
+        old_records.sort()
+
+    print("Sorted old records:\n", old_records)
+
+    def delete_old_records():
+        for r in old_records:
+            os.unlink(os.path.join(RSS_DIR, r))
 
     records = mtg_records.records_by_date()
     if not records:
         print("No meeting records")
-        return
+        return "No meeting records", None
 
+    # First pass to determine the most recently added record
     for rec in records:
         recdate = datetime.datetime.strptime(rec["latest-record"],
-                                             "%Y-%m-%d").astimezone()
-        if recdate > most_recent:
-            most_recent = recdate
+                                             "%Y-%m-%d").date()
+        rec["latest_record_date"] = recdate
+        if recdate > most_recent_date:
+            most_recent_date = recdate
 
-        # if rec["latest-record"] == todaystr:
-        if (now - recdate).days < 2:
+    if most_recent_date == EARLY_DATE:
+        # There are no meeting records
+        print("No meeting records with a sensible date")
+        return "", None
+
+    # Get the date the most recent records file was last written
+    old_record_file = None
+    try:
+        old_record_file = old_records[-1]
+        old_records_date = os.stat(
+            os.path.join(RSS_DIR, old_record_file)).st_mtime
+        # This is a float. Turn it into a datetime.date
+        old_records_date = datetime.date.fromtimestamp(old_records_date)
+    except FileNotFoundError:
+        print("Old record file", old_records[-1], "not found")
+        old_records_date = EARLY_DATE
+    except IndexError:
+        print("No old record file")
+        old_records_date = EARLY_DATE
+
+    if old_records_date == EARLY_DATE:
+        old_records_datestr = "[a while ago]"
+    else:
+        old_records_datestr = old_records_date.strftime("%Y-%m-%d")
+
+    print("old_records_date:", old_records_date)
+    print("most_recent_date:", most_recent_date)
+    if most_recent_date <= old_records_date:
+        print("Most recent record", most_recent_date,
+              "is older than current records file", old_records_date)
+        return f"""There shouldn't be anything new here;
+The most recent record is {old_records_datestr}""", old_record_file
+
+    # Okay, there are new records to display. Rewrite the records file.
+    # Second pass through records.
+    print("Second pass through records")
+    # Have to re-initialize the generator
+    records = mtg_records.records_by_date()
+    recordfp = None
+    for rec in records:
+        # Retrieve the datetime.date that was set in the first pass
+        recdate = rec["latest_record_date"]
+        if (today - recdate).days < 5:
             if not initialized:
-                filename = f'{ todaystr }-meeting-records.html'
+                filename = f'{ todaystr }-{RECORDS_FILEBASE}'
                 recordfp = open(os.path.join(RSS_DIR, filename), 'w')
-                print(html_head(title=f"Meeting Records as of {todaystr}"),
-                      file=recordfp)
+                print(
+                    html_head(title=f"Recent Meeting Records as of {todaystr}"),
+                    file=recordfp)
                 print("""<p>
 Dates are when the record was last updated.
 <p>
@@ -1420,10 +1498,6 @@ then <i>Audio Download.</i>""",
 
             newrecords.append(rec['name'])
 
-        elif not initialized or not recordfp:
-            print("Didn't see any new records")
-            return "", None
-
         retstr = ""
         print(" <tr>\n  <td><b>%s</b>" % rec['name'], file=recordfp)
 
@@ -1444,17 +1518,35 @@ then <i>Audio Download.</i>""",
 
         print("</tr>", file=recordfp)
 
-    print("</body></html>", file=recordfp)
-    recordfp.close()
+    if recordfp:
+        print("</body></html>", file=recordfp)
+        recordfp.close()
 
-    if Verbose:
-        print("Wrote meeting records file", filename)
+        if Verbose:
+            print("Wrote meeting records file", filename)
 
-    retstr = "<p>\nRecent records for:\n<ul>\n<li>" + '\n<li>'.join(newrecords)
-    retstr += "</ul>\n<p>\nMost recent record updated: " \
-        + most_recent.strftime("%Y-%m-%d")
+        # In that case, remove any older records files.
+        print("Removing old records files:", old_records)
+        for oldrec in old_records:
+            if oldrec == filename:
+                print("EEK! Would have removed the records file just written",
+                      filename)
+                continue
+            print("Removing file", oldrec)
+            os.unlink(os.path.join(RSS_DIR, oldrec))
 
-    return retstr, filename
+        retstr = "<p>\nRecent records for:\n<ul>\n<li>" \
+            + '\n<li>'.join(newrecords) \
+            + "\n</ul>\n<p>\nMost recent record updated: " \
+            + most_recent_date.strftime("%Y-%m-%d")
+
+        return retstr, filename
+
+    # If we get here, recordfp didn't get set,
+    # which means there weren't any recent records
+    # (but somehow it didn't get picked up earlier)
+    print("Confused, thought there were recent records but there aren't")
+    return "", None
 
 
 VALID_FILENAME_CHARS = "-_." + string.ascii_letters + string.digits
