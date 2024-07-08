@@ -134,7 +134,7 @@ tempdir = tempfile.mkdtemp()
 #
 class MeetingRecords:
     # Types of records of meetings (to match the legistar calendar page):
-    RECORD_TYPES = [ 'Minutes', 'Video', 'Audio' ]
+    RECORD_TYPES = [ 'Minutes', 'Video', 'Audio', "Updated" ]
 
     RECORDFILENAME = "records.json"
 
@@ -561,14 +561,17 @@ def html_agenda_fitz(mtg, meetingtime, save_pdf_filename=None):
     return html
 
 
-def html_agenda_pdftohtml(mtg, meetingtime, save_pdf_filename=None):
+def html_agenda_pdftohtml(mtg, meetingtime, save_pdf_filename=None, url=None):
     """Convert a PDF agenda to text and/or HTML using pdftohtml,
        then returned cleaned_up bytes (not str).
        save_pdf_filename is for debugging:
        if set, save the PDF there and don't delete it.
        Returns the HTML source as bytes, not str.
     """
-    agendaloc = mtg["Agenda"]
+    if url:
+        agendaloc = url
+    else:
+        agendaloc = mtg["Agenda"]
     if not save_pdf_filename:
         save_pdf_filename = "/tmp/tmpagenda.pdf"
     if agendaloc.lower().startswith('http') and ':' in agendaloc:
@@ -899,7 +902,8 @@ def get_tickler(agenda_str, mtg, meetingtime, tickler_html_file):
         return None
 
     # The tickler is another PDF file, natch. Convert it:
-    tickler_html = html_agenda_pdftohtml(tickler_url, mtg, meetingtime).decode()
+    tickler_html = html_agenda_pdftohtml(mtg, meetingtime,
+                                         url=tickler_url).decode()
     soup = BeautifulSoup(tickler_html, "lxml")
 
     # First give it a clear title. After html_agenda_pdf2html,
@@ -1301,6 +1305,7 @@ def write_files(mtglist):
             print("<p>\nNo new meeting records.", file=htmlfp)
 
         # Are there any meetings with no agenda yet?
+        # XXX This should update the file only if new meetings have been posted.
         if not no_agenda_yet:
             try:
                 os.unlink(no_agenda_path)
@@ -1315,7 +1320,6 @@ def write_files(mtglist):
                       file=na_fp)
                 lastmod_all = EARLY_DATETIME
                 for mtg in no_agenda_yet:
-                    print("Parsing meeting date", mtg["Meeting Date"])
                     mtgdate = datetime.datetime.strptime(mtg["Meeting Date"],
                                                          "%m/%d/%Y")
                     print("<p>\n%s %s: %s\n" % (mtgdate.strftime("%b %d, %Y"),
@@ -1336,15 +1340,16 @@ def write_files(mtglist):
 
             # Now the no_agenda file is written. Add it to the RSS and HTML.
             lastmod_str = lastmod_noagenda.strftime(RSS_DATE_FORMAT)
-            print(rss_entry(title="No agenda",
+            print(rss_entry(title="Meetings with no agenda",
                             desc="Scheduled meetings with no agenda yet",
                             guid="%s-%s" % (no_agenda_file,
                                 time.mktime(lastmod_noagenda.timetuple())),
                             url=no_agenda_file,
                             lastmod=lastmod_str),
                   file=rssfp)
-            print("<h2>Meetings with no agenda yet:</h2>", file=htmlfp)
-            print("<p><a href='%s'>Meetings with no agenda yet</a>"
+            print("<h2>Recently scheduled meetings</h2>", file=htmlfp)
+            print("<p><a href='%s'>Meetings that have been scheduled,"
+                  " but which have no agenda yet</a>")
                   % no_agenda_file, file=htmlfp)
 
         print("</channel>\n</rss>", file=rssfp)
@@ -1405,28 +1410,24 @@ def write_meeting_records_file():
     if len(old_records) > 1:
         old_records.sort()
 
-    print("Sorted old records:\n", old_records)
-
     def delete_old_records():
         for r in old_records:
             os.unlink(os.path.join(RSS_DIR, r))
 
     records = mtg_records.records_by_date()
     if not records:
-        print("No meeting records")
         return "No meeting records", None
 
     # First pass to determine the most recently added record
     for rec in records:
         recdate = datetime.datetime.strptime(rec["latest-record"],
                                              "%Y-%m-%d").date()
-        rec["latest_record_date"] = recdate
+        rec["Updated"] = recdate
         if recdate > most_recent_date:
             most_recent_date = recdate
 
     if most_recent_date == EARLY_DATE:
         # There are no meeting records
-        print("No meeting records with a sensible date")
         return "", None
 
     # Get the date the most recent records file was last written
@@ -1438,10 +1439,8 @@ def write_meeting_records_file():
         # This is a float. Turn it into a datetime.date
         old_records_date = datetime.date.fromtimestamp(old_records_date)
     except FileNotFoundError:
-        print("Old record file", old_records[-1], "not found")
         old_records_date = EARLY_DATE
     except IndexError:
-        print("No old record file")
         old_records_date = EARLY_DATE
 
     if old_records_date == EARLY_DATE:
@@ -1449,23 +1448,18 @@ def write_meeting_records_file():
     else:
         old_records_datestr = old_records_date.strftime("%Y-%m-%d")
 
-    print("old_records_date:", old_records_date)
-    print("most_recent_date:", most_recent_date)
     if most_recent_date <= old_records_date:
-        print("Most recent record", most_recent_date,
-              "is older than current records file", old_records_date)
         return f"""There shouldn't be anything new here;
 The most recent record is {old_records_datestr}""", old_record_file
 
     # Okay, there are new records to display. Rewrite the records file.
     # Second pass through records.
-    print("Second pass through records")
     # Have to re-initialize the generator
     records = mtg_records.records_by_date()
     recordfp = None
     for rec in records:
         # Retrieve the datetime.date that was set in the first pass
-        recdate = rec["latest_record_date"]
+        recdate = rec["Updated"]
         if (today - recdate).days < 5:
             if not initialized:
                 filename = f'{ todaystr }-{RECORDS_FILEBASE}'
@@ -1494,9 +1488,8 @@ then <i>Audio Download.</i>""",
                     print("  <th>%s" % rkey, file=recordfp)
 
                 initialized = True
-                print("Initialized file", filename)
 
-            newrecords.append(rec['name'])
+            newrecords.append(f"{rec['name']} (updated {rec['Updated']})")
 
         retstr = ""
         print(" <tr>\n  <td><b>%s</b>" % rec['name'], file=recordfp)
@@ -1504,6 +1497,10 @@ then <i>Audio Download.</i>""",
         for rkey in MeetingRecords.RECORD_TYPES:
             if rkey not in rec or not rec[rkey]:
                 print("   <td>&nbsp;", file=recordfp)
+                continue
+            # "Updated" is a datetime, which json can't serialize.
+            # Skip it; "latest-record" is the serialized/stringified version.
+            if rkey == "Updated":
                 continue
 
             # Don't add links: the Legistar links are bogus and don't work
@@ -1526,26 +1523,26 @@ then <i>Audio Download.</i>""",
             print("Wrote meeting records file", filename)
 
         # In that case, remove any older records files.
-        print("Removing old records files:", old_records)
         for oldrec in old_records:
             if oldrec == filename:
                 print("EEK! Would have removed the records file just written",
                       filename)
                 continue
-            print("Removing file", oldrec)
+            if Verbose:
+                print("Removing old record file file", oldrec)
             os.unlink(os.path.join(RSS_DIR, oldrec))
 
         retstr = "<p>\nRecent records for:\n<ul>\n<li>" \
             + '\n<li>'.join(newrecords) \
-            + "\n</ul>\n<p>\nMost recent record updated: " \
-            + most_recent_date.strftime("%Y-%m-%d")
+            + "\n</ul>"
 
         return retstr, filename
 
     # If we get here, recordfp didn't get set,
     # which means there weren't any recent records
     # (but somehow it didn't get picked up earlier)
-    print("Confused, thought there were recent records but there aren't")
+    if Verbose:
+        print("Confused, thought there were recent records but there aren't")
     return "", None
 
 
