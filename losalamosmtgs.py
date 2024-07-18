@@ -782,7 +782,7 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
             itemfilebase = os.path.join(AGENDA_ITEM_STORE,
                                     bodyname + '-'
                                     + meetingtime.strftime('%Y-%m'))
-            itemfile = itemfilebase +' .jsonl'
+            itemfile = itemfilebase + '.jsonl'
             with open(itemfile, 'a') as itemsfp:
                 for item in item_list:
                     # item['body'] = bodyname
@@ -1347,10 +1347,10 @@ def write_files(mtglist):
                             url=no_agenda_file,
                             lastmod=lastmod_str),
                   file=rssfp)
-            print("<h2>Recently scheduled meetings</h2>", file=htmlfp)
-            print("<p><a href='%s'>Meetings that have been scheduled,"
-                  " but which have no agenda yet</a>")
-                  % no_agenda_file, file=htmlfp)
+            print("""<h2>Recently scheduled meetings</h2>
+<p>
+<a href='%s'>Meetings that have been scheduled</a>
+but have no agenda yet""" % no_agenda_file, file=htmlfp)
 
         print("</channel>\n</rss>", file=rssfp)
         print("</body>\n</html>", file=htmlfp)
@@ -1558,10 +1558,19 @@ def mtgdic_to_cleanname(mtgdic):
        Will be used both for the agenda file and for RSS entries.
     """
     mtg_dt = meeting_datetime(mtgdic)
-    if mtg_dt:
-        return mtg_dt.strftime("%Y-%m-%d") + '-' \
+    if not mtg_dt:
+        print("eeg, no mtg_dt for", mtgdic)
+        return "notime-" + clean_filename(mtgdic["Name"])
+
+    # If it has a nonzero hour, include that as part of the cleanname.
+    # Some bodies, like the County Council and BPU, schedule closed and
+    # open sessions consecutively on the same evening.
+    if hasattr(mtg_dt, 'hour') and mtg_dt.hour:
+        return mtg_dt.strftime("%Y-%m-%d_%H") + '-' \
             + clean_filename(mtgdic["Name"])
-    return "notime-" + clean_filename(mtgdic["Name"])
+
+    return mtg_dt.strftime("%Y-%m-%d") + '-' \
+        + clean_filename(mtgdic["Name"])
 
 
 if __name__ == '__main__':
