@@ -247,8 +247,9 @@ def get_check_msg():
     # else still idle.
     # Avoid the "Idle for 0.0 minutes" message:
     if idle_time < 30:
-        return ( f"Starting idle timer\n(after {nonidle_str()} nonidle)",
-                 COLORS_NORMAL, FONT_NORMAL )
+        return (f"""Starting idle timer
+(after {nonidle_str()} at the computer)""",
+                COLORS_NORMAL, FONT_NORMAL)
 
     if nonidle_time > GETUP_INTERVAL:
         color = COLORS_NEEDBREAK
@@ -256,7 +257,7 @@ def get_check_msg():
         color = COLORS_NORMAL
 
     return ( f"""\nIdle for {(idle_time/60):.1f} minutes
-({nonidle_str()} nonidle)""",
+({nonidle_str()} at the computer)""",
              color, FONT_NORMAL )
 
 
