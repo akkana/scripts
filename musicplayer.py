@@ -84,8 +84,8 @@ class MusicWin(Gtk.Window):
             configfile = os.path.join(self.configdir, "config")
             if os.path.exists(configfile):
                 with open(configfile) as fp:
-                    randomre = re.compile('^\s*random *= *([^ ]+)')
-                    shufflere = re.compile('^\s*shuffle *= *([^ ]+)')
+                    randomre = re.compile(r'^\s*random *= *([^ ]+)')
+                    shufflere = re.compile(r'^\s*shuffle *= *([^ ]+)')
                     for line in fp:
                         if line.startswith('#'):
                             continue
