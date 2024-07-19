@@ -355,15 +355,26 @@ def fix_agenda(agenda_infile):
             print("    ", f)
 
     if guesses:
-        print("\nFuzzy matches:")
+        print("\nFuzzy matches (in agenda -> actual filename):")
         for a in guesses:
             print(f"    {a} -> {guesses[a]}")
         print("BE SURE TO LOOK OVER THIS LIST!")
 
     if nosuchfiles:
-        print("\nCouldn't find files:")
+        print("\nMissing files referenced in the agenda:")
         for f in nosuchfiles:
             print("    ", f)
+
+    orphans = []
+    for o in origfiles:
+        if o not in already_converted and o not in converted \
+           and o not in cantconvert:
+            orphans.append(o)
+    if orphans:
+        orphans.sort()
+        print("\nOriginal files not referenced in the agenda:")
+        for o in orphans:
+            print("    ", o)
 
 
 if __name__ == '__main__':
