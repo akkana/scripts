@@ -2,7 +2,7 @@
 
 """A program to help with practicing guitar.
    Can run a metronome, play notes, display guitar tablature for notes,
-   and give a flashcard-style quiz.
+   and give several types of flashcard-style quiz.
    Copyright 2024 by Akkana: share and enjoy under the GPLv2 or later.
 """
 
@@ -11,6 +11,7 @@
 
 import subprocess
 import random
+import re
 import argparse
 import time
 import xdg.BaseDirectory
@@ -27,6 +28,10 @@ except:
 BEGINNER_CHORDS = "D A E"
 
 
+# How many times to repeat each note or chord that's played
+REPEAT_PLAY = 2
+
+
 # A Python Dictionary matching chord names with "fret notation"
 GUITAR_CHORDS = {
     "D": "xx0232",
@@ -40,8 +45,17 @@ GUITAR_CHORDS = {
     "Em": "022000",
     "G2": "320033",
     "B": "x24442",
+    "F": "133211",
+    "Fmaj7": "xx3210",
+    "miniF": "xx3211",
+    "Fmaj7C": "x33210",
     "F#m": "244222",
     "B7": "o212o2",
+    "D7": "'xxo212",
+    "G7": "32ooo1",
+    "B": "x24442",
+    "B7": "o212o1",
+    "F#m": "244222"
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
@@ -54,11 +68,73 @@ ALLNOTES = [ note + '2' for note in basicnotes ] + \
 
 GUITAR_STRINGS = [ "E2", "A2", "D3", "G3", "B3", "E4" ]
 
+#
+# Build the individual note dictionary.
+# Keys are note names ("A2"), values are (string, fret) pairs.
+# The string number is 0 for low E2, 5 for high E4,
+# NOT standard guitar string numbering that starts at the high string.
+#
+NOTE2STRING = {}    # will be filled by initialize()
+
+
+# How slowly to "strum" a chord
 DELAY_BETWEEN_STRINGS = .06
 
 Volume = 1
 
 Metroproc = None
+
+
+def initialize():
+    for stringno, note in enumerate(GUITAR_STRINGS):
+        fret = 0
+        NOTE2STRING[note] = (stringno, 0)
+        while True:
+            note = up_one_semitone(note)
+            fret += 1
+
+            # We're done with this string if the new note equals the base
+            # note (fret 0) on the next string,
+            # OR if this is the last string and we've done enough frets.
+            if stringno < len(GUITAR_STRINGS) - 1:
+                if note == GUITAR_STRINGS[stringno+1]:
+                    break
+
+            else:    # last string
+                if fret > 4:
+                    break
+
+            # If neither of those two conditions was satisfied,
+            # stay on this string and add the note.
+            NOTE2STRING[note] = (stringno, fret)
+
+
+def up_one_semitone(note):
+    """Given a note like "C2", return the designation
+       for one semitone higher, "C#2"
+    """
+    noteletter = note[0]      # "C"
+    noteoctave = note[-1]     # '2'
+
+    # Is it already sharp?
+    if note[1] == '#':
+        if noteletter == 'G':
+            return 'A' + noteoctave
+        return chr(ord(noteletter) + 1) + noteoctave
+
+    # Okay, not sharp.
+
+    # Special case: B->C is where the octave number changes,
+    # and B can't be sharpened, so return C of the next octave
+    if noteletter == 'B':
+        return 'C%d' % (int(noteoctave) + 1)
+
+    # E is the other note that can't be sharpened.
+    if noteletter == 'E':
+        return 'F' + noteoctave
+
+    # Sharpen the current note in the same octave
+    return noteletter + "#" + noteoctave
 
 
 def fretboard_to_note(stringbase, fret):
@@ -80,30 +156,60 @@ def chord_to_notes(chord_tab):
     return chord_notes
 
 
-#A procedure to display where to position your fingers to play a given chord
+def display_note(note):
+    """Use NOTE2STRING to display notes as tablature
+    """
+    stringno, fret = NOTE2STRING[note]
+    print("string", stringno+1, "fret", fret)
+#
+    line = ''
+    for stringNo in range(6):
+        if stringno == stringNo and fret == 0:
+            line += ' O'
+        else:
+            line += ' -'
+    print(line)
+#
+    if fret > 5:
+        maxfret = fret
+    else:
+        maxfret = 5
+#
+    for fretNo in range(1, maxfret):
+        line = ""
+        for stringNo in range(6):
+            if stringno == stringNo and fret == fretNo:
+                line += " #"
+            else:
+                line += " |"
+        print(line)
+
+
 def display_chord(chord):
+    """Given a chord name like 'A2', print a tablature for it.
+    """
     fretNotation = GUITAR_CHORDS[chord]
 
     print("  " + chord)
-    nut=""
+    nut = ""
     for string in fretNotation:
-        if string=="x":
+        if string == "x":
             nut = nut + " x"  # x means don't play this string
         else:
             nut = nut + " _"
     print(nut)
 
-    for fretNumber in range(1,5):
-        fret=""
+    for fretNumber in range(1, 5):
+        fret = ""
         for string in fretNotation:
-            if string==str(fretNumber):
+            if string == str(fretNumber):
                 fret = fret + " O"
             else:
                 fret = fret + " |"
         print(fret)
 
 
-def play_chord(chordname, volume=.25):
+def play_chord(chordname):
     """Play a chord, specified by name like "Em".
     """
     args = [ "play", "-nq", "-t", "alsa", "synth" ]
@@ -120,7 +226,7 @@ def play_chord(chordname, volume=.25):
         delay += DELAY_BETWEEN_STRINGS
     args += [ "remix", "-",
               "fade", "0", str(delay + 1.5), ".1",
-              "norm", "-1", "vol", str(volume) ]
+              "norm", "-1", "vol", str(Volume) ]
     # print(' '.join(args))
     subprocess.call(args)
 
@@ -142,7 +248,7 @@ def play_notes(notestr, delay=.6):
         d += delay
     args += [ "remix", "-",
               "fade", "0", str(len(notes) * delay + 2), ".1",
-              "norm", "-1", "vol", ".2" ]
+              "norm", "-1", "vol", str(Volume) ]
     # print(' '.join(args))
     subprocess.call(args)
 
@@ -188,36 +294,55 @@ def sanity_check(chords):
     return goodchords
 
 
-def chord_flashcards(chords=BEGINNER_CHORDS, metronome=None):
-    chords = sanity_check(chords)
-    if metronome:
-        start_metronome(metronome)
-    lastchord = None
-    try:
-        while True:
-            print("\n\n\n")
-            chord = random.choice(chords)
-            if chord == lastchord:
-                continue
-            lastchord = chord
-            try:
-                print(pyfiglet.figlet_format(chord))
-            except:
-                print(f"\n{ chord }\n")
+def bigtext(s):
+    if 'pyfiglet' in sys.modules:
+        return pyfiglet.figlet_format(s)
+    return "=== " + s
 
-            time.sleep(2)
-            for i in range(2):
-                play_chord(chord)
-            time.sleep(1)
 
-            display_chord(chord)
-            for i in range(2):
-                play_chord(chord)
+lastchord = None
 
-    except KeyboardInterrupt:
-        print("Exiting")
+def chord_flashcard(chords=BEGINNER_CHORDS, metronome=None):
+    """Run one chord flashcard"""
 
-    stop_metronome()
+    global lastchord
+
+    while True:
+        chord = random.choice(chords)
+        if chord == lastchord:
+            continue
+        lastchord = chord
+        break
+
+    print("\n\n\nchord:")
+    print(bigtext(chord))
+
+    time.sleep(2)
+    for i in range(2):
+        play_chord(chord)
+    time.sleep(1)
+
+    display_chord(chord)
+    for i in range(REPEAT_PLAY):
+        play_chord(chord)
+
+
+def note_flashcard(allow_sharps=False):
+    """Run one note flashcard"""
+    while True:
+        note = random.choice(list(NOTE2STRING.keys()))
+        if allow_sharps or '#' not in note:
+            break
+
+    print("\n\n\nnote:")
+    print(bigtext(note))
+    time.sleep(3)
+    play_notes(note)
+    display_note(note)
+    time.sleep(1)
+    for i in range(REPEAT_PLAY):
+        play_notes(note)
+        time.sleep(1)
 
 
 def read_config():
@@ -257,23 +382,69 @@ if __name__ == '__main__':
     # test_main()
 
     parser = argparse.ArgumentParser(description="Guitar Flashcards")
-    parser.add_argument('-c', "--chords", default=None, action="store",
-                        help="chords to use (you can also specify them in "
+    parser.add_argument('-c', "--chord_test", action="store_true",
+                        default=True,
+                        help="Test the user on knowledge of chords")
+    parser.add_argument('-n', "--note_test", action="store_true",
+                        default=True,
+                        help="Test the user on knowledge of individual notes")
+    parser.add_argument('-C', "--use-chords", default=None, action="store",
+                        help="chords to use, comma or space separated "
+                        "you can also specify them in "
                         "GUITARFLASH env variable or "
                         "XDG_CONFIG_HOME/guitarflash/*.conf")
+    parser.add_argument('-s', "--show-chords", default=False,
+                        action="store_true",
+                        help="Just print the chord charts, no flashcards")
     parser.add_argument('-m', "--bpm", "--metronome",
                         action="store", default=0, dest="bpm", type=int,
                         help='Metronome Beats per Minute')
     parser.add_argument('-v', "--volume",
                         action="store", default=1, dest="volume", type=float,
-                        help='Metronome Beats per Minute')
+                        help='Volume (a decimal, 1 = full volume)')
+    parser.add_argument("--allow-sharps", action="store_true", default=False,
+                        help="Include sharps in the notes to be tested")
     args = parser.parse_args(sys.argv[1:])
     Volume = args.volume
 
+    if not args.chord_test and not args.note_test:
+        parser.print_help()
+        sys.exit(1)
+
+    initialize()
+
     # Get a list of chords to use, otherwise, show just beginner chords
-    if args.chords:
-        chords = args.chords.split()
+    if args.use_chords:
+        chords = re.split(r"\s+|,", args.use_chords)
     else:
         chords = read_config()
 
-    chord_flashcards(chords=chords, metronome=args.bpm)
+    chords = sanity_check(chords)
+
+    # Just showing, no flashcard test?
+    if args.show_chords:
+        for chord in chords:
+            display_chord(chord)
+            print()
+        sys.exit(0)
+
+    if args.bpm:
+        start_metronome(args.bpm)
+
+    try:
+        while True:
+            if args.chord_test and args.note_test:
+                if random.randint(0, 1):
+                    chord_flashcard(chords=chords)
+                else:
+                    note_flashcard(allow_sharps=args.allow_sharps)
+            elif args.chord_test:
+                chord_flashcard(chords=chords)
+            elif args.note_test:
+                note_flashcard(allow_sharps=args.allow_sharps)
+
+    except KeyboardInterrupt:
+        print("Bye!")
+        stop_metronome()
+        sys.exit()
+
