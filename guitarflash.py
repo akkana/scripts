@@ -44,6 +44,17 @@ GUITAR_CHORDS = {
     "Dm": "xx0231",
     "Em": "022000",
     "G2": "320033",
+
+    # "stuck 3-4 chords:
+    "bigG": "32oo22",
+    "rockG": "3xoo33",
+    "Cadd9": "x32o33",
+    "Dsus4": "xxo233",
+    "A7sus4": "xo2233",
+    "Emin7": "022033",
+    "Dadd11": "2xo233",
+    "F69": "xx3233",
+
     "B": "x24442",
     "F": "133211",
     "Fmaj7": "xx3210",
@@ -188,7 +199,11 @@ def display_note(note):
 def display_chord(chord):
     """Given a chord name like 'A2', print a tablature for it.
     """
-    fretNotation = GUITAR_CHORDS[chord]
+    try:
+        fretNotation = GUITAR_CHORDS[chord]
+    except KeyError:
+        print("Don't know the", chord, "chord", file=sys.stderr)
+        return
 
     print("  " + chord)
     nut = ""
