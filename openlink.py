@@ -24,30 +24,38 @@ def open_in_existing_firefox(url, minwidth=800):
         for line in proc.stdout.splitlines():
             if not line.endswith(b'irefox'):
                 continue
-            words = line.split()
+            words = line.decode().split()
             windowid = words[0]
             desktop = words[1]
+            title = ' '.join(words[7:])
             w = int(words[4])
             if w < minwidth:
                 continue
             if w > maxwidth:
                 maxwidth = w
-                biggest_win = (windowid, desktop, w)
+                biggest_win = (windowid, desktop, w, title)
 
         return biggest_win
 
     # Find the widest firefox window
-    windowid, desktop, winwidth = find_biggest_firefox_window_and_desktop()
+    windowid, desktop, winwidth, wintitle = \
+        find_biggest_firefox_window_and_desktop()
     if not windowid:
         print("Can't find a firefox process")
         return False
 
     # Switch to appropriate desktop if needed
-    if desktop:
-        subprocess.call(['wmctrl', '-s', desktop])
-        # This sometimes doesn't finish in time, and part of the text
-        # ends up in the wrong window. So delay slightly:
-        time.sleep(.5)
+    # if desktop:
+    #     subprocess.call(['wmctrl', '-s', desktop])
+    #     # This sometimes doesn't finish in time, and part of the text
+    #     # ends up in the wrong window. So delay slightly:
+    #     time.sleep(.5)
+
+    # Switch to the right desktop, raise the window, and give it focus.
+    # There's apparently no way to do this using the window ID;
+    # wmctrl will only do it using the title.
+    subprocess.call(['wmctrl', '-a', wintitle])
+    time.sleep(.5)
 
     # Move mouse to center of urlbar (winwidth/2)
     subprocess.call(['xdotool', 'mousemove', '--window', windowid,
