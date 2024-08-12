@@ -49,23 +49,30 @@ GUITAR_CHORDS = {
     "bigG": "32oo22",
     "rockG": "3xoo33",
     "Cadd9": "x32o33",
+    # "Cadd9": "x32o3o",
     "Dsus4": "xxo233",
     "A7sus4": "xo2233",
     "Emin7": "022033",
     "Dadd11": "2xo233",
     "F69": "xx3233",
 
-    "B": "x24442",
-    "F": "133211",
+    # 7s
     "Fmaj7": "xx3210",
-    "miniF": "xx3211",
     "Fmaj7C": "x33210",
-    "F#m": "244222",
     "B7": "o212o2",
     "D7": "'xxo212",
     "G7": "32ooo1",
-    "B": "x24442",
     "B7": "o212o1",
+    "E7": "o2o1oo",
+    "A7": "xo2o2o",
+
+    # 6
+    "F6": "13o2xx",
+
+    "B": "x24442",
+    "F": "133211",
+    "miniF": "xx3211",
+    "F#m": "244222",
     "F#m": "244222"
 }
 
@@ -353,6 +360,7 @@ def note_flashcard(allow_sharps=False):
     print(bigtext(note))
     time.sleep(3)
     play_notes(note)
+    time.sleep(3)
     display_note(note)
     time.sleep(1)
     for i in range(REPEAT_PLAY):
@@ -398,10 +406,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Guitar Flashcards")
     parser.add_argument('-c', "--chord_test", action="store_true",
-                        default=True,
                         help="Test the user on knowledge of chords")
     parser.add_argument('-n', "--note_test", action="store_true",
-                        default=True,
                         help="Test the user on knowledge of individual notes")
     parser.add_argument('-C', "--use-chords", default=None, action="store",
                         help="chords to use, comma or space separated "
@@ -446,6 +452,7 @@ if __name__ == '__main__':
     if args.bpm:
         start_metronome(args.bpm)
 
+    print(args.chord_test, args.note_test)
     try:
         while True:
             if args.chord_test and args.note_test:
