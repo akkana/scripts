@@ -52,9 +52,15 @@ if not os.path.exists(RSS_DIR):
 # If None, long-term records will not be stored.
 AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItems")
 
+# Legal Notices published on the paper of record, the LA Daily Post
+LEGALURL = 'https://ladailypost.com/legal-notices/'
+
+
 ######## END CONFIGURATION ############
 
 RECORDS_FILEBASE = 'meeting-records.html'
+
+LEGAL_JSON = 'legal-notices.json'
 
 
 # Make a timezone-aware datetime for now:
@@ -108,6 +114,27 @@ header_pat = re.compile(r'([0-9]+)\.\s*([A-Z \(\)\/,]+)$', flags=re.DOTALL)
 
 # Where temp files will be created. pdftohtml can only write to a file.
 tempdir = tempfile.mkdtemp()
+
+
+def protected(filename):
+    """Is the filename something that should be protected from
+       directory cleanup?
+    """
+    # Protected files: don't remove these
+    if filename.startswith("index") or filename.startswith("about"):
+        return True
+    if filename.startswith('records'):
+        return True
+    if filename.startswith('no-agenda'):
+        return True
+    # *-meeting-records.html will be managed by write_meeting_records_file()
+    # and only deleted when a new one is to be added.
+    if filename.endswith(RECORDS_FILEBASE):
+        return True
+    if filename.endswith(LEGAL_JSON):
+        return True
+    return False
+
 
 #
 # Meeting Records (Minutes, Video, Audio):
@@ -387,7 +414,9 @@ def meeting_datetime(mtg):
         return None
 
 
-def html_head(title):
+def html_head(title, rsspage=None):
+    if not rsspage:
+        rsspage = "index.rss"
     return f"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 
 <html>
@@ -396,8 +425,8 @@ def html_head(title):
   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="alternate" type="application/rss+xml"
-        title="Los Alamos Meetings Feed"
-        href="{RSS_URL}index.rss" />
+        title="Los Alamos Meetings RSS Feed"
+        href="{RSS_URL}{rsspage}" />
   <link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
 </head>
 <body>
@@ -405,10 +434,15 @@ def html_head(title):
 
 
 def rss_entry(title, desc, guid, url, lastmod):
+    """Create an entry for one link in an RSS file.
+       title: title for the entry
+       desc: longer description for the entry
+       guid: unique identifier
+       url: link to follow (if any).
+       lastmod: date to be used for RSS
+    """
     # lastmod must be in RSS_DATE_FORMAT
-    # url will be made absolute
-    if ':' not in url:
-        url = RSS_URL + url
+    # XXX url should be made absolute
     return f"""<item>
    <title>{title}</title>
    <guid isPermaLink="false">{guid}</guid>
@@ -951,7 +985,7 @@ def get_tickler(agenda_str, mtg, meetingtime, tickler_html_file):
 
 NO_AGENDA = b"No agenda available."
 
-def write_files(mtglist):
+def write_meeting_files(mtglist):
     """Take a list of meeting dictionaries and make RSS and HTML files.
     """
     active_meetings = []
@@ -986,9 +1020,16 @@ def write_files(mtglist):
 
         print(html_head("Los Alamos County Government Meetings"), file=htmlfp)
         print(f"""As of: {gendate}
- ... <a href="about.html">About Los Alamos Meetings (How to Use This Page)</a>
+ ... <a href="about.html">About Los Alamos Meetings (How to Use This Service)</a>
  ... <a href="{RSS_URL}index.rss">Los Alamos Meetings RSS2.0 Feed</a>.
 
+<p>
+<b>NEWS, August 2024:
+ Los Alamos Meetings is now scraping Legal Notices from the LA Daily Post.</b>
+<br />
+Legal Notices are on a separate
+<a href="legal-notices.html">Legal Notices</a> page with their own
+<a href="legal-notices.rss">Legal Notices RSS Feed</a>.
 """, file=htmlfp)
 
         agendafile = None
@@ -1365,16 +1406,7 @@ but have no agenda yet""" % no_agenda_file, file=htmlfp)
         if ext not in rmexts:
             continue
 
-        # Protected files: don't remove these
-        if f.startswith("index") or f.startswith("about"):
-            continue
-        if f.startswith('records'):
-            continue
-        if f.startswith('no-agenda'):
-            continue
-        # *-meeting-records.html will be managed by write_meeting_records_file()
-        # and only deleted when a new one is to be added.
-        if f.endswith(RECORDS_FILEBASE):
+        if protected(f):
             continue
 
         def is_active(f):
@@ -1386,6 +1418,7 @@ but have no agenda yet""" % no_agenda_file, file=htmlfp)
         if not is_active(f):
             print("removing", f)
             os.unlink(os.path.join(RSS_DIR, f))
+
 
 def write_meeting_records_file():
     """Write one file holding all the meeting records we've seen,
@@ -1573,6 +1606,130 @@ def mtgdic_to_cleanname(mtgdic):
         + clean_filename(mtgdic["Name"])
 
 
+def check_legal_notices():
+    """The LA Daily Post is the "newspaper of record" for Los Alamos County.
+       Fetch the legal notices and deal with them.
+       Create new RSS and HTML pages if anything has changed.
+    """
+    # with open("/home/akkana/src/scripts/LegalNotices.html") as fp:
+    #     soup = BeautifulSoup(fp, 'lxml')
+    r = requests.get(LEGALURL, timeout=45)
+    soup = BeautifulSoup(r.text, 'lxml')
+
+    articles = []
+    for article in soup.find_all('article', {"class": "legal"}):
+        # RSS requires a link, so link to the LADP article
+        try:
+            link = article.find("a", {"class": "read-more"}).get("href")
+        except:
+            link = LEGALURL
+
+        # This is wrapped in a bunch of divs. Take the inner div.
+        articles.append({
+            'html': str(article),
+            # Items don't have anything useful for titles,
+            # so just take the first text line.
+            'title': article.text.strip().splitlines()[0],
+            'link': link,
+        })
+
+    jsonfile = os.path.join(RSS_DIR, LEGAL_JSON)
+    try:
+        with open(jsonfile) as fp:
+            old_articles = json.load(fp)
+    except FileNotFoundError as e:
+        old_articles = []
+        print("No old articles!", e)
+
+    # articles and old_articles are each a list of dictionaries,
+    # where 'html' is the HTML from the LADP page.
+    # The items in old_articles also have a 'date' member.
+    for article in articles:
+        for old_article in old_articles:
+            # Compare links if possible. If not, compare the full HTML entry.
+            if 'link' in article and 'link' in old_article:
+                if article['link'] == old_article['link']:
+                    article['date'] = old_article['date']
+                    break
+            elif article['html'] == old_article['html']:
+                article['date'] = old_article['date']
+                break
+
+    # Now articles is a list of current articles;
+    # any that were in old_articles have a 'date' member.
+    # Anything that doesn't have 'date' yet should have today's date.
+    # If there are any such, then there's new material and we
+    # need to write a new RSS and HTML file.
+    has_new_articles = False
+    for article in articles:
+        if 'date' not in article:
+            print("At least one new article:", article['link'])
+            article['date'] = todaystr
+            has_new_articles = True
+
+    if not has_new_articles:
+        print("No new legal notices")
+        return
+
+    # Sort by date.
+    articles.sort(key=lambda x: x['date'])
+
+    # There's new material. Update the JSON, HTML and RSS files.
+    # XXX TEMPORARY save the old JSON file:
+    try:
+        os.rename(jsonfile, os.path.join(RSS_DIR, 'sav-' + LEGAL_JSON))
+    except FileNotFoundError:
+        pass
+    # from pprint import pprint
+    # print("Dumping JSON:")
+    # pprint(articles)
+    with open(jsonfile, 'w') as fp:
+        json.dump(articles, fp, indent=4)
+
+    # Generate the new RSS and HTML entries
+    with open(os.path.join(RSS_DIR, 'legal-notices.rss'), 'w') as rssfp, \
+         open(os.path.join(RSS_DIR, 'legal-notices.html'), 'w') as htmlfp:
+        print(f"""<?xml version="1.0" encoding="iso-8859-1" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+
+<channel>
+   <title>Los Alamos County Legal Notices</title>
+   <link>{RSS_URL}losalamosmeetings</link>
+   <description>An Unofficial, Non-Sanctioned Listing of Los Alamos County Legal Notices, provided by Akkana Peck.</description>
+   <language>en</language>
+   <copyright>Public Domain</copyright>
+   <ttl>14</ttl>
+   <pubDate>{todaystr}</pubDate>
+   <managingEditor>akk at shallowsky dot com (Akkana Peck)</managingEditor>
+   <atom:link href="{RSS_URL}" rel="self" type="application/rss+xml" />
+   <generator>losalamosmtgs</generator>
+""",
+              file=rssfp)
+
+        print(html_head("Los Alamos County Legal Notices",
+                        rsspage="legal-notices.rss"), file=htmlfp)
+        print(f"""As of: {todaystr}
+ ... <a href="about.html">About Los Alamos Meetings and Los Alamos Legal Notices (How to Use This Service)</a>
+ ... <a href="{RSS_URL}legal-notices.html">Los Alamos Legal Notices</a>.
+ ... <a href="{RSS_URL}legal-notices.rss">Los Alamos Legal Notices RSS2.0 Feed</a>.
+
+""", file=htmlfp)
+
+        for article in articles:
+            print(rss_entry(article['title'], article['html'],
+                            # an attempt at a unique ID:
+                            article['date'] + article['title'],
+                            article['link'], article['date']),
+                  file=rssfp)
+            print("<hr>", file=htmlfp)
+            print(article['html'], file=htmlfp)
+
+        print("</channel>\n</rss>", file=rssfp)
+        print("</body>\n</html>", file=htmlfp)
+
+    print("Updated legal notices")
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         RSS_DIR = sys.argv[1]
@@ -1584,5 +1741,7 @@ if __name__ == '__main__':
 
     build_upcoming_meetings_list()
 
-    write_files(upcoming_meetings)
+    write_meeting_files(upcoming_meetings)
 
+    # Finally, check for new legal notices on the LA Daily Post website
+    check_legal_notices()
