@@ -114,6 +114,10 @@ def sonogram(wav_file, startsecs=None, endsecs=None):
     # The wave module doesn't have any way to read just part of a wave file
     # (sigh), so we have to take an array slice after we've already read
     # the whole thing into numpy.
+    # XXX note: a blog commenter suggests that I try one of:
+    # readframes(n)   -- returns at most n frames of audio
+    # setpos(pos)     -- seek to the specified position
+
     if startsecs or endsecs:
         if not startsecs:
             startsecs = 0.0
