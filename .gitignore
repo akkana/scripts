@@ -15,6 +15,7 @@ develop-eggs
 
 # Data directories
 data
+mapping/cache
 
 # Installer logs
 pip-log.txt
