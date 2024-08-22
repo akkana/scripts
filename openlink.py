@@ -44,18 +44,11 @@ def open_in_existing_firefox(url, minwidth=800):
         print("Can't find a firefox process")
         return False
 
-    # Switch to appropriate desktop if needed
-    # if desktop:
-    #     subprocess.call(['wmctrl', '-s', desktop])
-    #     # This sometimes doesn't finish in time, and part of the text
-    #     # ends up in the wrong window. So delay slightly:
-    #     time.sleep(.5)
-
     # Switch to the right desktop, raise the window, and give it focus.
-    # There's apparently no way to do this using the window ID;
-    # wmctrl will only do it using the title.
-    subprocess.call(['wmctrl', '-a', wintitle])
-    time.sleep(.5)
+    # wmctrl needs flags to be separate, -ai doesn't work.
+    # print("Calling wmctrl -i -a %s" % windowid)
+    subprocess.call(['wmctrl', '-i', '-a', windowid])
+    time.sleep(.3)
 
     # Move mouse to center of urlbar (winwidth/2)
     subprocess.call(['xdotool', 'mousemove', '--window', windowid,
