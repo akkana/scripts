@@ -21,8 +21,17 @@
 # https://gitlab.gnome.org/GNOME/gimp/-/blob/master/INSTALL.in
 # https://testing.developer.gimp.org/core/submit-patch/
 
+# Just build, don't pull anything new.
+# This is sometimes needed e.g. after applying a patch,
+# since the pull stage will die because of needing to merge.
+# XXX Would be nice to make this an argument.
+justbuild=0
+
 GIMPVER="$1"
-if [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
+if [[ "$GIMPVER" == "justbuild" ]]; then
+    $justbuild=1
+    GIMPVER=master
+elif [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
     GIMPVER=master
 fi
 echo "GIMPVER: $GIMPVER"
@@ -34,7 +43,7 @@ echo "Using PREFIX of $PREFIX"
 echo "Using SRCDIR of $SRCDIR"
 
 usage() {
-    echo "Usage: $0 gimpver [clean]"
+    echo "Usage: $0 gimpver [clean] [justbuild]"
     exit 1
 }
 
@@ -139,6 +148,11 @@ meson-build() {
 #
 # Sets pullstatus=0 if nothing happened, 1 if it pulled anything.
 pull-clone() {
+    if [[ $justbuild == 1 ]]; then
+        echo "Just building, not pulling"
+        return
+    fi
+
     repo=$1
 
     # SRCDIR=$PREFIX
@@ -146,9 +160,10 @@ pull-clone() {
     pullstatus=0
 
     # Find the directory by stripping the extension from the URL basename
-    d=$(basename $repo:r)
+    projname=$(basename $repo:r)
+    echo "proj name:" $projname
     cd $SRCDIR
-    # echo pull_clone: SRCDIR $SRCDIR, repo $repo, ./$d, clean $clean, branch $branch
+    # echo pull_clone: SRCDIR $SRCDIR, repo $repo, ./$projname, clean $clean, branch $branch
 
     # Have we checked out in this directory before?
     # There's a thing on https://stackoverflow.com/questions/13736385/how-to-write-a-shell-script-that-checks-if-git-repository-is-up-to-date
@@ -158,10 +173,13 @@ pull-clone() {
     #   if [[ "${reslog}" != "" ]] ; then  ...
     # but it only works for master, not for branches.
     # This may be more useful:
-    if [[ -d $d ]]; then
+    if [[ -d $projname ]]; then
 
-        cd $d
+        cd $projname
+        echo "Now in $projname :" $(pwd)
+        echo "running git checkout"
         echo_and_do git checkout $branch
+        echo "running git pull"
         pullres=$(git pull)
 
         echo "Git pulled:" $pullres
@@ -175,7 +193,7 @@ pull-clone() {
     else
         # New directory, never pulled before
         echo_and_do git clone $repo
-        cd $d
+        cd $projname
         if [[ x$branch != x ]]; then   # no branch
             echo_and_do git checkout -t origin/$branch
         fi
@@ -226,15 +244,12 @@ popd_maybe() {
 
 # These two only needed for master builds, not 2.10
 echo '========== mypaint-brushes'
-echo "clean:" $clean
 cd $SRCDIR
 branch=v1.3.x
 pull-clone https://github.com/mypaint/mypaint-brushes.git
-echo "after pull-clone, clean:" $clean
 if [[ $pullstatus == 1 ]]; then
     ./autogen.sh && ./configure --prefix=$PREFIX && make -j4 && make install
 fi
-echo "after building, clean:" $clean
 
 # On Debian sid, the provided libmypaint is good enough.
 # echo '========== libmypaint'
@@ -249,7 +264,6 @@ echo "after building, clean:" $clean
 # fi
 
 echo '========== babl'
-echo "clean:" $clean
 unset branch
 # cd $SRCDIR/babl
 # meson-build
@@ -274,27 +288,40 @@ fi
 echo '========== gimp'
 
 cd $SRCDIR
-pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 
-# This is now required to get the images in gimp-data.
-# If it doesn't work, try once running git submodule update --init
-# though you might not need that if you cloned with --recurse as suggested in
-# https://testing.developer.gimp.org/core/submit-patch/#checkout-the-source
-git submodule update
+if [[ $justbuild != 1 ]]; then
+    echo "Calling pull-clone from"
+    pwd
+    pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 
-# If on master, git pull. If on another branch,
-# pull, but don't merge, all branches
-curbranch=$(git status | grep "On branch" | awk '{print $3}')
+    # This is now required to get the images in gimp-data.
+    # If it doesn't work, try once running git submodule update --init
+    # though you might not need that if you cloned with --recurse as suggested in
+    # https://testing.developer.gimp.org/core/submit-patch/#checkout-the-source
+    echo "Updating submodules"
+    pwd
+    git submodule update
 
-if [[ x"$curbranch" != 'xmaster' ]]; then
-    echo "Rebasing master to $curbranch"
-    pullstatus=$(git fetch)
-    git rebase origin/master
+    # If on master, git pull. If on another branch,
+    # pull, but don't merge, all branches
+    curbranch=$(git status | grep "On branch" | awk '{print $3}')
+
+    if [[ x"$curbranch" != 'xmaster' ]]; then
+        echo "Rebasing master to $curbranch"
+        pullstatus=$(git fetch)
+        git rebase origin/master
+    else
+        pullstatus=$(git pull)
+    fi
+    echo "pullstatus:" $pullstatus
 else
-    pullstatus=$(git pull)
+    # Might still need the submodules
+    # git submodule update
+    cd gimp
+    echo "Not pulling anything, just building gimp"
+    pullstatus=1
 fi
 
-echo "pullstatus:" $pullstatus
 
 # Don't actually care about pullstatus: if running buildgimp,
 # the assumption is that we want to rebuild.
