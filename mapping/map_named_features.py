@@ -16,6 +16,23 @@ from sys import argv, stdout
 spaces = ' ' * 60
 
 
+# Pare down to a smaller set
+MIN_LON = -106.4336827
+MAX_LON = -106.1411717
+MIN_LAT = 35.7466669
+MAX_LAT = 35.9527426
+
+numinbounds = 0
+def WITHIN_BOUNDS(lon, lat):
+    global numinbounds
+    if lon < MIN_LON or lon > MAX_LON:
+        return False
+    if lat < MIN_LAT or lat > MAX_LAT:
+        return False
+    numinbounds += 1
+    return True
+
+
 def map_features(filename, featureclass):
     m = folium.Map(control_scale=True)
     featureclass = featureclass.lower()
@@ -33,6 +50,11 @@ def map_features(filename, featureclass):
             mouth_lon = float(row['prim_long_dec'])
             source_lat = float(row['source_lat_dec'])
             source_lon = float(row['source_long_dec'])
+
+            if not WITHIN_BOUNDS(mouth_lon, mouth_lat):
+                continue
+            if not WITHIN_BOUNDS(source_lon, source_lat):
+                continue
 
             if mouth_lat and mouth_lon:
                 folium.Marker([mouth_lat, mouth_lon], tooltip=name,
@@ -76,5 +98,8 @@ def map_features(filename, featureclass):
 
 
 if __name__ == '__main__':
+    if len(argv) != 3:
+        print("Usage: map_named_features demfile featureclass")
+        exit(1)
     map_features(argv[1], argv[2])
 

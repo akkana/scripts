@@ -13,7 +13,7 @@ from OSMPythonTools.api import Api
 # Start with a query about powerlines in a fixed bbox.
 # Obviously this could be generalized.
 query = overpassQueryBuilder(bbox=[35.236646, -106.710205,
-                                   36.151182, -105.759888],
+                                   36.2551715, -105.9002583],
                              elementType='way',
                              selector='"power"="line"',
                              out='body')
