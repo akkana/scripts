@@ -115,7 +115,7 @@ class DropButton(QPushButton):
            Firefox sometimes handles this, but it isn't 100% reliable
            at least in Firefox 120.
         """
-        return re.sub('\s*\n\s*', '', url.strip(), flags=re.MULTILINE)
+        return re.sub(r'\s*\n\s*', '', url.strip(), flags=re.MULTILINE)
 
     def run_command(self, text):
         if not self.command:
