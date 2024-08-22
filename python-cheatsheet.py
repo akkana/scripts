@@ -291,8 +291,6 @@ for b in string_list:
         best_match = b
         best_ratio = r
 
-# Compare two possibly similar strings:
-
 
 # raw string literals: r'' avoids any backslash escapes.
 # printf-style %x still works, e.g. r'abc %d' % 42
@@ -1476,6 +1474,9 @@ head = soup.head
 head.append(soup.new_tag('style', type='text/css'))
 head.style.append('.someclass { background-color: #7fb; }')
 
+# find elements by class:
+mydivs = soup.find_all("div", {"class": "stylelistrow"})
+
 # Look for the next p tag after the current tag:
 tag.find_next('p')
 tag.find_next_sibling('p')
@@ -1888,6 +1889,43 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+
+################################################################
+# varargs and asterisks in function signatures
+################################################################
+
+# https://www.srcecde.me/posts/2024/02/asterisk-and-forward-slash-as-function-parameters-python/
+
+# collect additional positional arguments as a tuple
+def asterisk_arg_func(first_argument, *additional_args):
+    pass
+
+# collect additional keyword arguments as a dictionary
+def my_function(**kwargs):
+    print(kwargs)
+
+# Standalone * to specify Keyword-Only Parameters
+# parameters defined after * are keyword-only
+def my_function(a, b, *, c, d):
+    print(a, b, c, d)
+my_function(1, 2, c=3, d=4) # Valid
+my_function(a=1, b=2, c=3, d=4) # Valid
+my_function(1, 2, 3, 4) # TypeError
+
+# / to specify Position-Only Parameters
+# parameters defined before it (/) are position-only
+def my_function(a, b, /, c, d):
+    print(a, b, c, d)Z
+my_function(1, 2, 3, d=4) # Valid
+my_function(a=1, b=2, c=3, d=4) # TypeError
+
+# * and \ both in function signature
+def my_function(a, /, b, *, c):
+    print(a, b, c)
+
+my_function(1, b=2, c=3) # Valid
+my_function(1, 2, c=3) # Valid
+my_function(a=1, b=2, c=3) # TypeError: my_function() got some positional-only arguments passed as keyword arguments: 'a'
 
 ################################################################
 # Nonlocal variables, class statics, and closures
@@ -2505,7 +2543,10 @@ Upload to Test PyPI
     keyring disable
   per https://twine.readthedocs.io/en/latest/#disabling-keyring
   then:
-python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+twine upload --repository testpypi dist/*
+  (older:
+   python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+  )
 
 Install and test in a new empty virtualenv:
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
