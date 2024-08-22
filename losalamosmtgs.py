@@ -131,8 +131,11 @@ def protected(filename):
     # and only deleted when a new one is to be added.
     if filename.endswith(RECORDS_FILEBASE):
         return True
-    if filename.endswith(LEGAL_JSON):
+
+    # Files for legal notices should only be removed by check_legal_notices:
+    if 'legal-notices' in filename:
         return True
+
     return False
 
 
