@@ -73,6 +73,14 @@ todaystr = today.strftime("%Y-%m-%d")
 # and a UTC version
 utcnow = datetime.datetime.now(tz=datetime.timezone.utc)
 
+# Format for dates in RSS:
+# This has to be GMT, not %Z, because datetime.strptime just
+# throws away any %Z info anyway rather than parsing it.
+# Better to get an error if we see any time that's not GMT.
+RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
+
+rssnow = utcnow.strftime(RSS_DATE_FORMAT)
+
 # Needed to deal with meetings that don't list a time:
 NO_TIME = "NO TIME"
 
@@ -86,12 +94,6 @@ Verbose = True
 
 # and save the timezone
 localtz = now.tzinfo
-
-# Format for dates in RSS:
-# This has to be GMT, not %Z, because datetime.strptime just
-# throws away any %Z info anyway rather than parsing it.
-# Better to get an error if we see any time that's not GMT.
-RSS_DATE_FORMAT = "%a, %d %b %Y %H:%M GMT"
 
 # Match the date format used in the tickler, e.g. Tue Feb 28
 TICKLER_HDR_DATE_PAT = re.compile("[MTWFS][a-z]{2} [A-Z][a-z]{2} [0-9]{1,2}")
@@ -442,9 +444,8 @@ def rss_entry(title, desc, guid, url, lastmod):
        desc: longer description for the entry
        guid: unique identifier
        url: link to follow (if any).
-       lastmod: date to be used for RSS
+       lastmod: date to be used for RSS, must be in RSS_DATE_FORMAT
     """
-    # lastmod must be in RSS_DATE_FORMAT
     # XXX url should be made absolute
     return f"""<item>
    <title>{title}</title>
@@ -1003,18 +1004,17 @@ def write_meeting_files(mtglist):
 
         print("\n==== Generating RSS for", len(mtglist), "meetings")
 
-        gendate = now.strftime(RSS_DATE_FORMAT)
         print(f"""<?xml version="1.0" encoding="iso-8859-1" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 
 <channel>
    <title>Los Alamos County Government Meetings</title>
    <link>{RSS_URL}losalamosmeetings</link>
-   <description>An Unofficial, Non-Sanctioned Listing of Los Alamos Government Meetings, provided by Akkana Peck.</description>
+   <description>An Unofficial, Non-Sanctioned Mirror of Los Alamos Government Meetings, provided by Akkana Peck.</description>
    <language>en</language>
    <copyright>Public Domain</copyright>
    <ttl>14</ttl>
-   <pubDate>{gendate}</pubDate>
+   <pubDate>{rssnow}</pubDate>
    <managingEditor>akk at shallowsky dot com (Akkana Peck)</managingEditor>
    <atom:link href="{RSS_URL}" rel="self" type="application/rss+xml" />
    <generator>losalamosmtgs</generator>
@@ -1022,7 +1022,7 @@ def write_meeting_files(mtglist):
               file=rssfp)
 
         print(html_head("Los Alamos County Government Meetings"), file=htmlfp)
-        print(f"""As of: {gendate}
+        print(f"""As of: {rssnow}
  ... <a href="about.html">About Los Alamos Meetings (How to Use This Service)</a>
  ... <a href="{RSS_URL}index.rss">Los Alamos Meetings RSS2.0 Feed</a>.
 
@@ -1065,7 +1065,7 @@ Legal Notices are on a separate
                                     desc=desc,
                                     guid=tickler_filename,
                                     url=f"{RSS_URL}{tickler_filename}",
-                                    lastmod=now),
+                                    lastmod=rssnow),
                           file=rssfp)
 
                     # Add to the HTML
@@ -1327,7 +1327,7 @@ Legal Notices are on a separate
             #     print("<p>No agenda yet", file=htmlfp)
             print(f"""<p>
 {desc}
-<p>(Last modified: {gendate}.)
+<p>(Last modified: {rssnow}.)
 """,
                   file=htmlfp)
 
@@ -1652,9 +1652,15 @@ def check_legal_notices():
             # Compare links if possible. If not, compare the full HTML entry.
             if 'link' in article and 'link' in old_article:
                 if article['link'] == old_article['link']:
+                    if Verbose:
+                        print("Old article:", old_article['date'],
+                              ":", article['title'])
                     article['date'] = old_article['date']
                     break
             elif article['html'] == old_article['html']:
+                if Verbose:
+                    print("html matched:", old_article['date'],
+                          article['title'])
                 article['date'] = old_article['date']
                 break
 
@@ -1674,10 +1680,12 @@ def check_legal_notices():
         print("No new legal notices")
         return
 
-    # Sort by date.
-    articles.sort(key=lambda x: x['date'])
+    # There's new material.
 
-    # There's new material. Update the JSON, HTML and RSS files.
+    # Sort by date, reversed, so newer items are first.
+    articles.sort(key=lambda x: x['date'], reverse=True)
+
+    # Update the JSON, HTML and RSS files.
     # XXX TEMPORARY save the old JSON file:
     try:
         os.rename(jsonfile, os.path.join(RSS_DIR, 'sav-' + LEGAL_JSON))
@@ -1719,10 +1727,20 @@ def check_legal_notices():
 """, file=htmlfp)
 
         for article in articles:
+            # Date in the JSON is "YY-mm-dd"
+            # Need to reformat that as RSS_DATE_FORMAT.
+            try:
+                rssdatetime = datetime.datetime.strptime(article['date'],
+                                                         '%Y-%m-%d')
+            except Exception as e:
+                print("Couldn't understand JSON item date:", article['date'],
+                      e, file=sys.stderr)
+                rssdatetime = now
+            rssdatestimestr = rssdatetime.strftime(RSS_DATE_FORMAT)
             print(rss_entry(article['title'], article['html'],
-                            # an attempt at a unique ID:
-                            article['date'] + article['title'],
-                            article['link'], article['date']),
+                            article['link'],  # use link for a semi-unique ID
+                            article['link'],
+                            rssdatestimestr),
                   file=rssfp)
             print("<hr>", file=htmlfp)
             print(article['html'], file=htmlfp)
@@ -1742,9 +1760,9 @@ if __name__ == '__main__':
         if not RSS_URL.endswith('/'):
             RSS_URL += '/'
 
-    build_upcoming_meetings_list()
-
-    write_meeting_files(upcoming_meetings)
+    # build_upcoming_meetings_list()
+    #
+    # write_meeting_files(upcoming_meetings)
 
     # Finally, check for new legal notices on the LA Daily Post website
     check_legal_notices()
