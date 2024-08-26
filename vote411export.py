@@ -119,8 +119,8 @@ class Candidate:
 
     @staticmethod
     def simplify_name(name):
-        return re.sub('\.', '',
-                      re.sub('\s+', ' ', name.lower())).strip()
+        return re.sub(r'\.', '',
+                      re.sub(r'\s+', ' ', name.lower())).strip()
 
 
     def has_answers(self):
@@ -146,7 +146,7 @@ class Candidate:
             # like 1. Why should we vote for you?
             # except it starts at 0, not 1.
             # qindex is the index into allquestions.
-            if re.match('\d+\.', allquestions[qindex]):
+            if re.match(r'\d+\.', allquestions[qindex]):
                 q = allquestions[qindex]
             else:
                 q = f'{qnum+1}. {allquestions[qindex]}'
@@ -528,8 +528,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             # Make the fullnames match the comparenames from the full database,
             # by removing dots and extra spaces and converting to lowercase.
             for cand in order:
-                cand['fullname'] = re.sub('\.\.\.', '',
-                                          re.sub(' +', ' ',
+                cand['fullname'] = re.sub(r'\.\.\.', '',
+                                          re.sub(r' +', ' ',
                                                  cand['fullname'])) \
                                                  .translate(SMARTQUOTE_CHARMAP)
 
