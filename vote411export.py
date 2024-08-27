@@ -25,7 +25,7 @@ SMARTQUOTE_CHARMAP = { 0x201c : u'"',
 
 # The column index of the first question.
 # This is subject to change each year.
-FIRST_Q_COL = 18
+FIRST_Q_COL = 20
 
 # The global list of all questions from the header of the CSV file.
 allquestions = None
