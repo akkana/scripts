@@ -58,8 +58,8 @@ css = '''@media (prefers-color-scheme: dark) {
 '''
 
 # Patterns used for restricting datetimes before parsing
-datetimepat = re.compile('[\d:apm ]+')
-datetimerangepat = re.compile('[\d:apm -]+')
+datetimepat = re.compile(r'[\d:apm ]+')
+datetimerangepat = re.compile(r'[\d:apm -]+')
 
 
 # termcolor.colored wasn't working, and termcolor.cprint doesn't help
@@ -322,8 +322,33 @@ def print_remind_for_interval(enddate, formatter):
     # Some things that cau cause "Day specified twice":
     # 18 Jun First thing happens today -- the "First" confuses remind
     if reminderr:
-        print("<fieldset><b>Warning from 'remind -n - <", reminderfile, ":",
-              reminderr.decode(), "</b></fieldset>")
+        def real_warning(line):
+            """Filter out some common warnings that appeared in remind 05.00.04
+            """
+            ignore_warnings = [
+                "Unrecognized command; interpreting as REM",
+                "Missing REM type; assuming MSG"
+            ]
+            for warning in ignore_warnings:
+                if warning in line:
+                    return False
+            return True
+
+        errlines = reminderr.decode().splitlines()
+        realwarnings = []
+        reminderr = ""
+        for line in errlines:
+            if real_warning(line):
+                realwarnings.append(line)
+
+        if realwarnings:
+            print("<fieldset><b>Warning from 'remind -n - <",
+                  reminderfile, "':</b>",
+                  "\n<pre>\n",
+                  '\n'.join(realwarnings),
+                  "\n</pre>\n",
+                  "</fieldset>")
+
     lines = remindout.decode().split('\n')
     # lines look like
     # 2022/08/27 on Saturday, August 27th: some meeting||zoomlink||more info
@@ -401,14 +426,14 @@ def datetimekey(s):
 
     if lowertime.endswith('am'):
         # Make sure it's zero-prefixed
-        hours = re.match('\d+', lowertime).group(0)
+        hours = re.match(r'\d+', lowertime).group(0)
         houri = int(hours)
         return f'{savedate} {houri:02}'
 
     # The initial time (lowertime) could end with pm;
     # or the pm could be after the range end, 1-3pm
     if lowertime.endswith('pm') or timerange.lower().endswith('pm'):
-        hours = re.match('\d+', lowertime).group(0)
+        hours = re.match(r'\d+', lowertime).group(0)
         houri = int(hours)
         # Special rule for 12 pm
         if houri == 12:
