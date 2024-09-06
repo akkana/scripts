@@ -13,6 +13,8 @@ import csv
 import re
 from io import StringIO
 
+from datetime import datetime
+
 from pprint import pprint
 
 
@@ -233,7 +235,11 @@ class HtmlFormatter:
     def add_q_and_a(self, question, answer):
         self.htmlstr += f'<p>\n<b>{question}</b><br />\n' + answer
 
-    def save(self, outfile="savedoc.html"):
+    def save(self, outfile=None):
+        if not outfile:
+            outfile = 'savedoc.html'
+        elif '.' not in outfile:
+            outfile += '.html'
         self.htmlstr += '''
 </body>
 </html>
@@ -330,7 +336,12 @@ class DocxFormatter:
         # not an RGBColor directly
         heading.style.font.color.rgb = docx.shared.RGBColor(0, 0, 0)
 
-    def save(self, outfile="savedoc.docx"):
+    def save(self, outfile=None):
+        if not outfile:
+            outfile = 'savedoc.docx'
+        elif '.' not in outfile:
+            outfile += '.docx'
+
         self.doc.save(outfile)
         print("Saved to", outfile)
 
@@ -657,7 +668,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         if cur_office and num_for_office:
             print(num_for_office, "running for", cur_office)
 
-        formatter.save()
+        formatter.save(datetime.now().strftime('export-%Y%m%d_%H%M'))
 
         # Print the candidates who didn't respond
         if no_response_candidates:
