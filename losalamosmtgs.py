@@ -430,7 +430,7 @@ def html_head(title, rsspage=None):
   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="alternate" type="application/rss+xml"
-        title="Los Alamos Meetings RSS Feed"
+        title="{ title } RSS Feed"
         href="{RSS_URL}{rsspage}" />
   <link rel="stylesheet" type="text/css" title="Style" href="meetingstyle.css"/>
 </head>
@@ -1760,9 +1760,8 @@ if __name__ == '__main__':
         if not RSS_URL.endswith('/'):
             RSS_URL += '/'
 
-    # build_upcoming_meetings_list()
-    #
-    # write_meeting_files(upcoming_meetings)
+    build_upcoming_meetings_list()
+    write_meeting_files(upcoming_meetings)
 
     # Finally, check for new legal notices on the LA Daily Post website
     check_legal_notices()
