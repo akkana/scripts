@@ -1614,8 +1614,7 @@ def check_legal_notices():
        Fetch the legal notices and deal with them.
        Create new RSS and HTML pages if anything has changed.
     """
-    echo ""
-    echo "==== Checking Legal Notices"
+    print("\n==== Checking Legal Notices")
 
     # with open("/home/akkana/src/scripts/LegalNotices.html") as fp:
     #     soup = BeautifulSoup(fp, 'lxml')
@@ -1675,7 +1674,6 @@ def check_legal_notices():
     has_new_articles = False
     for article in articles:
         if 'date' not in article:
-            print("At least one new article:", article['link'])
             article['date'] = todaystr
             has_new_articles = True
 
