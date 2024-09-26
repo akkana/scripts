@@ -635,6 +635,10 @@ mylist.pop(i)            # Removes and returns list[i]
 >>> rest
 [2, 3, 4]
 
+# multiple "with" context managers:
+with open("infile") as infile, open("outfile") as outfile:
+with A() as a, B() as b, C() as c:
+
 # get first or next item in an iterator:
 python3: next(iter)
 
@@ -2430,6 +2434,9 @@ Pip reinstall:
     pip install -I
 --force-reinstall isn't enough, you need --upgrade which is -I
 
+Install a particular version:
+pip install pytopo==1.7.3
+
 There is no reliable way to upgrade all packages, a la apt upgrade.
 Here are various hacks and partial solutions people have come up with.
 
@@ -2522,7 +2529,11 @@ Test installing in a virtualenv:
 
 python3 -m venv /tmp/testpythonenv
 source /tmp/testpythonenv/bin/activate
+
+If building from the test env:
 pip install wheel
+
+If installing the current project into the test env:
 pip install .
 
 Test and make sure it works.
@@ -2542,21 +2553,28 @@ Upload to Test PyPI
   First disable keyring (only need once) if you don't use Kwallet:
     keyring disable
   per https://twine.readthedocs.io/en/latest/#disabling-keyring
-  then:
+
+Set VERSION to something like 1.2rc1
+because you may need to change it several times when testing uploads.
+
 twine upload --repository testpypi dist/*
   (older:
    python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
   )
 
 Install and test in a new empty virtualenv:
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME
+if you used preN or rcn in the version number, be sure to include ==VERSION
+
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME==VERSION
+
 Ideally, also test on a separate default account on some distro like Ubuntu,
 or on other OSes.
 
 If that doesn't work (e.g. on Ubuntu eoan), try:
-  python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
+  pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
   https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
   The no-deps is because test pypi may not have all the same dependencies.
+  But it means you can't test the dependencies in your 
 
 If everything works, upload to the real PyPI:
 twine upload dist/*
