@@ -1614,6 +1614,9 @@ def check_legal_notices():
        Fetch the legal notices and deal with them.
        Create new RSS and HTML pages if anything has changed.
     """
+    echo ""
+    echo "==== Checking Legal Notices"
+
     # with open("/home/akkana/src/scripts/LegalNotices.html") as fp:
     #     soup = BeautifulSoup(fp, 'lxml')
     r = requests.get(LEGALURL, timeout=45)
