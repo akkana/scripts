@@ -534,7 +534,10 @@ button:hover { background: #dff; border-color: #8bb; }
         pos = self.progress_hscale.get_value()
         self.set_time_label(pos)
         self.skipped_seconds = pos
-        mixer.music.play(0, pos)
+        if self.play_state == MusicWin.PLAYING:
+            mixer.music.play(0, pos)
+        else:
+            mixer.music.set_pos(pos)
 
     def skip_fwd(self, w=None):
         self.skip(20)
