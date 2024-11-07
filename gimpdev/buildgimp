@@ -7,7 +7,10 @@
 #
 # With no args, will assume "master".
 #
-# if clean is specified as the final argument,
+# If cleangimp is specified as the final argument,
+# run a git clean -dfx in gimp, but not in other dirs.
+#
+# If cleanall is specified as the final argument,
 # also update the config.site and
 # run git clean -dfx in any srcdir that wasn't freshly checked out.
 #
@@ -21,20 +24,66 @@
 # https://gitlab.gnome.org/GNOME/gimp/-/blob/master/INSTALL.in
 # https://testing.developer.gimp.org/core/submit-patch/
 
+usage() {
+    echo "Usage: buildgimp [cleangimp|cleanall] [justbuild] [-n|--dryrun] [gimp-version-directory]"
+    exit 1
+}
+
+# Which GIMP to build; default is 'master'
+GIMPVER=master
+
 # Just build, don't pull anything new.
 # This is sometimes needed e.g. after applying a patch,
 # since the pull stage will die because of needing to merge.
-# XXX Would be nice to make this an argument.
-justbuild=0
+justbuild=false
 
-GIMPVER="$1"
-if [[ "$GIMPVER" == "justbuild" ]]; then
-    $justbuild=1
-    GIMPVER=master
-elif [[ "$GIMPVER" == "" || "$GIMPVER" == "clean" ]]; then
-    GIMPVER=master
-fi
-echo "GIMPVER: $GIMPVER"
+# really build, or just print arguments?
+dryrun=false
+
+# Clean anywhere before building? can be no, gimp or all
+clean=
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -n|--dryrun)
+            dryrun=true
+            shift
+            ;;
+        -b|--justbuild)
+            justbuild=true
+            shift
+            ;;
+        clean)
+            usage
+            ;;
+        cleangimp)
+            clean=gimp
+            shift
+            ;;
+        cleanall)
+            clean=all
+            shift
+            ;;
+    -*|--*)
+      echo "Unknown option $1"
+      usage
+      ;;
+    *)
+      GIMPVER="$1"
+      shift
+      ;;
+  esac
+done
+
+# echo "After parsing arguments:"
+# echo GIMPVER = $GIMPVER
+# echo dryrun = $dryrun
+# echo justbuild = $justbuild
+# echo clean = $clean
+# exit 0
 
 export PREFIX=$HOME/run/gimp-$GIMPVER
 export SRCDIR=$HOME/outsrc/gimp-$GIMPVER
@@ -42,9 +91,13 @@ export SRCDIR=$HOME/outsrc/gimp-$GIMPVER
 echo "Using PREFIX of $PREFIX"
 echo "Using SRCDIR of $SRCDIR"
 
-usage() {
-    echo "Usage: $0 gimpver [clean] [justbuild]"
-    exit 1
+echo_and_do() {
+  if [ $dryrun = false ]; then
+    echo "=== Running: $@"
+    "$@"
+  else
+    echo "=== Would run: $@"
+  fi
 }
 
 if [ ! -d $PREFIX ]; then
@@ -66,13 +119,7 @@ export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig:$PKG_CONFI
 export LD_LIBRARY_PATH="$PREFIX/lib:$LD_LIBRARY_PATH"
 export ACLOCAL_FLAGS="-I $PREFIX/share/aclocal $ACLOCAL_FLAGS"
 
-
-if [[ "${@: -1}" == "clean" ]]; then
-    clean=true
-    echo "Cleaning all directories"
-    echo ""
-    sleep 3
-    rm -rf $PREFIX/*
+overwrite_config_dot_site() {
 
     # The build will fail if the share/aclocal dir isn't already created.
     # The share dir needs to be there in any case, for config.site.
@@ -88,9 +135,21 @@ export ACLOCAL_FLAGS="-I \$PREFIX/share/aclocal \$ACLOCAL_FLAGS"
 export XDG_DATA_DIRS=$PREFIX/share:$XDG_DATA_DIRS
 # export GI_TYPELIB_PATH=
 EOF
-else
-    echo "Not cleaning"
-    clean=''
+
+}
+
+if [[ "$clean" = "gimp" ]]; then
+    echo "Cleaning first in GIMP"
+
+    echo_and_do overwrite_config_dot_site
+
+elif [[ "$clean" = "all" ]]; then
+    echo "Cleaning all directories"
+    echo ""
+    sleep 3
+    echo_and_do rm -rf $PREFIX
+    echo_and_do overwrite_config_dot_site
+    echo "done cleaning"
 fi
 
 # Make sure this exits on errors:
@@ -132,18 +191,22 @@ meson-build() {
         # but supposedly ninja will do whatever's needed.
         # meson reconfigure
     else
-        meson -Dprefix=$PREFIX --libdir=lib $MESONSRC
+        echo "== running meson"
+        # 2024-10-26 jehan thinks lua is messing up the build,
+        # but it turns out that wasn't the problem
+        # echo_and_do meson -Dprefix=$PREFIX --libdir=lib -Dlua=false $MESONSRC
+        echo_and_do meson -Dprefix=$PREFIX --libdir=lib $MESONSRC
     fi
 
-    ninja && \
-    ninja install && \
+    echo_and_do ninja && \
+    echo_and_do ninja install && \
     cd ..
 }
 
 # update-clone dir repo: if dir already exists, cd there and git pull;
 # if not, git clone and then cd into the new dir.
 # If branch is set, check out that branch.
-# Either way, if $clean is set to true, do a git clean -dfx.
+# Either way, if $clean is set to all do a git clean -dfx.
 # Either way, we should end up in the directory with an up-to-date repo.
 #
 # Sets pullstatus=0 if nothing happened, 1 if it pulled anything.
@@ -155,11 +218,10 @@ pull-clone() {
 
     repo=$1
 
-    # SRCDIR=$PREFIX
-
     pullstatus=0
 
     # Find the directory by stripping the extension from the URL basename
+    # e.g. gimp, gegl, libmypaint
     projname=$(basename $repo:r)
     echo "proj name:" $projname
     cd $SRCDIR
@@ -178,7 +240,7 @@ pull-clone() {
         cd $projname
         echo "Now in $projname :" $(pwd)
         echo "running git checkout"
-        echo_and_do git checkout $branch
+        git checkout $branch
         echo "running git pull"
         pullres=$(git pull)
 
@@ -186,7 +248,8 @@ pull-clone() {
         if [[ x$pullres != 'xAlready up to date.' ]]; then
             pullstatus=1
         fi
-        if [[ x"$clean" == xtrue ]]; then
+        if [[ $clean == "all" ||
+                  ($clean == "gimp" && $projname == "gimp") ]]; then
             echo_and_do git clean -dfx
             pullstatus=1
         fi
@@ -208,14 +271,6 @@ pull-clone() {
     # may get a value left over from the last call.
     unset repo
     unset branch
-}
-
-#
-# echo_and_do something.
-#
-echo_and_do() {
-  echo "$@"
-  "$@"
 }
 
 # pushd, but not if we're already at the target directory
@@ -243,12 +298,13 @@ popd_maybe() {
 }
 
 # These two only needed for master builds, not 2.10
+echo
 echo '========== mypaint-brushes'
 cd $SRCDIR
 branch=v1.3.x
 pull-clone https://github.com/mypaint/mypaint-brushes.git
-if [[ $pullstatus == 1 ]]; then
-    ./autogen.sh && ./configure --prefix=$PREFIX && make -j4 && make install
+if [[ $pullstatus == 1 || $clean == 'all' ]]; then
+    echo_and_do ./autogen.sh && echo_and_do ./configure --prefix=$PREFIX && echo_and_do make -j4 && echo_and_do make install
 fi
 
 # On Debian sid, the provided libmypaint is good enough.
@@ -263,6 +319,7 @@ fi
 #     ./autogen.sh && ./configure --prefix=$PREFIX && make -j4 && make install
 # fi
 
+echo
 echo '========== babl'
 unset branch
 # cd $SRCDIR/babl
@@ -271,53 +328,71 @@ unset branch
 # exit 0
 
 cd $SRCDIR
-pull-clone https://gitlab.gnome.org/GNOME/babl.git $clean
+echo in babl, clean is $clean
+echo_and_do pull-clone https://gitlab.gnome.org/GNOME/babl.git $clean
 echo "pullstatus:" $pullstatus
-if [[ $pullstatus == 1 ]]; then
-    meson-build
+if [[ $pullstatus == 1 || $clean == 'all' ]]; then
+    echo_and_do meson-build
+else
+    echo "Nope, not building"
 fi
 
+echo
 echo '========== gegl'
 cd $SRCDIR
-pull-clone https://gitlab.gnome.org/GNOME/gegl.git $clean
+echo_and_do pull-clone https://gitlab.gnome.org/GNOME/gegl.git $clean
 echo "pullstatus:" $pullstatus
-if [[ $pullstatus == 1 ]]; then
-    meson-build
+if [[ $pullstatus == 1 || $clean == 'all' ]]; then
+    echo_and_do meson-build
 fi
 
+echo
 echo '========== gimp'
 
-cd $SRCDIR
+cd $SRCDIR/gimp
 
 if [[ $justbuild != 1 ]]; then
-    echo "Calling pull-clone from"
-    pwd
-    pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
-
-    # This is now required to get the images in gimp-data.
-    # If it doesn't work, try once running git submodule update --init
-    # though you might not need that if you cloned with --recurse as suggested in
-    # https://testing.developer.gimp.org/core/submit-patch/#checkout-the-source
-    echo "Updating submodules"
-    pwd
-    git submodule update
+    echo "Calling pull-clone from" $(pwd)
+    echo_and_do pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 
     # If on master, git pull. If on another branch,
     # pull, but don't merge, all branches
     curbranch=$(git status | grep "On branch" | awk '{print $3}')
 
     if [[ x"$curbranch" != 'xmaster' ]]; then
-        echo "Rebasing master to $curbranch"
-        pullstatus=$(git fetch)
-        git rebase origin/master
-    else
-        pullstatus=$(git pull)
+        if [ $dryrun = false ]; then
+            echo "Rebasing master to $curbranch"
+            pullstatus=$(git fetch)
+        else
+            echo "Dry run, would run git fetch"
+        fi
+        echo_and_do git rebase origin/master
+    else    # this is git master
+        if [ $dryrun = false ]; then
+            pullstatus=$(git pull)
+        else
+            echo "Dry run, would run git pull"
+        fi
     fi
     echo "pullstatus:" $pullstatus
+
+    # This is now required to get the images in gimp-data.
+    # If it fails, try once running git submodule update --init
+    # though you might not need that if you cloned with --recurse as suggested in
+    # https://testing.developer.gimp.org/core/submit-patch/#checkout-the-source
+    # echo "Updating submodules"
+    # pwd
+    # echo_and_do git submodule update
+    # However, it turns out git submodule update doesn't actually pull
+    # changes in gimp-data, and to actually get updates, this is needed:
+    echo "Pulling in gimp-data"
+    cd gimp-data
+    echo_and_do git pull
+    cd ..
+
 else
-    # Might still need the submodules
+    # Just build, but might still need the submodules
     # git submodule update
-    cd gimp
     echo "Not pulling anything, just building gimp"
     pullstatus=1
 fi
@@ -331,11 +406,21 @@ if [[ 1 || $pullstatus == 1 ]]; then
     # Comment out one of these lines.
     # ./autogen.sh --prefix=$PREFIX --disable-vector-icons && make -j4 && make install
     # ./autogen.sh --prefix=$PREFIX && make -j4 && make install
-    meson-build
+
+    # TEMPORARY: disable lua build. Lua is apparently messing up the build.
+    # MESONSRC=$(pwd)
+    # BUILD_DIR=$MESONSRC/obj-$(arch)
+    # mkdir -p $BUILD_DIR
+    # # cd $BUILD_DIR
+    # echo running meson configure from $(pwd)
+    # echo_and_do meson configure -Dprefix=$PREFIX --libdir=lib -Dlua=false
+    # # cd ..
+
+    echo_and_do meson-build
 fi
 
-unset clean
-unset pullstatus
-unset SRCDIR
+# unset clean
+# unset pullstatus
+# unset SRCDIR
 popd_maybe
 
