@@ -17,7 +17,7 @@
 # The name of the executable will be used as the prefix directory
 # inside BASE_PREFIX, and will also be used as the name of the
 # GIMP executable to run -- with the special case that "gimp-master"
-# will try to run an executable named "gimp-2.99".
+# will try to run an executable named "gimp-3.0".
 
 # Set the path to your base prefix here, if it's different:
 BASE_PREFIX=$HOME/run
@@ -45,10 +45,9 @@ fi
 # Shouldn't be need for gimp, but Might be for things like plug-ins
 export PKG_CONFIG_PATH=$GIMP_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 
-# If GIMPEX is gimp-master, change it to GIMP 2.99.
-# This will need to be changed when the version gets bumped.
+# If GIMPEX is gimp-master, change it to GIMP 3.0.
 if [ $GIMPEX = 'gimp-master' ]; then
-  GIMPEX=gimp-2.99
+  GIMPEX=gimp-3.0
 fi
 
 echo PATH $PATH
