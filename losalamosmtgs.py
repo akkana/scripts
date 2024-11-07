@@ -1107,9 +1107,13 @@ Legal Notices are on a separate
                                              meetingtime,
                                              save_pdf_filename=pdfout)
             except ReadTimeoutError:
-                print("Timed out on " + agendaloc)
+                print("Timed out on", agendaloc)
                 agenda_html = NO_AGENDA
                 agendastatus = "timeout"
+            except Exception as e:
+                print("Problem getting agenda", agendaloc, ":", e)
+                agenda_html = NO_AGENDA
+                agendastatus = "error"
 
             # Might need a diff file too:
             agenda_diff = None
