@@ -35,13 +35,41 @@ import subprocess
 
 VERBOSE = True
 
+# A list of extensions we might expect to find in original files.
+# This is because the agenda might omit extensions, and we also can't
+# assume that a dot indicates an extension.
+# For example, the agenda might have '9.3_LA_Report_11.2024'
+# which is expected to match '9.3_LA_Report_11.2024.docx', and you
+# can't just strip off everything after the last dot because then
+# you lose the '2024'. Sigh!
+ORIG_EXTENSIONS = [ '.doc', '.docx', '.odt',
+                    '.xls', '.xlsx', '.csv'
+                  ]
+
+# Remove extension: can't just use os.path.splitext
+# because there might be dots in the filename,
+# e.g. 10.1_CNM_Report_03.2021
+def smart_splitext(aname):
+    """Strip off any extension matching something in ORIG_EXTENSIONS.
+    """
+    name, ext = os.path.splitext(aname)
+    if ext.lower() in ORIG_EXTENSIONS:
+        return name, ext
+    return aname, ''
+
+
+def legalchars(fname):
+    """Remove illegal characters from filenames"""
+    return''.join([x for x in fname if x.isalpha() or x.isdigit() \
+                   or x in '-_.'])
+
 
 def fix_agenda(agenda_infile):
     # Convert agenda_infile to absolute path
     agenda_infile = os.path.abspath(agenda_infile)
 
     # First convert the agenda, if needed
-    agenda_base, agenda_ext = os.path.splitext(agenda_infile)
+    agenda_base, agenda_ext = smart_splitext(agenda_infile)
     if agenda_ext =='.html':
         with open(agenda_infile) as fp:
             soup = BeautifulSoup(fp, "lxml")
@@ -77,18 +105,17 @@ def fix_agenda(agenda_infile):
             link.attrs["target"] = "_blank"
 
     origfiles = os.listdir(origdir)
-    origbases = [ os.path.splitext(f)[0] for f in origfiles ]
+    origbases = [ smart_splitext(f)[0] for f in origfiles ]
     if not os.path.exists(htmldir):
         os.mkdir(htmldir)
     htmlfiles = os.listdir(htmldir)
-    htmlbases = [ os.path.splitext(f)[0] for f in htmlfiles ]
+    htmlbases = [ smart_splitext(f)[0] for f in htmlfiles ]
 
     # Read the list of original filenames, in subdir orig.
     # with bad filename characters removed.
     origfiles = []
     for fname in os.listdir("orig"):
-        newfname = ''.join([x for x in fname if x.isalpha() or x.isdigit() \
-                                                or x in '-_.'])
+        newfname = legalchars(fname)
         if newfname != fname:
             print("** Renaming '%s' to '%s'" % (fname, newfname))
             os.rename(os.path.join('orig', fname),
@@ -106,7 +133,7 @@ def fix_agenda(agenda_infile):
     guesses = {}
 
     for em in soup.findAll('em'):
-        # em_text = os.path.splitext(em.text.strip())[0]
+        # em_text = smart_splitext(em.text.strip())[0]
         em_text = em.text.strip()
 
         # Remove empty <em>s
@@ -114,13 +141,10 @@ def fix_agenda(agenda_infile):
             em.extract()
             continue
 
+        em_text = legalchars(em_text)
+
         if VERBOSE:
             print("\n===", em_text)
-
-        # Strip off any extension, if any.
-        # But this doesn't work because there might be dots in the filename,
-        # e.g. 10.1_CNM_Report_03.2021
-        # em_text, fileext = os.path.splitext(em_text)
 
         # Find the original file.
         # Can't just search for em_text in origbases,
@@ -131,6 +155,15 @@ def fix_agenda(agenda_infile):
         # the actual filename is "45. Budget proposal FY 21-23.pdf".
         # elif em_text in origbases:
         def fuzzy_search(agendaname, filenames):
+            """If agendaname is a filename referenced in the agenda,
+               try to match it in the list filenames,
+               returning the index into the list, or -1 if no match.
+               If there's no exact match, use fuzzy search and also
+               be tolerant of missing extensions.
+            """
+            agendaname, fileext = smart_splitext(agendaname)
+            filenames_no_ext = [ os.path.splitext(f)[0] for f in filenames ]
+
             if agendaname in guesses:
                 return filenames.index(guesses[agendaname])
 
@@ -148,8 +181,10 @@ def fix_agenda(agenda_infile):
                 if r > best_ratio:
                     best_match = i
                     best_ratio = r
+
             if best_ratio > .88:
                 return best_match
+
             return -1
 
         def replace_em(href):
@@ -161,9 +196,8 @@ def fix_agenda(agenda_infile):
 
         def append_parenthesized_orig(em, origfile):
             # Add a parenthesizedlink to the original document.
-            # This doesn't end up getting called for every .doc*
-            # file, though.
-            base, ext = os.path.splitext(origfile)
+            # This doesn't end up getting called for every .doc* file, though.
+            base, ext = smart_splitext(origfile)
             em.append(NavigableString(" (original "))
             linkfile = "orig/" + origfile
             a = soup.new_tag("a", href=linkfile, target="_blank")
@@ -174,7 +208,7 @@ def fix_agenda(agenda_infile):
         index = fuzzy_search(em_text, origbases)
         htmlindex = fuzzy_search(em_text, htmlbases)
 
-        if index < 0 and htmlindex < 0:    # No fuzzy match
+        if index < 0 and htmlindex < 0:    # No exact or fuzzy match
             print("Couldn't find a match for", em_text)
             nosuchfiles.append(em_text)
             continue
