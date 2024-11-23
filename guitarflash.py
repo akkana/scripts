@@ -6,6 +6,9 @@
    Copyright 2024 by Akkana: share and enjoy under the GPLv2 or later.
 """
 
+# Uses sox play to play the notes/chords, so this script will probably
+# only work on Linux.
+
 # Uses chord display code and fret notation adapted from
 # https://www.101computing.net/guitar-chords-reader/
 
@@ -104,6 +107,8 @@ Metroproc = None
 
 
 def initialize():
+    random.seed()
+
     for stringno, note in enumerate(GUITAR_STRINGS):
         fret = 0
         NOTE2STRING[note] = (stringno, 0)
@@ -368,12 +373,46 @@ def note_flashcard(allow_sharps=False, just_strings=False):
         time.sleep(1)
 
 
-def random_c_song(num_chords=16, delaysec=2):
+def random_c_song(num_chords=None, delaysec=2, structure=None):
     """Play/print random chords chosen from the key of C:
        C Dm Em F G Am
        (Like the JustinGuitar "Dice Songwriting" lesson)
+       Structure is a list of strings that functions
+       like a rhyme scheme for chords.
+       For example, [ "A", "A", "B", "A", "A", "B", "C", "B" ]
+       will choose numchords chords (default 4) for the main part of the song
+       and will play them twice; then a refrain of another numchords chords,
+       then repeat that again, then a break, then the refrain again.
+       Instead of single letters you can use words, like "refrain".
+       If you pass a string rather than a list, it will be split into letters
+       with spaces removed,
+       "AA B AA C B" -> [ "A", "A", "B", "A", "A", "B", "C", "B" ]
     """
     key_chords = [ "C", "Dm", "Em", "F", "G", "Am" ]
+
+    if structure:
+        if type(structure) is str:
+            structure = list(structure.replace(' ', ''))
+        if not num_chords:
+            num_chords = 4
+        songstruct = {}
+        for part in structure:
+            if part in songstruct:
+                continue
+            songstruct[part] = []
+            for i in range(num_chords):
+                songstruct[part].append(random.choice(key_chords))
+        print("Song structure:")
+        from pprint import pprint
+        pprint(songstruct)
+        for part in structure:
+            for chord in songstruct[part]:
+                play_chord(chord)
+        return
+
+    # Otherwise, just play random chords.
+    if not num_chords:
+        num_chords = 16
     for i in range(num_chords):
         chord = random.choice(key_chords)
         print(f"{chord} ", end='')
@@ -439,8 +478,12 @@ if __name__ == '__main__':
                         help='Volume (a decimal, 1 = full volume)')
     parser.add_argument("--allow-sharps", action="store_true", default=False,
                         help="Include sharps in the notes to be tested")
+
     parser.add_argument("--csong", action="store_true", default=False,
                         help="Compose a random song in the key of C")
+    parser.add_argument("--struct", action="store", default="",
+                        help="Structure of the song to be composed, e.g. AABAB")
+
     args = parser.parse_args(sys.argv[1:])
     Volume = args.volume
 
@@ -459,7 +502,8 @@ if __name__ == '__main__':
     chords = sanity_check(chords)
 
     if args.csong:
-        random_c_song()    # XXX eventually let numchords and delay be settable
+        random_c_song(num_chords=4, delaysec=2, structure=args.struct)
+            # XXX eventually other args should be settable too
         sys.exit(0)
 
     # Just showing, no flashcard test?
