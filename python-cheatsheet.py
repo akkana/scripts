@@ -501,6 +501,23 @@ print(f"{setting:>27}: ")    # right-justify with >
 '123       '
 >>> f'{123:^10d}'
 '   123    '
+# https://gist.github.com/nedbat/9a29a7e0f8091844d65f5ca433612e59
+>>> word = "Hello"
+>>> f"{word:=<20}"
+'Hello==============='
+
+>>> f"{word:->20}"
+'---------------Hello'
+
+>>> f"{word:/^20}"
+'///////Hello////////'X
+
+# you can nest f-strings, which is a matter of taste:
+word = 'Title'
+f"""{f" {word} ":=^40}"""
+'================ Title ================='
+
+
 
 # str and repr in formatted string literals
 >>> animals = 'eels'
