@@ -384,17 +384,23 @@ def random_c_song(num_chords=None, delaysec=2, structure=None):
        and will play them twice; then a refrain of another numchords chords,
        then repeat that again, then a break, then the refrain again.
        Instead of single letters you can use words, like "refrain".
-       If you pass a string rather than a list, it will be split into letters
-       with spaces removed,
+       If you pass a string rather than a list, it will be split
+       by commas and spaces if there are any, else it will be split
+       into individual letters.
        "AA B AA C B" -> [ "A", "A", "B", "A", "A", "B", "C", "B" ]
     """
     key_chords = [ "C", "Dm", "Em", "F", "G", "Am" ]
 
     if structure:
-        if type(structure) is str:
-            structure = list(structure.replace(' ', ''))
         if not num_chords:
             num_chords = 4
+        if type(structure) is str:
+            if ' ' in structure or ',' in structure:
+                structure = re.split(r'[\s,]+', structure)
+                print("split by commas/spaces:", structure)
+            else:
+                structure = list(structure)
+                print("split into list", structure)
         songstruct = {}
         for part in structure:
             if part in songstruct:
@@ -405,9 +411,14 @@ def random_c_song(num_chords=None, delaysec=2, structure=None):
         print("Song structure:")
         from pprint import pprint
         pprint(songstruct)
+        print(structure)
+
         for part in structure:
             for chord in songstruct[part]:
+                print(chord, end=' ')
+                sys.stdout.flush()
                 play_chord(chord)
+        print()
         return
 
     # Otherwise, just play random chords.
