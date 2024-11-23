@@ -349,7 +349,7 @@ def chord_flashcard(chords=BEGINNER_CHORDS, metronome=None):
         play_chord(chord)
 
 
-def note_flashcard(allow_sharps=False):
+def note_flashcard(allow_sharps=False, just_strings=False):
     """Run one note flashcard"""
     while True:
         note = random.choice(list(NOTE2STRING.keys()))
@@ -366,6 +366,20 @@ def note_flashcard(allow_sharps=False):
     for i in range(REPEAT_PLAY):
         play_notes(note)
         time.sleep(1)
+
+
+def random_c_song(num_chords=16, delaysec=2):
+    """Play/print random chords chosen from the key of C:
+       C Dm Em F G Am
+       (Like the JustinGuitar "Dice Songwriting" lesson)
+    """
+    key_chords = [ "C", "Dm", "Em", "F", "G", "Am" ]
+    for i in range(num_chords):
+        chord = random.choice(key_chords)
+        print(f"{chord} ", end='')
+        sys.stdout.flush()
+        play_chord(chord)
+    print()
 
 
 def read_config():
@@ -425,10 +439,12 @@ if __name__ == '__main__':
                         help='Volume (a decimal, 1 = full volume)')
     parser.add_argument("--allow-sharps", action="store_true", default=False,
                         help="Include sharps in the notes to be tested")
+    parser.add_argument("--csong", action="store_true", default=False,
+                        help="Compose a random song in the key of C")
     args = parser.parse_args(sys.argv[1:])
     Volume = args.volume
 
-    if not args.chord_test and not args.note_test:
+    if not args.chord_test and not args.note_test and not args.csong:
         parser.print_help()
         sys.exit(1)
 
@@ -442,11 +458,14 @@ if __name__ == '__main__':
 
     chords = sanity_check(chords)
 
+    if args.csong:
+        random_c_song()    # XXX eventually let numchords and delay be settable
+        sys.exit(0)
+
     # Just showing, no flashcard test?
     if args.show_chords:
         for chord in chords:
             display_chord(chord)
-            print()
         sys.exit(0)
 
     if args.bpm:
