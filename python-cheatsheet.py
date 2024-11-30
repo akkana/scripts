@@ -517,7 +517,13 @@ word = 'Title'
 f"""{f" {word} ":=^40}"""
 '================ Title ================='
 
+#  You can also define your own formatting by defining __format__:
+# this nedbat article has a wonderful example using latitude/longitude pairs.
+# https://nedbatchelder.com/blog/202204/python_custom_formatting.html
 
+# Recommended way of splitting long f-strings: paren and multiple f-strings
+print(("foo is {foo}, "
+       "bar is {bar}"))
 
 # str and repr in formatted string literals
 >>> animals = 'eels'
