@@ -238,6 +238,21 @@ class ImageViewerWidget:
                 return
             print("Couldn't show", self.img_list[self.imgno])
 
+    def goto_imageno(self, imagenum):
+        num_images = len(self.img_list)
+        if imagenum >= num_images:
+            self.imgno = num_images()
+            self.prev_image()
+            return
+        if imagenum < 0:
+            # For negative numbers, count back, -1 being the last image
+            self.imgno = num_images - imagenum - 1
+            self.prev_image()
+            return
+        self.imgno = imagenum - 1
+        self.next_image()
+        return
+
     def rotate_right(self):
         if VERBOSE:
             print("Rotating right")
@@ -282,9 +297,10 @@ class ImageViewerWindow:
         self.viewer = ImageViewerWidget(self.root, img_list,
                                         size=self.fixed_size)
 
-        self.root.bind('<Key-space>', self.next_image_handler)
-
-        self.root.bind('<Key-BackSpace>', self.prev_image_handler)
+        self.root.bind('<Key-space>', self.image_nav_handler)
+        self.root.bind('<Key-BackSpace>', self.image_nav_handler)
+        self.root.bind('<Key-Home>', self.image_nav_handler)
+        self.root.bind('<Key-End>', self.image_nav_handler)
 
         self.root.bind('<Key-Right>', self.rotate_right_handler)
         self.root.bind('<Key-Left>', self.rotate_left_handler)
@@ -307,11 +323,19 @@ class ImageViewerWindow:
     def add_image(img):
         self.viewer.add_image(img)
 
-    def next_image_handler(self, event):
-        self.viewer.next_image()
-
-    def prev_image_handler(self, event):
-        self.viewer.prev_image()
+    def image_nav_handler(self, event):
+        if event.keysym == 'space':
+            self.viewer.next_image()
+            return
+        if event.keysym == 'BackSpace':
+            self.viewer.next_image()
+            return
+        if event.keysym == 'Home':
+            self.viewer.goto_imageno(0)
+            return
+        if event.keysym == 'End':
+            self.viewer.goto_imageno(-1)
+            return
 
     def rotate_right_handler(self, event):
         self.viewer.rotate_right()
