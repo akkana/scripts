@@ -154,9 +154,9 @@ def geocode(addr):
 
 # Useful patterns
 # stateend = '.*\s+([A-Z]{2})$'
-statezip = '.*\s+([A-Z]{2})\s*(\d{5})?.*$'
-numeric = '[\+\-\d\.]'
-twonums = '^(%s+)\s+(%s+)$' % (numeric, numeric)
+statezip = r'.*\s+([A-Z]{2})\s*(\d{5})?.*$'
+numeric = r'[\+\-\d\.]'
+twonums = r'^(%s+)\s+(%s+)$' % (numeric, numeric)
 
 # street directions that could be confused for a state name
 abqdirections = [ "NE", "NW", "SE", "SW" ]
@@ -289,7 +289,7 @@ def read_description_file(filename):
         # so we're just appending to the description..
         # But skip lines that have any long words that are likely
         # too long to wrap on a phone display (they're probably URLs).
-        if re.search('\S{27,}', line):
+        if re.search(r'\S{27,}', line):
             print("Skipping long line: '%s'" % line)
             continue
         if "desc" in cur_ent and cur_ent["desc"]:
