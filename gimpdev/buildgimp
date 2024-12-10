@@ -35,7 +35,7 @@ GIMPVER=master
 # Just build, don't pull anything new.
 # This is sometimes needed e.g. after applying a patch,
 # since the pull stage will die because of needing to merge.
-justbuild=false
+justbuild=0
 
 # really build, or just print arguments?
 dryrun=false
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -b|--justbuild)
-            justbuild=true
+            justbuild=1
             shift
             ;;
         clean)
@@ -352,6 +352,7 @@ echo '========== gimp'
 cd $SRCDIR/gimp
 
 if [[ $justbuild != 1 ]]; then
+    echo "justbuild is", $justbuild
     echo "Calling pull-clone from" $(pwd)
     echo_and_do pull-clone https://gitlab.gnome.org/GNOME/gimp.git $clean
 
