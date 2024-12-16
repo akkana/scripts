@@ -25,4 +25,8 @@ weatherwin:
     Display a window showing temperature and today's forecast
     for several cities at once.
 
+watchwatch.py:
+    Monitor a watchweather server and send email (using localhost)
+    if it's more than 2 hours behind. Meant to be run as a cron job.
+
 ... plus some assorted experiments.
