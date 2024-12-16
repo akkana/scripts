@@ -41,7 +41,7 @@ for clientbox in soup.find_all('fieldset', class_='stationbox'):
     datetext = curyear + bottomrow.text.splitlines()[0]
     dt = datetime.strptime(datetext, '%Y %a %b %d %H:%M')
 
-    if (now - dt).seconds > 2: # *3600:
+    if (now - dt).seconds > 2*3600:
         email_text += "%s hasn't reported since %s\n" % (clientbox.legend.text,
                                                          dt)
 
