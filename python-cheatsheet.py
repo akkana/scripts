@@ -735,7 +735,7 @@ isodd = ['t' if n%2 else 'f' for n in nums]
 # dictionary default values, several ways:
 
 # With regular dicts, you can use get() with a default value
-total['newvalue']] = total.get(key, 0) + 42
+total['newvalue'] = total.get(key, 0) + 42
 
 # With collections, you can use defaultdict
 from collections import defaultdict
@@ -1001,6 +1001,20 @@ datetime                   seconds since the epoch   time.mktime(dt.timetuple())
 now = datetime.datetime.now()
 if (now - time_end).seconds < 7200:
     time_end = now - datetime.timedelta(seconds=7200)
+
+# You can define a timedelta with arguments of weeks, days,
+# hours, minutes, seconds, milliseconds or microseconds,
+# but once you have a timedelta you can only query for
+# days, seconds or microseconds.
+>>> td = timedelta(hours=36)
+>>> td.hours
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+AttributeError: 'datetime.timedelta' object has no attribute 'hours'
+>>> td.days
+1
+>>> td.seconds
+
 
 # Setting fixed parts of datetime
 dt = dt.replace(hour=11, minute=59)
@@ -2377,8 +2391,35 @@ class Temp:
         self._tempC = (value - 32) / 1.8
 
 ################################################################
-# Python3 only
+# Initializing class objects
 ################################################################
+
+"""
+A derived class can call super().__init(self)
+but for immutables like str/bytes, __init__ only one argument, self.
+You can't pass the initial value because __init__ isn't able to
+change the immutable value.
+So use __new__, which returns the new object created
+and is is called before __init__.
+"""
+
+# To derive from bytes at init time, use __new__
+# but note that __new__ is a static function, so there's no self.
+class BytesSubclass(bytes):
+    def __new__(cls, other, arguments):
+        bytesvalue = compute(other, arguments)
+        ob = bytes.__new__(cls, bytesvalue)
+        ob.some_other_att = compute_something_else(other, arguments)
+        return ob
+
+# Another __new__ example that also shows an interesting comprehension
+class Reverse(str):
+    def __new__(cls, sequence):
+        return super().__new__(cls, sequence[::-1])
+
+"""More notes:
+Overriding __new__ is also the best way to implement a singleton.
+"""
 
 ################################################################
 # Inheriting from and supplementing a class
