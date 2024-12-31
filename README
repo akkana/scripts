@@ -731,6 +731,11 @@ word2html.py:
     Uses python-mammoth for docx, and either uniconv + python-mammoth
     or wvHtml for .doc. Uses BeautifulSoup for prettyprinting.
 
+worddiff.py:
+    Convert two files from MS Word (.doc or .docx) to text or markdown,
+    then run a diff on those two files, to see if the content of the
+    Word file has changed.
+
 wordview:
     Convert a doc or docx file to html, and call a new firefox window on it.
     Predecessor to (and simpler than) viewmailattachments.
