@@ -632,6 +632,12 @@ termsize:
 text_wrapped_image.py:
     Demo of how to add wrapped text to an image using PIL/Pillow.
 
+tkdualwin.py:
+    Mini example of how to manage a secondary TkInter window derived from
+    tk.Toplevel. I found a lot of contradictory and sometimes wrong
+    advice when web searching, so I wrote an example to see what
+    actually worked and what didn't.
+
 tklabelimage.py:
     Mini example of how to display text and images together in a label
     in TkInter, and of how to conditionally import Tk in python2 or 3.
