@@ -21,6 +21,7 @@
 # It will also make a zip file of everything.
 
 from bs4 import BeautifulSoup, NavigableString
+import re
 from datetime import datetime
 import os, sys
 
@@ -42,7 +43,7 @@ VERBOSE = True
 # which is expected to match '9.3_LA_Report_11.2024.docx', and you
 # can't just strip off everything after the last dot because then
 # you lose the '2024'. Sigh!
-ORIG_EXTENSIONS = [ '.doc', '.docx', '.odt',
+ORIG_EXTENSIONS = [ '.doc', '.docx', '.odt', '.html', '.htm',
                     '.xls', '.xlsx', '.csv'
                   ]
 
@@ -62,6 +63,22 @@ def legalchars(fname):
     """Remove illegal characters from filenames"""
     return''.join([x for x in fname if x.isalpha() or x.isdigit() \
                    or x in '-_.'])
+
+
+def remove_all_children(tag):
+    """Removing all of a tag's children is ridiculously hard in BS.
+       See python-cheatsheet for more discussion.
+    """
+    for c in tag.find_all(recursive=True):
+        c.extract()
+        # c.decompose()
+
+    # Afterwards, we're left with NavigableStrings.
+    # You can't extract them in a loop like this, because it affects
+    # the iterator you're looping over,
+    # but you can keep extracting the first one:
+    while tag.contents:
+        tag.contents[0].extract()
 
 
 def fix_agenda(agenda_infile):
@@ -132,7 +149,12 @@ def fix_agenda(agenda_infile):
     already_converted = []
     guesses = {}
 
-    for em in soup.findAll('em'):
+    # file bases that have something in the agenda linking to them,
+    # so they were either an exact or a fuzzy match.
+    # filebase: (agendaname, matchquality)
+    matchedfiles = {}
+
+    for em in soup.find_all('em'):
         # em_text = smart_splitext(em.text.strip())[0]
         em_text = em.text.strip()
 
@@ -160,32 +182,39 @@ def fix_agenda(agenda_infile):
                returning the index into the list, or -1 if no match.
                If there's no exact match, use fuzzy search and also
                be tolerant of missing extensions.
+
+               There may be dups. So return the quality of the match too,
+               to ensure there aren't two agenda items linking to the
+               same doc, which is always an error.
+
+               Return closest_filename, match_quality.
             """
             agendaname, fileext = smart_splitext(agendaname)
             filenames_no_ext = [ os.path.splitext(f)[0] for f in filenames ]
 
             if agendaname in guesses:
-                return filenames.index(guesses[agendaname])
+                return filenames.index(guesses[agendaname]), guesses[agendaname]
 
-            # First try non-fuzzy, with fingers tightly crossed
+            # First try non-fuzzy, with fingers tightly crossed.
+            # But this will always fail, because we already tried exact match.
             if agendaname in filenames:
-                return filenames.index(agendaname)
+                return filenames.index(agendaname), 1.0
 
             # No luck there, try fuzzy matches
             best_ratio = -1
             best_match = None
             for i, filename in enumerate(filenames):
                 if agendaname in filename:
-                    return i
+                    return i, .99
                 r = SequenceMatcher(None, agendaname, filename).ratio()
                 if r > best_ratio:
                     best_match = i
                     best_ratio = r
 
             if best_ratio > .88:
-                return best_match
+                return best_match, best_ratio
 
-            return -1
+            return -1, 0
 
         def replace_em(href):
             nonlocal em, em_text
@@ -205,8 +234,8 @@ def fix_agenda(agenda_infile):
             em.append(a)
             em.append(NavigableString(")"))
 
-        index = fuzzy_search(em_text, origbases)
-        htmlindex = fuzzy_search(em_text, htmlbases)
+        index, quality = fuzzy_search(em_text, origbases)
+        htmlindex, htmlquality = fuzzy_search(em_text, htmlbases)
 
         if index < 0 and htmlindex < 0:    # No exact or fuzzy match
             print("Couldn't find a match for", em_text)
@@ -214,7 +243,7 @@ def fix_agenda(agenda_infile):
             continue
 
         if index > 0 and origbases[index] != em_text:
-            guesses[em_text] = origbases[index]
+            guesses[em_text] = origbases[index], quality
 
         # Is the html match fuzzy but the original match not?
         # e.g. if origfiles include 9.1_CNM_Report_03.2024.docx and
@@ -229,6 +258,8 @@ def fix_agenda(agenda_infile):
             print("%s and %s don't match: probably not the right HTML file"
                   % (origbases[index], htmlbases[htmlindex]))
             htmlindex = -1
+            print("Now htmlbases is", htmlbases)
+            sys.exit(0)
 
         # Found a match by searching origbases, returning index.
         # So the actal original file is origfiles[index].
@@ -236,6 +267,37 @@ def fix_agenda(agenda_infile):
         if index >= 0:
             origfile = origfiles[index]
             origbase, ext = os.path.splitext(origfile)
+
+        # Has this filename already been matched? Is the new match better?
+        if origbase in matchedfiles:
+            print("=====================================")
+            print("**** Just matched", em_text, "->", origbase, quality,
+                  "but there was already", matchedfiles[origbase])
+            if matchedfiles[origbase][1] >= quality:
+                print("previous match", matchedfiles[origbase],
+                      "was a better match than", origbase, quality, " - whew!")
+                # Remove from the guess list:
+                del guesses[em_text]
+                # But that means this file wasn't matched,
+                # so add it to the missing list
+                nosuchfiles.append(em_text)
+                # we need do no more for this em_text, the best match
+                # we found was already taken
+                continue
+
+            # Bad news: the new match is better than the old one.
+            # That means trying to remove the old em block with its 2 links.
+            hrefpat = f'.*{origbase}.*'
+            old_a = soup.find("a", href=re.compile(hrefpat))
+            parent_em = old_a.parent
+            print("New match is better: Trying to remove old link", old_a,
+                  "and replace with", em_text, " -- PLEASE CHECK!")
+            print("parent_em is a", parent_em.name, ":", parent_em)
+            remove_all_children(parent_em)
+            parent_em.insert(0, NavigableString(em_text))
+            # Now it's safe to proceed, and add the new match
+
+        matchedfiles[origbase] = em_text, quality
 
         # Is there already an HTML file matching this em?
         if htmlindex >= 0:
@@ -389,7 +451,7 @@ def fix_agenda(agenda_infile):
             print("    ", f)
 
     if guesses:
-        print("\nFuzzy matches (in agenda -> actual filename):")
+        print("\nFuzzy matches (in agenda -> (actual filename, match score)):")
         for a in guesses:
             print(f"    {a} -> {guesses[a]}")
         print("BE SURE TO LOOK OVER THIS LIST!")
