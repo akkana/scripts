@@ -65,22 +65,6 @@ def legalchars(fname):
                    or x in '-_.'])
 
 
-def remove_all_children(tag):
-    """Removing all of a tag's children is ridiculously hard in BS.
-       See python-cheatsheet for more discussion.
-    """
-    for c in tag.find_all(recursive=True):
-        c.extract()
-        # c.decompose()
-
-    # Afterwards, we're left with NavigableStrings.
-    # You can't extract them in a loop like this, because it affects
-    # the iterator you're looping over,
-    # but you can keep extracting the first one:
-    while tag.contents:
-        tag.contents[0].extract()
-
-
 def fix_agenda(agenda_infile):
     # Convert agenda_infile to absolute path
     agenda_infile = os.path.abspath(agenda_infile)
@@ -289,12 +273,15 @@ def fix_agenda(agenda_infile):
             # That means trying to remove the old em block with its 2 links.
             hrefpat = f'.*{origbase}.*'
             old_a = soup.find("a", href=re.compile(hrefpat))
+            # Save the old filename that will still be shown,
+            # though not linked
+            old_filename = old_a.string
             parent_em = old_a.parent
             print("New match is better: Trying to remove old link", old_a,
                   "and replace with", em_text, " -- PLEASE CHECK!")
             print("parent_em is a", parent_em.name, ":", parent_em)
-            remove_all_children(parent_em)
-            parent_em.insert(0, NavigableString(em_text))
+            parent_em.clear()
+            parent_em.insert(0, NavigableString(old_filename))
             # Now it's safe to proceed, and add the new match
 
         matchedfiles[origbase] = em_text, quality
