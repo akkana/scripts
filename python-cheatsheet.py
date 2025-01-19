@@ -1474,8 +1474,52 @@ for tag in invalid_tags:
 # Get first child
 child = next(tag.children)
 
-# Replace children (at least if they're NavigableString)
-headerchild.replaceWith("Tickler " + headertext)
+# Delete all children: this is ridiculously hard
+# because there's nothing that loops over both children and
+# NavigableStrings, and you can't extract NavigableStrings
+# while looping over them because it affects the loop iterator.
+
+def remove_all_children(tag):
+    # Tried various ways of looping over em's children,
+    # but neither of these iterators includes NavigableString
+    # for c in tag.children:
+    for c in tag.find_all(recursive=True):
+        print("Removing", c)
+        # Tried both extract and decompose:
+        c.extract()
+        # c.decompose()
+
+    print("After removing children, tag =", tag)
+
+    # Afterwards, we're left with NavigableStrings.
+    # You can't extract them in a loop like this, because it affects
+    # the iterator you're looping over:
+    for c in tag.contents:
+        print("::", c)
+        # c.extract()
+
+    # But you can keep extracting the first one:
+    while tag.contents:
+        print("extracting")
+        tag.contents[0].extract()
+        print("Now, tag =", tag)
+
+    print("After pop, tag =", tag)
+
+# A good test case for this:
+ORIG_HTML = '''<em><a href="some_url">link text</a> (original <a href="orig_url">orig text</a>)</em>'''
+soup = BeautifulSoup(ORIG_HTML, 'lxml')
+em = soup.find('em')
+remove_all_children(em)
+
+# XXX THIS DOESN"T WORK
+for t in oldtag.findChildren():
+    t.extract()
+oldtag.insert(0, NavigableString("New text"))
+
+# THIS DOESN"T WORK EITHER
+for child in parent_div.find_all(recursive=True):
+    child.decompose()
 
 # Wrap a container around an existing node
 tag.wrap(soup.new_tag("b"))
@@ -1541,6 +1585,48 @@ def linkify(soup):
 
 # Prettyprint output:
 soup.prettify()
+
+# SoupStrainer:
+# a faster way to search through long/many html if you're only
+# looking for a few things.
+
+import bs4
+from urllib.request import urlopen as request
+from bs4 import BeautifulSoup as soup
+from bs4 import SoupStrainer as strainer
+
+url = 'https://www.newegg.com/p/pl?d=graphics+cards'
+
+# opening connection, grabbing the HTML from the page
+client = request(url)
+page_html = client.read()
+client.close()
+
+only_item_cells = strainer("div", attrs={"class": "item-cell"})
+page_soup = soup(page_html, 'html.parser', parse_only=only_item_cells)
+page_soup_list = list(page_soup)
+
+# Some other examples:
+parse = BeautifulSoup(req.content, 'html.parser',
+                      parse_only=SoupStrainer('meta'))
+for link in parse:
+    ...
+
+tagsWithClass = SoupStrainer('p',{'class': 'refpurpose'})
+soup = BeautifulSoup(siteData, "lxml",  parse_only=tagsWithClass)
+
+self._strainer = SoupStrainer('div', attrs={'class': [
+    're_gall_top_1',    # 제목, 글쓴이, 작성시각
+    'btn_recommend',    # 추천, 비추천
+    'gallery_re_title',  # 댓글
+    's_write',          # 본문
+]})
+
+links = SoupStrainer('table', {'id': table_id})
+
+
+# More:
+# https://medium.com/codex/using-beautiful-soups-soupstrainer-to-save-time-and-memory-when-web-scraping-ea1dbd2e886f
 
 
 ########################################################
