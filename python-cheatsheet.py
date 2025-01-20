@@ -1436,9 +1436,14 @@ reader = csv.DictReader(csvfp)
 
 """
 Difference between .string and .text:
+  .text returns a unicode object that concatenates  all the child strings.
   .string returns a NavigableString object, which offers a lot of
           the same methods tags do.
-  .text returns a unicode object that concatenates  all the child strings.
+          It gets the string from something that has a single NS child,
+          e.g. href or title, or something that has only one child
+          and that child has only a single NS child.
+          .string will be None if there are multiple NS descendants.
+  .strings and stripped_strings iterate over all string children.
 
 Useful recent additions: tag.replace_with_children()
 
@@ -1449,6 +1454,9 @@ and tag.previous_sibling will return the whitespace.
 """
 
 # Iterate depth-first over all tags: soup.find_all()
+
+# Iterate over all parents, going uphill:
+for parent in link.parents: ...
 
 # Find tags with inline style attribute:
 for t in soup.find_ll(style=True)
@@ -1474,17 +1482,34 @@ for tag in invalid_tags:
 # Get first child
 child = next(tag.children)
 
-# Delete all children: this is ridiculously hard
-# because there's nothing that loops over both children and
-# NavigableStrings, and you can't extract NavigableStrings
-# while looping over them because it affects the loop iterator.
+# Delete all children:
+tag.clear()
 
+# Iterate over ALL children: for c in tag.children only shows nodes,
+# but iterating over contents (a list) gives nodes AND NavigableStrings.
+for c in soup.em.contents:
+    print("::", c.name, "::", type(c), "::", c)
+# To recurse into sub-children, use .descendants, which does
+# include NavigableStrings.
+
+# .next_sibling and .previous_sibling include strings, not just tags.
+# Also, you can get an iterator over all future/past siblings:
+for sibling in soup.a.next_siblings: ...
+
+# The section on contents in
+# https://beautiful-soup-4.readthedocs.io/en/latest/#modifying-the-tree
+# implies that .children is just an iterator over .contents, but it's not:
+# .children only gives tags, .contents gives tags AND NavigableStrings.
+
+# Finding out about clear() was a relief because otherwise,
+# you need to extract both children and NavigableStrings,
+# and you can't extract NavigableStrings
+# while looping over them because it affects the loop iterator.
 def remove_all_children(tag):
     # Tried various ways of looping over em's children,
     # but neither of these iterators includes NavigableString
     # for c in tag.children:
     for c in tag.find_all(recursive=True):
-        print("Removing", c)
         # Tried both extract and decompose:
         c.extract()
         # c.decompose()
@@ -1492,34 +1517,23 @@ def remove_all_children(tag):
     print("After removing children, tag =", tag)
 
     # Afterwards, we're left with NavigableStrings.
-    # You can't extract them in a loop like this, because it affects
-    # the iterator you're looping over:
     for c in tag.contents:
-        print("::", c)
+        print("content:", c)
+        # You can't extract them in a loop like this, because it affects
+        # the iterator you're looping over:
         # c.extract()
 
     # But you can keep extracting the first one:
     while tag.contents:
-        print("extracting")
         tag.contents[0].extract()
-        print("Now, tag =", tag)
 
-    print("After pop, tag =", tag)
+    print("After extracting contents, tag =", tag)
 
 # A good test case for this:
 ORIG_HTML = '''<em><a href="some_url">link text</a> (original <a href="orig_url">orig text</a>)</em>'''
 soup = BeautifulSoup(ORIG_HTML, 'lxml')
 em = soup.find('em')
 remove_all_children(em)
-
-# XXX THIS DOESN"T WORK
-for t in oldtag.findChildren():
-    t.extract()
-oldtag.insert(0, NavigableString("New text"))
-
-# THIS DOESN"T WORK EITHER
-for child in parent_div.find_all(recursive=True):
-    child.decompose()
 
 # Wrap a container around an existing node
 tag.wrap(soup.new_tag("b"))
