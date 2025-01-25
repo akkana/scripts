@@ -102,6 +102,8 @@ blogtouch.py:
 bookfind.py:
     List books by author optionally year of publication,
     to find new books by particular authors.
+    Broken most of the time because I can never find a book API
+    that continues to work.
 
 breaktime.py:
     Reminds you to take a break from the computer every half-hour,
@@ -715,6 +717,11 @@ vol:
 vote411export.py:
     A script to take an exported format from the LWV VOTE411 site,
     parse it, and produce clean outputs for a printed Voter Guide.
+
+watchurl.py:
+    Check to see if a URL has changed in the last day, week or month.
+    Print a message, and optionally send an email if it changed
+    (useful as a cron job).
 
 weborphans:
     Check a web site (perhaps localhost) against a local mirror,
