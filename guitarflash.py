@@ -211,11 +211,14 @@ def display_note(note):
 def display_chord(chord):
     """Given a chord name like 'A2', print a tablature for it.
     """
-    try:
-        fretNotation = GUITAR_CHORDS[chord]
-    except KeyError:
-        print("Don't know the", chord, "chord", file=sys.stderr)
-        return
+    if len(chord) == 6:
+        fretNotation = chord
+    else:
+        try:
+            fretNotation = GUITAR_CHORDS[chord]
+        except KeyError:
+            print("Don't know the", chord, "chord", file=sys.stderr)
+            return
 
     print("  " + chord)
     nut = ""
@@ -230,7 +233,14 @@ def display_chord(chord):
         fret = ""
         for string in fretNotation:
             if string == str(fretNumber):
-                fret = fret + " O"
+                # fret = fret + " O"
+                # Various unicode blocks that could substitute.
+                # None of them are particularly satisfying:
+                # either they're too small, or they're big enough
+                # but print as two characters wide.
+                # fret = fret + " \u2588"
+                fret = fret + " \u25A0"
+                # fret = fret + " \u25CF"
             else:
                 fret = fret + " |"
         print(fret)
@@ -308,6 +318,9 @@ def sanity_check(chords):
     for c in chords:
         if c in GUITAR_CHORDS:
             goodchords.append(c)
+        # Also accept specifiers like 020200
+        elif len(c) == 6:
+            goodchords.append(c)
         else:
             badchords.add(c)
 
@@ -383,11 +396,10 @@ def random_c_song(num_chords=None, delaysec=2, structure=None):
        will choose numchords chords (default 4) for the main part of the song
        and will play them twice; then a refrain of another numchords chords,
        then repeat that again, then a break, then the refrain again.
-       Instead of single letters you can use words, like "refrain".
-       If you pass a string rather than a list, it will be split
-       by commas and spaces if there are any, else it will be split
+       Instead of single letters you can use words, like "verse,chorus"
+       separated by commas or spaces.
+       A string argument with no commas or spaces will be split
        into individual letters.
-       "AA B AA C B" -> [ "A", "A", "B", "A", "A", "B", "C", "B" ]
     """
     key_chords = [ "C", "Dm", "Em", "F", "G", "Am" ]
 
@@ -498,7 +510,8 @@ if __name__ == '__main__':
     args = parser.parse_args(sys.argv[1:])
     Volume = args.volume
 
-    if not args.chord_test and not args.note_test and not args.csong:
+    if not args.chord_test and not args.note_test and not args.csong \
+       and not args.show_chords:
         parser.print_help()
         sys.exit(1)
 
