@@ -238,7 +238,7 @@ def tobin(data, width=8):
 # http://code.activestate.com/recipes/52215-get-more-information-from-tracebacks/
 
 ########################################################
-# Stringy stuff
+# Stringy stuff (Python 3)
 ########################################################
 
 # Decode vs. Encode:
@@ -272,6 +272,12 @@ url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
 url2 = "http://www.crummy.com/software/BeautifulSoup/" \
        "bs3/documentation.html"
 
+# Convert a character (e.g. pasted from somewhere) to a
+# hex unicode codepoint that you can insert inside a string.
+print('%x' % ord('█'))    # --> 2588
+hex(ord('█'))             # --> '0x2588'
+print("Here is the character again: \u2588")
+
 # s.find vs s.index: find returns -1 if not found, index raises ValueError
 
 #
@@ -301,6 +307,56 @@ r == c    # True
 
 # Replace non-breaking spaces in unicode (python3):
 s = s.replace("\u00A0"," ")
+
+# Split a long string over multiple lines in the source file
+url1 = ( "http://www.crummy.com/software/BeautifulSoup/"
+         "bs3/documentation.html" )
+# Note no commas in the parenthesized one:
+# parentheses without a comma inside are just grouping, not a tuple.
+(42)    # is type int
+(42,)   # is a tuple with len 1
+
+# You can also use a backslash and no parentheses:
+url2 = "http://www.crummy.com/software/BeautifulSoup/" \
+       "bs3/documentation.html"
+
+# raw string literals: r'' avoids any backslash escapes.
+# printf-style %x still works, e.g. r'abc %d' % 42
+r = r'abc\def'
+c = 'abc\\def'
+r == c    # True
+
+
+# Replace non-breaking spaces in unicode:
+s = s.replace("\u00A0"," ")
+
+#############
+# Some Python 2 stuff that might still apply (test first):
+
+# Detect charset if you don't know it:
+>>> chardet.detect(b'\301\242\300\200\300\231')
+{'encoding': 'Windows-1252', 'confidence': 0.73, 'language': ''}
+>>> b'\301\242\300\200\300\231'.decode('Windows-1252')
+'Á¢À€À™'
+
+# s.find vs s.index: find returns -1 if not found, index raises ValueError
+
+#
+# Fuzzy string match.
+# SequenceMatcher's first argument is a function that returns true for
+# characters considered to be "junk". For instance, if blanks are junk,
+# lambda x: x == " "
+# To consider nothing as junk, pass None.
+#
+from difflib import SequenceMatcher
+
+best_ratio = -1
+best_match = None
+for b in string_list:
+    r = SequenceMatcher(None, pattern, b).ratio()
+    if r > best_ratio:
+        best_match = b
+        best_ratio = r
 
 ################################################################
 # re: Regular expressions/regexp:
@@ -390,207 +446,6 @@ if match: return match.group()
 import textwrap
 textwrap.fill(intext, width=w)
 
-
-################################################################
-# Python3-specific stringy stuff
-################################################################
-
-# Migrate python2 to python3 in place (omit -n to leave a .bak):
-$ 2to3 -wn file_or_directory
-
-# To make print() work in both 2 and 3:
-from __future__ import print_function
-
-# print without a newline and to a file:
-print("Hello, world", end='', file=sys.stderr)
-
-# encode/decode between bytes and str:
->>> b'string of bytes'.decode()
-'string of bytes'
-
->>> b'string of bytes'.decode('utf-8')
-'string of bytes'
-
->>> 'piñon'.encode('utf-8')
-b'pi\xc3\xb1on'
-
-# But if there might be an emoji involved, for some reason, plain utf-8
-# isn't enough and you need this:
-print(output.encode('utf-8', "surrogatepass"))
-
-# For a while, you could just pass encoding as a second argument
-# in type coercion; This has changed in more recent python3,
-# so don't use it any more.
-# I don't know the limits, but it's probably best not to use things like:
->>> str(b'string of bytes')
-"b'string of bytes'"
->>> str(b'string of bytes', 'utf-8')
-'string of bytes'
->>> str(b'pi\xc3\xb1on')
-"b'pi\\xc3\\xb1on'"
->>> str(b'pi\xc3\xb1on', 'utf-8')
-'piñon'
->>> bytes('piñon', 'utf-8')
-b'pi\xc3\xb1on'
-
-# Read or write bytes from a file:
-fp = open(filename, 'rb')   # or 'wb'
-
-# Write bytes to a file opened in string mode with .buffer
-if hasattr(sys.stdout, 'buffer')::
-    sys.stdout.buffer.write(b'abc')
-
-# Also, you can specify encoding when opening a file:
-open(path, "w", encoding="utf-8")
-
-# Conditional depending on python version:
-if sys.version[:1] == '2':
-    from urlparse import urlparse
-else:
-    from urllib.parse import urlparse
-
-# Call input everywhere but make that call raw_input if it's python2:
-try: input = raw_input
-except NameError: pass
-# OR:
-if hasattr(__builtins__, 'raw_input'):
-    input = raw_input
-
-########################################################
-# Byte strings and byte arrays
-########################################################
-
-buf = bytearray(b'\x51\x02\x00\x00\x00')
-buf.append(0xa2)
-buf.insert(2, 0xf7)
-
-# struct: https://docs.python.org/2/library/struct.html
-# is perhaps a better way to handle byte strings like this.
-
-#############################
-# ways of formatting numbers.
-# https://docs.python.org/3/tutorial/inputoutput.html
-# For pre-2.6, see https://stackoverflow.com/a/2962966
-
-# String concatenation:
-filename = 'file' + str(num) + '.txt'
-
-# Conversion Specifier:
-filename = 'file%s.txt' % num
-
-#############################
-# Formatted string literals or f-strings, Python 3.6+
-print(f'Fly to {name}: {lat}N {lon}E')
-print(f'The value of pi is approximately {math.pi:.3f}.')
-print(f"{setting:>27}: ")    # right-justify with >
->>> print(f"{foo=}")         # prints: foo=42
-
-# decimals and field widths:
-# NOTE: SPACES INSIDE THE BRACES MAY LEAD TO Invalid format specifier ERROR
->>> f'{math.pi:.2f}'
-'3.14'
->>> f'{5:>3d}'
-'  5'
->>> f'{5:0>3d}'    # you can fill with any character, not just 0
-'005'
-
-# Right, left and center alignment
->>> f'{123:10d}'
-'       123'
->>> f'{123:<10d}'
-'123       '
->>> f'{123:^10d}'
-'   123    '
-# https://gist.github.com/nedbat/9a29a7e0f8091844d65f5ca433612e59
->>> word = "Hello"
->>> f"{word:=<20}"
-'Hello==============='
-
->>> f"{word:->20}"
-'---------------Hello'
-
->>> f"{word:/^20}"
-'///////Hello////////'X
-
-# you can nest f-strings, which is a matter of taste:
-word = 'Title'
-f"""{f" {word} ":=^40}"""
-'================ Title ================='
-
-#  You can also define your own formatting by defining __format__:
-# this nedbat article has a wonderful example using latitude/longitude pairs.
-# https://nedbatchelder.com/blog/202204/python_custom_formatting.html
-
-# Recommended way of splitting long f-strings: paren and multiple f-strings
-print(("foo is {foo}, "
-       "bar is {bar}"))
-
-# str and repr in formatted string literals
->>> animals = 'eels'
->>> print(f'My hovercraft is full of {animals!s}.')  # applies str() (default)
-My hovercraft is full of eels.
->>> print(f'My hovercraft is full of {animals!r}.')  # applies repr()
-My hovercraft is full of 'eels'.
-
-# More formatted string literals tricks:
-# Escaping braces
->>> f"{{74}}"
-'{74}'
-
-# Other bases
->>> f'{255:x}'
-'ff'
->>> f'{255:o}'
-'377'
->>> f'{255:b}'
-'11111111'
-
-# Adding commas
->>> f'{1234567:,}'
-'1,234,567'
-
-# Python 3.8+: shorthand for debugging
-# https://stribny.name/blog/2019/06/debugging-python-programs
-# https://realpython.com/python38-new-features/
->>> print(f"{i=}, {word=}")
-i=42, word=everything
-
-##### end f-strings
-
-# Justification:
->>> x = 'ab'
->>> print(repr(x).rjust(10))
-      'ab'
->>> print("%10s" % x)
-        ab
->>> print("%-10s" % x)
-ab        
->>> print(str(x).rjust(10))
-        ab
-
-
-# Older, pre-3.6 Pythons can use format():
-filename = 'file{0}.txt'.format(num)
-# Using variable names with format()
-filename = 'file%(num)s.txt' % locals()  # Neat trick
-
-# Using string.Template:
-filename = string.Template('file${num}.txt').substitute(locals()))
-
-##### Unicode code points, names etc.
-
-# Print by name
-print(u'\N{snowman}'))
-
-import unicodedata
-print(unicodedata.name('\u03b1'))
-
-# Remove accented characters
->>> accented = 'Eleanor Chávez'
->>> unicodedata.normalize('NFD', accented).encode('ascii', 'ignore').decode('ascii')
-'Eleanor Chavez'
-
-# See also unidecode.py, e.g. for how to search in names.
 
 
 ####### Exceptions #####################
@@ -1030,6 +885,8 @@ three_months_from_now = today + relativedelta(months=3)
 # month gives you the current dayofmonth in a specific month number;
 # months gives you how many months relative to the current one.
 # For differences of just days or weeks, datetime.timedelta works.
+# relativedelta offers years, months, weeks, days, hours,
+# minutes, seconds, microseconds
 
 def nextmonth(d):
     '''Beginning of the following month.
