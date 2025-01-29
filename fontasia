@@ -798,6 +798,7 @@ class FontApp(Gtk.Window):
         return lastword + ' ' + ' '.join(words)
 
     def choose_family(self, widget):
+        self.fontsize = self.sizespin.get_value()
         familyname = self.current_font_family()
         if not familyname:
             return
