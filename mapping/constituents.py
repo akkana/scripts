@@ -6,167 +6,100 @@
 """
 
 from collections import defaultdict
-from urllib.parse import unquote_plus
+# from urllib.parse import unquote_plus, quote_plus
+import urllib.parse, urllib.request
 import json
-from simplejson.errors import JSONDecodeError
-from shapely.geometry import Point, Polygon
-from geopy.geocoders import Nominatim, PickPoint
-from geopy.extra.rate_limiter import RateLimiter
-import requests
-import argparse
-import traceback
-import csv
 import re
 import sys, os
 
+from shapely.geometry import Point, Polygon
 
-# Nominatim requires local caching.
-# CACHEFILE = os.path.expanduser("~/.config/constituents/constituents-cache.json")
-CACHEFILE = "constituents-cache.json"
 
-# Cached addresses, saved in CACHEFILE
+# Nominatim is failing on about 2/3 of New Mexico addresses I give it.
+# Use the census instead: https://geocoding.geo.census.gov/geocoder/
+# GEOLOCATOR can be "Nominatim" or "USCensus"
+# though Nominatim has been failing and probably isn't worth using.
+# I never got any of the other geopy geocoders to work either,
+# even after registering.
+GEOLOCATOR = "USCensus"
+USE_NOMINATIM = False
+USE_CENSUS = True
+
+if GEOLOCATOR == "Nominatim":
+    from geopy.geocoders import Nominatim
+    from geopy.extra.rate_limiter import RateLimiter
+
+    Geolocator = Nominatim(user_agent="constituents")
+
+
+# Called as a CGI?
+if 'REQUEST_METHOD' in os.environ:
+    print("Content-Type: text/plain\n\n")
+
+
+def census_geocode(addr):
+    """Geocode using the US Census API.
+       Returns (lat, lon), or None, None.
+    """
+    url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
+    url += '?benchmark=Public_AR_Current'
+    url += '&vintage=Current'
+    url += '&format=json'
+    url += '&address=' + urllib.parse.quote_plus(addr)
+    # print("url:", url)
+
+    data = str(urllib.request.urlopen(url).read(), 'utf-8')
+    dataj = json.loads(data)
+
+    if not dataj['result']['addressMatches']:
+        return None, None
+
+    firstmatch = dataj['result']['addressMatches'][0]
+
+    # Weirdly, they call the coordinates x and y, not longitude/latitude
+    return (float(firstmatch['coordinates']['y']),
+            float(firstmatch['coordinates']['x']))
+
+
+# Nominatim requires local caching, the Census doesn't;
+# but it's a good idea regardless of the geocoder being used.
+if 'REQUEST_METHOD' in os.environ:    # running as a CGI
+    CACHEFILE = os.path.expanduser("constituents-cache.json")
+else:                                 # running locallyq
+    CACHEFILE = os.path.expanduser("~/.cache/constituents/constituents-cache.json")
+
 Cachedata = {}
 
-# When initialized, will store the function to use when geocoding.
-Geocode = None
+if os.path.exists(CACHEFILE):
+    print(CACHEFILE, "exists", file=sys.stderr)
+    try:
+        with open(CACHEFILE) as fp:
+            Cachedata = json.load(fp)
+            print("Read cached data from", CACHEFILE,
+                  ":", len(Cachedata), "items", file=sys.stderr)
+    except:
+        print("Couldn't read JSON from cache file", CACHEFILE, file=sys.stderr)
+else:
+    print("'%s' doesn't exist" % CACHEFILE, file=sys.stderr)
+    try:
+        os.makedirs(os.path.dirname(CACHEFILE))
+    except FileExistsError as e:
+        pass
+    except Exception as e:    # Most likely a PermissionError
+        print("Couldn't create", CACHEFILE, ":", e, file=sys.stderr)
 
 
 # Some patterns for things Nominatim can't handle
 BAD_ADDR_PATTERNS = [
-    "(PO )?[bB]ox *\#* *[0-9]+,? *"
+    r"(PO )?[bB]ox *\#* *[0-9]+,? *"
 ]
 PATTERNS_TO_REMOVE = [
-    "\# *[0-9]+ *"
+    r"\# *[0-9]+ *"
 ]
-
-
-def geocode_US_census(addr):
-    """Geocode using the US Census API"""
-    url = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=%s&benchmark=2020&format=json' % addr.replace(' ', '+')
-    try:
-        req = requests.get(url)
-        output = req.json()
-        # print("Got JSON:", output)
-        matches = output["result"]["addressMatches"]
-        if len(matches) == 0:
-            print("Couldn't match", addr)
-            return [ (None, None) ]
-
-        if len(matches) > 1:
-            print("Yikes, more than one match for", addr)
-            for match in matches:
-                print("   ", match, ":", match["coordinates"])
-        # print('coordinates:', matches[0]["coordinates"])
-
-        # To be consistent with geopy, should return a tuple of
-        # number, street, city, county,state, zip, (lat, lon)
-        # but nothing except the final tuple is used, so
-        # for now, that's enough. (Census doesn't differentiate number.)
-        match = matches[0]
-        return [ ( match["coordinates"]["y"],
-                   match["coordinates"]["x"] ) ]
-
-    except JSONDecodeError as e:
-        # When this happens it can't print req.text either,
-        print("JSON decode error on: '%s'" % req.text)
-        return [ (None, None) ]
-    except Exception as e:
-        print("Exception: '%s' geolocating '%s'" % (e, addr))
-        traceback.print_exc(file=sys.stderr)
-        return [ (None, None) ]
-
-
-def init_geolocator():
-    global Geocode, Cachedata
-
-    # geocoding API investigation:
-    # US Census!
-    # https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
-    # e.g. https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=123+Main+Street,+Las+Cruces,+NM+88007-8816&benchmark=2020&format=json
-    #
-    # Nominatim: randomly stops serving anything, giving only timeouts
-    #   (even when used on only one address or with rate limiter)
-    # Pelias: doesn't seem to understand searching for addresses,
-    #   gives a list of results most of which aren't near the specified city
-    #   even with sources=oa which is supposed to search for addresses
-    # OpenCageData: gives two results one of which is a completely different
-    #   address than the one asked for
-    #
-    # Services that you can't even try without registering:
-    # PickPoint: Has free tier, but fails on about 1/3 of US addresses
-    # Google: wants a credit card, claims it won't charge it if you
-    #   don't make too many queries (but no way to check or limit that)
-    # geonames.org: their examples use an account named "demo"
-    #   but you can't actually use that for testing
-    # mapbox.com
-    # here.com
-    # developer.what3words.com
-    # developer.tomtom.com
-    # smarty.com
-    # mapquest.com: they have an example at
-    # https://developer.mapquest.com/documentation/samples/geocoding/v1/address
-    # but it doesn't actually do anything, just stays on the default query.
-    # OpenMapQuest (https://developer.mapquest.com/documentation/open/):
-    # intro page doesn't even load, just spins a busy indicator forever.
-    #
-    # Services that don't work via geopy:
-    # Don't work without an API key:
-    # www.geocod.io/docs/: the "try this in your browser right now"
-    #   links don't work since they use api_key=YOUR_API_KEY
-    # USPS: does address validation but not geolocation
-    # https://geocoding.geo.census.gov/geocoder/
-
-    pickpointapikey = os.getenv("PICKPOINTAPIKEY")
-    if True:
-        # Use the Census API
-        Geocode = geocode_US_census
-        print("Geolocation using the US Census API")
-
-    elif pickpointapikey:
-        # https://geopy.readthedocs.io/en/latest/#geopy.geocoders.PickPoint
-        Geocode = PickPoint(pickpointapikey).geocode
-        print("Geolocation courtesy of PickPoint.io")
-
-    elif False:
-        # Use the free Nominatim service, though it doesn't always work
-        # even with the rate limiter in place.
-
-        Geolocator = Nominatim(user_agent="constituents")
-
-        # Nominatim has a limit of 1 request per second for free non-OSM use.
-        # (They don't always enforce this, but be nice and follow the guidelines!)
-        # Unfortunately, even when rate limited, Nominatim will randomly
-        # start timing out or raising errors like
-        # geopy.exc.GeocoderUnavailable: HTTPSConnectionPool(host='nominatim.openstreetmap.org', port=443): Max retries exceeded with url: /search?q=111+N+California+Ave%2C+Silver+City%2C+NM+88061-3720&format=json&limit=1 (Caused by ReadTimeoutError("HTTPSConnectionPool(host='nominatim.openstreetmap.org', port=443): Read timed out. (read timeout=1)"))
-        Geocode = RateLimiter(Geolocator.geocode, min_delay_seconds=1)
-        print("Geolocation courtesy of OpenStreetMap/Nominatim")
-        print()
-
-
-    # Set up a cache
-    if os.path.exists(CACHEFILE):
-        print(CACHEFILE, "exists", file=sys.stderr)
-        try:
-            with open(CACHEFILE) as fp:
-                Cachedata = json.load(fp)
-                print("Read cached data from", CACHEFILE, file=sys.stderr)
-        except:
-            print("Couldn't read JSON from cache file", CACHEFILE,
-                  file=sys.stderr)
-    else:
-        print("'%s' doesn't exist" % CACHEFILE, file=sys.stderr)
-        try:
-            os.makedirs(os.path.dirname(CACHEFILE))
-        except FileExistsError as e:
-            pass
-        except Exception as e:    # Most likely a PermissionError
-            print("Couldn't create", os.path.dirname(CACHEFILE),
-                  ":", e, file=sys.stderr)
-
 
 def clean_addr(addr):
     """First remove things like apartment numbers and PO boxes,
-       which Nominatim can't handle
+       which Nominatim can't handle. The Census geolocator is more tolerant.
     """
     for pat in BAD_ADDR_PATTERNS:
         if re.match(pat, addr):
@@ -180,32 +113,35 @@ def clean_addr(addr):
     return addr
 
 
-def geocode(addr, ignore_cache=False):
-    """Geocode a single address using GeoPY.
+def geocode(addr):
+    """Geocode a single address using GeoPY/Nominatim.
        Returns a (lat, lon) pair, or None, None.
     """
-    print("*** geocode '%s'" % addr, file=sys.stderr)
+    constituents = defaultdict(list)
 
-    if addr in Cachedata and not ignore_cache:
-        print(addr, "was cached: returning", Cachedata[addr], file=sys.stderr)
+    if addr in Cachedata:
+        # print(addr, "was cached: returning", Cachedata[addr], file=sys.stderr)
         return Cachedata[addr]
 
-    print("Not cached", file=sys.stderr)
-    print(".", end="")
-    sys.stdout.flush()
+    # print("geocode '%s'" % addr, file=sys.stderr)
 
-    location = Geocode(addr)
-    if not location:
-        print("Couldn't geocode", addr)
-        Cachedata[addr] = (None, None)
+    # print(".", end="")
+    # sys.stdout.flush()
+
+    if GEOLOCATOR == "Nominatim":
+        location = Geocode(addr)
+        if not location:
+            Cachedata[addr] = (None, None)
+            return Cachedata[addr]
+
+        # Nominatim returns a tuple of number, street, city, county,state, zip,
+        # (lat, lon)
+        Cachedata[addr] = location[-1]
         return Cachedata[addr]
 
-    print("geocoded:", location[-1])
-
-    # Nominatim returns a tuple of number, street, city, county,state, zip,
-    # (lat, lon)
-    Cachedata[addr] = location[-1]
-    return Cachedata[addr]
+    elif GEOLOCATOR == "USCensus":
+        Cachedata[addr] = census_geocode(addr)
+        return Cachedata[addr]
 
 
 def load_geojson(geojson_file):
@@ -218,8 +154,8 @@ def load_geojson(geojson_file):
 
         # Done with json
         district_json = None
-    print("Found", len(district_polygons), "districts in", geojson_file,
-          file=sys.stderr)
+    # print("Found", len(district_polygons), "districts in", geojson_file,
+    #       file=sys.stderr)
     return district_polygons
 
 
@@ -229,192 +165,176 @@ def district_sort_key(k):
     return "%03s" % k
 
 
-def save_cachefile():
-    print("Saving cachefile with", len(Cachedata), "entries")
+def handle_address(addrline, district_polygons):
+    addrline = addrline.strip()
+    try:
+        lat, lon = geocode(addrline)
+    except:
+        lat = None
+        lon = None
+    if not lat or not lon:
+        # print("Couldn't geocode", addrline)
+        constituents["address error"].append(addrline)
+        return
 
+    pt = Point(lon, lat)
+
+    for district in district_polygons:
+        # print("checking district", district)
+        if pt.within(district_polygons[district]):
+            constituents[district].append(addrline)
+            break
+    else:
+        constituents["unknown"].append(addrline)
+
+
+def districts_for_addresses(addressfile, district_json):
+    district_polygons = load_geojson(district_json)
+
+    with open(addressfile) as fp:
+        for addrline in fp:
+            handle_address(addrline, district_polygons)
+
+    # print("Saving", len(Cachedata), "items to cache")
     with open(CACHEFILE, 'w') as fp:
         json.dump(Cachedata, fp, indent=2)
 
+    return constituents
 
-def read_csv(inputcsv):
-    print("Reading CSV file", inputcsv)
-    # Read everyone in from the inputcsv to members
-    members = []
-    with open(inputcsv) as fp:
-        reader = csv.DictReader(fp)
+
+def districts_for_csv(csvfile, polygon_files):
+    import csv
+
+    polygon_sets = {}
+    for pf in polygon_files:
+        polygon_sets[os.path.basename(pf)] = load_geojson(pf)
+
+    allrows = []
+
+    # The keys to save
+    savekeys = [ 'name', 'address', 'latitude', 'longitude' ]
+    polyfilekeys = [ os.path.splitext(f)[0] for f in polygon_files ]
+
+    with open(csvfile) as csvfp:
+        reader = csv.DictReader(csvfp)
         for row in reader:
-            print(row)
-            # Fields we care about: "League: League Name", "First Name".
-            # "Last Name", "Mailing Street", "Mailing City",
-            # "Mailing State/Province" "Mailing Country",
-            # "Mailing Zip/Postal Code"
+            # Each row is an OrderedDict
+            # fields needed: Account Name, Email, Mailing Street,
+            # Mailing City, Mailing State/Province, Mailing Zip/Postal Code
 
-            # Only care about NM, US
-            if row["Mailing Country"] != "US":
-                print("Skipping", row["First Name"], row["Last Name"],
-                      ":",  row["Mailing Country"], "not US", file=sys.stderr)
-                continue
-            if row["Mailing State/Province"] != "NM":
-                print("Skipping", row["First Name"], row["Last Name"],
-                      ":",  row["Mailing State/Province"], "not NM",
+            if not row['Mailing Street'].strip():
+               print(row['Account Name'], "has no address, skipping",
+                     file=sys.stderr)
+               continue
+            # Nominatim can't handle 9-digit zip codes, returns None
+            # for any address that includes one
+            zip = row['Mailing Zip/Postal Code']
+            # if '-' in zip:
+            #     zip = zip.split('-')[0]
+            addr = "%s, %s, %s %s" % (
+                row['Mailing Street'].strip(), row['Mailing City'].strip(),
+                row['Mailing State/Province'].strip(), zip)
+            if addr.startswith("PO Box"):
+                print(row['Account Name'], "is a PO Box, skipping",
                       file=sys.stderr)
                 continue
 
-            # Some members don't list an address at all
-            if not row["Mailing Street"] or not row["Mailing City"]:
-                print("Skipping", row["First Name"], row["Last Name"],
-                      ": Missing street address or city",
-                      file=sys.stderr)
-                continue
+            addr = clean_addr(addr)
 
-            addr = "%s, %s, NM %s" % (row["Mailing Street"],
-                                      row["Mailing City"],
-                                      row["Mailing Zip/Postal Code"])
-
+            # Mark it for saving even before knowing if it's geocodable.
+            # We can still add to the object, which won't be
+            # actually written to the cache file til the end.
             member = {
-                "addr": addr,
-                "lastname": row["Last Name"],
-                "firstname": row["First Name"],
-                "leaguename": row["League: League Name"]
+                'name': row['Account Name'],
+                'address': addr,
+                'latitude': 0,
+                'longitude': 0,
             }
-            members.append(member)
+            for key in polyfilekeys:
+                member[key] = ''
+            allrows.append(member)
 
-    return members
-
-
-def whichdistrict(point, polygons):
-    """If point is inside any of the polygons, return the associated district,
-       else None.
-    """
-    for district in polygons:
-        # print("checking district", district)
-        if point.within(polygons[district]):
-            return district
-    return None
-
-
-def districts_for_csv(csvfile, districtfiles, naddrs=0):
-    members = read_csv(csvfile)
-
-    # Now all the members in the CSV have been read in to members
-    print("Read", len(members), "members")
-
-    num_addrs_done = 0
-    for m in members:
-        if "clean_addr" not in members:
-            m["clean_addr"] = clean_addr(m["addr"])
-        if not m["clean_addr"]:
-            # It might be ungeolocatable, e.g. a PO Box
-            continue
-        if m["clean_addr"] in Cachedata:
-            m["lat"], m["lon"] = Cachedata[m["clean_addr"]]
-        elif m["clean_addr"]:
-            print(m["clean_addr"], "is not in Cachedata; geocoding")
-            m["lat"], m["lon"] = geocode(m["clean_addr"])
-            print(m["addr"], "-->", m["lat"], m["lon"])
-            num_addrs_done += 1
-            if naddrs and num_addrs_done > naddrs:
-                break
-
-    # Make sure all coordinates are cached before proceding
-    save_cachefile()
-
-    print()
-    print("****** looking for districts")
-    print()
-
-    # Now figure out districts for the members who have lat/lon.
-    csv_fieldnames = [ "firstname", "lastname", "leaguename", "addr" ]
-    csv_districtnames = []
-    for districtfile in districtfiles:
-        districttype, ext = os.path.splitext(districtfile)
-        csv_districtnames.append(districttype)
-        district_polygons = load_geojson(districtfile)
-        print("Loaded", districtfile)
-        print()
-
-        for m in members:
-            if "lat" not in m or "lon" not in m or not m["lat"] or not m["lon"]:
-                # print("No coordinates for", m["firstname"], m["lastname"])
+            try:
+                gc = geocode(addr)
+                lat, lon = gc
+            except RuntimeError as e:
+                print("Couldn't geocode", addr, ":", e, file=sys.stderr)
+                # for polyset in polygon_sets:
+                #     constituents[polyset] = None
                 continue
 
-            pt = Point(m["lon"], m["lat"])
-            if "districts" not in m:
-                m["districts"] = {}
-            m["districts"][districttype] = whichdistrict(pt, district_polygons)
-            # print("  ", m["firstname"], m["lastname"], m["addr"],
-            #       districtfile, "districts:", m["districts"])
+            if not lat or not lon:
+                print("Error geocoding", row['Account Name'], "at:", addr,
+                      file=sys.stderr)
+                row['latitude'] = ''
+                row['longitude'] = ''
+                continue
 
-    with open("member-districts.json", "w") as fp:
-        json.dump(members, fp, indent=2)
-        print("Saved to member-districts.json")
+            member['latitude'] = lat
+            member['longitude'] = lon
 
-    with open("member-districts.csv", "w") as fp:
-        csvwriter = csv.writer(fp)
-        csvwriter.writerow(csv_fieldnames + csv_districtnames)
-        for m in members:
-            if "districts" in m:
-                row = [ m[field] for field in csv_fieldnames ]
-                for distname in csv_districtnames:
-                    if distname in m["districts"]:
-                        row.append(m["districts"][distname])
-                    else:
-                        row.append("")
-                csvwriter.writerow(row)
-        print("Saved to member-districts.csv")
+            # We have coordinates.
+            pt = Point(lon, lat)
+            for polyset in polygon_sets:  # chambers, e.g. House, Senate
+                polysetkey = os.path.splitext(polyset)[0]
+                for district in polygon_sets[polyset]:
+                    if pt.within(polygon_sets[polyset][district]):
+                        member[polysetkey] = district
+                        break
 
+    # print("Saving", len(Cachedata), "items to cache")
+    with open(CACHEFILE, 'w') as fp:
+        json.dump(Cachedata, fp, indent=2)
 
-def tryagain():
-    """Retry any address that has cached coordinates of None, None"""
-    changes = False
-    for addr in Cachedata:
-        for pat in BAD_ADDR_PATTERNS:
-            if re.match(pat, addr):
-                print("Skipping", addr)
-                addr = None
-                break
-        if not addr:
-            continue
+    # Save as both JSON and CSV
+    outfilebase = "districts-%s" % os.path.splitext(csvfile)[0]
+    with open(outfilebase + ".json", 'w') as fp:
+        json.dump(allrows, fp, indent=2)
+        print("Saved as", outfilebase + ".json", file=sys.stderr)
 
-        if not Cachedata[addr][0] or not Cachedata[addr][1]:
-            print("Retrying", addr)
-            foo = geocode(addr, ignore_cache=True)
-            print("geocode", addr, "returned", foo)
-            lat, lon = foo
-            if lat and lon:
-                changes = True
+    # print("Will save CSV with keys:", savekeys, '+', polyfilekeys)
+    with open(outfilebase + ".csv", 'w') as fp:
+        writer = csv.DictWriter(fp, fieldnames=savekeys + polyfilekeys,
+                                lineterminator='\n')
+        writer.writeheader()
+        for row in allrows:
+            writer.writerow(row)
+        print("Saved as", outfilebase + ".csv", file=sys.stderr)
 
-    if changes:
-        print("There were changes", end="")
-        save_cachefile()
+    return allrows
 
 
 if __name__ == '__main__':
-    # Check arguments
-    print("Parsing arguments ...")
-    parser = argparse.ArgumentParser(description="Map addresses to districts")
-    parser.add_argument('-n', action="store", default=0, dest="naddrs",
-                        type=int, help='How many addresses to process.')
-    parser.add_argument('--tryagain', dest="tryagain", default=False,
-                        action="store_true",
-        help="Try again to get addresses that aren't already geocoded")
-    parser.add_argument('inputcsv', nargs=1, help="Input CSV file")
-    parser.add_argument('distfiles', nargs='+', help="district files (geojson)")
-    args = parser.parse_args()
-    print("args:", args)
+    # Called as a CGI?
+    if 'REQUEST_METHOD' in os.environ:
+        district_polygons = load_geojson(
+            "../../districtmaps/data/NM_Senate.json")
+        import cgi
+        form = cgi.FieldStorage()
+        if 'addresses' in form:
+            addresses = urllib.parse.unquote_plus(form["addresses"].value)
+            for addrline in addresses.splitlines():
+                handle_address(addrline, district_polygons)
 
-    for districtfile in args.distfiles:
-        if not (districtfile.endswith(".json")
-                or districtfile.endswith(".geojson")):
-            parser.print_help()
-            sys.exit(1)
+            for dist in sorted(constituents.keys(), key=district_sort_key):
+                print("\nDistrict", dist)
+                if constituents[dist]:
+                    for addr in constituents[dist]:
+                        print("   ", addr)
+                else:
+                    print("    No constituents")
+            sys.exit(0)
 
-    init_geolocator()
-    print("Initially Cachedata has", len(Cachedata), "entries")
-
-    if args.tryagain:
-        tryagain()
-
-    # Argparse sets inputcsv as a list even though it's nargs=1
-    districts_for_csv(args.inputcsv[0], args.distfiles, args.naddrs)
-
+    # Not a CGI
+    if sys.argv[1].endswith('.csv'):
+        try:
+            constituents = districts_for_csv(sys.argv[1], sys.argv[2:])
+        except KeyboardInterrupt:
+            print("Interrupt")
+            sys.exit(0)
+    elif sys.argv[1].endswith('.xlsx'):
+        print("Sorry, can't read xlsx, please convert it to CSV",
+              file=sys.stderr)
+        sys.exit(1)
+    else:
+        constituents = districts_for_addresses(sys.argv[1], sys.argv[2])
