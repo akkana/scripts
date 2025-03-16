@@ -194,6 +194,9 @@ python -c "$(printf %b 'import sys\nfor r in range(10): print("%d:" % r)')"
 # Dump into the debugger (in 3.7 and later):
 breakpoint()
 
+# Print line by line tracing
+sys.settrace()
+
 # Print a stack trace -- how did we get here?
 traceback.print_stack()
 
@@ -516,6 +519,14 @@ mylist.pop(i)            # Removes and returns list[i]
 # multiple "with" context managers:
 with open("infile") as infile, open("outfile") as outfile:
 with A() as a, B() as b, C() as c:
+
+# First item in an ordered dict (or other iterable):
+def first(s):
+    '''Return the first element from an ordered collection
+       or an arbitrary element from an unordered collection.
+       Raise StopIteration if the collection is empty.
+    '''
+    return next(iter(s))
 
 # get first or next item in an iterator:
 python3: next(iter)
@@ -948,6 +959,9 @@ datetime.datetime.strptime('2016-01-01', '%Y-%m-%d')
 
 # Same thing with decimal seconds:
 datetime.datetime.strptime('2016-01-01.234', '%Y-%m-%d.%f')
+
+# To parse AM/PM, use %I %p instead of %H:
+datetime.strptime('3/14/2025\t5:23 PM MST', '%m/%d/%Y\t%I:%M %p MST')
 
 # datetime to Unix timestamp:
 time.mktime(d.timetuple())
@@ -1801,6 +1815,22 @@ def roundall(numbers):
     return map(int, map(round, numbers))
 
 #
+# Lambda in a loop needs intermediate variables
+# https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+#
+fcns = []
+for i in range(5):
+    fcns.append(lambda: print(i))
+for f in fcns:
+    f()    # prints 4 five times
+# Instead, you need to make a lambda with its own intermediate variable:
+fcns = []
+for i in range(5):
+    fcns.append(lambda x=i: print(x))
+for f in fcns:
+    f()    # prints 0 1 2 3 4
+
+#
 # sorting + lambda examples
 #
 # The cmp function is obsolete in py3. Instead, use a key function,
@@ -2430,6 +2460,14 @@ PySonar: a type inferencer and indexer
 '''
 
 ################################################################
+# Flask tips
+################################################################
+'''
+Jinja put a comma after all but the last value:
+{% if not loop.last %},{% endif %}
+'''
+
+################################################################
 # pip tips
 ################################################################
 
@@ -2485,7 +2523,7 @@ option so you have to actually install the package to see the file list.
 '''
 
 ################################################################
-# Virtualenv
+# Virtualenv/venv
 ################################################################
 
 '''Python3
@@ -2503,6 +2541,7 @@ Optionally, add --system-site-packages to either of these.
 
 Then activate it:
 source ~/pythonenv/envname/bin/activate
+VIRTUAL_ENV_DISABLE_PROMPT=1 source $HOME/pythonenv/3env/bin/activate
 '''
 
 '''
