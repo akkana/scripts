@@ -7,6 +7,7 @@ import sqlite3
 import shutil
 import shlex
 from urllib.parse import urlparse, parse_qs
+from datetime import datetime
 import os, sys
 
 
@@ -22,9 +23,10 @@ def get_search_history(filename):
     # fetchedlist = [ cur.fetchall() ]   # list of (url, last_visit_date)
     fetchedlist = list(cur.fetchall())
 
-    # Sort by date (second item), which is is unix time in microseconds.
+    # Sort by date (second item), which is is unix time but in microseconds.
     fetchedlist.sort(key=lambda x: x[1] if x[1] else 0)
-    return [ pair[0] for pair in fetchedlist ]
+    # return [ pair[0] for pair in fetchedlist ]
+    return fetchedlist
 
 
 def find_search_terms(url, query_string=None):
@@ -55,11 +57,27 @@ def find_search_terms(url, query_string=None):
 
     return terms
 
+
 if __name__ == '__main__':
-    urls = get_search_history(sys.argv[1])
-    for url in urls:
+    print(len(sys.argv))
+    if len(sys.argv) < 2:
+        print("Usage: %s /path/to/places.sqlite"
+              % os.path.basename(sys.argv[0]))
+        print("places.sqlite is probably in ~/.mozilla/firefox/profilename")
+        sys.exit(1)
+
+    pairs = get_search_history(sys.argv[1])
+    for url, timestamp in pairs:
+        # print("url, timestamp:", url, timestamp)
         terms = find_search_terms(url)
-        print(terms)
+        if timestamp:
+            dt = datetime.fromtimestamp(timestamp / 1000000) \
+                         .strftime("%Y-%m-%d %H:%M")
+        else:
+            # For a few of the db entries, the timestamp is null.
+            # In most cases the search terms are null too.
+            dt = ''
+        print('%16s  %s' % (str(dt), str(terms)))
 
 
 
