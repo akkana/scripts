@@ -56,18 +56,18 @@ def prettyprint(soup):
 def clean_up_html(soup, remove_images=True):
     remove_empty_tags(soup)
 
-    for t in soup.findAll('font'):
+    for t in soup.find_all('font'):
         t.replaceWithChildren()
     for t in soup.find_all(class_=re.compile("^m_")):
         t.replaceWithChildren()
 
     if remove_images:
-        for t in soup.findAll("img"):
+        for t in soup.find_all("img"):
             t.extract()
 
     # Remove all inline style tags:
-    # for t in soup.findAll(lambda tag: 'style' in tag.attrs):
-    for t in soup.findAll(style=True):
+    # for t in soup.find_all(lambda tag: 'style' in tag.attrs):
+    for t in soup.find_all(style=True):
         del t["style"]
 
     return soup
