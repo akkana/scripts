@@ -114,6 +114,7 @@ def fix_agenda(agenda_infile):
 
     # Read the list of original filenames, in subdir orig.
     # with bad filename characters removed.
+    # We'll be modifying the list of origfiles, so can't loop over it.
     origfiles = []
     for fname in os.listdir("orig"):
         newfname = legalchars(fname)
@@ -122,6 +123,8 @@ def fix_agenda(agenda_infile):
             os.rename(os.path.join('orig', fname),
                       os.path.join('orig', newfname))
         origfiles.append(newfname)
+    # Now reset origfiles since some files might have been renamed
+    origfiles = os.listdir(origdir)
 
     # List of already existing html filenames, in subdir html.
     # We'll add to this list as files are converted to html.
@@ -133,9 +136,9 @@ def fix_agenda(agenda_infile):
     already_converted = []
     guesses = {}
 
-    # file bases that have something in the agenda linking to them,
-    # so they were either an exact or a fuzzy match.
-    # filebase: (agendaname, matchquality)
+    # Search through the agenda looking for italics that might be filenames
+    # with either an exact or a fuzzy match.
+    # matchedfiles will be { filebase: (agendaname, matchquality) }
     matchedfiles = {}
 
     for em in soup.find_all('em'):
@@ -461,5 +464,8 @@ def fix_agenda(agenda_infile):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) < 1:
+        print("Usage: fix_agenda orig/agenda-file")
+        sys.exit(1)
     fix_agenda(sys.argv[1])
 
