@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 
+"""Trying to define a class (FlexWindow),
+   inheriting from tk.Toplevel, that can be either a main window by itself,
+   or a secondary window popped up from an app that already has a main window.
+"""
+
 import tkinter as tk
+
 
 #
 # The main window doesn't inherit from tk.Toplevel:
@@ -23,36 +29,43 @@ class MainWindow():
 
     def popup_subwindow(self):
         if self.win2:
-            print("Calling SecondaryWindow.reshow()")
-            self.win2.reshow("Hi again!")
+            print("Calling FlexWindow.reshow()")
+            self.win2.reshow("Hello again -- I'm back!")
         else:
-            print("Creating a new window")
-            self.win2 = SecondaryWindow("Here's a new secondary window")
+            print("Creating a new FlexWindow")
+            self.win2 = FlexWindow("Here's a new secondary window")
+
+            # Redefine the wm close button so that it just hides
+            # the secondary window
+            self.win2.protocol("WM_DELETE_WINDOW", self.win2.hide)
 
 
-class SecondaryWindow(tk.Toplevel):
-    def __init__(self, message):
-        super().__init__()
-        frame = tk.Frame(self)
+class FlexWindow(tk.Toplevel):
+    def __init__(self, message, parent=None):
+        # Apparently the self is automatically passed when you call
+        # super().__init__()
+        # But alternately you could call it with the explicit class name,
+        # and in that case you do need to pass self:
+        tk.Toplevel.__init__(self)
+
+        frame = tk.Frame(self, parent)
         frame.pack()
+
         self.label = tk.Label(frame, text=message)
-        print("Set self.label to", self.label)
         self.label.pack()
         tk.Button(frame, text="Hide", command=self.hide).pack()
 
     def hide(self, event=None):
         # iconify makes an icon the windowmanager can show;
         # withdraw hides/unmaps the window without making an icon.
-        print("Withdrawing...")
+        print("Hiding by withdrawing...")
         self.withdraw()
-        print("self.label is now", self.label)
 
     def reshow(self, new_msg=None):
         print("Showing an old window again")
 
         if not new_msg:
-            new_msg = "I'm back"
-        print("self.label is", self.label)
+            new_msg = "Hi again"
         self.label.config(text=new_msg)
 
         # deiconify will show a window whether it was withdrawn or iconified
@@ -60,6 +73,11 @@ class SecondaryWindow(tk.Toplevel):
 
 
 if __name__ == '__main__':
-    mw = MainWindow()
-    mw.root.mainloop()
+    import sys
+    if len(sys.argv) > 1:
+        mw = FlexWindow("Now I'm primary, not secondary")
+        mw._root().mainloop()
+    else:
+        mw = MainWindow()
+        mw.root.mainloop()
 
