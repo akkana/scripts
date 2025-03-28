@@ -145,6 +145,32 @@ else:
     myfoo = None
 
 ########################################################
+# Using global variables from an import
+########################################################
+
+# This works:
+import stuff
+
+def main():
+    stuff.VERBOSE = True
+    stuff.do_stuff()
+
+# This doesn't:
+from stuff import VERBOSE, do_stuff
+
+def main2():
+    VERBOSE = True
+    do_stuff()
+
+'''
+<SnoopJ>  akk, when you do `from stuff import VERBOSE`, you create a new name in [whatever module you're in] called `VERBOSE` whose value is the same as `stuff.VERBOSE` *at import time*. But otherwise they are unrelated.
+<akk> SnoopJ: Ah, so it's set at import time to whatever stuff.VERBOSE was at that point, but it's just a copy local to the file?
+<SnoopJ>  akk, right, they are separate names
+<SnoopJ> `from somewhere import something` is almost like writing `import somewhere; something = somewhere.something; del somewhere`
+<SnoopJ> There's a great explanation of the broader mechanisms here: https://nedbatchelder.com/text/names1.html
+'''
+
+########################################################
 # Import of runtime-specified modules and functions
 ########################################################
 
@@ -159,6 +185,10 @@ val = getattr(themodule, functionname)()
 # the variable and doesn't see later changes.
 # If you want to see changes, you need to
 # import pytopo and have it be pytopo.user_agent.
+
+# Testing a single file in a submodule:
+python -m app.bills.nmlegisbill
+# The python -m is needed, and note .py has been dropped from the filename.
 
 
 ########################################################
@@ -377,7 +407,7 @@ for b in string_list:
 # https://regex-generator.olafneumann.org/
 # https://regex101.com/ (but doesn't allow pasting)
 
-# Difference between match and search:
+# re match vs search:
 # match matches only from the beginning of the string,
 # search will look anywhere in the string.
 
@@ -396,6 +426,9 @@ re.search('[0-9]+\..*[A-Z]+', teststr, flags=re.DOTALL)
 # re.MULTILINE controls whether ^ and $ match line beginnings
 # and ends in the pattern, but doesn't affect whether the
 # search can cross newlines.
+
+# Non-greedy, use ( ... ?)
+quoted = re.findall(r"'(.*?)'", buffer, re.DOTALL)
 
 # Grouping without capturing: use (?: ... ) e.g.
 re.match(r'''\s*([a-zA-Z]+)\s*(?:([a-zA-Z]+)\s*=\s*(.*))?''',
@@ -1515,6 +1548,35 @@ links = SoupStrainer('table', {'id': table_id})
 
 
 ########################################################
+# JSON
+########################################################
+
+# Ways around "Object of type datetime is not JSON serializable"
+
+# Easy quick fix: convert anything unknown to str
+json.dumps(my_dictionary, indent=4, sort_keys=True, default=str)
+
+# Better control: convert only what you want converted
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
+
+json.dumps(yourobj, default=json_serial)
+
+# Another way: subclass json.JSONEncoder
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+
+        return json.JSONEncoder.default(self, o)
+
+json.dumps(yourobj, cls=DateTimeEncoder)
+
+########################################################
 # Networking and Requests
 ########################################################
 
@@ -1654,7 +1716,7 @@ url = os.environ["REQUEST_URI"]
 
 
 ###########################################################
-# "for..else" in loops
+# else in loops, e.g. "for..else"
 ###########################################################
 
 """
@@ -1831,7 +1893,9 @@ for f in fcns:
     f()    # prints 0 1 2 3 4
 
 #
-# sorting + lambda examples
+# sorting + lambda key examples
+#
+# NOTE: max and min can also use key functions
 #
 # The cmp function is obsolete in py3. Instead, use a key function,
 # which is called on each element of the list prior to sorting,
