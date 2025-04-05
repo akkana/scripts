@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Debian apt search helper. Uses aptitude search first;
+# A Debian apt search helper. Uses aptitude search first;
 # if no results, calls apt-file search instead.
 
 # Misc aptitude notes:
@@ -79,9 +79,17 @@ else
     aptitude search "${argstr}" | egrep -v '( - $|:i386)'
 fi
 
-# If aptitude search found nothing, try apt-file search
+# If aptitude search found nothing, ask whether to try apt-file search
 if [ $? -ne 0 ]; then
-    echo "=== No packages found by that name. Looking for files:"
-    echo "apt-file search \"${argstr}\""
-    apt-file search "${argstr}"
+    echo
+    read -q "ans?No packages found by that name. Look for matching files? "
+    echo
+    case $ans in
+        [Yy]* )
+            echo "Looking for files:"
+            echo "apt-file search \"${argstr}\""
+            apt-file search "${argstr}"
+            ;;
+        * ) exit;;
+    esac
 fi
