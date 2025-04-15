@@ -97,6 +97,14 @@ GUITAR_STRINGS = [ "E2", "A2", "D3", "G3", "B3", "E4" ]
 #
 NOTE2STRING = {}    # will be filled by initialize()
 
+# The 4th and 5th in various keys
+PROGRESSIONS = {
+    'c': [ 'f', 'g' ],
+    'a': [ 'd', 'e' ],
+    'e': [ 'a', 'b' ],
+    'g': [ 'c', 'd' ],
+}
+
 
 # How slowly to "strum" a chord
 DELAY_BETWEEN_STRINGS = .06
@@ -238,8 +246,8 @@ def display_chord(chord):
                 # None of them are particularly satisfying:
                 # either they're too small, or they're big enough
                 # but print as two characters wide.
-                # fret = fret + " \u2588"
-                fret = fret + " \u25A0"
+                fret = fret + " \u2588"
+                # fret = fret + " \u25A0"
                 # fret = fret + " \u25CF"
             else:
                 fret = fret + " |"
@@ -386,6 +394,21 @@ def note_flashcard(allow_sharps=False, just_strings=False):
         time.sleep(1)
 
 
+def test_chord_progressions():
+    keys = list(PROGRESSIONS.keys())
+    print("Input the fourth and fifth for each key:")
+    while True:
+        key = random.choice(keys)
+        print("%s: " % key, end='')
+        sys.stdout.flush()
+        chords = re.split(r'[\s,]+', input())
+        chords = [ c.lower() for c in chords ]
+        if chords == PROGRESSIONS[key]:
+            print("Correct!")
+        else:
+            print("Sorry, no, it's %s" % ' '.join(PROGRESSIONS[key]))
+
+
 def random_c_song(num_chords=None, delaysec=2, structure=None):
     """Play/print random chords chosen from the key of C:
        C Dm Em F G Am
@@ -485,6 +508,8 @@ if __name__ == '__main__':
                         help="Test the user on knowledge of chords")
     parser.add_argument('-n', "--note_test", action="store_true",
                         help="Test the user on knowledge of individual notes")
+    parser.add_argument('-p', "--progressions", action="store_true",
+                        help="Test the user on chord progressions")
     parser.add_argument('-C', "--use-chords", default=None, action="store",
                         help="chords to use, comma or space separated "
                         "you can also specify them in "
@@ -511,11 +536,17 @@ if __name__ == '__main__':
     Volume = args.volume
 
     if not args.chord_test and not args.note_test and not args.csong \
-       and not args.show_chords:
+       and not args.show_chords and not args.progressions:
         parser.print_help()
         sys.exit(1)
 
     initialize()
+
+    if args.progressions:
+        try:
+            test_chord_progressions()
+        except KeyboardInterrupt:
+            sys.exit(0)
 
     # Get a list of chords to use, otherwise, show just beginner chords
     if args.use_chords:
