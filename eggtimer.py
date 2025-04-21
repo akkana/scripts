@@ -42,7 +42,7 @@ def keyEvent(event):
 
 def showAlert(message:str):
     # Try to beep a bit, even though that doesn't work on some distros:
-    print("")
+    # print("")
 
     root = tkinter.Tk()
 
@@ -135,7 +135,7 @@ def handle_wakeup(signal, frame):
                                     time.localtime(time.time() + timeleft))
 
             if data == b"STATUS":
-                print("checking status")
+                # print("checking status")
                 conn.sendall(f"In {user_timestr(timeleft)} (at {endtime}): "
                              f"{message} (PID {os.getpid()})".encode())
 
