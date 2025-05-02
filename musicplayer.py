@@ -116,6 +116,7 @@ class MusicWin(Gtk.Window):
         self.noplayfile = None
 
         self.playlist = None
+        self.playlistfile = None
 
         # If no songs or playlists specified, look for favorites.m3u.
         if not init_songs:
@@ -591,8 +592,7 @@ using a no-play file or a single playlist""")
             del self.songs[self.song_ptr]
             self.song_ptr = (self.song_ptr - 1) % len(self.songs)
 
-            if self.playlistfile:
-                self.save_playlist()
+            self.save_playlist()
 
             if from_disk:
                 os.remove(cur_song)
@@ -603,7 +603,7 @@ using a no-play file or a single playlist""")
     def save_playlist(self):
         """Save the current playlist."""
         if not self.playlistfile:
-            print("No playlist to save to!")
+            # print("No playlist to save to!")
             return
 
         if not os.path.exists(self.configdir):
