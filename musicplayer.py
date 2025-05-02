@@ -805,7 +805,7 @@ if __name__ == '__main__':
             print("Usage: %s [-s|--shuffle] [-S|--sequential] [-b|--backward]" % os.path.basename(sys.argv[0]))
             sys.exit(0)
 
-        if args[0] == '-r' or args[0] == 's' or args[0] == '--shuffle':
+        if args[0] == '-r' or args[0] == '-s' or args[0] == '--shuffle':
             shuffle = True
             args = args[1:]
 
