@@ -18,7 +18,7 @@
 # I'm happy to take patches or bug reports if you use it on other
 # Android devices, and I'd love to hear where it does and doesn't work.
 #
-# Copyright 2017,2018 by Akkana; share and enjoy under the GPL v2 or later.
+# Copyright 2017-2025 by Akkana; share and enjoy under the GPL v2 or later.
 
 # XXX TO DO: Fix detection of empty directories and call rmdir.
 
@@ -561,12 +561,16 @@ def sync(src, dst, dryrun=True):
 
         if idst >= len(dst_ls):
             # No more dst files, but there are still src files to copy.
+            if VERBOSE:
+                print("no more dst files, appending", rc_ls[isrc][0])
             updates.append(src_ls[isrc][0])
             isrc += 1
             continue
 
         if src_ls[isrc][0] < dst_ls[idst][0]:
             # The file exists on the src but not the dst. Need to copy.
+            if VERBOSE:
+                print(src_ls[isrc][0], "exists on src but not dst")
             updates.append(src_ls[isrc][0])
             isrc += 1
             continue
@@ -589,6 +593,9 @@ def sync(src, dst, dryrun=True):
             # The file exists on both src and dst
             if src_ls[isrc][1] != dst_ls[idst][1]:
                 # the files have different sizes, need to sync.
+                if VERBOSE:
+                    print(src_ls[isrc], "and", dst_ls[idst],
+                          "have different sizes; updating")
                 updates.append(src_ls[isrc][0])
             isrc += 1
             idst += 1
@@ -841,36 +848,41 @@ def main():
 
         sys.exit(0)
 
-    if args.sync:
-        sync(expandpath(args.paths[0], pathdict),
-             expandpath(args.paths[1], pathdict),
-             dryrun=args.dryrun)
-        return
+    try:
+        if args.sync:
+            sync(expandpath(args.paths[0], pathdict),
+                 expandpath(args.paths[1], pathdict),
+                 dryrun=args.dryrun)
+            return
 
-    for path in (args.paths):
-        path = expandpath(path, pathdict)
-        if not path:
-            print(Usage())
-            sys.exit(0)
-        print("\n%s :" % path)
-        files, dirs = list_dir(path, sizes=(not args.nosize),
-                               recursive=args.recursive)
+        for path in (args.paths):
+            path = expandpath(path, pathdict)
+            if not path:
+                print(Usage())
+                sys.exit(0)
+            print("\n%s :" % path)
+            files, dirs = list_dir(path, sizes=(not args.nosize),
+                                   recursive=args.recursive)
 
-        if dirs and not args.recursive:
-            print("Directories:")
-            for d in dirs:
-                print("  ", d)
-            print()
-            print("Files:")
+            if dirs and not args.recursive:
+                print("Directories:")
+                for d in dirs:
+                    print("  ", d)
+                print()
+                print("Files:")
 
-        if not args.nosize:
-            for f in files:
-                if f[1] < 500:
-                    print("%d\t%s" % (f[1], f[0]))
-                else:
-                    print("%dk\t%s" % (int((f[1]+500)/1000), f[0]))
-        else:
-            print("%s: %s" % (path, ', '.join(files)))
+            if not args.nosize:
+                for f in files:
+                    if f[1] < 500:
+                        print("%d\t%s" % (f[1], f[0]))
+                    else:
+                        print("%dk\t%s" % (int((f[1]+500)/1000), f[0]))
+            else:
+                print("%s: %s" % (path, ', '.join(files)))
+
+    except KeyboardInterrupt:
+        print("Interrupt")
+
 
 if __name__ == "__main__":
     try:
