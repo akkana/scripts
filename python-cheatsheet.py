@@ -707,6 +707,9 @@ def walkfiles(rootdir):
         for f in files:
             print(os.path.join(root, f))
 
+# Depth-first, so it's possible to rename directories:
+os.walk(root, topdown=False)
+
 # os.walk is handy, but it doesn't allow any type of sorting.
 # So here's a rewritten os.walk that sorts alphabetically.
 def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
@@ -1855,6 +1858,23 @@ with open("access-log") as wwwlog:
 ########################################################
 
 #
+# Lambda in a loop needs intermediate variables
+# (this comes up especially in TkInter programs, like populating menus)
+# https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+#
+fcns = []
+for i in range(5):
+    fcns.append(lambda: print(i))
+for f in fcns:
+    f()    # prints 4 five times
+# Instead, you need to make a lambda with its own intermediate variable:
+fcns = []
+for i in range(5):
+    fcns.append(lambda x=i: print(x))
+for f in fcns:
+    f()    # prints 0 1 2 3 4
+
+#
 # map + lambda example
 #
 def helloall(names):
@@ -1875,22 +1895,6 @@ def only_even(numbers):
 #
 def roundall(numbers):
     return map(int, map(round, numbers))
-
-#
-# Lambda in a loop needs intermediate variables
-# https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
-#
-fcns = []
-for i in range(5):
-    fcns.append(lambda: print(i))
-for f in fcns:
-    f()    # prints 4 five times
-# Instead, you need to make a lambda with its own intermediate variable:
-fcns = []
-for i in range(5):
-    fcns.append(lambda x=i: print(x))
-for f in fcns:
-    f()    # prints 0 1 2 3 4
 
 #
 # sorting + lambda key examples
