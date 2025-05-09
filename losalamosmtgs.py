@@ -55,6 +55,16 @@ AGENDA_ITEM_STORE = os.path.join(RSS_DIR, "AgendaItems")
 # Legal Notices published on the paper of record, the LA Daily Post
 LEGALURL = 'https://ladailypost.com/legal-notices/'
 
+# If you set ARCHIVEDIR, all meeting HTML will be archived there
+# letting you grep in past meetings
+ARCHIVEDIR = "Archive"
+
+# Only clean up certain extensions:
+rmexts = [ '.json', '.rss', '.html', '.pdf' ]
+
+# Only archive certain extensions:
+archiveexts = [ '.json', '.html' ]
+
 
 ######## END CONFIGURATION ############
 
@@ -1406,9 +1416,8 @@ but have no agenda yet""" % no_agenda_file, file=htmlfp)
     print("Wrote", outrssfilename, "and", outhtmlfilename)
 
     # Remove obsolete files for meetings no longer listed.
+    # Or archive them, if ARCHIVEDIR exists.
     for f in os.listdir(RSS_DIR):
-        # Only clean up certain extensions:
-        rmexts = [ '.json', '.rss', '.html', '.pdf' ]
         name, ext = os.path.splitext(f)
         if ext not in rmexts:
             continue
@@ -1423,8 +1432,15 @@ but have no agenda yet""" % no_agenda_file, file=htmlfp)
             return False
 
         if not is_active(f):
-            print("removing", f)
-            os.unlink(os.path.join(RSS_DIR, f))
+            if (ARCHIVEDIR and
+                os.path.exists(os.path.join(RSS_DIR, ARCHIVEDIR)) and
+                ext in archiveexts):
+                print("Archiving", f)
+                os.rename(os.path.join(RSS_DIR, f),
+                          os.path.join(RSS_DIR, ARCHIVEDIR, f))
+            else:
+                print("removing", f)
+                os.unlink(os.path.join(RSS_DIR, f))
 
 
 def write_meeting_records_file():
@@ -1658,9 +1674,9 @@ def check_legal_notices():
             # Compare links if possible. If not, compare the full HTML entry.
             if 'link' in article and 'link' in old_article:
                 if article['link'] == old_article['link']:
-                    if Verbose:
-                        print("Old article:", old_article['date'],
-                              ":", article['title'])
+                    # if Verbose:
+                    #     print("Old article:", old_article['date'],
+                    #           ":", article['title'])
                     article['date'] = old_article['date']
                     break
             elif article['html'] == old_article['html']:
@@ -1686,6 +1702,7 @@ def check_legal_notices():
         return
 
     # There's new material.
+    new_articles = 0
 
     # Sort by date, reversed, so newer items are first.
     articles.sort(key=lambda x: x['date'], reverse=True)
@@ -1753,7 +1770,7 @@ def check_legal_notices():
         print("</channel>\n</rss>", file=rssfp)
         print("</body>\n</html>", file=htmlfp)
 
-    print("Updated legal notices")
+    print("Updated legal notices with", len(articles), "articles")
 
 
 if __name__ == '__main__':
