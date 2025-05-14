@@ -277,6 +277,10 @@ htmlmail.py:
 icalview.py:
     Interpret an .ics calendar attachment, including timezones.
 
+id3tag.py:
+    Fetch metadata for MP3 files from musicbrainzngs and update
+    the ID3 tags in an album directory.
+
 intel_backlight.py:
     Tiny script to adjust the backlight on an Intel-based laptop
     that uses /sys/class/backlight/intel_backlight.
