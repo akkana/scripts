@@ -62,12 +62,14 @@ GUITAR_CHORDS = {
     # 7s
     "Fmaj7": "xx3210",
     "Fmaj7C": "x33210",
-    "B7": "o212o2",
+    "B7": "x212o2",
     "D7": "'xxo212",
+    "Dmaj7": "xxo222",
     "G7": "32ooo1",
     "B7": "o212o1",
     "E7": "o2o1oo",
     "A7": "xo2o2o",
+    "C7": "x32310",
 
     # 6
     "F6": "13o2xx",
@@ -76,7 +78,6 @@ GUITAR_CHORDS = {
     "F": "133211",
     "miniF": "xx3211",
     "F#m": "244222",
-    "F#m": "244222"
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
@@ -218,6 +219,7 @@ def display_note(note):
 
 def display_chord(chord):
     """Given a chord name like 'A2', print a tablature for it.
+       Or you can give fret notation like 'xx0232'.
     """
     if len(chord) == 6:
         fretNotation = chord
@@ -516,7 +518,7 @@ if __name__ == '__main__':
                         "GUITARFLASH env variable or "
                         "XDG_CONFIG_HOME/guitarflash/*.conf")
     parser.add_argument('-s', "--show-chords", default=False,
-                        action="store_true",
+                        action="store",
                         help="Just print the chord charts, no flashcards")
     parser.add_argument('-m', "--bpm", "--metronome",
                         action="store", default=0, dest="bpm", type=int,
@@ -532,12 +534,16 @@ if __name__ == '__main__':
     parser.add_argument("--struct", action="store", default="",
                         help="Structure of the song to be composed, e.g. AABAB")
 
-    args = parser.parse_args(sys.argv[1:])
+    # args = parser.parse_args(sys.argv[1:])
+    args, rest = parser.parse_known_args(sys.argv)
     Volume = args.volume
+
+    # print("args:", args, "rest:", rest)
 
     if not args.chord_test and not args.note_test and not args.csong \
        and not args.show_chords and not args.progressions:
         parser.print_help()
+        print("this clause")
         sys.exit(1)
 
     initialize()
@@ -551,6 +557,12 @@ if __name__ == '__main__':
     # Get a list of chords to use, otherwise, show just beginner chords
     if args.use_chords:
         chords = re.split(r"\s+|,", args.use_chords)
+        for ch in rest:
+            chords.append(ch)
+    elif args.show_chords:
+        chords = re.split(r"\s+|,", args.show_chords)
+        for ch in rest:
+            chords.append(ch)
     else:
         chords = read_config()
 
@@ -563,7 +575,9 @@ if __name__ == '__main__':
 
     # Just showing, no flashcard test?
     if args.show_chords:
+        print("Showing chords")
         for chord in chords:
+            print("chord:", chord)
             display_chord(chord)
         sys.exit(0)
 
