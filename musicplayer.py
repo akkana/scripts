@@ -650,7 +650,7 @@ using a no-play file or a single playlist""")
         except:
             id3info = {}
 
-        # The keys in mutagen.ID3 don't seem to be documented anywhere!
+        # The keys in mutagen.ID3 don't seem to be documented anywhere.
         # This is empirical and will probably break at some point.
 
         try:
