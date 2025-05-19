@@ -48,6 +48,11 @@ GUITAR_CHORDS = {
     "Em": "022000",
     "G2": "320033",
 
+    "B": "x24442",
+    "F": "133211",
+    "miniF": "xx3211",
+    "F#m": "244222",
+
     # "stuck 3-4 chords:
     "bigG": "32oo22",
     "rockG": "3xoo33",
@@ -62,22 +67,17 @@ GUITAR_CHORDS = {
     # 7s
     "Fmaj7": "xx3210",
     "Fmaj7C": "x33210",
-    "B7": "x212o2",
-    "D7": "'xxo212",
-    "Dmaj7": "xxo222",
-    "G7": "32ooo1",
-    "B7": "o212o1",
-    "E7": "o2o1oo",
-    "A7": "xo2o2o",
+    "B7": "x21202",
+    "D7": "'xx0212",
+    "Dmaj7": "xx0222",
+    "G7": "320001",
+    "B7": "021202",
+    "E7": "020100",
+    "A7": "x02020",
     "C7": "x32310",
 
     # 6
     "F6": "13o2xx",
-
-    "B": "x24442",
-    "F": "133211",
-    "miniF": "xx3211",
-    "F#m": "244222",
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
