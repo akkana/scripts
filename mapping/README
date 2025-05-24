@@ -17,6 +17,10 @@ demraytrace.py:
     demproj.py is similar but pointless, making lots of smaller
     povray projections that you can stitch together.
 
+district_population.py:
+    Use geopandas to intersect US Census 2020 decadal population numbers
+    with a shapefile of districts, like school districts.
+
 firedata.py:
     Track progress of a wildfire. Download MODIS and VIIRS hotspot data
     plus perimeter data, and massage it into something pytopo can show.
