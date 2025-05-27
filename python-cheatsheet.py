@@ -562,7 +562,7 @@ def first(s):
     return next(iter(s))
 
 # get first or next item in an iterator:
-python3: next(iter)
+next(iter)
 
 # Get the next item in the middle of a loop:
 listiter = iter(mylist)
@@ -762,13 +762,11 @@ def pathwalk(top, topdown=True, onerror=None, followlinks=False, sortfn=None):
 ########################################################
 # Command-line Argument parsing
 ########################################################
-# #python recommends click first (not installed by default),
-# then argparse, over optparse.
-
-import argparse
 
 def parse_args():
     """Parse commandline arguments."""
+    import argparse
+
     parser = argparse.ArgumentParser(description="Do some stuff")
 
     # Boolean flag (don't use type=bool, gives a TypeError)
@@ -2386,9 +2384,44 @@ ax.tick_params(which='major', length=10, labelrotation=45, color='b')
 # But if I ever manage to get it doing anything useful,
 # I'll put that here.
 
+# number of rows and columns:
+df.shape
+
 # View a specific row of a dataframe. Accepts slices, or : to include all.
 # https://realpython.com/pandas-dataframe/#accessing-and-modifying-data
 df.loc[11]
+
+# print an entire dataframe, or column or whatever, without truncation.
+# OPTION 1:
+print(df.to_string())    # not recommended for huge datasets
+
+# Extract every other row: use iloc
+alt_rows = df.iloc[::2]
+
+# OPTION 2:
+with pd.option_context('display.max_rows', None,
+                       'display.max_columns', None,
+                       'display.precision', 3):
+    print(df)
+
+# OPTION 3:
+# Permanently changes the pandas settings
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', -1)
+
+# All dataframes hereafter reflect these changes.
+display(df)
+
+print('**RESET_OPTIONS**')
+
+# Resets the options
+pd.reset_option('all')
+
+# OPTION 4: requires dependency 'tabulate'
+print(df.to_markdown())
+
 
 # Plot a time series of some random subset of a dataframe.
 # I don't know why it doesn't plot the whole df,
