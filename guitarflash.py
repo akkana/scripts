@@ -35,24 +35,6 @@ BEGINNER_CHORDS = "D A E"
 REPEAT_PLAY = 2
 
 
-# Chord groups that might need to be practiced at various levels
-CHORD_GROUPS = {
-    "beginner1": [ "D", "A", "E", "G" ],
-    "beginner": [ "D", "A", "E", "G", "C", "Am", "Dm" ],
-    "stuck34": [ "bigG", "rockG", "Cadd9", "Dsus4", "A7sus4",
-                 # "Emin7", "Dadd11", "F69"
-               ],
-    "sus": [ "Dsus2", "Dsus4", "Asus2", "Asus4", "A7sus4", "Esus2", "Esus4" ],
-    "7": [ "G7", "B7", "E7", "A7", "C7",
-           # "Fmaj7", "D7", "Dmaj7"
-         ],
-    "slash": [ "G/B", "G6/B", "D/F#", "G/F#", "C/G", "C/E", "C/B",
-               "Cadd2/B", "A/E", "D/A", "F/A",
-               # "A/C#", "Am7/G", "G/F", "Am/F#",
-             ]
-}
-
-
 # A Python Dictionary matching chord names with "fret notation"
 GUITAR_CHORDS = {
     "D": "xx0232",
@@ -123,6 +105,25 @@ GUITAR_CHORDS = {
     # "G/F": "1x0033",
     # "Am/F#": "2x2210",
 }
+
+
+# Chord groups that might need to be practiced at various levels
+CHORD_GROUPS = {
+    "beginner1": [ "D", "A", "E", "G" ],
+    "beginner": [ "D", "A", "E", "G", "C", "Am", "Dm" ],
+    "stuck34": [ "bigG", "rockG", "Cadd9", "Dsus4", "A7sus4",
+                 # "Emin7", "Dadd11", "F69"
+               ],
+    "sus": [ "Dsus2", "Dsus4", "Asus2", "Asus4", "A7sus4", "Esus2", "Esus4" ],
+    "7": [ "G7", "B7", "E7", "A7", "C7",
+           # "Fmaj7", "D7", "Dmaj7"
+         ],
+    "slash": [ "G/B", "G6/B", "D/F#", "G/F#", "C/G", "C/E", "C/B",
+               "Cadd2/B", "A/E", "D/A", "F/A",
+               # "A/C#", "Am7/G", "G/F", "Am/F#",
+             ]
+}
+
 
 # Notes must start with C: in sox, A2 is higher than C2
 # so a scale goes C2, D2 ... G2, A2, B2, C2, D3 ...
@@ -261,9 +262,9 @@ def display_note(note):
         print(line)
 
 
-def display_chord(chord):
-    """Given a chord name like 'A2', print a tablature for it.
-       Or you can give fret notation like 'xx0232'.
+def chord_to_string(chord):
+    """Given a chord name like 'Am', return a string showing a tablature for it.
+       Can also expand fret notation like 'xx0232'.
     """
     if len(chord) == 6:
         fretNotation = chord
@@ -277,14 +278,14 @@ def display_chord(chord):
             print("Don't know the", chord, "chord", file=sys.stderr)
             return
 
-    print("  " + chord)
+    retstr = f"  {chord}\n"
     nut = ""
     for string in fretNotation:
         if string == "x":
             nut = nut + " x"  # x means don't play this string
         else:
             nut = nut + " _"
-    print(nut)
+    retstr += "%s\n" % nut
 
     for fretNumber in range(1, 5):
         fret = ""
@@ -300,7 +301,39 @@ def display_chord(chord):
                 # fret = fret + " \u25CF"
             else:
                 fret = fret + " |"
-        print(fret)
+        retstr += '%s\n' % fret
+
+    return retstr
+
+def display_chord(chord):
+    print(chord_to_string(chord))
+
+
+CHORDS_PER_LINE = 5
+INTERCHORD_SPACE = 4
+
+def display_chords_compactly(chords):
+    chordlines = []
+    for i, chord in enumerate(chords):
+        if i % CHORDS_PER_LINE == 0:
+            if chordlines:
+                print('\n'.join(chordlines))
+            chordlines = []
+        fretting = chord_to_string(chord)
+        if not chordlines:
+            chordlines = fretting.splitlines()
+            continue
+
+        # What's the longest chordline? Make a format string
+        width = max([len(s) for s in chordlines]) + INTERCHORD_SPACE
+        fmt = f'%-{width}s%s'
+
+        # Put the new fretting to the right of the current chordline
+        for i, line in enumerate(fretting.splitlines()):
+             chordlines[i]= fmt % (chordlines[i], line)
+
+    if chordlines:
+        print('\n'.join(chordlines))
 
 
 def play_chord(chordname):
@@ -616,7 +649,6 @@ if __name__ == '__main__':
         for ch in rest:
             chords.append(ch)
     elif args.show_chords:
-        print("args.show_chords =", args.show_chords)
         chords = re.split(r"\s+|,", args.show_chords)
         for ch in rest:
             chords.append(ch)
@@ -632,9 +664,7 @@ if __name__ == '__main__':
 
     # Just showing, no flashcard test?
     if args.show_chords:
-        for chord in chords:
-            print()
-            display_chord(chord)
+        display_chords_compactly(chords)
         sys.exit(0)
 
     if args.bpm:
