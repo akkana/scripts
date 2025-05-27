@@ -35,18 +35,34 @@ BEGINNER_CHORDS = "D A E"
 REPEAT_PLAY = 2
 
 
+# Chord groups that might need to be practiced at various levels
+CHORD_GROUPS = {
+    "beginner1": [ "D", "A", "E", "G" ],
+    "beginner": [ "D", "A", "E", "G", "C", "Am", "Dm" ],
+    "stuck34": [ "bigG", "rockG", "Cadd9", "Dsus4", "A7sus4",
+                 # "Emin7", "Dadd11", "F69"
+               ],
+    "sus": [ "Dsus2", "Dsus4", "Asus2", "Asus4", "A7sus4", "Esus2", "Esus4" ],
+    "7": [ "G7", "B7", "E7", "A7", "C7",
+           # "Fmaj7", "D7", "Dmaj7"
+         ],
+    "slash": [ "G/B", "G6/B", "D/F#", "G/F#", "C/G", "C/E", "C/B",
+               "Cadd2/B", "A/E", "D/A", "F/A",
+               # "A/C#", "Am7/G", "G/F", "Am/F#",
+             ]
+}
+
+
 # A Python Dictionary matching chord names with "fret notation"
 GUITAR_CHORDS = {
     "D": "xx0232",
     "A": "x02220",
     "E": "022100",
-    "G": "320003",
+    "G": [ "320003", "320033"],
     "C": "x32010",
-    "F": "x3321x",
     "Am": "x02210",
     "Dm": "xx0231",
     "Em": "022000",
-    "G2": "320033",
 
     "B": "x24442",
     "F": "133211",
@@ -56,28 +72,56 @@ GUITAR_CHORDS = {
     # "stuck 3-4 chords:
     "bigG": "32oo22",
     "rockG": "3xoo33",
-    "Cadd9": "x32o33",
-    # "Cadd9": "x32o3o",
-    "Dsus4": "xxo233",
-    "A7sus4": "xo2233",
+    "Cadd9": [ "x32o33", "x32o3o" ],
+    # A7sus4 and Dsus4 are in here too
     "Emin7": "022033",
     "Dadd11": "2xo233",
     "F69": "xx3233",
 
+    # "sus" chords
+    "Dsus2": "xx0230",
+    "Dsus4": "xx0233",
+    "Asus2": "x02200",
+    "Asus4": "x02230",
+    "A7sus4": "xo2233",
+    "Esus2": "024400",
+    "Esus4": "022200",
+
+    # barre chords
+    "F": "x3321x",
+
     # 7s
-    "Fmaj7": "xx3210",
-    "Fmaj7C": "x33210",
+    "Fmaj7": [ "xx3210", "x33210" ],
     "B7": "x21202",
     "D7": "'xx0212",
     "Dmaj7": "xx0222",
     "G7": "320001",
-    "B7": "021202",
+    "B7": [ "020100", "022130", "021202" ],
     "E7": "020100",
-    "A7": "x02020",
+    "A7": [ "x02020", "x02223" ],
     "C7": "x32310",
 
     # 6
     "F6": "13o2xx",
+
+    # "Slash" chords
+    "G/B": [ "x20033", "x20003" ],
+    "G6/B": "x20030",
+    "D/F#": [ "200232", "2x023x" ],
+    "G/F#": "2x0033",
+    "C/G": [ "332010", "3x2010" ],
+    "C/E": [ "032010", "xx2010" ],
+    "C/B": "x22010",
+    "Cadd2/B": "x20010",
+    "A/E": "0x2220",
+    "D/A": "x00232",
+    "F/A": "x03211",
+
+    #  Harder slash chords
+    # "A/C#": "x4222x",
+    # "Am7/G": "3x2010",
+    # "G/F": "1x0033",
+    # "Am/F#": "2x2210",
 }
 
 # Notes must start with C: in sox, A2 is higher than C2
@@ -226,6 +270,9 @@ def display_chord(chord):
     else:
         try:
             fretNotation = GUITAR_CHORDS[chord]
+            # If there are multiple fingerings, display the first one
+            if type(fretNotation) is list:
+                fretNotation = fretNotation[0]
         except KeyError:
             print("Don't know the", chord, "chord", file=sys.stderr)
             return
@@ -262,7 +309,10 @@ def play_chord(chordname):
     args = [ "play", "-nq", "-t", "alsa", "synth" ]
     # pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
     #      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
-    chordnotes = chord_to_notes(GUITAR_CHORDS[chordname])
+    if type(GUITAR_CHORDS[chordname]) is list:
+        chordnotes = chord_to_notes(GUITAR_CHORDS[chordname][0])
+    else:
+        chordnotes = chord_to_notes(GUITAR_CHORDS[chordname])
     for note in chordnotes:
         args.append("pl")
         args.append(note)
@@ -321,13 +371,21 @@ def stop_metronome():
     Metroproc = None
 
 
-def sanity_check(chords):
-    """Do all the indicated chords actually exist?"""
+def sanity_check_chords(chords):
+    """Do all the indicated chords actually exist?
+       Also expand shorthand like "beginner" or "7".
+    """
+    # goodchords is a list, not a set. That means you can specify a chord
+    # multiple times if you want its flashcard to come up more often.
     goodchords = []
     badchords = set()
     for c in chords:
         if c in GUITAR_CHORDS:
             goodchords.append(c)
+        elif c in CHORD_GROUPS:
+            expandchords = sanity_check_chords(CHORD_GROUPS[c])
+            for e in expandchords:
+                goodchords.append(e)
         # Also accept specifiers like 020200
         elif len(c) == 6:
             goodchords.append(c)
@@ -534,17 +592,15 @@ if __name__ == '__main__':
     parser.add_argument("--struct", action="store", default="",
                         help="Structure of the song to be composed, e.g. AABAB")
 
-    # args = parser.parse_args(sys.argv[1:])
-    args, rest = parser.parse_known_args(sys.argv)
+    args, rest = parser.parse_known_args(sys.argv[1:])
     Volume = args.volume
 
     # print("args:", args, "rest:", rest)
 
     if not args.chord_test and not args.note_test and not args.csong \
        and not args.show_chords and not args.progressions:
-        parser.print_help()
-        print("this clause")
-        sys.exit(1)
+        # args.show_chords = ' '.join(rest)
+        print("No command specified: defaulting to showing chords")
 
     initialize()
 
@@ -560,13 +616,14 @@ if __name__ == '__main__':
         for ch in rest:
             chords.append(ch)
     elif args.show_chords:
+        print("args.show_chords =", args.show_chords)
         chords = re.split(r"\s+|,", args.show_chords)
         for ch in rest:
             chords.append(ch)
     else:
         chords = read_config()
 
-    chords = sanity_check(chords)
+    chords = sanity_check_chords(chords)
 
     if args.csong:
         random_c_song(num_chords=4, delaysec=2, structure=args.struct)
@@ -575,9 +632,8 @@ if __name__ == '__main__':
 
     # Just showing, no flashcard test?
     if args.show_chords:
-        print("Showing chords")
         for chord in chords:
-            print("chord:", chord)
+            print()
             display_chord(chord)
         sys.exit(0)
 
