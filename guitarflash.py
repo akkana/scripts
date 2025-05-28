@@ -26,11 +26,6 @@ except:
     print("pyfiglet isn't available: can't draw big chord names")
 
 
-# If there's no GUITARFLASH env variable or ~/.config/guitarflash.conf,
-# show only these chords (space separated):
-BEGINNER_CHORDS = "D A E"
-
-
 # How many times to repeat each note or chord that's played
 REPEAT_PLAY = 2
 
@@ -98,6 +93,8 @@ GUITAR_CHORDS = {
     "A/E": "0x2220",
     "D/A": "x00232",
     "F/A": "x03211",
+    "F/G": "3x321x",   # Can move this one up and down the neck
+    "A11/E": "000000",
 
     #  Harder slash chords
     # "A/C#": "x4222x",
@@ -237,8 +234,8 @@ def display_note(note):
     """Use NOTE2STRING to display notes as tablature
     """
     stringno, fret = NOTE2STRING[note]
-    print("string", stringno+1, "fret", fret)
-#
+    # print("string", stringno+1, "fret", fret)
+
     line = ''
     for stringNo in range(6):
         if stringno == stringNo and fret == 0:
@@ -246,7 +243,7 @@ def display_note(note):
         else:
             line += ' -'
     print(line)
-#
+
     if fret > 5:
         maxfret = fret
     else:
@@ -313,6 +310,7 @@ CHORDS_PER_LINE = 5
 INTERCHORD_SPACE = 4
 
 def display_chords_compactly(chords):
+    # print("Displaying chords:", chords)
     chordlines = []
     for i, chord in enumerate(chords):
         if i % CHORDS_PER_LINE == 0:
@@ -408,6 +406,7 @@ def sanity_check_chords(chords):
     """Do all the indicated chords actually exist?
        Also expand shorthand like "beginner" or "7".
     """
+    # print("Sanity checking chords:", chords)
     # goodchords is a list, not a set. That means you can specify a chord
     # multiple times if you want its flashcard to come up more often.
     goodchords = []
@@ -428,10 +427,6 @@ def sanity_check_chords(chords):
     if badchords:
         print("Ignoring unsupported chords", ' '.join(badchords))
 
-    if not goodchords:
-        print("No chords left; defaulting to beginner chords")
-        return BEGINNER_CHORDS,
-
     return goodchords
 
 
@@ -443,7 +438,7 @@ def bigtext(s):
 
 lastchord = None
 
-def chord_flashcard(chords=BEGINNER_CHORDS, metronome=None):
+def chord_flashcard(chords, metronome=None):
     """Run one chord flashcard"""
 
     global lastchord
@@ -563,7 +558,8 @@ def random_c_song(num_chords=None, delaysec=2, structure=None):
 def read_config():
     """Look for GUITARFLASH env variable or ~/.config/guitarflash/*.conf
        for a list of chords to show.
-       Return a list of chord name strings, defaulting to BEGINNER_CHORDS.
+       Return a list of chord name strings,
+       defaulting to CHORD_GROUPS['beginner'].
        Chords are not unique; if a chord name repeats, it will be shown more.
        Suggested conf file name is $XDG_CONFIG_HOME/guitarflash/guitarflash.conf
        but you can have multiple files; everything matching
@@ -590,7 +586,7 @@ def read_config():
         print(e)
         pass
 
-    return BEGINNER_CHORDS
+    return CHORD_GROUPS['beginner']
 
 
 if __name__ == '__main__':
@@ -609,7 +605,7 @@ if __name__ == '__main__':
                         "GUITARFLASH env variable or "
                         "XDG_CONFIG_HOME/guitarflash/*.conf")
     parser.add_argument('-s', "--show-chords", default=False,
-                        action="store",
+                        action="store", nargs='?',
                         help="Just print the chord charts, no flashcards")
     parser.add_argument('-m', "--bpm", "--metronome",
                         action="store", default=0, dest="bpm", type=int,
@@ -632,7 +628,7 @@ if __name__ == '__main__':
 
     if not args.chord_test and not args.note_test and not args.csong \
        and not args.show_chords and not args.progressions:
-        # args.show_chords = ' '.join(rest)
+        args.show_chords = True
         print("No command specified: defaulting to showing chords")
 
     initialize()
@@ -649,13 +645,23 @@ if __name__ == '__main__':
         for ch in rest:
             chords.append(ch)
     elif args.show_chords:
-        chords = re.split(r"\s+|,", args.show_chords)
+        if args.show_chords != True:
+            chords = re.split(r"\s+|,", args.show_chords)
+        else:
+            chords = []
         for ch in rest:
             chords.append(ch)
     else:
         chords = read_config()
 
     chords = sanity_check_chords(chords)
+
+    if not chords:
+        if args.use_chords or args.show_chords or rest:
+            print("No known chords specified")
+            sys.exit(1)
+        print("No known chords specified; defaulting to beginner chords")
+        chords = CHORD_GROUPS['beginner']
 
     if args.csong:
         random_c_song(num_chords=4, delaysec=2, structure=args.struct)
