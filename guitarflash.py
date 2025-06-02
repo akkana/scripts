@@ -66,6 +66,8 @@ GUITAR_CHORDS = {
 
     # barre chords
     "F": "x3321x",
+    "Bm": "x24432",
+    "Bsus2": "x24422",
 
     # 7s
     "Fmaj7": [ "xx3210", "x33210" ],
