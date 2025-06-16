@@ -261,35 +261,46 @@ def display_note(note):
         print(line)
 
 
+LEGAL_FRET_CHARS = 'oO0xX0123456789-'
+
+def is_fret_notation(ch):
+    if len(ch) != 6:
+        return False
+    for c in ch:
+        if c not in LEGAL_FRET_CHARS:
+            return False
+    return True
+
+
 def chord_to_string(chord):
     """Given a chord name like 'Am', return a string showing a tablature for it.
        Can also expand fret notation like 'xx0232'.
     """
-    if len(chord) == 6:
-        fretNotation = chord
+    if is_fret_notation(chord):
+        fret_notation = chord
     else:
         try:
-            fretNotation = GUITAR_CHORDS[chord]
+            fret_notation = GUITAR_CHORDS[chord]
             # If there are multiple fingerings, display the first one
-            if type(fretNotation) is list:
-                fretNotation = fretNotation[0]
+            if type(fret_notation) is list:
+                fret_notation = fret_notation[0]
         except KeyError:
             print("Don't know the", chord, "chord", file=sys.stderr)
             return
 
     retstr = f"  {chord}\n"
     nut = ""
-    for string in fretNotation:
+    for string in fret_notation:
         if string == "x":
             nut = nut + " x"  # x means don't play this string
         else:
             nut = nut + " _"
     retstr += "%s\n" % nut
 
-    for fretNumber in range(1, 5):
+    for fret_number in range(1, 5):
         fret = ""
-        for string in fretNotation:
-            if string == str(fretNumber):
+        for string in fret_notation:
+            if string == str(fret_number):
                 # fret = fret + " O"
                 # Various unicode blocks that could substitute.
                 # None of them are particularly satisfying:
@@ -421,10 +432,16 @@ def sanity_check_chords(chords):
             for e in expandchords:
                 goodchords.append(e)
         # Also accept specifiers like 020200
-        elif len(c) == 6:
+        elif is_fret_notation(c):
             goodchords.append(c)
         else:
-            badchords.add(c)
+            # Maybe it just wasn't capitalized?
+            if c[0].islower() and c[0] in 'abcdefg':
+                upc = c[0].upper() + c[1:]
+                if upc in GUITAR_CHORDS:
+                    goodchords.append(upc)
+            else:
+                badchords.add(c)
 
     if badchords:
         print("Ignoring unsupported chords", ' '.join(badchords))
