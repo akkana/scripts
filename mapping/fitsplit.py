@@ -24,12 +24,13 @@ try:
 except:
     print("Warning: couldn't import pytopo.TrackPoints, won't save GPX",
           file=sys.stderr)
+    import subprocess
 
 # Specialized fit uses "semicircles" for latitude and longitude.
 SEMICIRCLES_TO_DEGREES = 180. / 0x80000000
 
 
-def handle_gps_point(fields, trackpoints=None):
+def handle_gps_point(fields, trackpoints):
     """Convert the position_lat and position_long from semicircles to degrees,
        and add a trackpoint including other relevant fields.
        Return the newly created trackpoint.
@@ -68,14 +69,21 @@ def read_fit_file(filename, outgpxname=None, outcsvname=None):
     else:
         outcsv = None
 
-    trackpoints = None
     if outgpxname:
         if 'pytopo.TrackPoints' in sys.modules:
             trackpoints = TrackPoints()
         else:
-            print("Can't export trackpoints: need pytopo.TrackPoints module",
-                  file=sys.stderr)
-            outgpxname = None
+            trackpoints = None
+            # Try to use gpsbabel
+            try:
+                subprocess.call(["gpsbabel",
+                                 "-i", "garmin_fit", "-f", filename,
+                                 "-o", "gpx", "-F", outgpxname])
+            except:
+                print("Can't export trackpoints: need pytopo.TrackPoints module"
+                      " or gpsbabel installed",
+                      file=sys.stderr)
+                outgpxname = None
 
     with fitdecode.FitReader(filename) as fit:
         for frame in fit:
@@ -114,7 +122,8 @@ def read_fit_file(filename, outgpxname=None, outcsvname=None):
                     # print("    units:", f.units)
                     fields[f.name] = f.value
 
-                if 'position_lat' in fields and 'position_long' in fields \
+                if trackpoints is not None \
+                   and 'position_lat' in fields and 'position_long' in fields \
                    and fields['position_lat'] and fields['position_long']:
                     handle_gps_point(fields, trackpoints)
 
@@ -129,10 +138,20 @@ def read_fit_file(filename, outgpxname=None, outcsvname=None):
 
     if outcsv:
         outcsv.close()
-        print("Saved CSV to", outcsvname)
+        if os.path.exists(outcsvname):
+            print("Saved CSV to", outcsvname)
+        else:
+            print("Something went wrong saving CSV, sorry")
+
     if outgpxname:
-        trackpoints.save_GPX(outgpxname)
-        print("Saved GPX to", outgpxname)
+        if trackpoints:
+            trackpoints.save_GPX(outgpxname)
+        if os.path.exists(outgpxname):
+            print("Saved GPX to", outgpxname)
+        else:
+            print("Something went wrong saving GPX, sorry")
+    else:
+        print("Couldn't save GPX, need either gpsbabel or pytopo installed")
 
 
 if __name__ == '__main__':
