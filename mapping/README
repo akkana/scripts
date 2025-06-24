@@ -25,8 +25,8 @@ firedata.py:
     Track progress of a wildfire. Download MODIS and VIIRS hotspot data
     plus perimeter data, and massage it into something pytopo can show.
 
-fitread.py:
-    Decode Specialized bike app .fit files to GPX and CSV.
+fitsplit.py:
+    Split Specialized bike app .fit files to GPX and CSV files.
 
 geoipcompare.py:
     Check several different geoip services and log the varying

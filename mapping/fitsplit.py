@@ -21,10 +21,9 @@ import sys
 
 try:
     from pytopo import TrackPoints
-    print("Imported TrackPoints")
 except:
-    print("Warning: couldn't export pytopo.TrackPoints")
-    pass
+    print("Warning: couldn't import pytopo.TrackPoints, won't save GPX",
+          file=sys.stderr)
 
 # Specialized fit uses "semicircles" for latitude and longitude.
 SEMICIRCLES_TO_DEGREES = 180. / 0x80000000
