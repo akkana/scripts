@@ -24,6 +24,8 @@
 # https://gitlab.gnome.org/GNOME/gimp/-/blob/master/INSTALL.in
 # https://testing.developer.gimp.org/core/submit-patch/
 
+# Documentation: https://developer.gimp.org/core/setup/build/
+
 usage() {
     echo "Usage: buildgimp [cleangimp|cleanall] [justbuild] [-n|--dryrun] [gimp-version-directory]"
     exit 1

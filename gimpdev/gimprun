@@ -19,6 +19,9 @@
 # GIMP executable to run -- with the special case that "gimp-master"
 # will try to run an executable named gimp-3.x.
 
+# A document that gives some hints as to all the variables needed:
+# https://developer.gimp.org/core/setup/build/
+
 # Set the path to your base prefix here, if it's different:
 BASE_PREFIX=$HOME/run
 
