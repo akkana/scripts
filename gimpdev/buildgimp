@@ -43,6 +43,8 @@ dryrun=false
 # Clean anywhere before building? can be no, gimp or all
 clean=
 
+FINAL_MESSAGES=""
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help)
@@ -105,6 +107,20 @@ if [ ! -d $PREFIX ]; then
     usage
 else
     echo "$PREFIX exists"
+    if [[ $clean != "" ]]; then
+        echo Removing $PREFIX
+        if [[ -e $PREFIX/share/config.site ]]; then
+            echo_and_do mv $PREFIX/share/config.site /tmp/gimp-config.site
+        else
+            echo ">>>>>>>>> WARNING: NO $PREFIX/share/config.site"
+            exit 1
+        fi
+        echo_and_do rm -rf $PREFIX
+        echo_and_do mkdir -p $PREFIX/share
+        if [[ -e /tmp/gimp-config.site ]]; then
+            echo_and_do cp /tmp/gimp-config.site $PREFIX/share/config.site
+        fi
+    fi
 fi
 
 if [ ! -d $SRCDIR ]; then
@@ -202,6 +218,15 @@ meson-build() {
     echo_and_do ninja install && \
     cd ..
 }
+
+meson-install() {
+    MESONSRC=$(pwd)
+    BUILD_DIR=$MESONSRC/obj-$(arch)
+    mkdir -p $BUILD_DIR
+    cd $BUILD_DIR
+    meson install
+}
+
 
 # update-clone dir repo: if dir already exists, cd there and git pull;
 # if not, git clone and then cd into the new dir.
@@ -305,9 +330,12 @@ branch=v1.3.x
 pull-clone https://github.com/mypaint/mypaint-brushes.git
 if [[ $pullstatus == 1 || $clean == 'all' ]]; then
     echo_and_do ./autogen.sh && echo_and_do ./configure --prefix=$PREFIX && echo_and_do make -j4 && echo_and_do make install
+elif [[ $clean == 'gimp' ]]; then
+    echo_and_do make install
 fi
 
-# On Debian sid, the provided libmypaint is good enough.
+# On Debian sid, the distro-provided libmypaint is sometimes good enough,
+# but other times, not so much.
 # echo '========== libmypaint'
 # echo "clean:" $clean
 # cd $SRCDIR
@@ -333,6 +361,8 @@ echo_and_do pull-clone https://gitlab.gnome.org/GNOME/babl.git $clean
 echo "pullstatus:" $pullstatus
 if [[ $pullstatus == 1 || $clean == 'all' ]]; then
     echo_and_do meson-build
+elif [[ $clean == 'gimp' ]]; then
+    echo_and_do meson-install
 else
     echo "Nope, not building"
 fi
@@ -344,6 +374,8 @@ echo_and_do pull-clone https://gitlab.gnome.org/GNOME/gegl.git $clean
 echo "pullstatus:" $pullstatus
 if [[ $pullstatus == 1 || $clean == 'all' ]]; then
     echo_and_do meson-build
+elif [[ $clean == 'gimp' ]]; then
+    echo_and_do meson-install
 fi
 
 echo
@@ -373,8 +405,13 @@ else
         else
             echo "Dry run, would run git fetch"
         fi
-        echo_and_do git rebase origin/master
-    else    # this is git master
+        # This is what I think I'm supposed to do to merge master changes
+        # into a branch (after git fetch), but in practice it gives
+        # merge conflicts that don't go away even after resolving them.
+        # echo_and_do git rebase origin/master
+        echo "**************** Didn't merge master changes into $curbranch"
+        FINAL_MESSAGES="$FINAL_MESSAGES \n **************** Didn't merge master changes into $curbranch"
+    else    # this is the git master branch
         if [ $dryrun = false ]; then
             pullstatus=$(git pull)
         else
@@ -396,12 +433,10 @@ else
     cd gimp-data
     echo_and_do git pull
     cd ..
-
 fi
 
-
 # Don't actually care about pullstatus: if running buildgimp,
-# the assumption is that we want to rebuild.
+# the assumption is that we want to rebuild gimp.
 #  --disable-vector-icons is temporary to try to get around a startup crash
 if [[ 1 || $pullstatus == 1 ]]; then
     # You can build GIMP with either autotools or meson.
@@ -425,4 +460,6 @@ fi
 # unset pullstatus
 # unset SRCDIR
 popd_maybe
+
+echo $FINAL_MESSAGES
 
