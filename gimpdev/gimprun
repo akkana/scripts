@@ -22,8 +22,11 @@
 # Set the path to your base prefix here, if it's different:
 BASE_PREFIX=$HOME/run
 
-
 GIMPEX=$(basename $0)
+# Prefer gimp-master
+if [[ $GIMPEX == 'gimp' ]]; then
+    GIMPEX=gimp-master
+fi
 GIMP_PREFIX=$BASE_PREFIX/$GIMPEX
 echo "prefix:", $GIMP_PREFIX
 
@@ -36,6 +39,8 @@ fi
 # Set mandatory enviroment variables
 export PATH=$GIMP_PREFIX/bin:$PATH
 export LD_LIBRARY_PATH=$GIMP_PREFIX/lib:$LD_LIBRARY_PATH
+# newly mandatory as of 2025-08-10
+export GI_TYPELIB_PATH=${GIMP_PREFIX}/lib/girepository-1.0/
 
 # GIMP master needs XDG_DATA_DIRS, but 2.10 breaks if you include it..
 if [[ $GIMPEX == *master ]]; then
@@ -64,6 +69,8 @@ echo PKG_CONFIG_PATH $PKG_CONFIG_PATH
 if [[ $DEBUG_MODE ]]; then
     echo "Running:" gdb $GIMP_PREFIX/bin/$GIMPEX $@
     gdb $GIMP_PREFIX/bin/$GIMPEX $@
+    # gdb $HOME/outsrc/gimp-master/gimp/obj-x86_64/app/gimp-3.1
+    # gdb obj-x86_64/app/gimp-3.1
 else
     echo "Running:" $GIMP_PREFIX/bin/$GIMPEX $@
     $GIMP_PREFIX/bin/$GIMPEX $@
