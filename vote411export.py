@@ -3,6 +3,13 @@
 # Export the "Tab-Delimited, Candidate Full Export" from
 # Vote411/lwv.thevoterguide.org, and format it appropriately
 # for a printed voter guide.
+# To export:
+# - Races and Measures
+# - Change the number at the bottom to something like 1000 that's big
+#   enough to encompass everything
+# - Click next to Name at the top to select everything
+# - Now Export at the top should be highlighted. Click on it.
+# - Choose Races (CSV)
 
 # Requires the docx module if Word format output is required:
 # pip install python-docx
@@ -174,7 +181,9 @@ class Measure:
     #         "Category": "Constitutional Amendments", "State Bond Questions"
     def __init__(self, measurename, description, category):
         self.measurename = measurename.strip()
-        self.desc = description.strip().replace('NM', 'N.M.')
+        # In some year, someone wanted NM converted to N.M.,
+        # but in 2025 Lynn explicitly doesn't want that.
+        # self.desc = description.strip().replace('NM', 'N.M.')
         self.category = category.strip()
 
     def output(self, formatter):
@@ -605,7 +614,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
             if candidate.office not in race_descriptions:
                 race_descriptions[candidate.office] = \
                     rowdict["Description of Race/Referendum"] \
-                        .strip().replace('NM', 'N.M.')
+                        .strip()
+                         # .replace('NM', 'N.M.')
 
         # Done with loop over tab-separated lines. All candidates are read.
         print("\n*** Found", len(candidates), "candidates")
