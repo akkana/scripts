@@ -150,11 +150,19 @@ class Candidate:
         # Loop over all questions for the candidate's office.
         low, high = race_questions[self.office]
 
-        for qnum, qindex in enumerate(range(low, high+1)):
-            # qnum is the number to put before the question,
-            # like 1. Why should we vote for you?
-            # except it starts at 0, not 1.
-            # qindex is the index into allquestions.
+        # qnum is the number to put before the question,
+        # like 1. Why should we vote for you?
+        # except it starts at 0, not 1.
+        # qindex is the index into allquestions.
+        # Hack: in 2025, Vote411 exports have double entries for each question.
+        # So the question number isn't just index - low.
+        # Omit any questions that are the same as the previous one.
+        qnum = 0
+        for qindex in range(low, high+1):
+            # Is the question a repeat?
+            if qindex > 0 and allquestions[qindex] == allquestions[qindex-1]:
+                # print("Skipping repeated question:", allquestions[qindex])
+                continue
             if re.match(r'\d+\.', allquestions[qindex]):
                 q = allquestions[qindex]
             else:
@@ -164,6 +172,7 @@ class Candidate:
             else:
                 a = NO_RESPONSE
             formatter.add_q_and_a(q, a)
+            qnum += 1
 
     # Sorting:
     # Adjust as needed to match ballot order.
