@@ -148,7 +148,7 @@ else:
 # Using global variables from an import
 ########################################################
 
-# This works:
+# This works, sometimes:
 import stuff
 
 def main():
@@ -312,6 +312,7 @@ hex(ord('█'))             # --> '0x2588'
 print("Here is the character again: \u2588")
 
 # s.find vs s.index: find returns -1 if not found, index raises ValueError
+# but lists don't have find
 
 #
 # Fuzzy string match.
@@ -1546,6 +1547,22 @@ links = SoupStrainer('table', {'id': table_id})
 
 # More:
 # https://medium.com/codex/using-beautiful-soups-soupstrainer-to-save-time-and-memory-when-web-scraping-ea1dbd2e886f
+
+####################
+# splitting and otherwise parsing URLs
+>>> import urllib.parse
+>>> parsed = urllib.parse.urlparse('https://press.uchicago.edu/books/HOC/HOC_V1\
+/Volume1.html')
+>>> parsed
+ParseResult(
+    scheme='https',
+    netloc='press.uchicago.edu',
+    path='/books/HOC/HOC_V1/Volume1.html',
+    params='',
+    query='',
+    fragment=''
+)
+
 
 
 ########################################################
