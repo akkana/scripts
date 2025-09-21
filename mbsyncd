@@ -35,7 +35,7 @@ if __name__ == '__main__':
         except:
             Usage()
     else:
-        secs = 120
+        secs = 60
 
     # Is an mbsync or mbsyncd process already running?
     # Running two at once would be bad.
