@@ -223,6 +223,15 @@ def fix_agenda(agenda_infile):
 
         index, quality = fuzzy_search(em_text, origbases)
         htmlindex, htmlquality = fuzzy_search(em_text, htmlbases)
+        if VERBOSE:
+            if index >= 0:
+                print("    orig, quality:", origbases[index], quality)
+            else:
+                print("    no orig match")
+            if htmlindex >= 0:
+                print("    HTML, quality:", htmlbases[htmlindex], htmlquality)
+            else:
+                print("    no HTML match")
 
         if index < 0 and htmlindex < 0:    # No exact or fuzzy match
             print("Couldn't find a match for", em_text)
@@ -347,7 +356,7 @@ def fix_agenda(agenda_infile):
                 #             /usr/lib/libreoffice
                 # The cure: specify the full path to both python and unoconv.
                 # No one seems to understand why.
-                rv = subprocess.call(["/usr/bin/python3", "/usr/bin/unoconv",
+                rv = subprocess.call(["/usr/bin/python3", "/home/akkana/pythonenv/3env/bin/unoconv",
                                       "-f", "html", "-T", "10",
                                       "-o", outfile, infile])
                 if not rv:

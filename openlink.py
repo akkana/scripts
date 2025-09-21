@@ -61,6 +61,7 @@ def open_in_existing_firefox(url, minwidth=800):
     time.sleep(.3)
 
     # insert url
+    print("typing", url)
     subprocess.call(['xdotool', 'type', url])
     time.sleep(.1)
 
@@ -78,6 +79,9 @@ def quit(event):
 
 if __name__ == '__main__':
     for url in sys.argv[1:]:
+        if '://' not in url and os.path.exists(url):
+            print(url, "is a file")
+            url = 'file://' + os.path.abspath(url)
+            print("substituting url:", url)
         open_in_existing_firefox(url)
-
 

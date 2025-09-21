@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # A simple music player using pygame.
 
@@ -433,7 +433,7 @@ button:hover { background: #dff; border-color: #8bb; }
         self.skipped_seconds = 0
         self.stop()
         self.song_ptr = (self.song_ptr - 1) % len(self.songs)
-        self.play_state = MusicWin.PLAYING
+        # self.play_state = MusicWin.PLAYING
 
     def set_scale_slider(self, secs):
         self.ignore_callbacks = True

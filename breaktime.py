@@ -5,12 +5,10 @@
 
 # Requires idle.py from gajim:
 # https://dev.gajim.org/gajim/gajim/-/blob/89c7eb6e6ab3f61a188c6cee063a000526df522c/gajim/common/idle.py
-#
+import idle
 
 # ipcsimple comes from Akkana's scripts repository, same as this script
 import ipcsimple
-
-import idle
 
 import time
 import tkinter

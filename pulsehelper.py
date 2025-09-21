@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # A quickie way to switch audio between internal speakers and a USB hub,
 # using pulseaudio commandline tools.
@@ -396,7 +396,7 @@ def read_config_file() -> dict:
     with open(os.path.expanduser("~/.config/pulsehelper/config")) as fp:
         for line in fp:
             # Strip whitespace and comments
-            line = re.sub('\s*#.*$', '', line.strip())
+            line = re.sub(r'\s*#.*$', '', line.strip())
             if not line:
                 continue
             if line.startswith('#'):
