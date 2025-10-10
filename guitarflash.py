@@ -68,16 +68,20 @@ GUITAR_CHORDS = {
     "F": "x3321x",
     "Bm": "x24432",
     "Bsus2": "x24422",
+    "Cm": "x35543",
 
     # 7s
     "Fmaj7": [ "xx3210", "x33210" ],
     "B7": "x21202",
     "D7": "'xx0212",
     "Dmaj7": "xx0222",
+    "Cmaj7": "x32000",
+    "Em7": [ "022030", "xx2030" ],
     "G7": "320001",
     "B7": [ "020100", "022130", "021202" ],
     "E7": "020100",
     "A7": [ "x02020", "x02223" ],
+    "Am7": "x02010",
     "C7": "x32310",
 
     # 6
@@ -275,6 +279,7 @@ def is_fret_notation(ch):
 def chord_to_string(chord):
     """Given a chord name like 'Am', return a string showing a tablature for it.
        Can also expand fret notation like 'xx0232'.
+       If there are multiple fingerings, show them all.
     """
     if is_fret_notation(chord):
         fret_notation = chord
@@ -288,14 +293,17 @@ def chord_to_string(chord):
             print("Don't know the", chord, "chord", file=sys.stderr)
             return
 
-    retstr = f"  {chord}\n"
+    return f"  {chord}\n" + fret_notation_to_string(fret_notation)
+
+
+def fret_notation_to_string(fret_notation):
     nut = ""
     for string in fret_notation:
         if string == "x":
             nut = nut + " x"  # x means don't play this string
         else:
             nut = nut + " _"
-    retstr += "%s\n" % nut
+    retstr = "%s\n" % nut
 
     for fret_number in range(1, 5):
         fret = ""
