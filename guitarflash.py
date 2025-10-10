@@ -76,7 +76,7 @@ GUITAR_CHORDS = {
     "D7": "'xx0212",
     "Dmaj7": "xx0222",
     "Cmaj7": "x32000",
-    "Em7": [ "022030", "xx2030" ],
+    "Em7": [ "xx2030", "022030" ],
     "G7": "320001",
     "B7": [ "020100", "022130", "021202" ],
     "E7": "020100",
@@ -281,19 +281,27 @@ def chord_to_string(chord):
        Can also expand fret notation like 'xx0232'.
        If there are multiple fingerings, show them all.
     """
+    # print("chord_to_string", chord)
     if is_fret_notation(chord):
         fret_notation = chord
+        chord = None
     else:
         try:
             fret_notation = GUITAR_CHORDS[chord]
+
             # If there are multiple fingerings, display the first one
-            if type(fret_notation) is list:
+            if type(fret_notation) is not str and \
+               hasattr(fret_notation, "__getitem__"):
                 fret_notation = fret_notation[0]
+
         except KeyError:
             print("Don't know the", chord, "chord", file=sys.stderr)
             return
 
-    return f"  {chord}\n" + fret_notation_to_string(fret_notation)
+    if chord:
+        return f"  {chord}\n" + fret_notation_to_string(fret_notation)
+    else:
+        return fret_notation_to_string(fret_notation)
 
 
 def fret_notation_to_string(fret_notation):
@@ -331,14 +339,31 @@ CHORDS_PER_LINE = 5
 INTERCHORD_SPACE = 4
 
 def display_chords_compactly(chords):
-    # print("Displaying chords:", chords)
+    # print("Displaying chords compactly:", chords)
+
+    # chordlines will be a list of strings, each string representing
+    # a (multiple line) set of chords drawn side by side.
     chordlines = []
+
     for i, chord in enumerate(chords):
+        try:
+            if type(GUITAR_CHORDS[chord]) is list:
+                chordlines.append(
+                    f"  {chord}, {len(GUITAR_CHORDS[chord])} options:\n"
+                    + display_chords_compactly(GUITAR_CHORDS[chord]))
+                continue
+        except KeyError:
+            # GUITAR_CHORDS[chord] will raise KeyError if chord is
+            # fret notation already
+            pass
+
         if i % CHORDS_PER_LINE == 0:
             if chordlines:
                 print('\n'.join(chordlines))
             chordlines = []
         fretting = chord_to_string(chord)
+        # print("chord_to_string(", chord, ") returned", fretting)
+
         if not chordlines:
             chordlines = fretting.splitlines()
             continue
@@ -352,7 +377,9 @@ def display_chords_compactly(chords):
              chordlines[i]= fmt % (chordlines[i], line)
 
     if chordlines:
-        print('\n'.join(chordlines))
+        return '\n'.join(chordlines)
+    else:
+        return ''
 
 
 def play_chord(chordname):
@@ -697,7 +724,7 @@ if __name__ == '__main__':
 
     # Just showing, no flashcard test?
     if args.show_chords:
-        display_chords_compactly(chords)
+        print(display_chords_compactly(chords))
         sys.exit(0)
 
     if args.bpm:
