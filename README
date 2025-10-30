@@ -415,6 +415,14 @@ musicplayer.py:
 namedpipe.py:
     Illustrates how to use named pipes. Just a demo, nothing useful.
 
+newbackgrounds.py:
+    Find images tagged with 'wallpaper' or 'background', or images saved
+    in ~/Images/Backgrounds/orig, that haven't yet been copied/resized
+    into a wallpaper directory like ~/Images/Backgrounds/1920x1200.
+    This is obviously very specific to how I manage my wallpaper collection,
+    but it might also be useful as an example of how to use Metapho's
+    Tagger class.
+
 noblank:
     Turn off screen blanking. Run this when you're giving a presentation.
     Linux-specific.
