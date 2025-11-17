@@ -65,10 +65,11 @@ GUITAR_CHORDS = {
     "Esus4": "022200",
 
     # barre chords
-    "F": "x3321x",
-    "Bm": "x24432",
-    "Bsus2": "x24422",
-    "Cm": "x35543",
+    "F": "x3321xb1",
+    "F#": "244322b2",
+    "Bm": "x24432b2",
+    "Bsus2": "x24422b2",
+    "Cm": [ "x35543b3", "xx554x" ],
 
     # 7s
     "Fmaj7": [ "xx3210", "x33210" ],
@@ -243,6 +244,8 @@ def display_note(note):
     # print("string", stringno+1, "fret", fret)
 
     line = ''
+
+    # Display the nut
     for stringNo in range(6):
         if stringno == stringNo and fret == 0:
             line += ' O'
@@ -254,7 +257,7 @@ def display_note(note):
         maxfret = fret
     else:
         maxfret = 5
-#
+
     for fretNo in range(1, maxfret):
         line = ""
         for stringNo in range(6):
@@ -269,8 +272,9 @@ LEGAL_FRET_CHARS = 'oO0xX0123456789-'
 
 def is_fret_notation(ch):
     if len(ch) != 6:
-        return False
-    for c in ch:
+        if len(ch) != 8 or ch[-2] != 'b' or not ch[-1].isdigit():
+            return False
+    for c in ch[:6]:
         if c not in LEGAL_FRET_CHARS:
             return False
     return True
@@ -282,6 +286,7 @@ def chord_to_string(chord):
        If there are multiple fingerings, show them all.
     """
     # print("chord_to_string", chord)
+
     if is_fret_notation(chord):
         fret_notation = chord
         chord = None
@@ -304,7 +309,17 @@ def chord_to_string(chord):
         return fret_notation_to_string(fret_notation)
 
 
+MIN_FRETS_DISPLAYED = 5
 def fret_notation_to_string(fret_notation):
+    # print("fret_notation_to_string", fret_notation)
+
+    # If it's a barre chord, it should have something like 'b1' tacked on.
+    if fret_notation[-2] == 'b' and fret_notation[-1].isdigit():
+        barre = int(fret_notation[-1])
+        fret_notation = fret_notation[:-2]
+    else:
+        barre = None
+
     nut = ""
     for string in fret_notation:
         if string == "x":
@@ -313,7 +328,16 @@ def fret_notation_to_string(fret_notation):
             nut = nut + " _"
     retstr = "%s\n" % nut
 
-    for fret_number in range(1, 5):
+    frets_displayed = MIN_FRETS_DISPLAYED
+    for ch in fret_notation:
+        if ch.isdigit():
+            fretnum = int(ch)
+            frets_displayed = max(frets_displayed, fretnum)
+
+    for fret_number in range(1, frets_displayed+1):
+        if fret_number == barre:
+            retstr += ' ' + '\u25A0' * 11 + '\n'
+            continue
         fret = ""
         for string in fret_notation:
             if string == str(fret_number):
@@ -374,7 +398,9 @@ def display_chords_compactly(chords):
 
         # Put the new fretting to the right of the current chordline
         for i, line in enumerate(fretting.splitlines()):
-             chordlines[i]= fmt % (chordlines[i], line)
+            # for j, chl in enumerate(chordlines):
+            #     print("  ", j, ":", chl)
+            chordlines[i] = fmt % (chordlines[i], line)
 
     if chordlines:
         return '\n'.join(chordlines)
@@ -730,7 +756,6 @@ if __name__ == '__main__':
     if args.bpm:
         start_metronome(args.bpm)
 
-    print(args.chord_test, args.note_test)
     try:
         while True:
             if args.chord_test and args.note_test:
