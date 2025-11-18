@@ -3,11 +3,14 @@
 """A program to help with practicing guitar.
    Can run a metronome, play notes, display guitar tablature for notes,
    and give several types of flashcard-style quiz.
-   Copyright 2024 by Akkana: share and enjoy under the GPLv2 or later.
+   Copyright 2024-5 by Akkana: share and enjoy under the GPLv2 or later.
 """
 
 # Uses sox play to play the notes/chords, so this script will probably
 # only work on Linux.
+
+# Under pipewire, you'll probably need pipewire-alsa and libsox-fmt-pulse
+# as well as sox.
 
 # Uses chord display code and fret notation adapted from
 # https://www.101computing.net/guitar-chords-reader/
@@ -159,7 +162,9 @@ PROGRESSIONS = {
 # How slowly to "strum" a chord
 DELAY_BETWEEN_STRINGS = .06
 
-Volume = 1
+# Under pulseaudio, 1 was a reasonable starting volume,
+# but under pipewire, it needs to be more like .08.
+Volume = .08
 
 Metroproc = None
 
@@ -411,7 +416,11 @@ def display_chords_compactly(chords):
 def play_chord(chordname):
     """Play a chord, specified by name like "Em".
     """
-    args = [ "play", "-nq", "-t", "alsa", "synth" ]
+    # Used to have "-t", "alsa",  between -nq and synth
+    # which I think was needed under pulseaudio
+    # but makes it fail under pipewire.
+    # Also see note above about volume levels.
+    args = [ "play", "-nq", "synth" ]
     # pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
     #      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
     if type(GUITAR_CHORDS[chordname]) is list:
@@ -439,7 +448,7 @@ def play_notes(notestr, delay=.6):
        Useful for testing.
     """
     notes = notestr.split(',')
-    args = [ "play", "-nq", "-t", "alsa", "synth" ]
+    args = [ "play", "-nq", "synth" ]  # See notes above re pipewire/pulseaudio
     for note in notes:
         args.append("pl")
         args.append(note)
@@ -543,23 +552,29 @@ def chord_flashcard(chords, metronome=None):
         play_chord(chord)
 
 
+last_note = " "
+
 def note_flashcard(allow_sharps=False, just_strings=False):
-    """Run one note flashcard"""
+    """Run one note flashcard round"""
+    global last_note
     while True:
         note = random.choice(list(NOTE2STRING.keys()))
+        if last_note[0] == note[0]:
+            continue
         if allow_sharps or '#' not in note:
             break
 
     print("\n\n\nnote:")
     print(bigtext(note))
     time.sleep(3)
-    play_notes(note)
-    time.sleep(3)
-    display_note(note)
-    time.sleep(1)
     for i in range(REPEAT_PLAY):
         play_notes(note)
         time.sleep(1)
+    time.sleep(3)
+    display_note(note)
+    play_notes(note)
+    time.sleep(1)
+    last_note = note
 
 
 def test_chord_progressions():
@@ -691,8 +706,8 @@ if __name__ == '__main__':
                         action="store", default=0, dest="bpm", type=int,
                         help='Metronome Beats per Minute')
     parser.add_argument('-v', "--volume",
-                        action="store", default=1, dest="volume", type=float,
-                        help='Volume (a decimal, 1 = full volume)')
+                        action="store", default=-1, dest="volume", type=float,
+                        help='Volume (a decimal, 1 = full volume: with pipewire you probably want something under .1)')
     parser.add_argument("--allow-sharps", action="store_true", default=False,
                         help="Include sharps in the notes to be tested")
 
@@ -702,7 +717,8 @@ if __name__ == '__main__':
                         help="Structure of the song to be composed, e.g. AABAB")
 
     args, rest = parser.parse_known_args(sys.argv[1:])
-    Volume = args.volume
+    if args.volume >= 0:
+        Volume = args.volume
 
     # print("args:", args, "rest:", rest)
 
