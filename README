@@ -361,6 +361,13 @@ masq:
     Set up IP masquerading to talk to another computer, such as a
     Raspberry Pi, over eth0 while using wlan0 for the internet.
 
+mastothread.py:
+    Display a discussion thread from Mastodon given the original post ID.
+    Mastodon's web UI doesn't give you any reasonable way to follow a thread:
+    the order is always threaded, you can't choose chronological, and recent
+    posts aren't highlighted or flagged in any way so there's no way to
+    find what's new.
+
 mbsyncd:
     isync/mbsync is a good IMAP sync program, but for some bizarre reason
     it doesn't offer a daemon mode where it syncs regularly forever.
