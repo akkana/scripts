@@ -717,6 +717,10 @@ pip_upgrade.py:
     Upgrade all Python packages in the current virtualenv.
     Don't try to upgrade anything in the system Python directories.
 
+tk_scrollable_frame.py:
+    TkInter doesn't have a general scrollable container, so you have to
+    write it. This is an example (built for mastothread).
+
 vidtriage.py:
     View a list of videos in sequence, tagging them with numbers
     or 'd' (for delete) to triage which ones belong to which category.
