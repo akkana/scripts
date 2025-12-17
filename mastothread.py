@@ -63,8 +63,9 @@ def init_mastodon():
 
 
 ROOTBACKGROUND = "lightblue"
-POSTBACKGROUND = "yellow"
+POSTBACKGROUND = "#ffffdd"
 LABELBACKGROUND = "white"
+CANVASBACKGROUND = "#eeffee"
 
 
 class MastoThreadWin:
@@ -77,9 +78,11 @@ class MastoThreadWin:
         self.root.config(bg=ROOTBACKGROUND)
         self.root.bind('<Control-Key-q>', self.quit)
 
+        self.items = 0
+
         # Thanks to https://blog.teclado.com/tkinter-scrollable-frames/
         container = ttk.Frame(self.root)
-        self.canvas = tk.Canvas(container, bg="red")
+        self.canvas = tk.Canvas(container, bg=CANVASBACKGROUND)
         scrollbar = ttk.Scrollbar(container, orient="vertical",
                                   command=self.canvas.yview)
         self.scrollable_frame = ttk.Frame(self.canvas)
@@ -89,12 +92,18 @@ class MastoThreadWin:
         self.canvas.create_window((0, 0), window=self.scrollable_frame,
                                   anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+        # Binding <MouseWheel>" does nothing, either on the root or the canvas
+        self.canvas.bind_all("<Button-5>",   # Linux scroll down
+                             lambda e: self.canvas.yview_scroll(1, "units"))
+        self.canvas.bind_all("<Button-4>",   # Linux scroll up
+                             lambda e: self.canvas.yview_scroll(-1, "units"))
+
 
         container.pack(fill="both", expand=True)
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def add_item(self, statustext):
+    def add_item(self, statustext, images):
         post = tk.Frame(self.scrollable_frame, bg=POSTBACKGROUND,
                         width=POST_WIDTH)
         label = tk.Label(post, bg=LABELBACKGROUND,
@@ -102,19 +111,27 @@ class MastoThreadWin:
                          wraplength=LABEL_WIDTH,
                          text=statustext)
         label.bind('<Configure>', lambda e: self.label_configure(e, label))
-        label.pack(padx=5, pady=5, fill="x", expand=True)
-        post.pack(padx=5, pady=5, fill="x", expand=True)
+
+        label.grid(row=0, column=0, sticky='WENS')
+        # The padx=0 in the next line doesn't help, there's still big padding
+        # between the right edge of the scrollable frame
+        post.grid(row=self.items, column=0, sticky='WENS', padx=0, pady=5)
+        self.items += 1
 
     def quit(self, e):
         self.root.destroy()
         sys.exit(0)
 
     def label_configure(self, e, label):
-        # print("label configure", e)
+        # print("label configure", e, "wrapping to", label.winfo_width())
         label.config(wraplength=label.winfo_width())
 
     def configure_scrollable(self, e):
+        # print("configure_scrollable", e)
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def on_mousewheel(self, e):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def show(self):
         self.root.mainloop()
@@ -127,7 +144,7 @@ def clean_html_crap(htmlcrap):
        because what if someone actually posts something involving
        angle brackets?
     """
-    return BeautifulSoup(htmlcrap).text
+    return BeautifulSoup(htmlcrap, features='lxml').text
 
 
 def show_discussion(status, threadwin):
@@ -155,10 +172,16 @@ def show_discussion(status, threadwin):
     tree = Tree()
     tree.create_node(status["content"], status["id"])
 
+    # For testing, it helps to limit the number of entries
+    num_entries = 0
+    MAX_ENTRIES = 50
     for status in conversation["descendants"]:
         try:
             tree.create_node(status["content"], status["id"],
                              parent=status["in_reply_to_id"])
+            if num_entries > MAX_ENTRIES:
+                break
+            num_entries += 1
         except Exception as e:
             # If a parent node is missing
             print("Problem adding node to the tree:", e)
@@ -170,9 +193,9 @@ def show_discussion(status, threadwin):
     for id in tree.expand_tree():
         # tree[id] is type <class 'treelib.node.Node'>
         # use tag to get to the text in it
-        print("id", id, "content", tree[id].tag, "type", type(tree[id]))
+        # print("id", id, "content", tree[id].tag, "type", type(tree[id]))
         try:
-            threadwin.add_item(clean_html_crap(tree[id].tag))
+            threadwin.add_item(clean_html_crap(tree[id].tag), [])
         except Exception as e:
             print("Couldn't add_item for", tree[id].tag, "because:", e)
 
