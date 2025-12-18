@@ -9,6 +9,9 @@ import sys, os
 
 import tkinter as tk
 from tkinter import ttk
+# PhotoImage only supports an incredibly limited set of formats
+from PIL import Image, ImageTk
+
 import json
 from treelib import Tree
 from bs4 import BeautifulSoup
@@ -68,6 +71,8 @@ POSTBACKGROUND = "white"
 AUTHORBACKGROUND = "#eeffff"
 CANVASBACKGROUND = "#eeffee"
 
+CACHEDIR = os.path.expanduser("~/.cache/mastothread")
+
 
 class MastoThreadWin:
     def __init__(self):
@@ -80,6 +85,10 @@ class MastoThreadWin:
         self.root.bind('<Control-Key-q>', self.quit)
 
         self.items = 0
+
+        # Images in Tk labels are garbage collected and not saved,
+        # so they need to be saved somewhere else.
+        self.images = []
 
         # Thanks to https://blog.teclado.com/tkinter-scrollable-frames/
         container = ttk.Frame(self.root)
@@ -104,26 +113,47 @@ class MastoThreadWin:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def add_item(self, status, images, indent=0):
+    def add_item(self, status, indent=0):
         post = tk.Frame(self.scrollable_frame, bg=SFBACKGROUND,
                         padx=indent,
                         width=POST_WIDTH)
         authorlabel = tk.Label(post, bg=AUTHORBACKGROUND,
                                anchor="w", justify=tk.LEFT,
                                text=self.post_author(status))
-        label = tk.Label(post, bg=POSTBACKGROUND,
-                         anchor="w", justify=tk.LEFT,
-                         wraplength=LABEL_WIDTH,
-                         text=self.post_text(status))
-        label.bind('<Configure>', lambda e: self.label_configure(e, label))
+        postlabel = tk.Label(post, bg=POSTBACKGROUND,
+                             anchor="w", justify=tk.LEFT,
+                             wraplength=LABEL_WIDTH,
+                             text=self.post_text(status))
+        postlabel.bind('<Configure>',
+                       lambda e: self.label_configure(e, postlabel))
 
         authorlabel.grid(row=0, column=0, sticky='WENS')
-        label.grid(row=1, column=0, sticky='WENS')
+        postlabel.grid(row=1, column=0, sticky='WENS')
+
+        # Add images, if any
+        if status['media_attachments']:
+            imageframe = tk.Frame(post)
+            for attachment in status['media_attachments']:
+                imgfile = self.download_and_cache(attachment['preview_url'])
+
+                print("Adding an image for post from", self.post_author(status))
+                image = Image.open(imgfile)
+                photoimage = ImageTk.PhotoImage(image)
+                self.images.append(photoimage)
+                imagelabel = tk.Label(imageframe, image=photoimage)
+                print("Made the label")
+                imagelabel.pack()
+
+            imageframe.grid(row=2, column=0)
 
         # The padx=0 in the next line doesn't help, there's still big padding
         # between the right edge of the scrollable frame
         post.grid(row=self.items, column=0, sticky='WENS', padx=0, pady=5)
         self.items += 1
+
+    def download_and_cache(self, url):
+        """Return a path to the filename"""
+        return '/PATH/TO/SOME/FILE'
 
     @staticmethod
     def clean_html_crap(htmlcrap):
@@ -216,10 +246,10 @@ def show_discussion(status, threadwin):
         try:
             # Get depth
             # print("Depth", tree.depth(tree[id]), id, tree[id].data['content'])
-            threadwin.add_item(tree[id].data, [],
+            threadwin.add_item(tree[id].data,
                                indent=30 * tree.depth(tree[id]))
         except Exception as e:
-            print("Couldn't add_item for", tree[id].data, "because:", e)
+            print("Couldn't add_item for", id, "because:", e)
 
     print("Done adding items")
 
