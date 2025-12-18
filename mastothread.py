@@ -15,6 +15,12 @@ from PIL import Image, ImageTk
 import json
 from treelib import Tree
 from bs4 import BeautifulSoup
+import re
+
+# For downloading images:
+from requests_futures.sessions import FuturesSession
+from concurrent.futures import ThreadPoolExecutor
+import functools
 
 
 server_url = None
@@ -73,6 +79,9 @@ CANVASBACKGROUND = "#eeffee"
 
 CACHEDIR = os.path.expanduser("~/.cache/mastothread")
 
+# For mapping URLs to filenames
+BADCHARS = re.compile(r'''['\"\(\)&!:\/ ]''')
+
 
 class MastoThreadWin:
     def __init__(self):
@@ -90,6 +99,13 @@ class MastoThreadWin:
         # so they need to be saved somewhere else.
         self.images = []
 
+        self.downloader = \
+            FuturesSession(executor=ThreadPoolExecutor(max_workers=6))
+        # Don't add a response hook here, because there's no documentataion
+        # on how to pass extra arguments to the hook,
+        # even though the hook example has args and kwargs.
+        # self.downloader.hooks['response'] = self.response_hook
+
         # Thanks to https://blog.teclado.com/tkinter-scrollable-frames/
         container = ttk.Frame(self.root)
         self.canvas = tk.Canvas(container, bg=CANVASBACKGROUND)
@@ -102,6 +118,10 @@ class MastoThreadWin:
         self.canvas.create_window((0, 0), window=self.scrollable_frame,
                                   anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.bind_all("<Next>",
+                             lambda e: self.canvas.yview_scroll(1, "pages"))
+        self.canvas.bind_all("<Prior>",
+                             lambda e: self.canvas.yview_scroll(-1, "pages"))
         # Binding <MouseWheel>" does nothing, either on the root or the canvas
         self.canvas.bind_all("<Button-5>",   # Linux scroll down
                              lambda e: self.canvas.yview_scroll(1, "units"))
@@ -132,28 +152,94 @@ class MastoThreadWin:
 
         # Add images, if any
         if status['media_attachments']:
-            imageframe = tk.Frame(post)
+            imgframe = tk.Frame(post)
             for attachment in status['media_attachments']:
-                imgfile = self.download_and_cache(attachment['preview_url'])
+                imgfilename = os.path.join(CACHEDIR,
+                                           self.url_to_filename(
+                                               attachment['preview_url']))
+                if os.path.exists(imgfilename):
+                    self.add_preview_image(imgfilename, imgframe)
+                else:
+                    print("Requesting", attachment['preview_url'], '->', imgfilename)
+                    self.downloader.get(attachment['preview_url'],
+                                        hooks={'response': functools.partial(
+                                            self.response_hook,
+                                            imgframe=imgframe,
+                                            imgfilename=imgfilename
+                                        )
+                                               })
 
-                print("Adding an image for post from", self.post_author(status))
-                image = Image.open(imgfile)
-                photoimage = ImageTk.PhotoImage(image)
-                self.images.append(photoimage)
-                imagelabel = tk.Label(imageframe, image=photoimage)
-                print("Made the label")
-                imagelabel.pack()
-
-            imageframe.grid(row=2, column=0)
+            imgframe.grid(row=2, column=0)
 
         # The padx=0 in the next line doesn't help, there's still big padding
-        # between the right edge of the scrollable frame
+        # at the right edge of the scrollable frame
         post.grid(row=self.items, column=0, sticky='WENS', padx=0, pady=5)
         self.items += 1
 
-    def download_and_cache(self, url):
-        """Return a path to the filename"""
-        return '/PATH/TO/SOME/FILE'
+    @staticmethod
+    def url_to_filename(url):
+        return BADCHARS.sub('', url)
+
+    def add_preview_image(self, imgfilename, imgframe):
+        print("Trying to show", imgfilename)
+        image = Image.open(imgfilename)
+        photoimage = ImageTk.PhotoImage(image)
+        self.images.append(photoimage)
+        imagelabel = tk.Label(imgframe, image=photoimage)
+        imagelabel.pack()
+
+    def response_hook(self, response, *args, **kwargs):
+        """When the FuturesSession completes downloading an image, show it.
+           The standard response_hook example has *args, **kwargs
+           in addition to response,
+           but nobody anywhere seems to know what these are for or
+           how to use them.
+        """
+        # There's no exception handling in the response hook: if anything
+        # goes wrong it just silently does nothing.
+        # So try to catch all errors.
+        try:
+            print("response_hook, downloaded", response.url, "kwargs =", kwargs)
+            if response.status_code != 200:
+                print("Error: status", response.status_code, "on", response.url)
+                # XXX should check response, and maybe retry
+                # in which case it shouldn't go on failed_download_urls
+                self.num_failed_downloads += 1
+                self.last_failed_download_time = time.time()
+                self.failed_download_urls[response.url] = \
+                    self.last_failed_download_time
+                self.urls_queued.remove(response.url)
+                return
+
+            # Is the response an image?
+            try:
+                if not response.headers['Content-Type'].startswith('image/'):
+                    if self.mapwin.controller.Debug:
+                        print("%s not an image: Content-Type %s"
+                              % (response.url,
+                                 response.headers['Content-Type']))
+                    self.num_failed_downloads += 1
+                    self.last_failed_download_time = time.time()
+                    return
+            except:
+                print("No Content-Type in headers for", response.url)
+                # Perhaps that's not a problem and it's okay to continue
+
+            print("It's an image, content-type is", response.headers['Content-Type'])
+            # Write to disk
+            if not os.path.exists(CACHEDIR):
+                os.mkdir(CACHEDIR)
+            print("Trying to write", kwargs['imgfilename'])
+            with open(kwargs['imgfilename'], 'wb') as tilefp:
+                content = response.content
+                tilefp.write(content)
+
+            # Display it
+            self.add_preview_image(kwargs['imgfilename'], kwargs['imgframe'])
+
+        except Exception as e:
+            print("Whoops!", e)
+            return
 
     @staticmethod
     def clean_html_crap(htmlcrap):
