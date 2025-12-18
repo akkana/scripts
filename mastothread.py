@@ -10,7 +10,7 @@ import sys, os
 import tkinter as tk
 from tkinter import ttk
 import json
-from treelib import Node, Tree
+from treelib import Tree
 from bs4 import BeautifulSoup
 
 
@@ -63,8 +63,9 @@ def init_mastodon():
 
 
 ROOTBACKGROUND = "lightblue"
-POSTBACKGROUND = "#ffffdd"
-LABELBACKGROUND = "white"
+SFBACKGROUND = "#ffffdd"
+POSTBACKGROUND = "white"
+AUTHORBACKGROUND = "#eeffff"
 CANVASBACKGROUND = "#eeffee"
 
 
@@ -103,20 +104,44 @@ class MastoThreadWin:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def add_item(self, statustext, images):
-        post = tk.Frame(self.scrollable_frame, bg=POSTBACKGROUND,
+    def add_item(self, status, images, indent=0):
+        post = tk.Frame(self.scrollable_frame, bg=SFBACKGROUND,
+                        padx=indent,
                         width=POST_WIDTH)
-        label = tk.Label(post, bg=LABELBACKGROUND,
+        authorlabel = tk.Label(post, bg=AUTHORBACKGROUND,
+                               anchor="w", justify=tk.LEFT,
+                               text=self.post_author(status))
+        label = tk.Label(post, bg=POSTBACKGROUND,
                          anchor="w", justify=tk.LEFT,
                          wraplength=LABEL_WIDTH,
-                         text=statustext)
+                         text=self.post_text(status))
         label.bind('<Configure>', lambda e: self.label_configure(e, label))
 
-        label.grid(row=0, column=0, sticky='WENS')
+        authorlabel.grid(row=0, column=0, sticky='WENS')
+        label.grid(row=1, column=0, sticky='WENS')
+
         # The padx=0 in the next line doesn't help, there's still big padding
         # between the right edge of the scrollable frame
         post.grid(row=self.items, column=0, sticky='WENS', padx=0, pady=5)
         self.items += 1
+
+    @staticmethod
+    def clean_html_crap(htmlcrap):
+        """Mastodon status are full of crap like
+           <p><span class="h-card" translate="no"><a href="USER_URL" class="u-url mention" rel="nofollow noopener" target="_blank">@<span>username</span></a></span>
+           so remove anything between angle brackets ... which is frustrating
+           because what if someone actually posts something involving
+           angle brackets?
+        """
+        return BeautifulSoup(htmlcrap, features='lxml').text
+
+    @staticmethod
+    def post_text(status):
+        return MastoThreadWin.clean_html_crap(status['content'])
+
+    @staticmethod
+    def post_author(status):
+        return f"{status['account']['username']} ({status['account']['acct']}): "
 
     def quit(self, e):
         self.root.destroy()
@@ -137,18 +162,10 @@ class MastoThreadWin:
         self.root.mainloop()
 
 
-def clean_html_crap(htmlcrap):
-    """Mastodon status are full of crap like
-       <p><span class="h-card" translate="no"><a href="USER_URL" class="u-url mention" rel="nofollow noopener" target="_blank">@<span>username</span></a></span>
-       so remove anything between angle brackets ... which is frustrating
-       because what if someone actually posts something involving
-       angle brackets?
-    """
-    return BeautifulSoup(htmlcrap, features='lxml').text
-
-
 def show_discussion(status, threadwin):
-
+    """Add the discussion to a tree, and then add tree entries
+       to the thread window.
+    """
     jsonfile = 'convo.json'
     if os.path.exists(jsonfile):
         with open(jsonfile) as jfp:
@@ -169,15 +186,17 @@ def show_discussion(status, threadwin):
 
     # First save the conversation as a tree,
     # so statuses can be displayed in depth-first order.
+    # Start with the top parent.
     tree = Tree()
-    tree.create_node(status["content"], status["id"])
+    tree.create_node("Data Node", status["id"], data=status)
 
     # For testing, it helps to limit the number of entries
     num_entries = 0
     MAX_ENTRIES = 50
     for status in conversation["descendants"]:
         try:
-            tree.create_node(status["content"], status["id"],
+            tree.create_node("Data Node", status["id"],
+                             data=status,
                              parent=status["in_reply_to_id"])
             if num_entries > MAX_ENTRIES:
                 break
@@ -195,9 +214,12 @@ def show_discussion(status, threadwin):
         # use tag to get to the text in it
         # print("id", id, "content", tree[id].tag, "type", type(tree[id]))
         try:
-            threadwin.add_item(clean_html_crap(tree[id].tag), [])
+            # Get depth
+            # print("Depth", tree.depth(tree[id]), id, tree[id].data['content'])
+            threadwin.add_item(tree[id].data, [],
+                               indent=30 * tree.depth(tree[id]))
         except Exception as e:
-            print("Couldn't add_item for", tree[id].tag, "because:", e)
+            print("Couldn't add_item for", tree[id].data, "because:", e)
 
     print("Done adding items")
 
@@ -208,7 +230,7 @@ if __name__ == '__main__':
 
     threadwin = MastoThreadWin()
 
-    jsonfile = 'mastopost.json'
+    jsonfile = 'post.json'
     if os.path.exists(jsonfile):
         with open(jsonfile) as jfp:
             print("Reading from", jsonfile)
