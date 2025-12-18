@@ -561,6 +561,8 @@ def first(s):
        Raise StopIteration if the collection is empty.
     '''
     return next(iter(s))
+# There's no good way to get the last item from an iterator,
+# so just iterate through it.
 
 # get first or next item in an iterator:
 next(iter)
@@ -1365,7 +1367,7 @@ and tag.previous_sibling will return the whitespace.
 for parent in link.parents: ...
 
 # Find tags with inline style attribute:
-for t in soup.find_ll(style=True)
+for t in soup.find_all(style=True)
 
 # Find tags with inline absolute positioning style
 P_ABSOLUTE = re.compile(r'position:\s*absolute')
@@ -1543,6 +1545,13 @@ self._strainer = SoupStrainer('div', attrs={'class': [
 ]})
 
 links = SoupStrainer('table', {'id': table_id})
+
+# Parsing XML, like GPX, with BeautifulSoup:
+soup = BeautifulSoup(fp, features="xml")
+for pt in soup.find_all('trkpt'):
+    gpxtime = pt.time.text
+    lat = pt['lat']
+    lon = pt['lon']
 
 
 # More:
@@ -1931,6 +1940,16 @@ def sort_by_last_letter(words):
     # list.sort() modifies the list in place
     words.sort(key = lambda a: a[-1])
     print words
+
+# functools.partial is somewhat similar to lambda, but different.
+# In this example, response_hook already takes *args and **kwargs,
+# but 'otherdata': "more stuff you want to add"
+# will be added to kwargs before calling response_hook.
+# Great for use with requests or requests_futures.
+downloader.get(attachment['preview_url'],
+               hooks={'response': functools.partial(
+                   response_hook,
+                   otherdata="more stuff you want to add") })
 
 # Speaking of sorting, insert into a list sorted with:
 import bisect
