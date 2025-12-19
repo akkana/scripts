@@ -23,13 +23,14 @@ import functools
 
 from datetime import datetime
 import dateutil.parser
+import time
 
 
 server_url = None
 access_token = None
 
 WIN_WIDTH = 800
-WIN_HEIGHT = 900
+WIN_HEIGHT = 1100
 POST_WIDTH = WIN_WIDTH - 20
 LABEL_WIDTH = POST_WIDTH - 50
 
@@ -42,6 +43,8 @@ CONTAINERBACKGROUND = 'yellow'  # not normally visible
 TWEENPOSTSBACKGROUND = '#f3f3f3'
 
 SIMPLETIMEFMT = '%H:%M  %b %d'
+
+DAYS_IN_CACHE = 13
 
 
 def init_mastodon():
@@ -80,12 +83,17 @@ BADCHARS = re.compile(r'''['\"\(\)&!:\/ ]''')
 
 
 class MastoThreadWin:
-    def __init__(self):
-        self.numitems = 0
+    def __init__(self, statusid):
+        self.root_status_id = statusid
+
+        # TkFrames for each post on display, indexed by the status id
+        self.postframes = {}
 
         # Images in Tk labels are garbage collected and not saved,
         # so they need to be saved somewhere else.
         self.images = []
+
+        self.last_updated = None
 
         self.downloader = \
             FuturesSession(executor=ThreadPoolExecutor(max_workers=6))
@@ -138,13 +146,19 @@ class MastoThreadWin:
         self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    def add_item(self, status, indent=0):
+    def add_new_post(self, status, indent=0, bannercolors=None):
         posttime = dateutil.parser.parse(status['created_at'])
 
         postframe = tk.Frame(self.scrollable_frame, bg=SFBACKGROUND,
                              padx=indent,
                              width=POST_WIDTH)
-        authorlabel = tk.Label(postframe, bg=AUTHORBACKGROUND,
+        if bannercolors:
+            authorbg, authorfg = bannercolors
+        else:
+            authorfg = 'black'
+            authorbg = AUTHORBACKGROUND
+        authorlabel = tk.Label(postframe, bg=authorbg, fg=authorfg,
+                               font=('Sans 11 bold'),
                                anchor="w", justify=tk.LEFT,
                                text=self.post_author(status) + "         "
                                  + posttime.astimezone().strftime(SIMPLETIMEFMT))
@@ -168,7 +182,8 @@ class MastoThreadWin:
                 if os.path.exists(imgfilename):
                     self.add_preview_image(imgfilename, imgframe)
                 else:
-                    print("Requesting", attachment['preview_url'], '->', imgfilename)
+                    print("Requesting", attachment['preview_url'],
+                          '->', imgfilename)
                     self.downloader.get(attachment['preview_url'],
                                         hooks={'response': functools.partial(
                                             self.response_hook,
@@ -179,10 +194,121 @@ class MastoThreadWin:
 
             imgframe.grid(row=2, column=0)
 
+        # Add at the end of the list.
         # The padx=0 in the next line doesn't help, there's still big padding
         # at the right edge of the scrollable frame
-        postframe.grid(row=self.numitems, column=0, sticky='WENS', padx=0, pady=5)
-        self.numitems += 1
+        postframe.grid(row=len(self.postframes), column=0, sticky='WENS',
+                       padx=0, pady=5)
+        self.postframes[status['id']] = postframe
+
+    def show_discussion(self):
+        """Add the discussion to a tree, and then add tree entries
+           to the thread window.
+        """
+        num_old_entries = len(self.postframes)
+        print("Number of old entries:", num_old_entries)
+        jsonfile = 'post.json'
+        if os.path.exists(jsonfile):
+            with open(jsonfile) as jfp:
+                print("Reading from", jsonfile)
+                root_status = json.load(jfp)
+        else:
+            server_url, access_token = init_mastodon()
+            mastodon = Mastodon(api_base_url=server_url,
+                                access_token=access_token)
+            root_status = mastodon.status(self.root_status_id)
+            with open(jsonfile, 'w') as jfp:
+                json.dump(root_status, jfp, indent=4, default=str)
+                print("wrote to", jsonfile)
+
+        jsonfile = 'convo.json'
+        if os.path.exists(jsonfile):
+            with open(jsonfile) as jfp:
+                print("Reading from", jsonfile)
+                conversation = json.load(jfp)
+        else:
+            conversation = mastodon.status_context(root_status)
+
+            with open(jsonfile, 'w') as jfp:
+                json.dump(conversation, jfp, indent=4, default=str)
+                print("wrote conversation to", jsonfile)
+
+        # Are there any ancestors?
+        # if len(conversation["ancestors"]) > 0:
+        #    status = conversation["ancestors"][0]
+        #    status_id = status["id"]
+        #    conversation = mastodon.status_context(status_id)
+
+        # Did the number of entries change?
+        # The -1 is because old_entries includes the original post,
+        # which mastodon.status_context() doesn't include.
+        print("Number of new entries:", len(conversation['descendants']))
+        if len(conversation['descendants']) <= num_old_entries - 1:
+            print("Nothing changed, whew!")
+            return
+
+        print("Conversation changed! from %d to %d entries"
+              % (num_old_entries, len(conversation) + 1))
+
+        # First save the conversation as a tree,
+        # so statuses can be displayed in depth-first order.
+        # Start with the top parent.
+        tree = Tree()
+        tree.create_node("Data Node", root_status["id"], data=root_status)
+
+        # For testing, it helps to limit the number of entries
+        num_entries = 0
+        MAX_ENTRIES = 0
+        for status in conversation["descendants"]:
+            try:
+                tree.create_node("Data Node", status["id"],
+                                 data=status,
+                                 parent=status["in_reply_to_id"])
+                if MAX_ENTRIES and num_entries > MAX_ENTRIES:
+                    break
+                num_entries += 1
+            except Exception as e:
+                # If a parent node is missing
+                print("Problem adding node to the tree:", e)
+                # saved_statuses.append(status)
+
+        # tree.show()
+
+        # Need to re-do the grid.
+        # Tk doesn't have a way of inserting widgets between other widgets,
+        # so apparently the only way is to clear the grid and start over.
+        for widget in self.scrollable_frame.children.values():
+            widget.grid_forget()
+
+        # Depth-first traversal:
+        for id in tree.expand_tree():
+            # tree[id] is type <class 'treelib.node.Node'>
+            # use tag to get to the text in it
+            # print("id", id, "content", tree[id].tag, "type", type(tree[id]))
+            try:
+                if id in self.postframes:
+                    print("Re-adding old post", id)
+
+                    # Change the color of the old author label
+                    # for child in self.postframes[id].winfo_children():
+                    #     print("  child:", child)
+                    authorlabel = self.postframes[id].winfo_children()[0]
+                    authorlabel.configure(bg=AUTHORBACKGROUND, fg='black')
+
+                    # Add it to the end of the grid
+                    self.postframes[id].grid(
+                        row=self.scrollable_frame.grid_size()[1], column=0,
+                        sticky='WENS', padx=0, pady=5)
+                else:
+                    print("Adding new post", id)
+                    # Indent according to depth in the thread
+                    self.add_new_post(tree[id].data,
+                                      indent=30 * tree.depth(tree[id]),
+                                      bannercolors=('purple', 'white'))
+            except Exception as e:
+                print("Couldn't add_new_post for", id, "because:", e)
+
+        print("Done adding items")
 
     @staticmethod
     def url_to_filename(url):
@@ -269,6 +395,7 @@ class MastoThreadWin:
 
     def quit(self, e):
         self.root.destroy()
+        self.clean_cache()
         sys.exit(0)
 
     def label_configure(self, e, label):
@@ -290,80 +417,20 @@ class MastoThreadWin:
             text = datetime.now().strftime(SIMPLETIMEFMT))
 
     def refresh(self):
-        print("Would refresh if I knew how")
+        print("Refreshing")
+        self.show_discussion()
 
-    def show_discussion(self, statusid):
-        """Add the discussion to a tree, and then add tree entries
-           to the thread window.
-        """
-        jsonfile = 'post.json'
-        if os.path.exists(jsonfile):
-            with open(jsonfile) as jfp:
-                print("Reading from", jsonfile)
-                root_status = json.load(jfp)
-        else:
-            server_url, access_token = init_mastodon()
-            mastodon = Mastodon(api_base_url=server_url, access_token=access_token)
-            root_status = mastodon.status(statusid)
-            with open(jsonfile, 'w') as jfp:
-                json.dump(status, jfp, indent=4, default=str)
-                print("wrote to", jsonfile)
-
-        jsonfile = 'convo.json'
-        if os.path.exists(jsonfile):
-            with open(jsonfile) as jfp:
-                print("Reading from", jsonfile)
-                conversation = json.load(jfp)
-        else:
-            conversation = mastodon.status_context(status)
-
-            with open(jsonfile, 'w') as jfp:
-                json.dump(conversation, jfp, indent=4, default=str)
-                print("wrote conversation to", jsonfile)
-
-        # Are there any ancestors?
-        # if len(conversation["ancestors"]) > 0:
-        #    status = conversation["ancestors"][0]
-        #    status_id = status["id"]
-        #    conversation = mastodon.status_context(status_id)
-
-        # First save the conversation as a tree,
-        # so statuses can be displayed in depth-first order.
-        # Start with the top parent.
-        tree = Tree()
-        tree.create_node("Data Node", root_status["id"], data=root_status)
-
-        # For testing, it helps to limit the number of entries
-        num_entries = 0
-        MAX_ENTRIES = 0
-        for status in conversation["descendants"]:
+    def clean_cache(self):
+        now = time.time()
+        for f in os.listdir(CACHEDIR):
             try:
-                tree.create_node("Data Node", status["id"],
-                                 data=status,
-                                 parent=status["in_reply_to_id"])
-                if MAX_ENTRIES and num_entries > MAX_ENTRIES:
-                    break
-                num_entries += 1
+                fpath = os.path.join(CACHEDIR, f)
+                howold = (now - os.path.getctime(fpath)) / 60 / 60 / 24
+                if howold > DAYS_IN_CACHE:
+                    print("Deleting", fpath, file=sys.stderr)
+                    os.unlink(fpath)
             except Exception as e:
-                # If a parent node is missing
-                print("Problem adding node to the tree:", e)
-                # saved_statuses.append(status)
-
-        # tree.show()
-
-        # Depth-first traversal:
-        for id in tree.expand_tree():
-            # tree[id] is type <class 'treelib.node.Node'>
-            # use tag to get to the text in it
-            # print("id", id, "content", tree[id].tag, "type", type(tree[id]))
-            try:
-                # Indent according to depth in the thread
-                self.add_item(tree[id].data,
-                              indent=30 * tree.depth(tree[id]))
-            except Exception as e:
-                print("Couldn't add_item for", id, "because:", e)
-
-        print("Done adding items")
+                print("Problem cleaning up cachefile", fpath, ":", e)
 
 
 def Usage(exitcode=0):
@@ -379,8 +446,8 @@ if __name__ == '__main__':
     if len(sys.argv) <= 1:
         Usage()
 
-    threadwin = MastoThreadWin()
+    threadwin = MastoThreadWin(sys.argv[1])
 
-    threadwin.show_discussion(sys.argv[1])
+    threadwin.show_discussion()
 
     threadwin.show()
