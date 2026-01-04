@@ -4,11 +4,20 @@ from __future__ import print_function
 
 import sys, os
 import time
+import dateutil.parser
 import signal
 import socket
 
 wakeuptime = None
+
+# Default wakeup message
 message = "Wake up!"
+
+# Don't sleep for the whole time. That works unless the machine is suspended.
+# But suspended time isn't counted in time.sleep, so after a sleep any
+# alarms will be late. Instead, loop over short sleeps and check whether
+# the wakeuptime has arrived yet.
+SLEEPTIME = 15    # seconds
 
 
 SLASHPROC = "/proc"
@@ -111,8 +120,22 @@ def user_timestr(secs):
                          time.gmtime(secs))
 
 
-# Set up a signal handler so users can query for time left
-def handle_wakeup(signal, frame):
+def sleep_til_wakeup():
+    """The main routine that sleeps, in a loop so it can wake up
+       occasionally and see if the wake time has happened.
+    """
+    while True:
+        time.sleep(SLEEPTIME)
+
+        timeleft = wakeuptime - time.time()
+        if timeleft <= 0:
+            showAlert(message)
+            sys.exit(0)
+
+
+# Set up 
+def signal_wakeup(signal, frame):
+    """a signal handler so users can query for time left"""
     global wakeuptime
 
     timeleft = int(wakeuptime - time.time())
@@ -161,9 +184,7 @@ def handle_wakeup(signal, frame):
         print("Socket already existed")
 
     # Go back to sleep, perhaps with an updated sleep time
-    time.sleep(timeleft)
-
-    showAlert(message)
+    sleep_til_wakeup()
 
 
 def ping_running_eggtimers(cmd_tuples):
@@ -253,13 +274,11 @@ def fork_timer(sleeptime, message):
         sys.exit(0)
 
     # Trap SIGUSR1
-    signal.signal(signal.SIGUSR1, handle_wakeup)
+    signal.signal(signal.SIGUSR1, signal_wakeup)
 
     wakeuptime = time.time() + sleeptime
 
-    time.sleep(sleeptime)
-
-    showAlert(message)
+    sleep_til_wakeup()
 
 
 # main: read the runtime arguments.
@@ -293,11 +312,21 @@ Examples:
         sys.exit(0)
 
     if not args.command:
-        try:
-            sleeptime = float(rest[0]) * 60
-        except ValueError:
-            parser.print_help()
-            sys.exit(1)
+        if ':' in rest[0]:
+            try:
+                wakeuptime = dateutil.parser.parse(rest[0])
+                # parse returns a datetime
+                sleeptime = int(time.mktime(wakeuptime.timetuple()) - time.time())
+            except:
+                print("Couldn't parse time", rest[0])
+                parser.print_help()
+                sys.exit(1)
+        else:
+            try:
+                sleeptime = float(rest[0]) * 60
+            except ValueError:
+                parser.print_help()
+                sys.exit(1)
         message = ' '.join(rest[1:])
         if not message:
             message = "Wake up!"
