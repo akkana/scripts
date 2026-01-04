@@ -1,4 +1,8 @@
-#! /bin/bash
+#! /bin/zsh
+
+# Note: this needs to be a zsh script so that the argument list
+# referenced later as $@ will handle filenames with spaces and other
+# special characters, which bash/sh don't.
 
 # This script lets you run a GIMP you built yourself, and allows for
 # several different GIMPs in different prefixes inside a base prefix.
@@ -31,7 +35,7 @@ if [[ $GIMPEX == 'gimp' ]]; then
     GIMPEX=gimp-master
 fi
 GIMP_PREFIX=$BASE_PREFIX/$GIMPEX
-echo "prefix:", $GIMP_PREFIX
+echo "prefix:" $GIMP_PREFIX
 
 # Debug mode? -D
 if [[ $1 == '-D' ]]; then
@@ -59,9 +63,10 @@ fi
 # Shouldn't be need for gimp, but Might be for things like plug-ins
 export PKG_CONFIG_PATH=$GIMP_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 
-# If GIMPEX is gimp-master, change it to GIMP 3.0.
+# If GIMPEX is gimp-master, change it to GIMP 3.<whatever>
+# XXX Should detect this automatically and not have to keep updating it!
 if [ $GIMPEX = 'gimp-master' ]; then
-  GIMPEX=gimp-3.1
+  GIMPEX=gimp-3.2
 fi
 
 echo PATH $PATH
@@ -76,5 +81,10 @@ if [[ $DEBUG_MODE ]]; then
     # gdb obj-x86_64/app/gimp-3.1
 else
     echo "Running:" $GIMP_PREFIX/bin/$GIMPEX $@
+    for arg in $@; do
+        echo arg: $arg
+    done
+    # XXX This doesn't work on filenames with spaces, even though $@
+    # is supposed to take care of that
     $GIMP_PREFIX/bin/$GIMPEX $@
 fi

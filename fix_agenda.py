@@ -68,6 +68,7 @@ def legalchars(fname):
 def fix_agenda(agenda_infile):
     # Convert agenda_infile to absolute path
     agenda_infile = os.path.abspath(agenda_infile)
+    print("Agenda file:", agenda_infile)
 
     # First convert the agenda, if needed
     agenda_base, agenda_ext = smart_splitext(agenda_infile)
@@ -75,7 +76,17 @@ def fix_agenda(agenda_infile):
         with open(agenda_infile) as fp:
             soup = BeautifulSoup(fp, "lxml")
     elif agenda_ext =='.docx':
-        soup = BeautifulSoup(docx2html(agenda_infile), "lxml")
+        html_agenda = docx2html(agenda_infile)
+        # The following might make sense if we change ./orig to ./html first.
+        # In theory, the agenda will be referenced in the agenda, turned
+        # into a link and converted for that reason,
+        # but sometimes the agenda em text doesn't get updated
+        # e.g. when 1.1_agenda changes to 1.2_agenda.
+        # html_agendafile = agenda_base + '.html'
+        # with open(html_agendafile, 'w') as fp:
+        #     fp.write(html_agenda)
+        #     print("docx2html agenda saved in", html_agendafile)
+        soup = BeautifulSoup(html_agenda, "lxml")
     else:
         print("Agenda must be .html or .docx")
         sys.exit(1)
@@ -96,6 +107,7 @@ def fix_agenda(agenda_infile):
     # How to change a title is completely undocumented,
     # but it turns out to be title.string.
     title = soup.title.string
+    print("Original title:", title)
     if '/' in title:
         title = os.path.basename(title)
         soup.title.string = title
@@ -153,7 +165,7 @@ def fix_agenda(agenda_infile):
         em_text = legalchars(em_text)
 
         if VERBOSE:
-            print("\n===", em_text)
+            print("\n=== em text in document:", em_text)
 
         # Find the original file.
         # Can't just search for em_text in origbases,
@@ -180,11 +192,13 @@ def fix_agenda(agenda_infile):
             filenames_no_ext = [ os.path.splitext(f)[0] for f in filenames ]
 
             if agendaname in guesses:
-                return filenames.index(guesses[agendaname]), guesses[agendaname]
+                print("    Guessed:", guesses[agendaname])
+                return filenames.index(guesses[agendaname]), .9
 
             # First try non-fuzzy, with fingers tightly crossed.
             # But this will always fail, because we already tried exact match.
             if agendaname in filenames:
+                print("    Exact match:", agendaname)
                 return filenames.index(agendaname), 1.0
 
             # No luck there, try fuzzy matches
@@ -193,12 +207,23 @@ def fix_agenda(agenda_infile):
             for i, filename in enumerate(filenames):
                 if agendaname in filename:
                     return i, .99
+
+                # Special case for LWVNM: SNM and CNM are too similar
+                # so they always show up as a good fuzzy match
+                # (even when the right one is available, sometimes
+                # it still picks the wrong one!)
+                if 'SNM' in agendaname and 'CNM' in filename or \
+                   'CNM' in agendaname and 'SNM' in filename:
+                    continue
+
                 r = SequenceMatcher(None, agendaname, filename).ratio()
                 if r > best_ratio:
                     best_match = i
                     best_ratio = r
 
             if best_ratio > .88:
+                print("    Best match for", agendaname, ":",
+                      best_match, best_ratio)
                 return best_match, best_ratio
 
             return -1, 0
@@ -240,6 +265,7 @@ def fix_agenda(agenda_infile):
 
         if index > 0 and origbases[index] != em_text:
             guesses[em_text] = origbases[index], quality
+            print("guess for", em_text, ":", guesses[em_text])
 
         # Is the html match fuzzy but the original match not?
         # e.g. if origfiles include 9.1_CNM_Report_03.2024.docx and

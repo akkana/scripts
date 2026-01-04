@@ -243,7 +243,7 @@ def chord_to_notes(chord_tab):
 
 
 def display_note(note):
-    """Use NOTE2STRING to display notes as tablature
+    """Use NOTE2STRING to display notes as tablature.
     """
     stringno, fret = NOTE2STRING[note]
     # print("string", stringno+1, "fret", fret)
@@ -552,10 +552,43 @@ def chord_flashcard(chords, metronome=None):
         play_chord(chord)
 
 
+def strip_numbers(s):
+    """Strip trailing numbers, so F#3 becomes F#"""
+    while s[-1].isdigit():
+        s = s[:-1]
+    return s
+
+
 last_note = " "
 
 def note_flashcard(allow_sharps=False, just_strings=False):
     """Run one note flashcard round"""
+    global last_note
+    while True:
+        note = random.choice(list(NOTE2STRING.keys()))
+        if last_note[0] == note[0]:
+            continue
+        if allow_sharps or '#' not in note:
+            break
+    print("initial note:", note)
+    note = strip_numbers(note)
+    fretted = ['-'] * 6
+    for somenote in NOTE2STRING:
+        if strip_numbers(somenote) == note:
+            print("Adding", somenote, ':', NOTE2STRING[somenote])
+            fretted[NOTE2STRING[somenote][0]] = str(NOTE2STRING[somenote][1])
+    print("fretted:", fretted)
+    print("fretted:", ''.join(fretted))
+    # chord_to_string(fretted)
+    print(fret_notation_to_string(fretted))
+    # display_note(fretted)
+    sys.exit(0)
+
+
+def single_note_flashcard(allow_sharps=False, just_strings=False):
+    """Run one single-note flashcard round
+       e.g. A3, F2
+    """
     global last_note
     while True:
         note = random.choice(list(NOTE2STRING.keys()))

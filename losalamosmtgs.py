@@ -844,7 +844,7 @@ def clean_up_htmlfile(htmlfile, mtg, meetingtime):
             print(e)
 
     # linkify links, particularly the Zoom link
-    for link in soup.body.findAll(string=LINK_PAT):
+    for link in soup.body.find_all(string=LINK_PAT):
         if type(link) is not NavigableString:
             continue
         url = str(link)
