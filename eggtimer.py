@@ -5,6 +5,7 @@ from __future__ import print_function
 import sys, os
 import time
 import dateutil.parser
+from datetime import datetime, timedelta
 import signal
 import socket
 
@@ -311,10 +312,32 @@ Examples:
         ping_running_eggtimers(None)
         sys.exit(0)
 
+    def parse_date(dstr):
+        """Be a little smarter than dateutil.parser.
+           Return a datetime.
+        """
+        dl = dstr.lower()
+        d = dateutil.parser.parse(dstr)
+        if dl.endswith('am'):
+            if d < 0:
+                return d + timedelta(hours=24)
+            return d
+        if dl.endswith('pm'):
+            if d.hour < 12:
+                return d.replace(hour=d.hour+12)
+        # If neither am nor pm is specified but the time is more than
+        # 12 hours away and it's an am time, chances are that the user
+        # meant pm.
+        now = datetime.now()
+        if d.hour < 12 and (d - now).seconds * 3600 > 12:
+            print("Guessing you meant %s pm" % d.strftime('%H:%M'))
+            return d.replace(hour=d.hour+12)
+        return d
+
     if not args.command:
         if ':' in rest[0]:
             try:
-                wakeuptime = dateutil.parser.parse(rest[0])
+                wakeuptime = parse_date(rest[0])
                 # parse returns a datetime
                 sleeptime = int(time.mktime(wakeuptime.timetuple()) - time.time())
             except:
