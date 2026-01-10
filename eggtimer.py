@@ -329,7 +329,7 @@ Examples:
         # 12 hours away and it's an am time, chances are that the user
         # meant pm.
         now = datetime.now()
-        if d.hour < 12 and (d - now).seconds * 3600 > 12:
+        if d.hour < 12 and (d - now).seconds / 3600 > 12:
             print("Guessing you meant %s pm" % d.strftime('%H:%M'))
             return d.replace(hour=d.hour+12)
         return d
