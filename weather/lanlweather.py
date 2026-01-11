@@ -522,7 +522,7 @@ class LANLWeatherPlots(LANLWeather):
     def set_up_subplot(self, subplot_triple=None):
         """Set up self.axes and create subplots according to the
            tuple argument, which specifies nrows, ncols, plotnum.
-           If subplot == None, set it up as a solo plot.
+           If subplot is None, set it up as a solo plot.
            Return the matplotlib axis object.
         """
         # Single plot?

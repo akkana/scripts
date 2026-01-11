@@ -155,9 +155,9 @@ class VLCwin:
 
     def toggle_fullscreen(self, event=False):
         # event can be True or False, or it could be an event
-        if event == True:
+        if event is True:
             go_fullscreen = True
-        elif event == False:
+        elif event is False:
             go_fullscreen = False
         # elif self.fullscreen_btn.config('relief')[-1] == 'sunken':
         elif not self.fullscreen:

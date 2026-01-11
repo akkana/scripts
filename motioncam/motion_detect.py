@@ -571,7 +571,7 @@ Assumes pins 23 for trigger, 24 for echo.""")
 
     # If a crop region is specified, make sure it at least parses.
     print("args.crop is", args.crop)
-    if args.crop == None:
+    if args.crop is None:
         args.crop = '-'
     elif args.crop and args.crop != '-':
         match = re.search('(\d+)x(\d+)\+(\d+)\+(\d+)', args.crop)
