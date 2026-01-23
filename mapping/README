@@ -77,6 +77,10 @@ polidistmap.py:
     and maintained solution, which I use on the LWVNM
     https://www.lwvnm.org/districtmaps/ page.)
 
+purplemap.py:
+    Merge 2024 voting data with census geojson, then display the resulting
+    geojson file as a map using Folium.
+
 shapemerge.py:
     Starting from a shapefile of lots of small shapes, merge (dissolve)
     them into a smaller number of shapes. For instance, coalesce
