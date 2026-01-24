@@ -4,11 +4,52 @@
    place, into a single tab image
 """
 
-from PIL import Image
+from PIL import Image, ImageTk
+import tkinter as tk
 import os
 
 
-def combine_images(fileprefix, bounds):
+def query_for_bounds(firstimg):
+    print('firstimg:', firstimg)
+    window = tk.Tk()
+    im = Image.open(firstimg)
+    canvas = tk.Canvas(window, width=im.size[0], height=im.size[1])
+    canvas.pack()
+    image_tk = ImageTk.PhotoImage(im)
+    canvas.create_image(im.size[0]//2, im.size[1]//2, image=image_tk)
+    text = "Left click at upper left; right click at lower right"
+    text_item = canvas.create_text(200, 200,
+                                   fill="yellow", justify=tk.LEFT, anchor='nw',
+                                   font=('sans', 30, 'bold'),
+                                   text=text)
+    bbox = canvas.bbox(text_item)
+    rect_item = canvas.create_rectangle(bbox, outline="red", fill="black")
+    canvas.tag_raise(text_item,rect_item)
+
+    x0, y0, x1, y1 = None, None, None, None
+    set_0, set_1 = False, False
+
+    def callback(event):
+        nonlocal x0, y0, x1, y1, set_0, set_1
+        print("clicked at:", event.x, event.y, "button", event.num)
+        if event.num == 1:
+            x0, y0 = event.x, event.y
+            set_0 = True
+        elif event.num == 3:
+            x1, y1 = event.x, event.y
+            set_1 = True
+
+        if set_0 and set_1:
+            window.destroy()
+
+    canvas.bind("<Button-1>", callback)
+    canvas.bind("<Button-3>", callback)
+
+    window.mainloop()
+    return (x0, y0, x1, y1)
+
+
+def combine_images(fileprefix, bounds=None):
     """Combine all images in imgdir/fileprefix* after cropping to
        the given bounds (x0, y0, x1, y1).
        Files must be named {fileprefix}NNN.ext
@@ -27,6 +68,9 @@ def combine_images(fileprefix, bounds):
     def sortkey(f):
         return int(os.path.splitext(f[prefixlen:])[0])
     files.sort(key=sortkey)
+
+    if not bounds:
+        bounds = query_for_bounds(os.path.join(imgdir, files[0]))
 
     cropheight = bounds[3] - bounds[1]
     destim = Image.new('RGB', (bounds[2] - bounds[0], cropheight * len(files)))
@@ -52,13 +96,18 @@ if __name__ == '__main__':
               "fileprefix x0 y0 x1 y1")
         sys.exit(1)
 
-    if len(sys.argv) != 6:
-        Usage()
-    try:
-        bounds = list(map(int, sys.argv[2:]))
-    except Exception as e:
-        print(e)
+    if len(sys.argv) == 6:
+        try:
+            bounds = list(map(int, sys.argv[2:]))
+        except Exception as e:
+            print(e)
+            Usage()
+
+    elif len(sys.argv) == 2:
+        bounds = None
+
+    else:
         Usage()
 
-    combine_images(sys.argv[1], bounds) # (0, 126, 1920, 475))
+    combine_images(sys.argv[1], bounds)
 
