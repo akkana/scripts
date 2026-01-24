@@ -634,6 +634,10 @@ speedtestserver:
     not very useful except as an illustration of how to make
     a mini server in Python. Use delaytest.cgi for actual testing.
 
+stitchtab.py:
+    Stitch together, vertically, parts of a series of images after
+    cropping them all to the same specified size.
+
 strongpasswd.py:
     Generate a strong random password.
     Firefox's is useless because it doesn't include punctuation
