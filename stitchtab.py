@@ -10,7 +10,6 @@ import os
 
 
 def query_for_bounds(firstimg):
-    print('firstimg:', firstimg)
     window = tk.Tk()
     im = Image.open(firstimg)
     canvas = tk.Canvas(window, width=im.size[0], height=im.size[1])
@@ -31,7 +30,7 @@ def query_for_bounds(firstimg):
 
     def callback(event):
         nonlocal x0, y0, x1, y1, set_0, set_1
-        print("clicked at:", event.x, event.y, "button", event.num)
+        # print("clicked at:", event.x, event.y, "button", event.num)
         if event.num == 1:
             x0, y0 = event.x, event.y
             set_0 = True
@@ -46,12 +45,16 @@ def query_for_bounds(firstimg):
     canvas.bind("<Button-3>", callback)
 
     window.mainloop()
+    print("Bounds:", x0, y0, x1, y1)
     return (x0, y0, x1, y1)
 
 
-def combine_images(fileprefix, bounds=None):
+def combine_images(fileprefix, outputfile=None, bounds=None, addspace=False):
     """Combine all images in imgdir/fileprefix* after cropping to
        the given bounds (x0, y0, x1, y1).
+       If bounds are not specified, query for them.
+       If lyricspace is True, leave a little space for lyrics
+       between bars.
        Files must be named {fileprefix}NNN.ext
        where NNN is an integer with any number of digits
        Save the result to imgdire/fileprefix-all.jpg.
@@ -73,7 +76,12 @@ def combine_images(fileprefix, bounds=None):
         bounds = query_for_bounds(os.path.join(imgdir, files[0]))
 
     cropheight = bounds[3] - bounds[1]
-    destim = Image.new('RGB', (bounds[2] - bounds[0], cropheight * len(files)))
+    if addspace:
+        ymult = 1.15
+    else:
+        ymult = 1.0
+    destim = Image.new('RGB', (bounds[2] - bounds[0],
+                               int(cropheight * len(files) * ymult)))
 
     for i, f in enumerate(files):
         print(f)
@@ -81,33 +89,31 @@ def combine_images(fileprefix, bounds=None):
 
         im = im.crop(bounds)
         # im.show()
-        destim.paste(im, (0, cropheight * i))
+        destim.paste(im, (0, int(cropheight * i * ymult)))
 
-    destfile = os.path.join(imgdir, fileprefix + '-all.jpg')
-    destim.save(destfile)
-    print("Saved to", destfile)
+    if not outputfile:
+        outputfile = os.path.join(imgdir, fileprefix + '-all.jpg')
+    destim.save(outputfile)
+    print("Saved to", outputfile)
 
 
 if __name__ == '__main__':
     import sys
+    import argparse
 
-    def Usage():
-        print("Usage:", os.path.basename(sys.argv[0]),
-              "fileprefix x0 y0 x1 y1")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Combine images vertically")
+    parser.add_argument('-s', "--space", dest="addspace", default=False,
+                        action="store_true",
+                        help="Add space for lyrics between images")
+    parser.add_argument('-o', action="store", default=None, dest="outputfile",
+                        help='Output filename')
+    parser.add_argument('filepat',
+                        help='file prefix, preceding number and extension')
+    parser.add_argument('bounds', nargs='*', help="x0 y0 x1 y1")
+    args = parser.parse_args(sys.argv[1:])
+    print("args:", args)
 
-    if len(sys.argv) == 6:
-        try:
-            bounds = list(map(int, sys.argv[2:]))
-        except Exception as e:
-            print(e)
-            Usage()
-
-    elif len(sys.argv) == 2:
-        bounds = None
-
-    else:
-        Usage()
-
-    combine_images(sys.argv[1], bounds)
+    combine_images(args.filepat, args.outputfile,
+                   bounds=list(map(int, args.bounds)),
+                   addspace=args.addspace)
 
