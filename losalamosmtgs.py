@@ -280,17 +280,29 @@ def build_upcoming_meetings_list():
     # to match the decreasing date order of the meetings on each month's page.
     if now.day > 20:
         cookiedict = { 'Setting-69-Calendar Year': 'Next Month' }
-        r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+        try:
+            r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+        except Exception as e:
+            print("ERROR: Couldn't fetch", MEETING_LIST_URL, ":",
+                  e, file=sys.stderr)
         parse_html_meeting_list(r.text)
 
     # Get the meetings on the default (this month) page.
     # These will be appended to the global list upcoming_meetings.
-    r = requests.get(MEETING_LIST_URL, timeout=30)
+    try:
+        r = requests.get(MEETING_LIST_URL, timeout=30)
+    except Exception as e:
+        print("ERROR: Couldn't fetch", MEETING_LIST_URL, ":",
+              e, file=sys.stderr)
     parse_html_meeting_list(r.text)
 
     # Look at last month to get any new records that have been posted
     cookiedict = { 'Setting-69-Calendar Year': 'Last Month' }
-    r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+    try:
+        r = requests.get(MEETING_LIST_URL, cookies=cookiedict)
+    except Exception as e:
+        print("ERROR: Couldn't fetch", MEETING_LIST_URL, ":",
+              e, file=sys.stderr)
     parse_html_meeting_list(r.text)
 
     # Now that all relevant months have been read,
@@ -623,7 +635,11 @@ def html_agenda_pdftohtml(mtg, meetingtime, save_pdf_filename=None, url=None):
     if not save_pdf_filename:
         save_pdf_filename = "/tmp/tmpagenda.pdf"
     if agendaloc.lower().startswith('http') and ':' in agendaloc:
-        r = requests.get(agendaloc, timeout=30)
+        try:
+            r = requests.get(agendaloc, timeout=30)
+        except Exception as e:
+            print("ERROR: Couldn't fetch", agendaloc, ":",
+                  e, file=sys.stderr)
 
         with open(save_pdf_filename, "wb") as pdf_fp:
             pdf_fp.write(r.content)
@@ -1638,7 +1654,11 @@ def check_legal_notices():
 
     # with open("/home/akkana/src/scripts/LegalNotices.html") as fp:
     #     soup = BeautifulSoup(fp, 'lxml')
-    r = requests.get(LEGALURL, timeout=45)
+    try:
+        r = requests.get(LEGALURL, timeout=45)
+    except Exception as e:
+        print("ERROR: Couldn't fetch", LEGALURL, ":", e)
+        return
     soup = BeautifulSoup(r.text, 'lxml')
 
     articles = []
