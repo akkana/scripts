@@ -382,7 +382,8 @@ def fix_agenda(agenda_infile):
                 #             /usr/lib/libreoffice
                 # The cure: specify the full path to both python and unoconv.
                 # No one seems to understand why.
-                rv = subprocess.call(["/usr/bin/python3", "/home/akkana/pythonenv/3env/bin/unoconv",
+                rv = subprocess.call(["/usr/bin/python3",
+                                      "/home/akkana/pythonenv/3env/bin/unoconv",
                                       "-f", "html", "-T", "10",
                                       "-o", outfile, infile])
                 if not rv:
@@ -392,6 +393,8 @@ def fix_agenda(agenda_infile):
                     # print("unoconv failed on", filename, "exit code", rv)
 
             if os.path.exists(outfile):
+                if VERBOSE:
+                    print("Linking to just converted", outfile)
                 htmlfile = "html/" + htmlfile
                 replace_em(htmlfile)
                 # Don't add to htmlfiles, should be already there
