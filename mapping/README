@@ -17,6 +17,9 @@ demraytrace.py:
     demproj.py is similar but pointless, making lots of smaller
     povray projections that you can stitch together.
 
+del_gpx_extensions.py:
+    delete <extensions> inside a GPX file, which OsmAnd is so fond of adding.
+
 district_population.py:
     Use geopandas to intersect US Census 2020 decadal population numbers
     with a shapefile of districts, like school districts.
