@@ -144,6 +144,8 @@ if __name__ == '__main__':
     if len(sys.argv) == 1 or sys.argv[1] == "-h" or sys.argv[1] == "--help":
         print(long_description)
         sys.exit(0)
+    elif sys.argv[1] == "-p":
+        php_extension = True
 
     saw_err = False
     for f in sys.argv[1:]:
