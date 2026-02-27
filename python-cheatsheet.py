@@ -541,6 +541,9 @@ mylist.pop(i)            # Removes and returns list[i]
 # There's no single call to remove ALL instances of an item,
 # so you have to use a list comprehension to do that.
 
+# Remove item from a dictionary:
+del mydict[badkey]
+
 # iterator unpacking (aka tuple unpacking) doesn't have to use all vals:
 >>> a, b, *rest = range(5)
 >>> a
@@ -586,9 +589,6 @@ thelist = list(dict.fromkeys(thelist))
 # Dictionary comprehensions:
 ({i : chr(65+i) for i in range(4)}
  # gives {0: 'A', 1: 'B', 2: 'C', 3: 'D'}
-
-# Delete an item from a dictionary:
-del thedic[key]
 
 # Rename a dictionary key:
 thedic["new_key"] = thedic.pop("old_key")
@@ -2603,6 +2603,14 @@ PySonar: a type inferencer and indexer
 Jinja put a comma after all but the last value:
 {% if not loop.last %},{% endif %}
 '''
+
+# SQLAlchemy case-insensitive queries:
+user = User.query.filter(func.lower(User.username)
+                         == func.lower("GaNyE")).first()
+
+# Remove an object from the database:
+db.session.delete(obj)
+db.session.commit()
 
 ################################################################
 # pip tips
