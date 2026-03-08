@@ -263,25 +263,27 @@ def fix_agenda(agenda_infile):
             nosuchfiles.append(em_text)
             continue
 
+        # XXX Check here for whether the HTML quality is better than orig.
+        # In that case, probably the HTML is the original and we should
+        # use it and make the orig file empty.
+        # But there's no way to test that path because currently,
+        # even if Hannah is given an HTML original she converts it to Word,
+        # so this case will never happen.
+
         if index > 0 and origbases[index] != em_text:
             guesses[em_text] = origbases[index], quality
             print("guess for", em_text, ":", guesses[em_text])
 
-        # Is the html match fuzzy but the original match not?
-        # e.g. if origfiles include 9.1_CNM_Report_03.2024.docx and
-        # 9.7_SNM_Report_03.2024.pdf, then there won't be an HTML file
-        # for SNM but fuzzy_match for SNM will match the CNM HTML,
-        # which it shouldn't.
-        # print("index", index, "htmlindex", htmlindex)
-        # print("origbases", origbases)
-        # print("htmlbases", htmlbases)
-        if index >= 0 and htmlindex >= 0 and \
-           origbases[index] != htmlbases[htmlindex]:
-            print("%s and %s don't match: probably not the right HTML file"
-                  % (origbases[index], htmlbases[htmlindex]))
+        # Now there's a guess for the original base.
+        # Use it for the HTML as well.
+        print("  index", index, "htmlindex", htmlindex)
+        print("  origbases", origbases)
+        print("  htmlbases", htmlbases)
+        try:
+            htmlindex = htmlbases.index(guesses[em_text])
+            print("  Found a matching HTML file")
+        except ValueError:
             htmlindex = -1
-            print("Now htmlbases is", htmlbases)
-            sys.exit(0)
 
         # Found a match by searching origbases, returning index.
         # So the actal original file is origfiles[index].
@@ -292,7 +294,6 @@ def fix_agenda(agenda_infile):
 
         # Has this filename already been matched? Is the new match better?
         if origbase in matchedfiles:
-            print("=====================================")
             print("**** Just matched", em_text, "->", origbase, quality,
                   "but there was already", matchedfiles[origbase])
             if matchedfiles[origbase][1] >= quality:
@@ -359,6 +360,7 @@ def fix_agenda(agenda_infile):
             infile = os.path.join(origdir, origfile)
             htmlfile = origbase + ".html"
             outfile = os.path.join(htmldir, htmlfile)
+            print("Converting", infile, "->", outfile)
 
             if origbase.startswith('1') and "Agenda" in origbase:
                 # When converting the agenda, use mammoth because
