@@ -179,6 +179,10 @@ delaytest.cgi:
     Use it on your webserver (or localhost) to test things like parallel
     downloads to make sure they work with slow servers.
 
+discover.py:
+    Two hosts discover each other on a peer-to-peer network, broadcasting
+    their IDs on a known port.
+
 domaincheck.py:
     Check for expiring domains, using python-whois.
 
