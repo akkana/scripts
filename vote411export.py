@@ -34,7 +34,7 @@ SMARTQUOTE_CHARMAP = { 0x201c : u'"',
 
 # The column index of the first question.
 # This is subject to change each year.
-FIRST_Q_COL = 20
+FIRST_Q_COL = 26
 
 # The global list of all questions from the header of the CSV file.
 allquestions = None
@@ -77,7 +77,7 @@ def is_in_order(fullname):
     return False
 
 
-NO_RESPONSE = "No response was received."
+NO_RESPONSE = "No response received."
 
 class Candidate:
     def __init__(self, name, lastname, office, party, q_and_a):
@@ -100,14 +100,16 @@ class Candidate:
         # OPTIONAL: Convert name to title case.
         # THIS COULD INTRODUCE ERRORS, e.g. McPhee would become Mcphee.
         # If using this option, be sure to proofread carefully!
-        if self.name.isupper():
+        if re.sub(r' *\(.*\) *$', '', self.name).isupper():
             self.name = self.name.title()
 
         # OPTIONAL: Add a . after a single initial that lacks one.
         self.name = re.sub(' ([A-Z]) ', ' \\1. ', self.name)
 
-        if self.comparename.endswith(' (write-in)'):
-            self.comparename = self.comparename[:-11]
+        # Remove any appended parentheses, like " (write-in)",
+        # in the compare name.
+        self.comparename = re.sub(r' *\(.*\) *$', '', self.comparename)
+
         self.lastname = lastname
 
         self.office = office
@@ -144,7 +146,8 @@ class Candidate:
 
         # Did no candidate answer any question yet in this race?
         if self.office not in race_questions:
-            formatter.add_q_and_a('', "No responses yet for this office")
+            formatter.add_q_and_a('', NO_RESPONSE)
+            # "No responses yet for this office.")
             return
 
         # Loop over all questions for the candidate's office.
@@ -264,7 +267,6 @@ class HtmlFormatter:
 '''
         with open(outfile, 'w') as outfp:
             outfp.write(self.htmlstr)
-        print('Saved to', outfile)
 
 
 class DocxFormatter:
@@ -361,7 +363,6 @@ class DocxFormatter:
             outfile += '.docx'
 
         self.doc.save(outfile)
-        print("Saved to", outfile)
 
 
 def sort_candidates(candidates, order):
@@ -399,6 +400,10 @@ def sort_candidates(candidates, order):
         # Candidate may or may not have a middle name, so collapse
         # that extra space.
         fullname = re.sub(' +', ' ', fullname.lower())
+
+        # Write-in candidates may have (write-in) appended.
+        # Remove any parenthesized ending because it won't be in the comparename.
+        fullname = re.sub(r' *\(.*\) *$', '', fullname)
 
         foundit = False
         for cand_c in candidates:
@@ -456,15 +461,14 @@ def sort_measures(measures, order):
 def skip_question(question):
     """Questions are skipped if they're empty, if they're Spanish,
        if they're meant to be translated into Spanish
-       ("(es)" at the end)
+       ("(es)" at the end).
     """
     # Vote411 gives a duplicate question for some questions,
     # with "(es)" at the end. The question's not in Spanish;
     # I'm guessing it's some sort of placeholder.
     # Ignore it.
     # Also ignore actual Spanish questions: they're not
-    # going into the printed Voter Guide, at least not
-    # for the primary.
+    # going into our printed Voter Guide
     question = question.strip()
     if not question:
         return True
@@ -531,7 +535,7 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
     """
     global allquestions
 
-    # Read the orderfile, if any:
+    # Read the orderfile if any:
     if orderfile:
         with open(orderfile) as orderfp:
             if orderfile.endswith('.csv'):
@@ -599,7 +603,8 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
 
             # Try to throw out any candidate not in the order file.
             # In 2024, a lot of the candidates have spurious extra spaces
-            # in their fullname, so try to remove those first:
+            # in their fullname, so try to remove those first;
+            # they will also be removed in the comparison name from the CSV.
             rowdict["Full Name"] = re.sub(' +', ' ', rowdict["Full Name"])
             if not is_in_order(rowdict["Full Name"]):
                 continue
@@ -687,7 +692,9 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
         if cur_office and num_for_office:
             print(num_for_office, "running for", cur_office)
 
-        formatter.save(datetime.now().strftime('export-%Y%m%d_%H%M'))
+        savefilename = datetime.now().strftime('export-%Y%m%d_%H%M')
+        formatter.save(savefilename)
+        print("Saved to", savefilename)
 
         # Print the candidates who didn't respond
         if no_response_candidates:
