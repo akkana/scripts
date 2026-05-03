@@ -66,7 +66,9 @@ export PKG_CONFIG_PATH=$GIMP_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
 # If GIMPEX is gimp-master, change it to GIMP 3.<whatever>
 # XXX Should detect this automatically and not have to keep updating it!
 if [ $GIMPEX = 'gimp-master' ]; then
-  GIMPEX=gimp-3.2
+    # Find the GIMP version in $BASE_PREFIX/$GIMPEX, e.g. gimp-3.3
+    GIMPEX=$(basename ~/run/gimp-master/bin/gimp-3.?)
+    echo "Found $GIMPEX in $GIMP_PREFIX"
 fi
 
 echo PATH $PATH
