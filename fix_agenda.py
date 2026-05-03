@@ -282,7 +282,7 @@ def fix_agenda(agenda_infile):
         try:
             htmlindex = htmlbases.index(guesses[em_text])
             print("  Found a matching HTML file")
-        except ValueError:
+        except (ValueError, KeyError):
             htmlindex = -1
 
         # Found a match by searching origbases, returning index.
