@@ -325,7 +325,24 @@ class FontApp(Gtk.Window):
     def toggle_fancy_list_cb(self, widget):
         self.fancy_list = widget.get_active()
         self.toggle_fancy_list(self.fancy_list)
-        #self.update_font_list()
+        # By default, each row won't change until it's moused over,
+        # or maybe it might change at some random future time
+        # for reasons I never figured out. Calling
+        # self.update_font_list()
+        # fixes it, but it's better to do it in an idle loop
+        # so as not to block the UI:
+        model = self.treeview.get_model()
+        self._refresh_iter = model.get_iter_first()
+        gi.repository.GLib.idle_add(self._refresh_chunk, model)
+
+    def _refresh_chunk(self, model):
+        count = 0
+        while self._refresh_iter is not None and count < 50:
+            path = model.get_path(self._refresh_iter)
+            model.row_changed(path, self._refresh_iter)
+            self._refresh_iter = model.iter_next(self._refresh_iter)
+            count += 1
+        return self._refresh_iter is not None  # True = reschedule, False = done
 
     def toggle_fancy_list(self, yesno):
         column = self.treeview.get_column(0)
