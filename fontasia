@@ -329,7 +329,7 @@ class FontApp(Gtk.Window):
 
     def toggle_fancy_list(self, yesno):
         column = self.treeview.get_column(0)
-        rendererText = column.get_cell_renderers()[0]
+        rendererText = column.get_cells()[0]
         if self.fancy_list:
             column.set_cell_data_func(rendererText, self.set_list_font)
         else:
@@ -943,10 +943,11 @@ if __name__ == '__main__':
         main()
         sys.exit(0)
 
-    # Run in background, give control back to the calling shell
-    rc = os.fork()
-    if rc:
-        sys.exit(0)
+    # Run in background, give control back to the calling shell.
+    # Grr: GTK doesn't allow this any more.
+    # rc = os.fork()
+    # if rc:
+    #     sys.exit(0)
 
     fontwin = FontApp()
     while not fontwin.quit:
