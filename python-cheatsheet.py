@@ -48,6 +48,9 @@ hasattr(os, 'get_terminal_size'):
 # You can also get with a default:
 getattr(os, 'get_terminal_size', "Doesn't exist")
 
+# Is a module imported?
+if 'modulename' in sys.modules:
+
 # Is a variable defined? You have to check locals and globals separately.
 if 'myVar' in locals():
 if 'myVar' in globals():
@@ -236,7 +239,10 @@ print(traceback.format_exc())
 # Equivalent of verbose mode in a shell: print each line before executing.
 python -m trace --trace /tmp/foo.py
 
-# Debugging in python2:
+# See what's being loaded, extremely verbosely:
+python -vv
+
+# Debug prints in python2:
 print >>sys.stderr, "foo"
 # and in python3:
 print('foo', file=sys.stderr)
@@ -284,6 +290,27 @@ def tobin(data, width=8):
 u'pi\xf1on'
 # For Python3 skip to the end of this file.
 
+# Normalize unicode strings before comparing them, in case they use
+# different representations, like combining characters
+>>> x, y = "café", "café"
+>>> x == y
+False
+>>> len(x), len(y)
+(4, 5)
+
+>>> from unicodedata import normalize
+>>> normalize("NFC", x) == normalize("NFC", y)
+True
+
+# NFC (Normalization Form Composed) is common for comparison. It combines decomposed characters into their precomposed form.
+#
+# For caseless comparing, you'll also want the string casefold method:
+# Note: casefold() isn't enough on its on. It DOES NOT normalize.
+>>> def norm(s): return normalize("NFC", s).casefold()
+>>> norm("CAFÉ") == norm("café")
+True
+
+
 # Fix "UnicodeEncodeError: 'ascii' codec can't encode character":
 .encode('utf-8', "xmlcharrefreplace")
 
@@ -313,6 +340,35 @@ print("Here is the character again: \u2588")
 
 # s.find vs s.index: find returns -1 if not found, index raises ValueError
 # but lists don't have find
+
+# Unicode characters
+# https://en.wikipedia.org/wiki/List_of_Unicode_characters
+print("\N{Latin Small Letter H with diaeresis}")
+print("\u1E27")
+>>> import unicodedata
+>>> unicodedata.‍name("\u1E27")
+LATIN SMALL LETTER H WITH DIAERESIS
+
+########
+# f-strings (Python >= 3.6)
+########
+x = 123.45678
+print(f'{x:.2f}')  # 123.46
+print(f'{x:.3f}')  # 123.457
+
+f'{key:.<5}{value:.>5}'
+
+# Debug helper: in 3.8, prints "count=10"
+print(f"{count=}")
+
+# want commas before every 3 digits? Use , in an f-string:
+x = 1234567890
+print(f'{x:,}') # 1,234,567,890
+
+x = 987654321.4567890
+print(f'{x:,}')  # 987,654,321.456789
+
+print(f'{x:,.2f}') # 987,654,321.46
 
 #
 # Fuzzy string match.
@@ -474,6 +530,14 @@ if match: return match.group()
 # Find IP address:
 match = re.search(r'([0-9]{1,3}[\.]){3}([0-9]{1,3})', instr)
 if match: return match.group()
+
+
+########################################################
+# Random string
+########################################################
+
+import string
+''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
 
 ########################################################
@@ -848,6 +912,28 @@ parser = argparse.ArgumentParser(description="Long string\nwith newlines",
 # Print usage:
 parser.print_help()
 
+# Custom types in argparse
+import datetime as dt
+
+def date(string):
+    return dt.‍date.strptime(string, "%Y-%m-%d")
+
+# And then you would use "type=date" in your parser.add_argument call to use that date function for parsing.
+# Of course, in the specific example of parsing a date, you could specify "type=dt.‍date.fromisoformat" instead.
+# But then parsing errors would show fromisoformat to the user:
+# program: error: argument date: invalid fromisoformat value: '01/01/2025'
+# And that's not the most user-friendly experience.
+
+# If you want to more deeply customize the message shown to the user, you can raise an argparse.ArgumentTypeError instead of a ValueError:
+def date(string):
+    try:
+        return dt.‍date.fromisoformat(string)
+    except ValueError:
+        message = "invalid YYYY-MM-DD date: {string!r}"
+        raise argparse.ArgumentTypeError(message) from None
+
+# If we had raised a ValueError, the printed message will be prefixed with "argument date: ". Not so bad, but sometimes unwanted.
+
 ########################################################
 # built-in help
 ########################################################
@@ -952,6 +1038,17 @@ datetime.datetime.now().replace(hour=0, minute=0,
 
 # Earliest and latest dates:
 datetime.datetime.min, datetime.datetime.max
+
+# Rounding datetimes
+# - dt.floor — earlier
+# - dt.ceil - later
+# - dt.round — nearest
+#
+# For example:
+
+s.dt.floor('3h')  # previous multiple-of-3 hour
+s.dt.ceil('15m')  # next 15-minute block
+s.dt.round('1D')  # nearest 1 day
 
 #
 # Calendar.timedelta
@@ -1946,6 +2043,14 @@ def sort_by_last_letter(words):
 # but 'otherdata': "more stuff you want to add"
 # will be added to kwargs before calling response_hook.
 # Great for use with requests or requests_futures.
+#
+# The difference is that
+# partial wraps a function with some arguments pre-filled. It produces a callable that looks and behaves like the original function, just with fewer arguments needed.
+# lambda creates a brand new anonymous function where you explicitly name all the arguments and write out the call yourself.
+#
+# partial is more concise when you're just pre-filling arguments; lambda is more flexible when you need to do something slightly more complex, like reorder arguments or compute something.
+#
+# One practical difference: partial preserves the original function's __name__, __doc__ etc. (useful for debugging/introspection), while a lambda just shows up as <lambda> everywhere. For a request handler that probably doesn't matter, but it's a reason to prefer partial in library code.
 downloader.get(attachment['preview_url'],
                hooks={'response': functools.partial(
                    response_hook,
@@ -1960,6 +2065,10 @@ bisect.insort(thelist, newstr)
 #
 for f, b in zip(foo, bar):
     print(f, b)
+
+# Compare two lists to see if all elements in l1 are less than l2
+all(x < y for x, y in zip(l1, l2))
+# There's also "any"
 
 #
 # Reduce example
@@ -2326,6 +2435,7 @@ sys.float_info.max
 # mpld3 is very powerful, but has to come from pip (the Debian
 # version doesn't work and Ubuntu doesn't even have it);
 # pygal is more available, possibly less powerful but very simple.
+# For pygal examples, see particular or covid_timeseries.
 #
 
 ax1 = fig.add_subplot(2, 1, 1)   # nrows, ncols, plotnum
@@ -2730,7 +2840,16 @@ This makes links to the live sourcedir, so you will get changes automatically.
 When finished, if you don't want the package there any more:
   setup.py develop --uninstall
 
+
+Install from a requirements.txt:
+pip install -r requirements.txt
+
+MAKING A RELEASE
+
+
 Test installing in a virtualenv:
+
+(nopythonenv first)
 
 python3 -m venv /tmp/testpythonenv
 source /tmp/testpythonenv/bin/activate
@@ -2746,28 +2865,40 @@ Test and make sure it works.
 Save what's installed in the venv, with versions:
 pip freeze > requirements.txt
 
-Install from a requirements.txt:
-pip install -r requirements.txt
-
-Generate a dist:
+Generate a dist with setup.py:
 python3 setup.py clean
 python3 setup.py sdist bdist_wheel
     (should generate two files in dist/)
 
+Build a dist with pyproject.toml:
+rm -rf dist build (if there is one)
+python3 -m build (requires python3-build package)
+
+Check it for errors:
+twine check dist/*
+
 Upload to Test PyPI
-  First disable keyring (only need once) if you don't use Kwallet:
+  First disable keyring (only need to do once) if you don't use Kwallet:
     keyring disable
   per https://twine.readthedocs.io/en/latest/#disabling-keyring
 
 Set VERSION to something like 1.2rc1
 because you may need to change it several times when testing uploads.
+But actually, it ignores strings like rc2, so never mind that.
+You can always do 1.2.3 if you need to try several times.
 
 twine upload --repository testpypi dist/*
   (older:
    python3 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
   )
 
-Install and test in a new empty virtualenv:
+Make a new empty virtualenv:
+nopythonenv OR deactivate
+rm -rf /tmp/testpythonenv
+python3 -m venv /tmp/testpythonenv
+source /tmp/testpythonenv/bin/activate
+
+Install and test in the new venv.
 if you used preN or rcn in the version number, be sure to include ==VERSION
 
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple PACKAGENAME==VERSION
@@ -2779,9 +2910,14 @@ If that doesn't work (e.g. on Ubuntu eoan), try:
   pip install --index-url https://test.pypi.org/simple/ --no-deps PACKAGENAME
   https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1833229
   The no-deps is because test pypi may not have all the same dependencies.
-  But it means you can't test the dependencies in your 
+  But it means you can't test the dependencies in your
 
-If everything works, upload to the real PyPI:
+If everything works, remove any extra strings you added to VERSION earlier.
+Build a new dist:
+  rm -rf dist
+  python3 -m build
+
+Upload to the real PyPI:
 twine upload dist/*
 
 Specifying required versions:
