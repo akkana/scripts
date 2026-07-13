@@ -657,21 +657,25 @@ thelist = list(dict.fromkeys(thelist))
 # Rename a dictionary key:
 thedic["new_key"] = thedic.pop("old_key")
 
+# Merge two dictionaries:
+merged = {**a, **b}    # Old Python
+merged = a | b         # New Python (new being maybe 3.13-ish?)
+
 # flatten a list using a double comprehension:
-x = [[1,2,3],[4,5,6,7],[8,9]]
+x = [[1,2,3], [4,5,6,7], [8,9]]
 [i for j in x for i in j]
 [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 # Another flatten:
-# l1 = [[1,2,3],[4,5,6,7],[8,9]]
-# l2 = []
-# for lz in l1:
-#      l2.extend(lz)
-# l2 -is now [1,2,3,4,5,6,7,8,9]
+l1 = [[1,2,3],[4,5,6,7],[8,9]]
+l2 = []
+for lz in l1:
+     l2.extend(lz)
+l2 -is now [1,2,3,4,5,6,7,8,9]
 
 # flatten using itertools.chain:
-# >>> lst = [[1,2,3],[4,5,6,7],[8,9]]
-# >>> list(itertools.chain.from_iterable(lst))
+>>> lst = [[1,2,3],[4,5,6,7],[8,9]]
+>>> list(itertools.chain.from_iterable(lst))
 # [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 # Insert an item into a list BEFORE the given index:
@@ -744,7 +748,7 @@ for emp in map(EmployeeRecord._make, csv.reader(open("employees.csv", "rb"))):
     print(emp.name, emp.title)
 
 
-# Pairwise loops with zip():
+# Loop through two iterables with zip():
 names = ["Eiffel Tower", "Empire State", "Sears Tower"]
 heights = [324, 381, 442]
 for name, height in zip(names, heights):
@@ -758,6 +762,10 @@ for i, (name, height) in enumerate(zip(names, heights)):
 tall_buildings = dict(zip(names, heights))
 print max(tall_buildings.values())
 
+# Use pairwise instead of indices to check the next element in an iterable:
+for day, next_day in pairwise(days):
+    print(f"{day} today, {next_day} tomorrow")
+# Some related helpers: https://www.pythonmorsels.com/avoid-indexes-in-python/
 #
 # Read a file of name=value pairs and return a dictionary.
 #
@@ -911,6 +919,10 @@ parser = argparse.ArgumentParser(description="Long string\nwith newlines",
 
 # Print usage:
 parser.print_help()
+
+# Set usage if the default isn't good enough:
+parser = argparse.ArgumentParser(prog='PROG',
+                                 usage='%(prog)s blah blah\n%(prog)s [options]')
 
 # Custom types in argparse
 import datetime as dt
