@@ -286,12 +286,17 @@ def fork_timer(sleeptime, message):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description="Set/manage time reminders",
-                             formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description="Set or manage timed reminders",
+        usage='''%(prog)s minutes message        <- Set a timer
+       %(prog)s HH:MM [AM/PM] message  <- Set a timer
+       %(prog)s [options]              <- View/control already running timers''',
+        formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-c', '--command',  action='append', nargs='+',
                         metavar=('command', 'cmdval'),
                         help="""Commands to query running eggtimers must start
 with the PID of the process to be modified.
+Times are specified in minutes.
 Examples:
   eggtimer -c 1234 ADD 2
   eggtimer -c 1234 SUBTRACT 60
