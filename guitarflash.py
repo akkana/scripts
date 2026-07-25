@@ -47,6 +47,7 @@ GUITAR_CHORDS = {
     "B": "x24442",
     "F": "133211",
     "miniF": "xx3211",
+    "mini-F": "xx3211",
     "F#m": "244222",
 
     # "stuck 3-4 chords:
@@ -90,6 +91,7 @@ GUITAR_CHORDS = {
 
     # 6
     "F6": "13o2xx",
+    "Em6": "022020",
 
     # "Slash" chords
     "G/B": [ "x20033", "x20003" ],
@@ -438,7 +440,7 @@ def play_chord(chordname):
     args += [ "remix", "-",
               "fade", "0", str(delay + 1.5), ".1",
               "norm", "-1", "vol", str(Volume) ]
-    # print(' '.join(args))
+    print(' '.join(args))
     subprocess.call(args)
 
 
@@ -510,7 +512,13 @@ def sanity_check_chords(chords):
                 upc = c[0].upper() + c[1:]
                 if upc in GUITAR_CHORDS:
                     goodchords.append(upc)
+            # hack for mini-f/minif
+            elif c.startswith('mini') and c[-1] in 'abcdefg':
+                upc = c[:-1] + c[-1].upper()
+                if upc in GUITAR_CHORDS:
+                    goodchords.append(upc)
             else:
+                print("Adding", c, "to badchords")
                 badchords.add(c)
 
     if badchords:
