@@ -87,6 +87,10 @@ class FontApp(Gtk.Window):
         self.connect("destroy", self.save_and_quit)
         self.set_title("Fontasia: Categorize your fonts")
 
+        # Intercept Page Up/Down when focus is in the preview,
+        # so you can scroll the list without needing to click in it first.
+        self.connect("key-release-event", self.key_release)
+
         main_vbox = Gtk.VBox(spacing = 10)
         self.add(main_vbox)
 
@@ -321,6 +325,21 @@ class FontApp(Gtk.Window):
         context.add_provider_for_screen(Gdk.Screen.get_default(),
                                         self.css_provider,
                                         Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    def key_release(self, widget, event):
+        if event.keyval == Gdk.KEY_Page_Up \
+           or event.keyval == Gdk.KEY_KP_Page_Up:
+            adj = self.sw.get_vadjustment()
+            new_value = adj.get_value() - adj.get_page_increment()
+            adj.set_value(max(new_value, adj.get_lower()))
+            return True
+        elif event.keyval == Gdk.KEY_Page_Down \
+             or event.keyval == Gdk.KEY_KP_Page_Down:
+            adj = self.sw.get_vadjustment()
+            new_value = adj.get_value() + adj.get_page_increment()
+            adj.set_value(min(new_value, adj.get_upper() - adj.get_page_size()))
+            return True
+        return False
 
     def toggle_fancy_list_cb(self, widget):
         self.fancy_list = widget.get_active()
