@@ -660,6 +660,8 @@ using a no-play file or a single playlist""")
                 self.songs[self.song_ptr]).replace("_", " "))[0]
         self.set_label_text(title, self.title_labl)
 
+        self.set_title(title)
+
         try:
             artist = id3info['TPE1'].text[0]    # ARTIST
         except:
