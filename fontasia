@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# TODO: Group fonts in the same family into one entry in the list.
+# TODO: See if it's possible to query for language and screen out
+#       fonts not in the current language.
+
 # fontasia 0.9:
 # List all fonts on the system and let the user group them into categories.
 #
@@ -32,8 +36,8 @@ from gi.repository import Gtk, Gdk
 # gi.require_version('Pango', '1.0')
 from gi.repository import Pango
 
-
 import re
+import subprocess
 import os
 
 # Maximum number of faces (in the Pango sense, e.g. italic, bold, extralight)
@@ -41,16 +45,89 @@ import os
 MAX_FACES = 27
 
 
-class FontApp(Gtk.Window):
+class PersistentCheckMenuItem(Gtk.CheckMenuItem):
+    """A CheckMenuItem that toggles without closing the parent menu."""
+
+    def __init__(self, label):
+        super().__init__(label=label)
+        self.connect("button-release-event", self._on_button_release)
+
+    def _on_button_release(self, item, event):
+        self.set_active(not self.get_active())  # still fires "toggled"
+        return True  # stop propagation -> menu shell won't auto-popdown
+
+
+class ToggleOptionsMenu(Gtk.Button):
+    """A button that pops up a Gtk.Menu of toggle buttons.
+       options is a list of (shortname, prettyname).
+       When the menu is popped down, presumably after changing something,
+       call on_changed.
+       The caller can get the list of currently ON toggles
+       with get_active_list().
+    """
+
+    def __init__(self, options, on_change=None):
+        super().__init__(label="All")
+        self.on_change = on_change
+        self.items = {}
+        self.connect("clicked", self.on_clicked)
+
+        self.menu = Gtk.Menu()
+        for key, label in options:
+            item = PersistentCheckMenuItem(label)
+            item.connect("toggled", self.on_toggled, key)
+            self.menu.append(item)
+            self.items[key] = item
+        self.menu.connect("hide", self.on_menu_closed)
+        self.menu.show_all()
+
+    def get_active_list(self):
+        return [ key for key in self.items
+                 if self.items[key].get_active() ]
+
+    def on_clicked(self, button):
+        # Click the button again to close it, like a normal dropdown.
+        # On my system that happens anyway and the get_visible() check
+        # isn't required, but keeping the check seems harmless
+        # and might be safer.
+        if self.menu.get_visible():
+            self.menu.popdown()
+        else:
+            self.menu.popup_at_widget(
+                button, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None
+            )
+        self.label = 'Clicked'
+
+    def on_toggled(self, item, key):
+        pass
+
+    def set_active(self, key, active=True):
+        self.items[key].set_active(active)
+
+    def on_menu_closed(self, menu):
+        active_items = [ key for key in self.items if self.items[key].get_active() ]
+        title = ','.join([ self.items[key].get_label()
+                           for key in active_items ])
+        if not title:
+            title = "All"
+        self.set_label(title)
+        if self.on_change:
+            self.on_change(active_items)
+
+
+class FontasiaApp(Gtk.Window):
 
     # CSS for the category buttons. No longer needed, but left in
     # as an example of how to apply CSS if needed.
-#     CSS = '''
-# .highlightbtn { background-image: none; background-color: #; }
-# '''
+    #     CSS = '''
+    # .highlightbtn { background-image: none; background-color: #; }
+    # '''
 
     def __init__(self):
-        super(FontApp, self).__init__()
+        super(FontasiaApp, self).__init__()
+
+        # This populates self.langs_by_family
+        self.get_font_languages()
 
         # When the quit button is pressed we'll set the quit flag,
         # but won't actually quit -- the caller has to do that
@@ -123,6 +200,84 @@ class FontApp(Gtk.Window):
         hbox.pack_end(btn, expand=False, fill=True, padding=0)
         btn.connect("clicked", self.save_and_quit);
 
+        #
+        # Above the TreeView: selectors for which fonts to show
+        #
+
+        # Box to hold font size, view category etc.
+        hbox = Gtk.HBox(spacing=10)
+        main_vbox.pack_start(hbox, expand=False, fill=True, padding=0)
+
+        # Checkbox for rendering fonts in the font list
+        self.fancy_btn = Gtk.ToggleButton(label="Fancy list")
+        self.fancy_btn.set_active(self.fancy_list)
+        self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb)
+        hbox.pack_start(self.fancy_btn, expand=False, fill=True, padding=0)
+
+        # Button to copy current font name
+        # btn = Gtk.Button(label="Copy Font Name")
+        # hbox.pack_end(btn, expand=False)
+        # btn.connect("clicked", self.copy_font_name);
+
+        # Font size
+        label = Gtk.Label(label="Size:")
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
+
+        adj = Gtk.Adjustment(value=self.fontsize, lower=1, upper=1000,
+                             step_increment=1)
+        self.sizespin = Gtk.SpinButton(adjustment=adj)
+        self.sizespin.set_numeric(True)
+        self.sizespin.connect("value-changed", self.choose_family);
+        hbox.pack_start(self.sizespin, expand=False, fill=True, padding=0)
+
+        #
+        # View category menu
+        #
+        label = Gtk.Label(label="Show Category:")
+        # This is supposed to right-align the label, but alas it does nothing
+        # and is now deprecated in Gtk3:
+        #label.set_alignment(1.0, .5)
+        # This also doesn't right-align, but the docs are clear on that:
+        # label.set_justify(Gtk.JUSTIFY_RIGHT)
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
+
+        self.view_cat_combo = Gtk.ComboBoxText()
+        hbox.pack_start(self.view_cat_combo, expand=False, fill=True, padding=0)
+        self.cat_combo_id = self.view_cat_combo.connect("changed",
+                                                        self.combochanged)
+
+        #
+        # View Property menu
+        #
+        label = Gtk.Label(label="Show Fonts with Property:")
+        # This is supposed to right-align the label, but alas it does nothing
+        # and is now deprecated in Gtk3:
+        #label.set_alignment(1.0, .5)
+        # This also doesn't right-align, but the docs are clear on that:
+        # label.set_justify(Gtk.JUSTIFY_RIGHT)
+        hbox.pack_start(label, expand=False, fill=True, padding=0)
+
+        # Get a list of all languages supported by fonts on the system
+        all_langs = []
+        for fam in self.langs_by_family:
+            for lang in self.langs_by_family[fam]:
+                if lang not in all_langs:
+                    all_langs.append(lang)
+        all_langs.sort()
+        proplist = [ ('monospace', 'Monospace'),
+                     ('variable', 'Variable Space'),
+                     ('lang:en', 'English'),
+                     ('lang:none', 'Language unspecified')
+                   ]
+        for lang in all_langs:
+            if lang != 'en' and lang != 'none':
+                proplist.append(('lang:' + lang, lang))
+        self.view_prop_menu = ToggleOptionsMenu(proplist,
+                                                self.view_prop_changed)
+        hbox.pack_start(self.view_prop_menu, expand=False, fill=True, padding=0)
+
+        # The main hbox contains the treeview font list,
+        # plus a right pane with a lot of info about the current font.
         main_hbox = Gtk.HBox(spacing = 10)
         main_vbox.add(main_hbox)
 
@@ -161,57 +316,15 @@ class FontApp(Gtk.Window):
         main_hbox.pack_start(self.sw, expand=False, fill=True, padding=0)
 
         #
-        # Right pane: the controls
+        # Right pane: details on the current font
         #
         vbox = Gtk.VBox(spacing=15)
         main_hbox.pack_start(vbox, expand=True, fill=True, padding=0)
 
-        # Box to hold font size, view category etc.
-        hbox = Gtk.HBox(spacing=10)
-        vbox.pack_start(hbox, expand=False, fill=True, padding=0)
-
-        # Checkbox for rendering fonts in the font list
-        self.fancy_btn = Gtk.ToggleButton(label="Fancy list")
-        self.fancy_btn.set_active(self.fancy_list)
-        self.fancy_btn.connect("toggled", self.toggle_fancy_list_cb)
-        hbox.pack_start(self.fancy_btn, expand=False, fill=True, padding=0)
-
-        # Button to copy current font name
-        # btn = Gtk.Button(label="Copy Font Name")
-        # hbox.pack_end(btn, expand=False)
-        # btn.connect("clicked", self.copy_font_name);
-
-        # Font size
-        label = Gtk.Label(label="Size:")
-        hbox.pack_start(label, expand=False, fill=True, padding=0)
-
-        adj = Gtk.Adjustment(value=self.fontsize, lower=1, upper=1000,
-                             step_increment=1)
-        self.sizespin = Gtk.SpinButton(adjustment=adj)
-        self.sizespin.set_numeric(True)
-        self.sizespin.connect("value-changed", self.choose_family);
-        hbox.pack_start(self.sizespin, expand=False, fill=True, padding=0)
-
         #
-        # View category menu
+        # Categories current font is in
         #
-        label = Gtk.Label(label="Show Category:")
-        # This is supposed to right-align the label, but alas it does nothing
-        # and is now deprecated in Gtk3:
-        #label.set_alignment(1.0, .5)
-        # This also doesn't right-align, but the docs are clear on that:
-        # label.set_justify(Gtk.JUSTIFY_RIGHT)
-        hbox.pack_start(label, expand=False, fill=True, padding=0)
-
-        self.view_cat_combo = Gtk.ComboBoxText()
-        hbox.pack_start(self.view_cat_combo, expand=False, fill=True, padding=0)
-        self.combo_connect_id = self.view_cat_combo.connect("changed",
-                                                            self.combochanged)
-
-        #
-        # Category area
-        #
-        frame = Gtk.Frame(label="Categories")
+        frame = Gtk.Frame(label="In User Categories")
         frame.set_shadow_type(Gtk.ShadowType.IN)
         vbox.pack_start(frame, expand=False, fill=True, padding=0)
         fvbox = Gtk.VBox(spacing=15)
@@ -245,7 +358,7 @@ class FontApp(Gtk.Window):
         #
         # Style area (what Pango calls faces):
         #
-        frame = Gtk.Frame(label="Styles")
+        frame = Gtk.Frame(label="Has Styles")
         # Shadow types don't currently seem to work, but leave it here
         # in case it ever starts working
         frame.set_shadow_type(Gtk.ShadowType.IN)
@@ -266,15 +379,10 @@ class FontApp(Gtk.Window):
         # Apply the CSS: not currently used.
         #
         # self.css_provider = Gtk.CssProvider()
-        # self.apply_CSS(FontApp.CSS)
+        # self.apply_CSS(FontasiaApp.CSS)
 
         # Not sure if this could be done earlier
         self.preview.get_style_context().add_class("preview")
-
-        # Pango can tell us about monospace fonts, so make a special category
-        # which will be at index 0:
-        self.add_category("_Monospace")
-        self.MONOSPACE_CAT_I = 0
 
         # Read in all system and user fonts and update the UI accordingly
         self.update_font_list()
@@ -428,10 +536,14 @@ class FontApp(Gtk.Window):
             # self.update_category_buttons(fontname)
         self.treeview.grab_focus()
 
+    def view_prop_changed(self, active_items):
+        self.update_font_list()
+
     # Update the View Categories combobox:
     def update_cats_menu(self):
-        if self.combo_connect_id:
-            self.view_cat_combo.handler_block(self.combo_connect_id)
+        """Populate the user categories menu"""
+        if self.cat_combo_id:
+            self.view_cat_combo.handler_block(self.cat_combo_id)
 
         self.view_cat_combo.get_model().clear()
         # A recent Gtk3 change requires this or none of the combobox entries
@@ -450,8 +562,8 @@ class FontApp(Gtk.Window):
 
         self.view_cat_combo.set_active(0)
 
-        if self.combo_connect_id:
-            self.view_cat_combo.handler_unblock(self.combo_connect_id)
+        if self.cat_combo_id:
+            self.view_cat_combo.handler_unblock(self.cat_combo_id)
 
     # How to get the active text from a combobox:
     def cur_category(self):
@@ -464,9 +576,12 @@ class FontApp(Gtk.Window):
     def combochanged(self, widget):
         curcat = self.cur_category()
         if curcat:
-            self.update_font_list(curcat)
+            self.update_font_list()
 
-    def update_font_list(self, catname = "All fonts"):
+    def update_font_list(self):
+        catname = self.cur_category()
+        if not catname:
+            catname = "All fonts"
         special = (catname[0:3] == "All")
         if special:
             show_all = (catname == "All fonts")
@@ -479,20 +594,61 @@ class FontApp(Gtk.Window):
         # Create or clear the list store:
         self.store.clear()
 
-        # Clear the special _Monospace category too:
-        self.category_fontlists[self.MONOSPACE_CAT_I] = []
+        active_props = self.view_prop_menu.get_active_list()
 
         self.font_families = {}
         for ff in self.all_families:
             fname = ff.get_name()
 
-            # Is it monospace?
-            if ff.is_monospace():
-                self.category_fontlists[self.MONOSPACE_CAT_I].append(fname)
-
             # Pango doesn't seem to have any way to get the font family object
             # from its name. So store all families as a dictionary.
             self.font_families[fname] = ff
+
+            # Should it be shown based on its properties?
+            hide_font = False
+            # Collect languages specified, if any
+            languages = set()
+            for prop in active_props:
+                if prop.startswith('lang:'):
+                    languages.add(prop[5:])
+            for prop in active_props:
+                if prop == 'monospace':
+                    if not ff.is_monospace():
+                        hide_font = True
+                        break
+                if prop == 'variable':
+                    if not ff.is_variable():
+                        hide_font = True
+                        break
+                if languages:
+                    # fc-list doesn't list all the families pango sees,
+                    # e.g. it doesn't see classes like 'Monospace'.
+                    # If something wasn't in fc-list, show it.
+                    if fname not in self.langs_by_family:
+                        break
+
+                    # Some fonts don't list languages,
+                    # including a lot of the noto crap that's for
+                    # specific languages, like cuneiform.
+                    # By default, if you specify at least one language,
+                    # fonts that don't specify a language won't be
+                    # shown, but you can show them by checking
+                    # Language unspecified.
+                    if not self.langs_by_family[fname] \
+                       and 'none' not in languages:
+                        hide_font = True
+                        break
+
+                    # If there's no intersection between languages specified
+                    # by the user and languages listed by fc-list,
+                    # skip this font.
+                    if not languages.intersection(
+                            set(self.langs_by_family[fname])):
+                        hide_font = True
+                        break
+
+            if hide_font:
+                continue
 
             # Else not a special case. Just check for cat membership:
             if not special:
@@ -857,7 +1013,8 @@ class FontApp(Gtk.Window):
         baseindex = None
 
         i = 0
-        for face in sorted(font_family.list_faces(), key=FontApp.facename_key):
+        for face in sorted(font_family.list_faces(),
+                           key=FontasiaApp.facename_key):
             facename = face.get_face_name()
             if facename in facenames:
                 # A lot of fonts have repeated face names
@@ -940,8 +1097,33 @@ class FontApp(Gtk.Window):
             btn.set_active(False)
         self.update_font_list()
 
+
+    def get_font_languages(self):
+        """Get a list of all fonts and their languages by shelling out
+           to fc-list, since there's no way to get this info from Pango.
+           Return a dictionary of 'family name': { set of 2-letter language codes }
+        """
+        # Fontconfig tags each font with an FC_LANG property,
+        # a set of ISO 639 language codes it covers
+        out = subprocess.run(
+            ["fc-list", "--format", "%{family[0]}\t%{lang}\n"],
+            capture_output=True, text=True, check=True
+        ).stdout
+
+        self.langs_by_family = {}
+        for line in out.splitlines():
+            if not line.strip() or "\t" not in line:
+                continue
+            family, langs = line.split("\t", 1)
+            if family not in self.langs_by_family:
+                self.langs_by_family[family] = set()
+            if langs:
+                langs = langs.split("|")
+                self.langs_by_family[family] |= set(langs)
+
+
 def python_fu_fontasia():
-    fontwin = FontApp()
+    fontwin = FontasiaApp()
 
     # fontwin.connect("destroy", Gtk.main_quit)
     # Gtk.main()
@@ -985,8 +1167,8 @@ if __name__ == '__main__':
     # if rc:
     #     sys.exit(0)
 
-    fontwin = FontApp()
+    fontwin = FontasiaApp()
     while not fontwin.quit:
         Gtk.main_iteration()
-    # Trust that the FontApp has already saved new categories, etc.
+    # Trust that the FontasiaApp has already saved new categories, etc.
     sys.exit(0)
