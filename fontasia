@@ -4,7 +4,7 @@
 # TODO: See if it's possible to query for language and screen out
 #       fonts not in the current language.
 
-# fontasia 0.9:
+# fontasia 0.95:
 # List all fonts on the system and let the user group them into categories.
 #
 # Can be run as a standalone script, or as a GIMP 2.x plug-in font chooser
@@ -27,8 +27,6 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Thanks to jan bodnar's ZetCode.com PyGTK/Pango tutorial.
-
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -43,76 +41,6 @@ import os
 # Maximum number of faces (in the Pango sense, e.g. italic, bold, extralight)
 # to show for a given font family:
 MAX_FACES = 27
-
-
-class PersistentCheckMenuItem(Gtk.CheckMenuItem):
-    """A CheckMenuItem that toggles without closing the parent menu."""
-
-    def __init__(self, label):
-        super().__init__(label=label)
-        self.connect("button-release-event", self._on_button_release)
-
-    def _on_button_release(self, item, event):
-        self.set_active(not self.get_active())  # still fires "toggled"
-        return True  # stop propagation -> menu shell won't auto-popdown
-
-
-class ToggleOptionsMenu(Gtk.Button):
-    """A button that pops up a Gtk.Menu of toggle buttons.
-       options is a list of (shortname, prettyname).
-       When the menu is popped down, presumably after changing something,
-       call on_changed.
-       The caller can get the list of currently ON toggles
-       with get_active_list().
-    """
-
-    def __init__(self, options, on_change=None):
-        super().__init__(label="All")
-        self.on_change = on_change
-        self.items = {}
-        self.connect("clicked", self.on_clicked)
-
-        self.menu = Gtk.Menu()
-        for key, label in options:
-            item = PersistentCheckMenuItem(label)
-            item.connect("toggled", self.on_toggled, key)
-            self.menu.append(item)
-            self.items[key] = item
-        self.menu.connect("hide", self.on_menu_closed)
-        self.menu.show_all()
-
-    def get_active_list(self):
-        return [ key for key in self.items
-                 if self.items[key].get_active() ]
-
-    def on_clicked(self, button):
-        # Click the button again to close it, like a normal dropdown.
-        # On my system that happens anyway and the get_visible() check
-        # isn't required, but keeping the check seems harmless
-        # and might be safer.
-        if self.menu.get_visible():
-            self.menu.popdown()
-        else:
-            self.menu.popup_at_widget(
-                button, Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None
-            )
-        self.label = 'Clicked'
-
-    def on_toggled(self, item, key):
-        pass
-
-    def set_active(self, key, active=True):
-        self.items[key].set_active(active)
-
-    def on_menu_closed(self, menu):
-        active_items = [ key for key in self.items if self.items[key].get_active() ]
-        title = ','.join([ self.items[key].get_label()
-                           for key in active_items ])
-        if not title:
-            title = "All"
-        self.set_label(title)
-        if self.on_change:
-            self.on_change(active_items)
 
 
 class FontasiaApp(Gtk.Window):
@@ -142,16 +70,20 @@ class FontasiaApp(Gtk.Window):
         self.font_families = {}
 
         # No categories to start with
-        self.category_fontlists = []
         self.category_buttons = []
         self.facebuttons = []
         self.DEFAULT_TEXT = "The quick brown fox jumped over the lazy dog"
         self.preview_text = self.DEFAULT_TEXT
         self.DEFAULT_FONT_SIZE = 18
-        self.fontsize = self.DEFAULT_FONT_SIZE
         self.fancy_list = True
 
+        # Items that will be remembered in the config file
+        self.category_fontlists = []
+        self.fontsize = self.DEFAULT_FONT_SIZE
+        self.current_font = None
+
         # Default sizes: can be overridden in .config/fontasia/fontasia.conf
+
         self.win_width = 760
         self.win_height = 400
         self.preview_height = 56
@@ -273,7 +205,8 @@ class FontasiaApp(Gtk.Window):
             if lang != 'en' and lang != 'none':
                 proplist.append(('lang:' + lang, lang))
         self.view_prop_menu = ToggleOptionsMenu(proplist,
-                                                self.view_prop_changed)
+                                                self.view_prop_changed,
+                                                max_visible=16)
         hbox.pack_start(self.view_prop_menu, expand=False, fill=True, padding=0)
 
         # The main hbox contains the treeview font list,
@@ -303,6 +236,9 @@ class FontasiaApp(Gtk.Window):
         # and this used to work, but no longer does:
         selection = self.treeview.get_selection()
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+
+        self.treeview.connect("button-press-event",
+                              self._on_treeview_button_press)
 
         # This doesn't work with multiple selection:
         # self.treeview.connect("cursor-changed", self.choose_family);
@@ -536,7 +472,7 @@ class FontasiaApp(Gtk.Window):
             # self.update_category_buttons(fontname)
         self.treeview.grab_focus()
 
-    def view_prop_changed(self, active_items):
+    def view_prop_changed(self):
         self.update_font_list()
 
     # Update the View Categories combobox:
@@ -578,7 +514,46 @@ class FontasiaApp(Gtk.Window):
         if curcat:
             self.update_font_list()
 
+    def _on_treeview_button_press(self, treeview, event):
+        if event.button != 1:
+            return False
+        if not event.state:
+            # This doesn't get triggered, at least for me, because
+            # GDK_MOD2_MASK is always set. That's NumLock.
+            print("Not event.state")
+            return False
+
+        path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
+        if path_info is None:
+            return False
+        path, column, cell_x, cell_y = path_info
+        selection = treeview.get_selection()
+
+        if event.state & Gdk.ModifierType.SHIFT_MASK:
+            anchor_path, _ = treeview.get_cursor()
+            if anchor_path is not None:
+                selection.select_range(anchor_path, path)
+            else:
+                selection.select_path(path)
+            return True
+
+        if event.state & Gdk.ModifierType.CONTROL_MASK:
+            if selection.path_is_selected(path):
+                selection.unselect_path(path)
+            else:
+                selection.select_path(path)
+            return True
+
+        return False  # not a ctrl-click: let GTK do its normal thing
+
     def update_font_list(self):
+        # Save the selected font(s), if any
+        tvselection = self.treeview.get_selection()
+        model, item = tvselection.get_selected_rows()
+        selected_fonts = []
+        for x in item:
+            selected_fonts.append(model[x[0]][0])
+
         catname = self.cur_category()
         if not catname:
             catname = "All fonts"
@@ -595,6 +570,7 @@ class FontasiaApp(Gtk.Window):
         self.store.clear()
 
         active_props = self.view_prop_menu.get_active_list()
+        tvselection.unselect_all()
 
         self.font_families = {}
         for ff in self.all_families:
@@ -676,6 +652,25 @@ class FontasiaApp(Gtk.Window):
                     self.store.append([fname])
                 continue
 
+        # Re-select anything that was selected before
+        if selected_fonts:
+            # Do this first before looping, otherwise set_cursor
+            # will overwrite any multi-selection
+            self.select_font_by_name(selected_fonts[0])
+            first_path = None
+            for row, treemodelrow in enumerate(self.store):
+                if treemodelrow[0] in selected_fonts:
+                    path = Gtk.TreePath.new_from_indices([row])
+                    tvselection.select_path(path)
+                    if first_path is None:
+                        first_path = path
+        # Control-click doesn't work in the treeview until focus is set there,
+        # so it takes two control-clicks to add another selection,
+        # even though regular left click works the first time.
+        # This fixes it, but at the cost of stealing focus which ought
+        # to be in the text field:
+        # self.treeview.grab_focus()
+
         # Reset all the button colors, since nothing is selected now
         # (eventually might be nice to retain the old selection,
         # if it's still in the list):
@@ -695,8 +690,8 @@ class FontasiaApp(Gtk.Window):
             # treemodelrow[0] is the name of the font
             if treemodelrow[0] == fontname:
                 # print("Matched line", row, treemodelrow[0])
-                col0 = self.treeview.get_column(0)
-                self.treeview.set_cursor(row, col0, True)
+                self.treeview.set_cursor(row, self.treeview.get_column(0),
+                                         False)
                 self.treeview.scroll_to_cell(row)
                 return
 
@@ -810,7 +805,7 @@ class FontasiaApp(Gtk.Window):
             except:
                 print("Problem saving the string; reverting to default string")
 
-        curfont = self.current_font_family()
+        curfont = self.get_cur_font_family()
         if curfont:
             print("set fontname=" + curfont, file=catfp)
 
@@ -896,18 +891,23 @@ class FontasiaApp(Gtk.Window):
 
         self.ignore_callbacks = False
 
-    def current_font_family(self):
+    def get_cur_font_family(self):
         selection = self.treeview.get_selection()
         model, item = selection.get_selected_rows()
 
         if not item:
+            if self.current_font:
+                return self.current_font
             return None
+
+        self.current_font = model[item[0][0]][0]
+
         # Only render the first font.
         return model[item[0][0]][0]
 
     def copy_font_name(self, widget):
         """Copy current font face name to both PRIMARY and CLIPBOARD"""
-        curfont = self.current_font_family()
+        curfont = self.get_cur_font_family()
 
         atom = Gdk.atom_intern('PRIMARY', True)
         clipboard = widget.get_clipboard(atom)
@@ -991,7 +991,7 @@ class FontasiaApp(Gtk.Window):
 
     def choose_family(self, widget):
         self.fontsize = self.sizespin.get_value()
-        familyname = self.current_font_family()
+        familyname = self.get_cur_font_family()
         if not familyname:
             return
 
@@ -1077,7 +1077,7 @@ class FontasiaApp(Gtk.Window):
         if self.ignore_callbacks:
             return
 
-        family = self.font_families[self.current_font_family()]
+        family = self.font_families[self.get_cur_font_family()]
         face = self.faces[index]
 
         # Toggle off all the other buttons.
@@ -1101,7 +1101,7 @@ class FontasiaApp(Gtk.Window):
     def get_font_languages(self):
         """Get a list of all fonts and their languages by shelling out
            to fc-list, since there's no way to get this info from Pango.
-           Return a dictionary of 'family name': { set of 2-letter language codes }
+           Return a dictionary 'family name': { set of 2-letter language codes }
         """
         # Fontconfig tags each font with an FC_LANG property,
         # a set of ISO 639 language codes it covers
@@ -1120,6 +1120,137 @@ class FontasiaApp(Gtk.Window):
             if langs:
                 langs = langs.split("|")
                 self.langs_by_family[family] |= set(langs)
+
+
+class PersistentCheckMenuItem(Gtk.CheckMenuItem):
+    """A CheckMenuItem that toggles without closing the parent menu."""
+
+    def __init__(self, label):
+        super().__init__(label=label)
+        self.connect("button-release-event", self._on_button_release)
+
+    def _on_button_release(self, item, event):
+        self.set_active(not self.get_active())  # still fires "toggled"
+        return True  # stop propagation -> menu shell won't auto-popdown
+
+
+class ToggleOptionsMenu(Gtk.Button):
+    """A button that pops up a scrollable list of check buttons.
+       options is a list of (shortname, prettyname).
+       When the menu is popped down, presumably after changing something,
+       call on_changed (passing no arguments).
+       The caller can get the list of currently ON toggles
+       with get_active_list().
+    """
+
+    def __init__(self, options, on_changed=None, max_visible=8):
+        super().__init__(label="All")
+        self.on_changed = on_changed
+        self.items = {}
+        self.connect("clicked", self._on_clicked)
+
+        self.popup = Gtk.Window(type=Gtk.WindowType.POPUP)
+        self.popup.set_type_hint(Gdk.WindowTypeHint.POPUP_MENU)
+        self.popup.connect("button-press-event", self._on_popup_button_press)
+        self.popup.connect("key-press-event", self._on_popup_key_press)
+        self.popup.connect("grab-broken-event", lambda *a: self._popdown())
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_border_width(4)
+        for key, label in options:
+            btn = Gtk.CheckButton(label=label)
+            btn.set_relief(Gtk.ReliefStyle.NONE)
+            btn.connect("toggled", self._on_toggled, key)
+            box.pack_start(btn, False, False, 0)
+            self.items[key] = btn
+        box.show_all()
+
+        scrolled.add(box)
+        self.popup.add(scrolled)
+
+        # Cap the popup's height so it scrolls after max_visible rows
+        # instead of growing to fit every item. Approximate row height
+        # from one button; nudge max_visible/row_height if it's off.
+        row_height = box.get_preferred_height()[1] // max(len(options), 1)
+        scrolled.set_min_content_height(min(len(options),
+                                            max_visible) * row_height)
+        scrolled.set_max_content_height(max_visible * row_height)
+        scrolled.set_propagate_natural_height(True)
+
+    def _on_clicked(self, button):
+        if self.popup.get_visible():
+            self._popdown()
+        else:
+            self._popup()
+
+    def _popup(self):
+        window = self.get_window()
+        alloc = self.get_allocation()
+        x, y = window.get_root_coords(alloc.x, alloc.y)
+        self.popup.move(x, y + alloc.height)
+        self.popup.set_size_request(alloc.width, -1)
+        self.popup.show_all()
+        # Explicitly focus it so it actually receives key events (Escape) --
+        # override-redirect popups aren't given focus by the WM automatically.
+        self.popup.get_window().focus(Gdk.CURRENT_TIME)
+        self._grab()
+        self.popup.grab_add()
+
+    def _popdown(self):
+        self._ungrab()
+        self.popup.grab_remove()
+        self.popup.hide()
+
+        active_items = [ key for key in self.items
+                         if self.items[key].get_active() ]
+        title = ','.join([ self.items[key].get_label()
+                           for key in active_items ])
+        if not title:
+            title = "All"
+        self.set_label(title)
+
+        if self.on_changed:
+            self.on_changed()
+
+    def _grab(self):
+        seat = Gdk.Display.get_default().get_default_seat()
+        seat.grab(
+            self.popup.get_window(),
+            Gdk.SeatCapabilities.ALL,
+            True,  # owner_events: clicks inside the popup still reach its widgets
+            None, None, None, None,
+        )
+
+    def _ungrab(self):
+        Gdk.Display.get_default().get_default_seat().ungrab()
+
+    def _on_popup_button_press(self, widget, event):
+        # Anything outside the popup's on-screen rectangle counts as "outside".
+        px, py = self.popup.get_position()
+        pw, ph = self.popup.get_size()
+        if not (px <= event.x_root <= px + pw and py <= event.y_root <= py + ph):
+            self._popdown()
+            return True
+        return False
+
+    def _on_popup_key_press(self, widget, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self._popdown()
+            return True
+        return False
+
+    def _on_toggled(self, button, key):
+        pass
+
+    def set_active(self, key, active=True):
+        self.items[key].set_active(active)
+
+    def get_active_list(self):
+        return [ key for key in self.items
+                 if self.items[key].get_active() ]
 
 
 def python_fu_fontasia():
