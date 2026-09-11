@@ -70,12 +70,14 @@ class FontasiaApp(Gtk.Window):
         self.font_families = {}
 
         # No categories to start with
+        self.default_fonts = []
         self.category_buttons = []
         self.facebuttons = []
         self.DEFAULT_TEXT = "The quick brown fox jumped over the lazy dog"
         self.preview_text = self.DEFAULT_TEXT
         self.DEFAULT_FONT_SIZE = 18
         self.fancy_list = True
+        self.default_props = []
 
         # Items that will be remembered in the config file
         self.category_fontlists = []
@@ -196,10 +198,11 @@ class FontasiaApp(Gtk.Window):
                 if lang not in all_langs:
                     all_langs.append(lang)
         all_langs.sort()
-        proplist = [ ('monospace', 'Monospace'),
-                     ('variable', 'Variable Space'),
-                     ('lang:en', 'English'),
-                     ('lang:none', 'Language unspecified')
+        proplist = [ ['monospace', 'Monospace'],
+                     ['variable', 'Variable Space'],
+                     ['lang:en', 'English'],
+                     ['excludeCJK', 'Exclude CJK'],
+                     ['lang:none', 'Language unspecified']
                    ]
         for lang in all_langs:
             if lang != 'en' and lang != 'none':
@@ -320,13 +323,13 @@ class FontasiaApp(Gtk.Window):
         # Not sure if this could be done earlier
         self.preview.get_style_context().add_class("preview")
 
-        # Read in all system and user fonts and update the UI accordingly
-        self.update_font_list()
-
-        #
-        # Just before showing, update everything:
-        #
+        # Read the prefs file
         self.read_category_file()
+
+        self.view_prop_menu.set_options(self.default_props)
+
+        # Read in all system and user fonts and update the UI accordingly
+        self.update_font_list(self.default_fonts)
 
         # Set size requests, now that we've read them from the config file:
         self.set_default_size(self.win_width, self.win_height)
@@ -334,8 +337,6 @@ class FontasiaApp(Gtk.Window):
         self.sw.set_size_request(self.list_width, -1)
         #self.sw.set_size_request(self.list_width, self.list_height)
         self.preview.set_size_request(-1, self.preview_height)
-
-        self.choose_family(self.treeview)
 
         # Done with UI, finish showing window
         self.show_all()
@@ -352,7 +353,6 @@ class FontasiaApp(Gtk.Window):
 
         # Try again to set multi-selection mode: sometimes it doesn't work
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-
 
     def save_and_quit(self, widget=None):
         self.write_category_file()
@@ -520,7 +520,6 @@ class FontasiaApp(Gtk.Window):
         if not event.state:
             # This doesn't get triggered, at least for me, because
             # GDK_MOD2_MASK is always set. That's NumLock.
-            print("Not event.state")
             return False
 
         path_info = treeview.get_path_at_pos(int(event.x), int(event.y))
@@ -546,13 +545,14 @@ class FontasiaApp(Gtk.Window):
 
         return False  # not a ctrl-click: let GTK do its normal thing
 
-    def update_font_list(self):
+    def update_font_list(self, selected_fonts=None):
         # Save the selected font(s), if any
         tvselection = self.treeview.get_selection()
         model, item = tvselection.get_selected_rows()
-        selected_fonts = []
-        for x in item:
-            selected_fonts.append(model[x[0]][0])
+        if not selected_fonts:
+            selected_fonts = []
+            for x in item:
+                selected_fonts.append(model[x[0]][0])
 
         catname = self.cur_category()
         if not catname:
@@ -594,6 +594,10 @@ class FontasiaApp(Gtk.Window):
                         break
                 if prop == 'variable':
                     if not ff.is_variable():
+                        hide_font = True
+                        break
+                if prop == 'excludeCJK':
+                    if 'CJK' in fname:
                         hide_font = True
                         break
                 if languages:
@@ -730,7 +734,7 @@ class FontasiaApp(Gtk.Window):
                         continue
 
                     if varval[0] == "fontname":
-                        self.select_font_by_name(varval[1])
+                        self.default_fonts = varval[1].split(',')
                         continue
 
                     if varval[0] == "fontsize":
@@ -753,6 +757,9 @@ class FontasiaApp(Gtk.Window):
                         continue
                     if varval[0] == "list_width":
                         self.list_width = int(varval[1])
+                        continue
+                    if varval[0] == "props":
+                        self.default_props = varval[1].split(',')
                         continue
 
                     # Arguably should save any other values
@@ -779,18 +786,6 @@ class FontasiaApp(Gtk.Window):
         except IOError:
             print("No fontasia conf file yet -- Welcome to fontasia!")
 
-            # Set up a couple of default categories with likely fonts
-            # self.add_category('monospace')
-            # self.toggle_font_in_category('Courier 10 Pitch', 'monospace', True)
-            # self.toggle_font_in_category('DejaVu Sans Mono', 'monospace', True)
-            # self.toggle_font_in_category('FreeMono', 'monospace', True)
-            # self.toggle_font_in_category('Monospace', 'monospace', True)
-            # self.toggle_font_in_category('Liberation Mono', 'monospace', True)
-            # self.toggle_font_in_category('Nimbus Mono L', 'monospace', True)
-            # self.add_category('script')
-            # self.toggle_font_in_category('Purisa', 'script', True)
-            # self.toggle_font_in_category('URW Chancery L', 'script', True)
-
             return
 
     def write_category_file(self):
@@ -805,9 +800,9 @@ class FontasiaApp(Gtk.Window):
             except:
                 print("Problem saving the string; reverting to default string")
 
-        curfont = self.get_cur_font_family()
-        if curfont:
-            print("set fontname=" + curfont, file=catfp)
+        curfonts = self.get_selected_fonts()
+        if curfonts:
+            print("set fontname=" + ','.join(curfonts), file=catfp)
 
         fontsize = self.sizespin.get_value()
         if fontsize != self.DEFAULT_FONT_SIZE:
@@ -831,6 +826,10 @@ class FontasiaApp(Gtk.Window):
                 continue
             print(catname + ":", ', '.join(self.category_fontlists[i]),
                   file=catfp)
+
+        active_props = self.view_prop_menu.get_active_list()
+        print("set props=" + ','.join([prop for prop in active_props]), file=catfp)
+
         catfp.close()
         print("Saved to", self.cat_file_name)
 
@@ -900,10 +899,19 @@ class FontasiaApp(Gtk.Window):
                 return self.current_font
             return None
 
-        self.current_font = model[item[0][0]][0]
+        self.current_fonts = model[item[0][0]][0]
 
         # Only render the first font.
         return model[item[0][0]][0]
+
+    def get_selected_fonts(self):
+        selection = self.treeview.get_selection()
+        model, item = selection.get_selected_rows()
+
+        if not item:
+            return []
+
+        return [model[it[0]][0] for it in item]
 
     def copy_font_name(self, widget):
         """Copy current font face name to both PRIMARY and CLIPBOARD"""
@@ -989,9 +997,10 @@ class FontasiaApp(Gtk.Window):
 
         return lastword + ' ' + ' '.join(words)
 
-    def choose_family(self, widget):
+    def choose_family(self, widget, familyname=None):
         self.fontsize = self.sizespin.get_value()
-        familyname = self.get_cur_font_family()
+        if not familyname:
+            familyname = self.get_cur_font_family()
         if not familyname:
             return
 
@@ -1051,7 +1060,9 @@ class FontasiaApp(Gtk.Window):
 
             btn.show()
 
-        # hide the unused high-number buttons
+        # hide the unused high-number buttons.
+        # How I wish there was a way to change button states without
+        # triggering callbacks every time!
         self.ignore_callbacks = True
         for j, btn in enumerate(self.facebuttons[i:]):
             index = i + j
@@ -1075,6 +1086,8 @@ class FontasiaApp(Gtk.Window):
 
     def facebutton_cb(self, button, index):
         if self.ignore_callbacks:
+            return
+        if not self.get_cur_font_family():
             return
 
         family = self.font_families[self.get_cur_font_family()]
@@ -1136,7 +1149,8 @@ class PersistentCheckMenuItem(Gtk.CheckMenuItem):
 
 class ToggleOptionsMenu(Gtk.Button):
     """A button that pops up a scrollable list of check buttons.
-       options is a list of (shortname, prettyname).
+       options is a list of (shortname, prettyname)
+       or (shortname, prettyname, true) for options that should be toggled on.
        When the menu is popped down, presumably after changing something,
        call on_changed (passing no arguments).
        The caller can get the list of currently ON toggles
@@ -1163,7 +1177,6 @@ class ToggleOptionsMenu(Gtk.Button):
         for key, label in options:
             btn = Gtk.CheckButton(label=label)
             btn.set_relief(Gtk.ReliefStyle.NONE)
-            btn.connect("toggled", self._on_toggled, key)
             box.pack_start(btn, False, False, 0)
             self.items[key] = btn
         box.show_all()
@@ -1179,6 +1192,13 @@ class ToggleOptionsMenu(Gtk.Button):
                                             max_visible) * row_height)
         scrolled.set_max_content_height(max_visible * row_height)
         scrolled.set_propagate_natural_height(True)
+
+    def set_options(self, optionlist):
+        for key in self.items:
+            for opt in optionlist:
+                if key == opt:
+                    self.items[key].set_active(True)
+        self.update_title()
 
     def _on_clicked(self, button):
         if self.popup.get_visible():
@@ -1203,7 +1223,9 @@ class ToggleOptionsMenu(Gtk.Button):
         self._ungrab()
         self.popup.grab_remove()
         self.popup.hide()
+        self.update_title()
 
+    def update_title(self):
         active_items = [ key for key in self.items
                          if self.items[key].get_active() ]
         title = ','.join([ self.items[key].get_label()
@@ -1241,9 +1263,6 @@ class ToggleOptionsMenu(Gtk.Button):
             self._popdown()
             return True
         return False
-
-    def _on_toggled(self, button, key):
-        pass
 
     def set_active(self, key, active=True):
         self.items[key].set_active(active)
