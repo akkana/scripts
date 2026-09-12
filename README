@@ -233,7 +233,7 @@ fix_agenda.py:
     Requires word2html (in this git repo), python-mammoth, unoconv
     (a part of Libre Office), and BeautifulSoup.
 
-fontasia:
+fontasia.py:
     A Linux font chooser and categorizer.
     Also works as a GIMP plug-in font chooser.
 
