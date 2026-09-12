@@ -36,6 +36,7 @@ from gi.repository import Pango
 
 import re
 import subprocess
+from itertools import pairwise
 import os
 
 # Maximum number of faces (in the Pango sense, e.g. italic, bold, extralight)
@@ -218,14 +219,14 @@ class FontasiaApp(Gtk.Window):
         main_vbox.add(main_hbox)
 
         #
-        # Left pane: the font list, a TreeView backed by a ListStore
+        # Left pane: the font list, a TreeView backed by a TreeStore
         #
         self.sw = Gtk.ScrolledWindow()
         self.sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
 
         context = self.create_pango_context()
         self.all_families = context.list_families()
-        self.store = Gtk.ListStore(str)
+        self.store = Gtk.TreeStore(str)
 
         self.treeview = Gtk.TreeView(model=self.store)
         # XXX deprecated
@@ -259,6 +260,22 @@ class FontasiaApp(Gtk.Window):
         #
         vbox = Gtk.VBox(spacing=15)
         main_hbox.pack_start(vbox, expand=True, fill=True, padding=0)
+
+        # Current font name, since some of them aren't actually readable
+        # with the "fancy font list" setting
+        self.fontname_label = Gtk.Label(label="Font Name")
+        self.fontname_label.set_xalign(0)
+        boldprovider = Gtk.CssProvider()
+        boldprovider.load_from_data('''
+.boldlabel {
+    font-weight: bold;
+    font-size: 14pt;
+}''')
+        self.fontname_label.get_style_context().add_class("boldlabel")
+        self.fontname_label.get_style_context().add_provider(
+            boldprovider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        vbox.pack_start(self.fontname_label, expand=False, fill=True, padding=0)
 
         #
         # Categories current font is in
@@ -554,33 +571,17 @@ class FontasiaApp(Gtk.Window):
             for x in item:
                 selected_fonts.append(model[x[0]][0])
 
-        catname = self.cur_category()
-        if not catname:
-            catname = "All fonts"
-        special = (catname[0:3] == "All")
-        if special:
-            show_all = (catname == "All fonts")
-            show_all_in_cats = (catname == "All in categories")
-            show_all_not_in_cats = (catname == "All uncategorized")
-        # if show_all or show_all_in_cats:
-        #     for catbtn in self.category_buttons:
-        #         catbtn.set_active(show_all_in_cats)
-
         # Create or clear the list store:
         self.store.clear()
 
         active_props = self.view_prop_menu.get_active_list()
         tvselection.unselect_all()
 
+        catname = self.cur_category()
+
         self.font_families = {}
         for ff in self.all_families:
             fname = ff.get_name()
-            if fname == 'Sans':
-                print(ff.get_face().get_face_name())
-
-            # Pango doesn't seem to have any way to get the font family object
-            # from its name. So store all families as a dictionary.
-            self.font_families[fname] = ff
 
             # Should it be shown based on its properties?
             hide_font = False
@@ -629,34 +630,61 @@ class FontasiaApp(Gtk.Window):
                         hide_font = True
                         break
 
+            # Okay, it's not excluded by property or language.
+            # Should it be excluded because it doesn't fit the
+            # category-related buttons?
+            if catname == "All in categories":
+                hide_font = True
+                for catbtn in self.category_buttons:
+                    if self.is_font_in_category(fname, catbtn.get_name()):
+                        hide_font = False
+                        break
+            elif catname == "All uncategorized":
+                hide_font = False
+                for catbtn in self.category_buttons:
+                    if self.is_font_in_category(fname, catbtn.get_name()):
+                        hide_font = True
+                        break
+            elif catname and catname != "All fonts":
+                print("Looking for category", catname)
+                hide_font = not self.is_font_in_category(fname, catname)
+
             if hide_font:
                 continue
 
-            # Else not a special case. Just check for cat membership:
-            if not special:
-                if self.is_font_in_category(fname, catname):
-                    self.store.append([fname])
-                continue
+            # Pango doesn't seem to have any way to get the font family object
+            # from its name. So store all families as a dictionary.
+            self.font_families[fname] = ff
 
-            if show_all:
-                self.store.append([fname])
-                continue
+        # Now loop through making it into a tree,
+        # grouping fonts that start with similar names.
+        # This isn't perfect, but it sure makes the font list
+        # a lot more manageable (and gets rid of all those Noto fonts).
+        commonprefix = None
+        curparent = None
+        for fname, fname_next in pairwise(sorted(self.font_families.keys())):
+            # Do we already have a subtree going?
+            if commonprefix:
+                if fname.startswith(commonprefix):
+                    self.store.append(curparent, [fname])
+                    continue
+                # fname is no longer in the common prefix, zero it out
+                commonprefix = None
+                curparent = None
 
-            if show_all_in_cats:
-                for catbtn in self.category_buttons:
-                    if self.is_font_in_category(fname, catbtn.get_name()):
-                        self.store.append([fname])
-                        break
+            prefix = os.path.commonprefix([fname, fname_next])
+            curparent = None
+            if prefix and len(prefix) > 3:
+                commonprefix = prefix
+            else:
+                commonprefix = None
 
-            if show_all_not_in_cats:
-                is_in_cat = False
-                for catbtn in self.category_buttons:
-                    if self.is_font_in_category(fname, catbtn.get_name()):
-                        is_in_cat = True
-                        break
-                if not is_in_cat:
-                    self.store.append([fname])
-                continue
+            if commonprefix:
+                if not curparent:
+                    curparent = self.store.append(None, [commonprefix])
+                self.store.append(curparent, [fname])
+            else:
+                self.store.append(None, [fname])
 
         # Re-select anything that was selected before
         if selected_fonts:
@@ -687,21 +715,44 @@ class FontasiaApp(Gtk.Window):
     def select_font_by_name(self, fontname):
         """Select the treeview row matching the given font name, if any.
         """
-        # OMG, it's so incredibly difficult and undocumented
-        # to auto-select a row in a treeview!
+        selection = self.treeview.get_selection()
+        model, paths = selection.get_selected_rows()
 
-        # Iterate through the treeview
-        for row, treemodelrow in enumerate(self.store):
-            # treemodelrow is a gi.overrides.Gtk.TreeModelRow
-            # treemodelrow[0] is the name of the font
-            if treemodelrow[0] == fontname:
-                # print("Matched line", row, treemodelrow[0])
-                self.treeview.set_cursor(row, self.treeview.get_column(0),
-                                         False)
-                self.treeview.scroll_to_cell(row)
-                return
+        def visit(model, path, iter, data=None):
+            depth = path.get_depth()
+            #     1 = top-level, 2 = child, 3 = grandchild, etc.
+            has_kids = model.iter_has_child(iter)
+            #     does this particular row have kids?
+            indent = "  " * (depth - 1)
+            # print(f"{indent}{model[iter][0]}  (depth={depth}, "
+            #       f"has_children={has_kids})")
+            if model[iter][0] == fontname:
+                # Expand ancestor rows so the row is visible.
+                # This expands every ancestor of the path.
+                self.treeview.expand_to_path(path)
 
-            treemodelrow = treemodelrow.get_next()
+                # Select it
+                # selection.unselect_all()
+                selection.select_path(path)
+
+                # Scroll so it's visible.
+                # Adding 0.5, 0.0 centers vertically, keeping horizontal as-is
+                # use_align=False (third arg) means don't center it
+                # if it's already visible.
+                # Call expand_to_path first, before calling scroll_to_cell.
+                self.treeview.scroll_to_cell(path, None, False)
+                # , 0.5, 0.0)
+                # Arguably, should only call scroll_to_cell on the first
+                # selected font.
+
+                return True
+            return False
+
+        model.foreach(visit)
+        # Another way to do this:
+        # model.iter_parent(iter) returns None for top-level rows,
+        # or the parent iter otherwise; another way to distinguish
+        # "has no parent" (top-level) from "has a parent."
 
     #
     # Lines in the category file look like:
@@ -893,27 +944,24 @@ class FontasiaApp(Gtk.Window):
         self.ignore_callbacks = False
 
     def get_cur_font_family(self):
+        """Return the first font name selected in the treeview"""
         selection = self.treeview.get_selection()
-        model, item = selection.get_selected_rows()
-
-        if not item:
-            if self.current_font:
-                return self.current_font
+        model, paths = selection.get_selected_rows()
+        # paths is a list of Gtk.TreePath objects.
+        if not paths:
             return None
-
-        self.current_fonts = model[item[0][0]][0]
-
-        # Only render the first font.
-        return model[item[0][0]][0]
+        # Only return the first selected font.
+        return model[paths[0]][0]
 
     def get_selected_fonts(self):
+        """Names of all fonts selected in the treeview"""
         selection = self.treeview.get_selection()
-        model, item = selection.get_selected_rows()
+        model, paths = selection.get_selected_rows()
 
-        if not item:
+        if not paths:
             return []
 
-        return [model[it[0]][0] for it in item]
+        return [ model[path][0] for path in paths ]
 
     def copy_font_name(self, widget):
         """Copy current font face name to both PRIMARY and CLIPBOARD"""
@@ -1005,6 +1053,8 @@ class FontasiaApp(Gtk.Window):
             familyname = self.get_cur_font_family()
         if not familyname:
             return
+
+        self.fontname_label.set_text(familyname)
 
         # Show buttons for faces within this family (bold, italic etc.)
         font_family = self.font_families[familyname]
