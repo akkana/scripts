@@ -398,15 +398,6 @@ class FontasiaApp(Gtk.Window):
         self._refresh_iter = model.get_iter_first()
         gi.repository.GLib.idle_add(self._refresh_chunk, model)
 
-    def _refresh_chunk(self, model):
-        count = 0
-        while self._refresh_iter is not None and count < 50:
-            path = model.get_path(self._refresh_iter)
-            model.row_changed(path, self._refresh_iter)
-            self._refresh_iter = model.iter_next(self._refresh_iter)
-            count += 1
-        return self._refresh_iter is not None  # True = reschedule, False = done
-
     def toggle_fancy_list(self, yesno):
         column = self.treeview.get_column(0)
         rendererText = column.get_cells()[0]
@@ -415,6 +406,15 @@ class FontasiaApp(Gtk.Window):
         else:
             column.set_cell_data_func(rendererText, None)
             rendererText.set_property('font', None)
+
+    def _refresh_chunk(self, model):
+        count = 0
+        while self._refresh_iter is not None and count < 50:
+            path = model.get_path(self._refresh_iter)
+            model.row_changed(path, self._refresh_iter)
+            self._refresh_iter = model.iter_next(self._refresh_iter)
+            count += 1
+        return self._refresh_iter is not None  # True = reschedule, False = done
 
     def set_list_font(self, column, cell, model, iter, user_data):
         fontname = model.get_value(iter, 0)
@@ -549,7 +549,7 @@ class FontasiaApp(Gtk.Window):
         # Save the selected font(s), if any
         tvselection = self.treeview.get_selection()
         model, item = tvselection.get_selected_rows()
-        if not selected_fonts:
+        if item and not selected_fonts:
             selected_fonts = []
             for x in item:
                 selected_fonts.append(model[x[0]][0])
@@ -575,6 +575,8 @@ class FontasiaApp(Gtk.Window):
         self.font_families = {}
         for ff in self.all_families:
             fname = ff.get_name()
+            if fname == 'Sans':
+                print(ff.get_face().get_face_name())
 
             # Pango doesn't seem to have any way to get the font family object
             # from its name. So store all families as a dictionary.
@@ -1272,43 +1274,152 @@ class ToggleOptionsMenu(Gtk.Button):
                  if self.items[key].get_active() ]
 
 
-def python_fu_fontasia():
-    fontwin = FontasiaApp()
-
-    # fontwin.connect("destroy", Gtk.main_quit)
-    # Gtk.main()
-
-    while not fontwin.quit:
-        Gtk.main_iteration()
-
-    pdb.gimp_context_set_font(fontwin.current_font())
+####### GIMP Piug-In
 
 if __name__ == '__main__':
     import sys
-    # Are we being run as a GIMP plug-in?
-    if sys.argv[0].endswith("gimp"):
-        from gimpfu import *
 
-        register(
-            "python_fu_fontasia",
-            "An alternate font chooser.",
-            "An alternate font chooser.",
-            "Akkana Peck",
-            "Akkana Peck",
-            "2016-2023",
-            "Fontasia...",
-            "",
-            [
-                # No arguments
-            ],
-            [],
-            python_fu_fontasia,
-            menu = "<Image>/Windows/"
-        )
+    # Are we being run as a GIMP 3 plug-in?
+    # The run path will be something like
+    # /home/username/.config/GIMP/3.3/plug-ins/fontasia/fontasia
+    if 'GIMP' in sys.argv[0]:
+        try:
+            gi.require_version('Gimp', '3.0')
+            from gi.repository import Gimp
+            gi.require_version('GimpUi', '3.0')
+            from gi.repository import GimpUi
+            from gi.repository import GObject
+            from gi.repository import GLib
+        except ImportError:
+            print("Sorry, need GIMP libraries")
+            sys.exit(1)
 
-        # Call GIMP's main loop, which will call python_fu_fontasia
-        # and handle cleaning up afterward.
-        main()
+        class GimpFontasia (Gimp.PlugIn):
+            def __init__(self, *args, **kwargs):
+                super ().__init__(*args, **kwargs)
+
+                self.gimp_fonts = None
+
+            ## GimpPlugIn virtual methods ##
+
+            # GIMP 3.0 requires that every plugin define the exact same function:
+            def do_set_i18n(self, procname):
+                return True, 'gimp30-python', None
+
+            def do_query_procedures(self):
+                return [ "python-fu-fontasia" ]
+
+            def do_create_procedure(self, name):
+                """Register as a GIMP plug-in"""
+                procedure = Gimp.Procedure.new(self, name,
+                                                    Gimp.PDBProcType.PLUGIN,
+                                                    self.show_fontasia_win, None)
+                procedure.set_menu_label("Fontasia")
+                # procedure.set_icon_name(GimpUi.ICON_GEGL);
+                procedure.add_menu_path('<Image>/Windows');
+                procedure.set_documentation("Fontasia font picker",
+                                            "Fontasia font picker", name)
+                procedure.set_attribution("Akkana Peck", "Akkana Peck",
+                                          "2016-2026");
+                # For a Procedure (as opposed to an ImageProcedure),
+                # you can't specify run_mode in Gimp.Procedure.new,
+                # but instead it has to be added this way:
+                procedure.add_enum_argument ("run-mode", "Run mode",
+                                             "The run mode", Gimp.RunMode,
+                                             Gimp.RunMode.INTERACTIVE,
+                                             GObject.ParamFlags.READWRITE)
+                return procedure
+
+            @staticmethod
+            def norm(s):
+                return "".join(ch.lower() for ch in s if ch.isalnum())
+
+            def show_fontasia_win(self, procedure, config, data):
+                fontwin = FontasiaApp()
+                while not fontwin.quit:
+                    Gtk.main_iteration()
+
+                # We'll need these for font name matching.
+                # Get them once rather than every time fontasia is called.
+                if not self.gimp_fonts:
+                    self.gimp_fonts = Gimp.fonts_get_list("")
+                    self.gimp_names = [f.get_name() for f in self.gimp_fonts]
+                    self.gimp_norm = {self.normalize_str(n): n
+                                      for n in self.gimp_names}
+
+                print("Exited fontasia app, fontwin is", fontwin)
+                print("current font is", fontwin.get_cur_font_family())
+                gimpname = self.gimp_font_name_for(fontwin.font_families[
+                    fontwin.get_cur_font_family()])
+                print("possible gimp name for that is", gimpname)
+                gimpfont = Gimp.Font.get_by_name(gimpname)
+                if gimpfont:
+                    Gimp.context_set_font(gimpfont)
+                    return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS,
+                                                       GLib.Error())
+                else:
+                    print("Gimp doesn't understand font name '%s'"
+                          % fontwin.get_cur_font_family())
+                return procedure.new_return_values(
+                    Gimp.PDBStatusType.EXECUTION_ERROR,
+                    GLib.Error("Gimp doesn't understand font name '%s'"
+                          % fontwin.get_cur_font_family()))
+
+            # Unfortunately, GIMP apparently renames all the fonts
+            # from what pango uses. For instance, 'Sans' in Pango is
+            # 'Sans-serif' in GIMP, and 'Dragonwick FG' in Pango is
+            # 'Dragonwick FG Regular' in GIMP. There's apparently no
+            # reliable way to map between Pango names and GIMP names.
+            # So here's a horrible function that searches through GIMP names
+            # and tries to find a reasonable match.
+            # It gets it right most of the time.
+            def gimp_font_name_for(self, pango_family):
+                name = pango_family.get_name()
+
+                # 1. Exact match (covers most concrete fonts)
+                if Gimp.Font.get_by_name(name):
+                    return name
+
+                # 2. Generic aliases (Sans -> Sans-serif, etc.)
+                generic_map = {
+                    "sans": "Sans-serif",
+                    "serif": "Serif",
+                    "monospace": "Monospace",
+                }
+                key = name.strip().lower()
+                if key in generic_map and Gimp.Font.get_by_name(generic_map[key]):
+                    return generic_map[key]
+
+                # pango_family.get_face().get_face_name()
+                # is often something like "Regular"
+
+                # 3. Family + each face's style name ("Regular", "Bold", ...)
+                faces = pango_family.list_faces() or []
+                face_names = [f.get_face_name() for f in faces]
+                # try Regular first
+                face_names.sort(key=lambda s: s.lower() != "regular")
+                for style in face_names:
+                    candidate = f"{name} {style}"
+                    if candidate in self.gimp_names:
+                        return candidate
+                    norm_candidate = self.normalize_str(candidate)
+                    if norm_candidate in self.gimp_norm:
+                        return self.gimp_norm[norm_candidate]
+
+                # 4. Fallback: prefix match against GIMP's list,
+                # preferring "Regular"
+                target = self.normalize_str(name)
+                matches = [n for n in self.gimp_names
+                           if self.normalize_str(n).startswith(target)]
+                if matches:
+                    matches.sort(key=lambda n:
+                                 (self.normalize_str(n) != target + "regular",
+                                  len(n)))
+                    return matches[0]
+
+                return None
+
+        Gimp.main(GimpFontasia.__gtype__, sys.argv)
         sys.exit(0)
 
     # Run in background, give control back to the calling shell.
