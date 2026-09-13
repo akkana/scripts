@@ -1,16 +1,45 @@
 #!/usr/bin/env python3
 
-"""Open a URL in a general-purpose Firefox window,
+"""Open a URL in the largest Firefox window on the system,
    ignoring small windows that might be used for specific purposes
    like social networking or chat.
 
-   Copyright 2023 by Akkana Peck: Share and enjoy under the GPLv2 or later.
+   Copyright 2023,2026 by Akkana Peck: Share and enjoy under the GPLv2 or later.
 """
-
 
 import sys, os
 import subprocess
 import time
+import re
+
+
+# You may want to do something special with certain links, like open them
+# in a different app or a different browser profile instead of doing this
+# "find the biggest browser window" thing.
+# If so, set up ~/.config/openlink/openlink.conf with lines like:
+# https://facebook.com = safebrowser --profile fb $1
+# where the pattern will be read as a regular expression
+# (which can occur anywhere in the URL),
+# and $1 will be replaced with the URL.
+CONFIGFILE = os.path.expanduser('~/.config/openlink/openlink.conf')
+special_browsers = {}
+try:
+    with open(CONFIGFILE) as fp:
+        for line in fp:
+            if line.startswith ('#'):
+                continue
+            line = line.split('#')[0]
+            try:
+                browserpat, browser = [ s.strip() for s in line.split('=') ]
+                special_browsers[browserpat] = browser
+            except Exception as e:
+                print(f"Couldn't parse '{line}':", e, file=sys.stderr)
+
+    print("Special browsers:", special_browsers)
+
+except Exception as e:
+    print("Couldn't open", CONFIGFILE, e, file=sys.stderr)
+    pass
 
 
 def open_in_existing_firefox(url, minwidth=800):
@@ -47,26 +76,26 @@ def open_in_existing_firefox(url, minwidth=800):
     # Switch to the right desktop, raise the window, and give it focus.
     # wmctrl needs flags to be separate, -ai doesn't work.
     # print("Calling wmctrl -i -a %s" % windowid)
-    subprocess.call(['wmctrl', '-i', '-a', windowid])
+    subprocess.run(['wmctrl', '-i', '-a', windowid])
     time.sleep(.3)
 
     # Move mouse to center of urlbar (winwidth/2)
-    subprocess.call(['xdotool', 'mousemove', '--window', windowid,
+    subprocess.run(['xdotool', 'mousemove', '--window', windowid,
                      f'{winwidth/2}', '75'])
     time.sleep(.3)
 
     # Open a new tab
-    subprocess.call(['xdotool', 'keydown', 'Ctrl', 'keydown', 't',
+    subprocess.run(['xdotool', 'keydown', 'Ctrl', 'keydown', 't',
                      'keyup', 't', 'keyup', 'Ctrl'])
     time.sleep(.3)
 
     # insert url
     print("typing", url)
-    subprocess.call(['xdotool', 'type', url])
+    subprocess.run(['xdotool', 'type', url])
     time.sleep(.1)
 
     # hit Enter to go there
-    subprocess.call(['xdotool', 'keydown', 'Return', 'keyup', 'Return'])
+    subprocess.run(['xdotool', 'keydown', 'Return', 'keyup', 'Return'])
 
     # Return apparent success
     return True
@@ -83,5 +112,16 @@ if __name__ == '__main__':
             print(url, "is a file")
             url = 'file://' + os.path.abspath(url)
             print("substituting url:", url)
+
+        for pat in special_browsers:
+            if re.search(pat, url):
+                if '$1' in special_browsers[pat]:
+                    args = special_browsers[pat].replace('$1', url).split()
+                else:
+                    args = special_browsers[pat].split().append(url)
+                print('args:', args)
+                subprocess.run(args)
+                sys.exit(0)
+
         open_in_existing_firefox(url)
 
