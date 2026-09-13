@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# TODO: Group fonts in the same family into one entry in the list.
-# TODO: See if it's possible to query for language and screen out
-#       fonts not in the current language.
-
 # fontasia 0.95:
 # List all fonts on the system and let the user group them into categories.
 #
@@ -727,32 +723,13 @@ class FontasiaApp(Gtk.Window):
             # print(f"{indent}{model[iter][0]}  (depth={depth}, "
             #       f"has_children={has_kids})")
             if model[iter][0] == fontname:
-                # Expand ancestor rows so the row is visible.
-                # This expands every ancestor of the path.
                 self.treeview.expand_to_path(path)
-
-                # Select it
-                # selection.unselect_all()
                 selection.select_path(path)
-
-                # Scroll so it's visible.
-                # Adding 0.5, 0.0 centers vertically, keeping horizontal as-is
-                # use_align=False (third arg) means don't center it
-                # if it's already visible.
-                # Call expand_to_path first, before calling scroll_to_cell.
                 self.treeview.scroll_to_cell(path, None, False)
-                # , 0.5, 0.0)
-                # Arguably, should only call scroll_to_cell on the first
-                # selected font.
-
                 return True
             return False
 
         model.foreach(visit)
-        # Another way to do this:
-        # model.iter_parent(iter) returns None for top-level rows,
-        # or the parent iter otherwise; another way to distinguish
-        # "has no parent" (top-level) from "has a parent."
 
     #
     # Lines in the category file look like:
