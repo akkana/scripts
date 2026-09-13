@@ -25,19 +25,20 @@ class TreeViewWindow(Gtk.Window):
         main_vbox = Gtk.VBox(spacing = 10)
         self.add(main_vbox)
 
-        #
-        # Left pane: the font list, a TreeView backed by a ListStore
-        #
         sw = Gtk.ScrolledWindow()
         # sw.set_policy(Gtk.POLICY_AUTOMATIC, Gtk.POLICY_AUTOMATIC)
 
-        store = Gtk.ListStore(str)
+        # The store is either a ListStore or TreeStore,
+        # depending on whether it's flat or hierarchical.
+        store = Gtk.TreeStore(str)
         self.treeview = Gtk.TreeView(model=store)
 
         selection = self.treeview.get_selection()
-        # selection.set_mode(Gtk.SELECTION_MULTIPLE)
+        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
-        # self.treeview.connect("cursor-changed", self.render_font);
+        selection.connect("changed", self.tree_changed);
+        # There's also "cursor-changed" on the treeview,
+        # but that doesn't work with multi selection
 
         sw.add(self.treeview)
 
@@ -53,9 +54,21 @@ class TreeViewWindow(Gtk.Window):
         self.connect("destroy", Gtk.main_quit)
         self.connect("key-press-event", self.key_press_event)
 
+        print("Reading the dictionary ...")
+
+        initial_letter = None
+        curparent = None
         with open("/usr/share/dict/words") as dictfp:
             for line in dictfp:
-                store.append([line.strip()])
+                word = line.strip()
+                if word[0].upper() != initial_letter:
+                    initial_letter = word[0].upper()
+                    # Appending these items takes too long for a demo; stop at D
+                    if initial_letter == 'D':
+                        break
+                    curparent = store.append(None, [initial_letter])
+                store.append(curparent, [word])
+        print("Done with dictionary")
 
         # Done with UI, finish showing window
         self.show_all()
@@ -66,6 +79,57 @@ class TreeViewWindow(Gtk.Window):
 
         if event.string == " ":
             self.next_word()
+
+    def select_name(self, name):
+        def visit(model, path, iter, data=None):
+            depth = path.get_depth()
+            #     1 = top-level, 2 = child, 3 = grandchild, etc.
+            has_kids = model.iter_has_child(iter)
+            #     does this particular row have kids?
+            indent = "  " * (depth - 1)
+            # print(f"{indent}{model[iter][0]}  (depth={depth}, "
+            #       f"has_children={has_kids})")
+            if model[iter][0] == name:
+                # Expand ancestor rows so the row is visible.
+                # This expands every ancestor of the path.
+                self.treeview.expand_to_path(path)
+
+                # Select it
+                # selection.unselect_all()
+                selection.select_path(path)
+
+                # Scroll so it's visible.
+                # Adding 0.5, 0.0 centers vertically, keeping horizontal as-is
+                # use_align=False (third arg) means don't center it
+                # if it's already visible.
+                # Call expand_to_path first, before calling scroll_to_cell.
+                self.treeview.scroll_to_cell(path, None, False)
+                # , 0.5, 0.0)
+                # Arguably, should only call scroll_to_cell on the first
+                # selected line.
+
+                return True
+            return False
+
+        model.foreach(visit)
+        # Another way to do this:
+        # model.iter_parent(iter) returns None for top-level rows,
+        # or the parent iter otherwise; another way to distinguish
+        # "has no parent" (top-level) from "has a parent."
+
+    def tree_changed(self, widget):
+        selection = self.treeview.get_selection()
+        model, paths = selection.get_selected_rows()
+        # paths is a list of Gtk.TreePath objects.
+        if not paths:
+            return None
+
+        print("Selected:")
+        for path in paths:
+            print("   ", model[path][0])
+
+        # return the first selected line
+        return model[paths[0]][0]
 
     def next_word(self):
         """Select the treeview row matching the given word, if any.
