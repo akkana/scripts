@@ -75,6 +75,10 @@ echo PATH $PATH
 echo LD_LIBRARY_PATH $LD_LIBRARY_PATH
 echo PKG_CONFIG_PATH $PKG_CONFIG_PATH
 
+# This is needed to get native file selection dialogs.
+# It makes GTK call the file portal instead of drawing a custom dialog for file picking. On sandboxed apps (e.g. AppImage, flatpak), this is the default, on regular builds, this needs to be forced with the env var.
+export GTK_USE_PORTAL=1
+
 # Run GIMP, passing along any command-line arguments.
 if [[ $DEBUG_MODE ]]; then
     echo "Running:" gdb $GIMP_PREFIX/bin/$GIMPEX $@
