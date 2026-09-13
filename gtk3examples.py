@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-# An example of how to change the selection programmatically
-# in a GTK3 TreeView.
+# Some examples of things in GTK3 that are under-documented
+# and I found hard to figure out.
 
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 
 
-class TreeViewWindow(Gtk.Window):
+class Gtk3ExampleWindow(Gtk.Window):
 
     def __init__(self, wordlist):
         super().__init__()
@@ -25,6 +25,53 @@ class TreeViewWindow(Gtk.Window):
         main_vbox = Gtk.VBox(spacing = 10)
         self.add(main_vbox)
 
+        ###########################################################
+        # Label styling
+        ###########################################################
+
+        label = Gtk.Label(label="TreeView with TreeStore")
+        # Center alignment is default, but you can specify it explicitly
+        label.set_xalign(.5)
+        boldprovider = Gtk.CssProvider()
+        boldprovider.load_from_data('''
+.label {
+    font-weight: bold;
+    font-size: 14pt;
+}''')
+
+        label.get_style_context().add_class("label")
+        # You can also use label.set_name and #my-label-name in the CSS
+
+        label.get_style_context().add_provider(
+            boldprovider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        main_vbox.pack_start(label, expand=False, fill=True, padding=0)
+
+        label = Gtk.Label()
+
+        # You can also set one-time markup, but if you change the label
+        # later, you have to add the markup each time.
+        # But the syntax isn't the same as real CSS or HTML. For instance,
+        # neither of these work:
+        # label.set_markup('<big><span style="color: red">A label with inline markup</span></big>')
+        # label.set_markup('<font color="red">red label</font>')
+        # Pango only recognizes its own tag set (span, b, i, u, s, big, small, tt, sub, sup, etc.),
+        # Support varies by Pango version.
+        # Documentation: https://docs.gtk.org/Pango/pango_markup.html
+        # Some other markup that can go on Pango's <span>:
+        #   background="..." — background color
+        #   foreground="..." / background="..." accept named colors, #rrggbb, or #rrggbbaa
+        #   alpha="..." — foreground opacity (e.g. "50%")
+        #   weight="bold" / weight="light" etc. — vs wrapping in <b>
+        #   size="..." — absolute ("x-large") or numeric (1024ths of a point, as you found before)
+        # underline="single", strikethrough="true"
+        label.set_markup('<big><i><span foreground="red">Note, sorting may be wrong due to Debian bug 1147602</span></i></big>')
+        label.set_xalign(0)
+        main_vbox.pack_start(label, expand=False, fill=True, padding=0)
+
+        ###########################################################
+        # Scrolling TreeView backed by a TreeStore
+        ###########################################################
         sw = Gtk.ScrolledWindow()
         # sw.set_policy(Gtk.POLICY_AUTOMATIC, Gtk.POLICY_AUTOMATIC)
 
@@ -164,7 +211,7 @@ class TreeViewWindow(Gtk.Window):
 if __name__ == '__main__':
     import sys
 
-    tvw = TreeViewWindow(sys.argv[1:])
+    tvw = Gtk3ExampleWindow(sys.argv[1:])
 
     Gtk.main()
 
