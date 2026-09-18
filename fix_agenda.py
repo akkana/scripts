@@ -117,14 +117,7 @@ def fix_agenda(agenda_infile):
         if link.attrs["href"] and not link.attrs["href"].startswith("#"):
             link.attrs["target"] = "_blank"
 
-    origfiles = os.listdir(origdir)
-    origbases = [ smart_splitext(f)[0] for f in origfiles ]
-    if not os.path.exists(htmldir):
-        os.mkdir(htmldir)
-    htmlfiles = os.listdir(htmldir)
-    htmlbases = [ smart_splitext(f)[0] for f in htmlfiles ]
-
-    # Read the list of original filenames, in subdir orig.
+    # Read the list of non-HTML source filenames, in subdir orig.
     # with bad filename characters removed.
     # We'll be modifying the list of origfiles, so can't loop over it.
     origfiles = []
@@ -135,12 +128,21 @@ def fix_agenda(agenda_infile):
             os.rename(os.path.join('orig', fname),
                       os.path.join('orig', newfname))
         origfiles.append(newfname)
-    # Now reset origfiles since some files might have been renamed
-    origfiles = os.listdir(origdir)
+    # Now reset sourcefiles since some files might have been renamed, and sort
+    origfiles = sorted(os.listdir(origdir))
+    origbases = [ smart_splitext(f)[0] for f in origfiles ]
 
     # List of already existing html filenames, in subdir html.
     # We'll add to this list as files are converted to html.
-    htmlfiles = os.listdir("html")
+    if not os.path.exists(htmldir):
+        os.mkdir(htmldir)
+    htmlfiles = sorted(os.listdir(htmldir))
+    htmlbases = [ smart_splitext(f)[0] for f in htmlfiles ]
+
+    print("  origfiles", origfiles)
+    print("  origbases", origbases)
+    print("  htmlfiles", htmlfiles)
+    print("  htmlbases", htmlbases)
 
     nosuchfiles = []
     cantconvert = []
@@ -230,6 +232,7 @@ def fix_agenda(agenda_infile):
 
         def replace_em(href):
             nonlocal em, em_text
+            print("Replace em", em, "with", href)
             a = soup.new_tag("a", href=href, target="_blank")
             a.string = em_text
             em.contents[0].replace_with(a)
@@ -270,20 +273,25 @@ def fix_agenda(agenda_infile):
         # even if Hannah is given an HTML original she converts it to Word,
         # so this case will never happen.
 
-        if index > 0 and origbases[index] != em_text:
-            guesses[em_text] = origbases[index], quality
-            print("guess for", em_text, ":", guesses[em_text])
+        if index >= 0:
+            if origbases[index] == em_text:
+                guesses[em_text] = origbases[index], 1.0
+                print("    Exact match, not guess, for", em_text)
+            else:
+                guesses[em_text] = origbases[index], quality
+                print("    guess for", em_text, ":", guesses[em_text])
 
-        # Now there's a guess for the original base.
-        # Use it for the HTML as well.
-        print("  index", index, "htmlindex", htmlindex)
-        print("  origbases", origbases)
-        print("  htmlbases", htmlbases)
-        try:
-            htmlindex = htmlbases.index(guesses[em_text])
-            print("  Found a matching HTML file")
-        except (ValueError, KeyError):
-            htmlindex = -1
+        # Now there's a guess for the original base and the matching html.
+        print(f"    index {index} ({origfiles[index]}) ({origbases[index]})")
+        print(f"    htmlindex {htmlindex} ({htmlfiles[htmlindex]}), ")
+
+        if htmlindex < 0 and em_text in guesses:
+            try:
+                htmlindex = htmlbases.index(guesses[em_text])
+                print("  Found a guessed HTML file:", guesses[em_text])
+            except (ValueError, KeyError):
+                print("No guess matching", em_text,
+                      "; index", index, "htmlindex", htmlindex)
 
         # Found a match by searching origbases, returning index.
         # So the actal original file is origfiles[index].
@@ -483,7 +491,8 @@ def fix_agenda(agenda_infile):
     if guesses:
         print("\nFuzzy matches (in agenda -> (actual filename, match score)):")
         for a in guesses:
-            print(f"    {a} -> {guesses[a]}")
+            if guesses[a][1] < 1.0:
+                print(f"    {a} -> {guesses[a]}")
         print("BE SURE TO LOOK OVER THIS LIST!")
 
     if nosuchfiles:
