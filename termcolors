@@ -7,7 +7,7 @@ import sys
 
 # Programs like ls and vim use the first 16 colors of the 256-color palette.
 # This was documented as 16-color mode, but actually anything over 8 fails.
-if len(sys.argv) > 1:
+if len(sys.argv) > 1 and sys,argv[1] == '--256':
     print("256-color mode:")
     for color in range(0, 256) :
         line = ""
@@ -16,14 +16,16 @@ if len(sys.argv) > 1:
             line += "\033[38;5; %sm %03s\033[m" % (str(color), str(color))
         print(line)
     print()
-    print("16-color mode (actually only 8):")
+    print("16-color mode:")
 else:
-    print("16-color mode (actually only 8): use -256 to usee more colors.")
+    print("16-color mode: use --256 to usee more colors.")
+print()
 
 colornames = [ "black", "red", "green", "yellow",
                "blue", "magenta", "cyan", "white" ]
-print("    %14ss %14s %14ss" % ('normal', 'inverse', 'bright'))
-for color in range(0, 8) :
+
+print("\033[1m%-15s %-15s  %-15s\033[0m" % ('normal', 'inverse', 'bright'))
+for color in range(0, 8):
     line = ""
 
     # Print the color in normal and inverse video:
@@ -38,15 +40,23 @@ for color in range(0, 8) :
                                                          colornames[color])
     print(line)
 
+print()
+
+for color in range(90, 97):
+    line = "[2m[%dm%2d bright %-8s\033[m" % (color, color,
+                                                      colornames[color-90])
+    line += "[2m[%dm%2d bright %-8s\033[m" % (color + 10, color + 10,
+                                                  colornames[color-90])
+    print(line)
+
 # Extra credit: display other formatting
 print()
 print('Styles: \033[1mbold\033[0m '
       '\033[3mitalic\033[0m '
       '\033[4munderline\033[0m '
-      '033[9mstrikethrough\033[0m '
-      '\033[31mred\033[0m\n')
+      '033[9mstrikethrough\033[0m ')
 
-if len(sys.argv) > 1 and sys.argv[1] == '-all':
+if len(sys.argv) > 1 and sys.argv[1] == '--all':
     # Text styles like bold:
     # https://stackoverflow.com/a/33206814
 
