@@ -50,6 +50,30 @@ GUITAR_CHORDS = {
     "mini-F": "xx3211",
     "F#m": "244222",
 
+    # barre chords
+    "F": "x3321xb1",
+    "F#": "244322b2",
+    "Bm": "x24432b2",
+    "Bsus2": "x24422b2",
+    "Cm": [ "x35543b3", "xx554x" ],
+
+    # 7s
+    "Fmaj7": [ "xx3210", "x33210" ],
+    "B7": [ "x21202", "022130" ],
+    "D7": "xx0212",
+    "Dmaj7": "xx0222",
+    "Cmaj7": "x32000",
+    "Em7": [ "xx2030", "022030" ],
+    "G7": "320001",
+    "E7": "020100",
+    "A7": [ "x02020", "x02223" ],
+    "Am7": "x02010",
+    "C7": "x32310",
+
+    # 6
+    "F6": "13o2xx",
+    "Em6": "022020",
+
     # "stuck 3-4 chords:
     "bigG": "32oo22",
     "rockG": "3xoo33",
@@ -67,31 +91,6 @@ GUITAR_CHORDS = {
     "A7sus4": "xo2233",
     "Esus2": "024400",
     "Esus4": "022200",
-
-    # barre chords
-    "F": "x3321xb1",
-    "F#": "244322b2",
-    "Bm": "x24432b2",
-    "Bsus2": "x24422b2",
-    "Cm": [ "x35543b3", "xx554x" ],
-
-    # 7s
-    "Fmaj7": [ "xx3210", "x33210" ],
-    "B7": "x21202",
-    "D7": "'xx0212",
-    "Dmaj7": "xx0222",
-    "Cmaj7": "x32000",
-    "Em7": [ "xx2030", "022030" ],
-    "G7": "320001",
-    "B7": [ "020100", "022130", "021202" ],
-    "E7": "020100",
-    "A7": [ "x02020", "x02223" ],
-    "Am7": "x02010",
-    "C7": "x32310",
-
-    # 6
-    "F6": "13o2xx",
-    "Em6": "022020",
 
     # "Slash" chords
     "G/B": [ "x20033", "x20003" ],
@@ -197,6 +196,16 @@ def initialize():
             NOTE2STRING[note] = (stringno, fret)
 
 
+def all_chords_iter():
+    for chord in GUITAR_CHORDS:
+        fretboard = GUITAR_CHORDS[chord]
+        if isinstance(fretboard, str):
+            yield chord, fretboard
+        else:
+            for fr in fretboard:
+                yield chord, fr
+
+
 def up_one_semitone(note):
     """Given a note like "C2", return the designation
        for one semitone higher, "C#2"
@@ -233,12 +242,20 @@ def fretboard_to_note(stringbase, fret):
 
 
 def chord_to_notes(chord_tab):
-    """Take notation like "xx0232" and turn it into a list of notes like E2
+    """Take notation like "xx0232" and turn it into a list of notes like E2.
+       Use '' for strings that are muted ('x').
     """
     chord_notes = []
     for stringno, string_fret in enumerate(chord_tab):
         if string_fret == 'x' or string_fret == ' ':
+            chord_notes.append('')
             continue
+        # In this notation, a barre goes at the end, e.g. 'b1'
+        # so when we see a b, we're done
+        if string_fret == 'b':
+            break
+        if string_fret == 'o':
+            string_fret = '0'
         chord_notes.append(fretboard_to_note(GUITAR_STRINGS[stringno],
                                              int(string_fret)))
     return chord_notes
@@ -518,7 +535,6 @@ def sanity_check_chords(chords):
                 if upc in GUITAR_CHORDS:
                     goodchords.append(upc)
             else:
-                print("Adding", c, "to badchords")
                 badchords.add(c)
 
     if badchords:
@@ -633,6 +649,32 @@ def test_chord_progressions():
             print("Sorry, no, it's %s" % ' '.join(PROGRESSIONS[key]))
 
 
+def chords_with_notes(notes):
+    """Notes is a string of letters like A, F etc.
+    """
+    matches = []
+    for chord, fretboard in all_chords_iter():
+        chordnotes_detail = chord_to_notes(fretboard)
+        # chordnotes is a list of strings like B2, D4 etc.
+        # We only need to match the first note.
+        chordnotes = [ c[0].upper() if c else '' for c in chordnotes_detail ]
+        # print("Trying chord", chord, fretboard, "notes:", chordnotes)
+        all_notes_in = True
+        for note in notes:
+            if note.upper() not in chordnotes:
+                all_notes_in = False
+                break
+        if all_notes_in:
+            matches.append((chord, fretboard, chordnotes_detail, chordnotes))
+
+    print("Chords with notes:", notes)
+    for chord, fretboard, chordnotes_detail, chordnotes in matches:
+        print()
+        print(chord, "    ", fretboard, "    ", chordnotes_detail)
+        print(fret_notation_to_string(fretboard).strip())
+        print("%2s%2s%2s%2s%2s%2s" % tuple(chordnotes))
+
+
 def random_c_song(num_chords=None, delaysec=2, structure=None):
     """Play/print random chords chosen from the key of C:
        C Dm Em F G Am
@@ -740,6 +782,8 @@ if __name__ == '__main__':
                         "you can also specify them in "
                         "GUITARFLASH env variable or "
                         "XDG_CONFIG_HOME/guitarflash/*.conf")
+    parser.add_argument("--notechords", action="store", default="",
+                        help="Print chords containing the given notes, e.g. CEG"),
     parser.add_argument('-s', "--show-chords", default=False,
                         action="store", nargs='?',
                         help="Just print the chord charts, no flashcards")
@@ -764,7 +808,7 @@ if __name__ == '__main__':
     # print("args:", args, "rest:", rest)
 
     if not args.chord_test and not args.note_test and not args.csong \
-       and not args.show_chords and not args.progressions:
+       and not args.show_chords and not args.progressions and not args.notechords:
         args.show_chords = True
         print("No command specified: defaulting to showing chords")
 
@@ -775,6 +819,10 @@ if __name__ == '__main__':
             test_chord_progressions()
         except KeyboardInterrupt:
             sys.exit(0)
+
+    if args.notechords:
+        chords_with_notes(args.notechords)
+        sys.exit(0)
 
     # Get a list of chords to use, otherwise, show just beginner chords
     if args.use_chords:
