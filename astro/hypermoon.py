@@ -4,7 +4,7 @@
 
 import sys, os
 import random
-import cgi
+from urllib.parse import parse_qsl
 
 
 def hypermoon(filename, num=4):
@@ -28,14 +28,14 @@ if __name__ == '__main__':
 <title>Tonight's Moon</title>
 </head>
 <body>''')
-        form = cgi.FieldStorage()
+        form = dict(parse_qsl(os.environ.get('QUERY_STRING', '')))
 
         if 'nwords' in form:
             try:
-                num = int(form['nwords'].value)
+                num = int(form['nwords'])
             except:
                 print("<p>I don't understand 'nwords=%s'"
-                      % form['nwords'].value)
+                      % form['nwords'])
                 num = 4
 
         print("<p>Tonight's moon is a <b>")
