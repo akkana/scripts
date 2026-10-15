@@ -725,7 +725,7 @@ if __name__ == '__main__':
                      % os.path.basename(sys.argv[0]),
         formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('-F', "--format", dest="format", default='text',
+    parser.add_argument('-F', "--format", dest="format", default='docx',
                         action="store", help="Output format: text, html, docx")
     parser.add_argument('-o', "--orderfile", dest="orderfile", default=None,
                         help="A CSV file listing all desired candidates in order")
