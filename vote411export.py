@@ -716,6 +716,22 @@ def convert_vote411_file(csvfilename, fmt='text', orderfile=None):
                 print("\nNot found (%d):" % num_notfound, notfound_s)
 
 
+def guess_filetype(filename):
+    """Guess whether this is a CSV file or an order file"""
+    with open(filename) as fp:
+        line = fp.readline()
+        # Are there a bunch of commas in the first line?
+        if line.count(',') > 2:
+            return 'CSV'
+        # Are the lines all fairly short?
+        maxcount = len(line)
+        for line in fp:
+            maxcount = max(maxcount, len(line))
+        if maxcount < 100:
+            return "order"
+        return "unknown"
+
+
 if __name__ == '__main__':
     import argparse
     import sys, os
@@ -741,9 +757,39 @@ if __name__ == '__main__':
             print("Try: pip install python-docx")
             sys.exit(1)
 
-    for f in args.infiles:
+    # Check whether someone might have forgotten the -o
+    # when specifying an order file
+    orderfile = args.orderfile
+    infiles = args.infiles
+    if not orderfile:
+        orderfiles = []
+        unknownfiles = []
+        for f in args.infiles:
+            guess = guess_filetype(f)
+            # print(f, "is", guess)
+            if guess == 'order':
+                orderfiles.append(f)
+            elif guess == 'unknown':
+                unknownfiles.append(f)
+        if unknownfiles:
+            if len(unknownfiles) == 1:
+                print(', '.join(unknownfiles), "doesn't look like a CSV file")
+            else:
+                print(', '.join(unknownfiles), "don't look like CSV files")
+        if len(orderfiles) > 1:
+            print(', '.join(orderfiles),
+                  "appear to be order files. "
+                  "Please combine them into one file.")
+            # XXX TODO: combine them so the user doesn't have to
+        elif len(orderfiles) == 1:
+            orderfile = orderfiles[0]
+            infiles.remove(orderfile)
+        if unknownfiles or len(orderfiles) > 1:
+            sys.exit(1)
+
+    for f in infiles:
         try:
-            convert_vote411_file(f, fmt=args.format, orderfile=args.orderfile)
+            convert_vote411_file(f, fmt=args.format, orderfile=orderfile)
         except FileNotFoundError:
             print("No such file:", f)
 
