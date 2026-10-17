@@ -48,7 +48,7 @@ GUITAR_CHORDS = {
     "F": "133211",
     "miniF": "xx3211",
     "mini-F": "xx3211",
-    "F#m": "244222",
+    "F#m": ["244222", "xx4675", "x0x675", "xx4222b2", "xxx321", "xxx111", "xxx231"],
 
     # barre chords
     "F": "x3321xb1",
@@ -106,12 +106,33 @@ GUITAR_CHORDS = {
     "F/A": "x03211",
     "F/G": "3x321x",   # Can move this one up and down the neck
     "A11/E": "000000",
+    "Fadd9": "xx3213",
 
     #  Harder slash chords
     # "A/C#": "x4222x",
     # "Am7/G": "3x2010",
     # "G/F": "1x0033",
     # "Am/F#": "2x2210",
+
+    # Various weirdo chords needed for trying to figure out Misalliance
+    "G#": "133211b1",
+    "F#m7": "242222b2",
+    "Ab7": "xx1112",
+    "G#7": "xx1112",
+    "Ab7": "xx1112",
+    "C#m": "xx2120",
+    "C#7": "x32200",
+    "Amaj7": ["x02120", "x03321", "x02210", "x01113"],
+    "F#7": "242322b2",
+    "F#6": ["211142b1", "x21302"],
+    "C#m": "xx2120",
+
+    # Needed for chordino's analysis of High Energy Groove
+    "E6": "022120",
+    "B6": "x21102",
+    "Eb": "xx5343b3",
+    "Emaj7": "021100",
+    "Abm7": "131111b1",
 }
 
 
@@ -387,78 +408,79 @@ CHORDS_PER_LINE = 5
 INTERCHORD_SPACE = 4
 
 def display_chords_compactly(chords):
-    # print("Displaying chords compactly:", chords)
+    # print("display_chords_compactly:", chords)
+    multichords = []
 
-    # chordlines will be a list of strings, each string representing
-    # a (multiple line) set of chords drawn side by side.
-    chordlines = []
-
-    for i, chord in enumerate(chords):
+    frettings = []
+    for ch in chords:
         try:
-            if type(GUITAR_CHORDS[chord]) is list:
-                chordlines.append(
-                    f"  {chord}, {len(GUITAR_CHORDS[chord])} options:\n"
-                    + display_chords_compactly(GUITAR_CHORDS[chord]))
+            if not isinstance(GUITAR_CHORDS[ch], str):
+                multichords.append(ch)
                 continue
-        except KeyError:
-            # GUITAR_CHORDS[chord] will raise KeyError if chord is
-            # fret notation already
+        except KeyError:  # It's probably a string rep, not a chord name
             pass
+        frettings.append(chord_to_string(ch).splitlines())
 
-        if i % CHORDS_PER_LINE == 0:
-            if chordlines:
-                print('\n'.join(chordlines))
-            chordlines = []
-        fretting = chord_to_string(chord)
-        # print("chord_to_string(", chord, ") returned", fretting)
+    if frettings:
+        # print(len(frettings), "frettings:", frettings)
+        numlines = max([len(fr) for fr in frettings])
+        # for fretlines in frettings:
+        #     print('\n'.join(fretlines))
+        # print("numlines:", numlines)
 
-        if not chordlines:
-            chordlines = fretting.splitlines()
-            continue
+        for i in range(numlines):
+            for fretlines in frettings:
+                if len(fretlines) > i:
+                    print('%-16s' % fretlines[i], end='')
+                else:
+                    print('%-16s' % '', end='')
+            print()
 
-        # What's the longest chordline? Make a format string
-        width = max([len(s) for s in chordlines]) + INTERCHORD_SPACE
-        fmt = f'%-{width}s%s'
-
-        # Put the new fretting to the right of the current chordline
-        for i, line in enumerate(fretting.splitlines()):
-            # for j, chl in enumerate(chordlines):
-            #     print("  ", j, ":", chl)
-            chordlines[i] = fmt % (chordlines[i], line)
-
-    if chordlines:
-        return '\n'.join(chordlines)
-    else:
-        return ''
+    for mch in multichords:
+        print("\n%s options:" % (mch))
+        display_chords_compactly(GUITAR_CHORDS[mch][:CHORDS_PER_LINE])
 
 
-def play_chord(chordname):
+def play_chord(chordname, all_options=False):
     """Play a chord, specified by name like "Em".
+      If a chord has options, play all of them one after another if all_options,
+      else just play the first.
     """
-    # Used to have "-t", "alsa",  between -nq and synth
-    # which I think was needed under pulseaudio
-    # but makes it fail under pipewire.
-    # Also see note above about volume levels.
-    args = [ "play", "-nq", "synth" ]
-    # pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
-    #      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
+    # Make a list of note lists
+    notelists = []
     if type(GUITAR_CHORDS[chordname]) is list:
-        chordnotes = chord_to_notes(GUITAR_CHORDS[chordname][0])
+        if all_options:
+            for notelist in GUITAR_CHORDS[chordname]:
+                notelists.append(chord_to_notes(notelist))
+        else:
+            notelists = [ chord_to_notes(GUITAR_CHORDS[chordname][0]) ]
     else:
-        chordnotes = chord_to_notes(GUITAR_CHORDS[chordname])
-    for note in chordnotes:
-        args.append("pl")
-        args.append(note)
-    args.append("delay")
-    delay = 0
-    for ch in chordnotes:
-        args.append(str(delay))
-        delay += DELAY_BETWEEN_STRINGS
-    args += [ "remix", "-",
-              "fade", "0", str(delay + 1.5), ".1",
-              "norm", "-1", "vol", str(Volume) ]
-    print(' '.join(args))
-    subprocess.call(args)
+        notelists = [ chord_to_notes(GUITAR_CHORDS[chordname]) ]
+
+    for chordnotes in notelists:
+        args = [ "play", "-nq", "synth" ]
+        # pl G2 pl B2 pl D3 pl G3 pl D4 pl G4 \
+        #      delay 0 .05 .1 .15 .2 .25 remix - fade 0 4 .1 norm -1
+        # Used to have "-t", "alsa",  between -nq and synth
+        # which I think was needed under pulseaudio
+        # but makes it fail under pipewire.
+        # Also see note above about volume levels.
+
+        # omit skipped strings
+        chordnotes = [ note for note in chordnotes if note ]
+        for note in chordnotes:
+            args.append("pl")
+            args.append(note)
+        args.append("delay")
+        delay = 0
+        for ch in chordnotes:
+            args.append(str(delay))
+            delay += DELAY_BETWEEN_STRINGS
+        args += [ "remix", "-",
+                  "fade", "0", str(delay + 1.5), ".1",
+                  "norm", "-1", "vol", str(Volume) ]
+        # print(' '.join(args))
+        subprocess.call(args)
 
 
 def play_notes(notestr, delay=.6):
@@ -538,9 +560,56 @@ def sanity_check_chords(chords):
                 badchords.add(c)
 
     if badchords:
-        print("Ignoring unsupported chords", ' '.join(badchords))
+        obscurechords = lookup_chords(badchords)
+        for ch in obscurechords:
+            badchords.remove(ch)
+            GUITAR_CHORDS[ch] = []
+            for fretting in obscurechords[ch]:
+                fretnums = [x for x in fretting if x.isdigit() and x != '0']
+                minfret = int(min(fretnums))
+                maxfret = int(max(fretnums))
+                if minfret < 5 and maxfret - minfret < 3:
+                    # print("including", fretting)
+                    GUITAR_CHORDS[ch].append(fretting)
+                # else:
+                #     print('skipping', fretting, "max/min frets", maxfret, minfret)
+            # print("Setting GUITAR_CHORDS[", ch, "] to", GUITAR_CHORDS[ch])
+            goodchords.append(ch)
+        if badchords:
+            print("Ignoring unsupported chords", ' '.join(badchords))
+        # print("Using chords", goodchords)
 
     return goodchords
+
+
+chords_complete = None
+
+def lookup_chords(chordlist):
+    global chords_complete
+    if 'json' not in sys.modules:
+        import json
+    if not chords_complete:
+        try:
+            with open(os.path.expanduser('~/outsrc/chord-collection/chords.complete.json')) as fp:
+                chords_complete = json.loads(fp.read())
+                print("Don't know", ' '.join(chordlist),
+                      ": looking up in chords.complete")
+        except FileNotFoundError:
+            return None
+    chords_found = {}
+    for chord in chordlist:
+        if chord not in chords_complete:
+            print(chord, "is not in chords_complete either")
+            continue
+        optionlist = []
+        for option in chords_complete[chord]:
+            # Don't include chords past fret 9: don't have a way to represent them
+            if any(len(x) > 1 for x in option['positions']):
+                continue
+            optionlist.append(''.join(option['positions']))
+        if optionlist:
+            chords_found[chord] = optionlist
+    return chords_found
 
 
 def bigtext(s):
@@ -775,7 +844,13 @@ if __name__ == '__main__':
                         help="Test the user on knowledge of chords")
     parser.add_argument('-n', "--note_test", action="store_true",
                         help="Test the user on knowledge of individual notes")
-    parser.add_argument('-p', "--progressions", action="store_true",
+    parser.add_argument('-p', "--play", action="store_true",
+                        help="Play the specified chords. "
+                             "If -a is specified, play all known variants, "
+                             "otherwise play the first one listed")
+    parser.add_argument('-a', "--allchords", action="store_true",
+                         help="When playing chords, play all known variants")
+    parser.add_argument('-P', "--progressions", action="store_true",
                         help="Test the user on chord progressions")
     parser.add_argument('-C', "--use-chords", default=None, action="store",
                         help="chords to use, comma or space separated "
@@ -808,7 +883,8 @@ if __name__ == '__main__':
     # print("args:", args, "rest:", rest)
 
     if not args.chord_test and not args.note_test and not args.csong \
-       and not args.show_chords and not args.progressions and not args.notechords:
+       and not args.show_chords and not args.play and not args.progressions \
+       and not args.notechords:
         args.show_chords = True
         print("No command specified: defaulting to showing chords")
 
@@ -836,6 +912,8 @@ if __name__ == '__main__':
             chords = []
         for ch in rest:
             chords.append(ch)
+    elif args.play:
+        chords = rest
     else:
         chords = read_config()
 
@@ -853,9 +931,27 @@ if __name__ == '__main__':
             # XXX eventually other args should be settable too
         sys.exit(0)
 
+    if args.play:
+        print("Playing chords:", chords)
+        # print("allchords:", args.allchords)
+        try:
+            for chord in chords:
+                if not chord:
+                    print("Don't know", chord)
+                    continue
+                if args.show_chords:
+                    display_chord(chord)
+                else:
+                    print("\nPlaying:", chord)
+                play_chord(chord, all_options=args.allchords)
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("Bye!")
+        sys.exit(0)
+
     # Just showing, no flashcard test?
     if args.show_chords:
-        print(display_chords_compactly(chords))
+        display_chords_compactly(chords)
         sys.exit(0)
 
     if args.bpm:
@@ -876,5 +972,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("Bye!")
         stop_metronome()
-        sys.exit()
+        sys.exit(0)
 
