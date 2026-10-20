@@ -20,11 +20,11 @@ import re
 import sys, os
 
 
-def gen_cpfont(familyname, roman_ttf, italic_ttf, midweight):
+def gen_cpfont(familyname, roman_ttf, italic_ttf, weights, sizes='12,14,16,18'):
     created = []
-    for diff in [ -75, 0, 75]:
-        weight = midweight + diff
+    for weight in weights:
         boldweight = weight + 175
+        # 800 is apparently the maximum weight
         if boldweight > 800:
             boldweight = 800
         files = [f"{familyname}-{weight}.ttf",
@@ -73,7 +73,7 @@ def gen_cpfont(familyname, roman_ttf, italic_ttf, midweight):
         if not os.path.isdir(familydir):
             os.mkdir(familydir)
         created.append(familydir)
-        args += [ '--intervals', 'latin-ext', '--sizes', '12,14,16,18',
+        args += [ '--intervals', 'latin-ext', '--sizes', sizes,
                   '--name', familydir,
                   '--output-dir', familydir ]
 
@@ -97,8 +97,11 @@ if __name__ == '__main__':
               "Bitter-Italic-VariableFont_wght.ttf")
         sys.exit(1)
     familyname = re.split(r'[-\.]', roman_ttf)[0]
+    midweight = 550
+    weights = [ midweight + diff for  diff in [ -125, -75, 0, 75, 125] ]
     try:
-        gen_cpfont(familyname, roman_ttf, italic_ttf, 550)
+        gen_cpfont(familyname, roman_ttf, italic_ttf, weights,
+                   '12,13,14,15,16,17,18')
     except KeyboardInterrupt:
         pass
 
